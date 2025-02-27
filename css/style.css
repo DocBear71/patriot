@@ -1,0 +1,537 @@
+/*
+FILE: standard.css
+AUTHOR: Edward G. McKeown
+DATE: 2024/09/27
+VERSION: 1.0.1
+DESCRIPTION:
+    Style Sheet for week 07 assignment. To be used with SlickNav.
+*/
+
+* {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+}
+ 
+body {
+    background-image: url("../images/american_flag40.jpg");
+    background-attachment: fixed;
+    background-repeat:no-repeat;
+    background-size:100% 100%;
+    z-index: 1;
+    
+}
+
+#page_layout {
+    width: 90%;
+    font-weight:bold;
+    margin: 2.5% auto 2.5% auto;
+    border: 2px solid #000000;
+    padding: 0;
+}
+
+header {
+    background-image: url("../images/flag_banner_2.jpg");
+    background-position: center;
+    background-size: contain;
+    width: 100%;
+    margin: 0 0;
+    border: 1px solid #000000;
+    padding: 0 0;
+}
+
+.left-banner {
+    width: 20%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    float: left;
+}
+
+.left-banner > a > img {
+    width: 100%;
+    height: auto;
+}
+
+.right-banner {
+    width: 60%;
+    height: auto;
+    margin: 0 0 0 5%;
+    padding: 0;
+    float: left;
+}
+
+.right-banner > h1 {
+    font-size: 3.5em;
+    margin: 6% 0 0 0;
+    padding: 0;
+    font-weight: bold;
+    color: gold;
+}
+
+.right-banner > h4 {
+    font-size: 1.5em;
+    margin: 1.2% 0 0 0;
+    padding: 0;
+    font-weight: bold;
+    color: gold;
+}
+
+.search_right input[type=text] {
+    float: right;
+    width: 15%;
+    height: auto;
+    padding: 8px;
+    border: 1px solid #000000;
+    font-size: 17px;
+}
+
+h2 {
+    font-family: "Caveat", cursive;
+    font-size: 35px;
+    text-align: center;
+    color: #8b0000;
+}
+
+h3 {
+    font-family: "Caveat", cursive;
+    font-weight: 900;
+    color: #00008b;
+    text-align: center;
+}
+
+h5 {
+    display: none;
+}
+
+.issue {
+    color: #0000ff;
+    font-size: large;
+    -webkit-text-stroke-width: 1px;
+    -webkit-text-stroke-color: #ff0000;
+}
+
+/*  css instructions for the two online fonts listed below */
+
+.dancing-script {
+    font-family: "Dancing Script", cursive;
+    text-align: center;
+    font-size: 35px;
+    font-weight: 500;
+    font-style: normal;
+  }
+  
+.caveat {
+      font-family: "Caveat", cursive;
+      font-style: normal;
+      font-size: 25px;
+      text-align: center;
+}
+  
+.slicknav_menu {
+	display:none;
+}
+
+nav {
+    width: 100%;
+    height: auto;
+    border: 1px solid #000000;
+    margin: 0;
+    padding: 10px 0 0 0;
+    background-color: #00ffff;
+}
+
+.sticky-menu {
+    position: sticky;
+        top: 0px;
+    z-index: 1000;
+}
+
+nav ol {
+    display: flex;
+    margin: 0;
+    padding: 3px 10px;
+    justify-content: center;
+}
+
+nav ol li {
+    display: inline;
+    list-style-type: none;
+    margin: 0;
+    padding: 5px 16px;
+    font-weight: bold;
+}
+
+nav ol li a {
+    display: inline-block;
+    font-size: 1.75vw;
+    color: #8b0000;
+    text-decoration: none;
+    font-family: helvetica;
+}
+
+nav ol li a:link {
+    font-size: 1.75vw;
+    color: #b8860b;
+    text-decoration: none;
+    font-family: helvetica;
+}
+
+nav ol li a:visited {
+    font-size: 1.75vw;
+    color: #000000;
+    text-decoration: none;
+    font-family: helvetica;
+}
+
+nav ol li a:hover {
+    font-size: 1.75vw;
+    color: #8b0000;
+    text-decoration: none;
+    font-family: helvetica;
+}
+
+nav ol li a:active {
+    font-size: 1.75vw;
+    color: #9932cc;
+    text-decoration: none;
+    font-family: helvetica;
+}
+
+.active {
+    color: #000000;
+    background-image:linear-gradient(45deg, #ff0000 0%, #ffffff 50%, #0000ff 100%);
+    text-decoration: none;
+    font-family: helvetica;
+}
+
+main {
+    border-top: 1px solid #000000;
+    border-bottom: 1px solid #000000;
+}
+
+.container {
+    border-radius: 5px;
+    background-color: rgba(242, 242, 242, 50%);
+    padding: 20px;
+    text-align: left;
+}
+
+.float_left {
+    display: block;
+    float: left;
+    width: 27%;
+    height: auto;
+}
+
+.float_right {
+    float: right;
+    width: 25%;
+    height: auto;
+}
+
+.float_left_book {
+    float: left;
+    width: 25%;
+    height: auto;
+    padding: 3%;
+}
+
+#left_img {
+    float: left;
+    width: 45%;
+    padding: 5% 2%;
+}
+
+#right_img {
+    float: left;
+    width: 45%;
+    padding: 10% 2%;
+}
+
+.left_pane {
+    float: left;
+    width: 45%;
+    padding: 0 2%;
+}
+
+.right_pane {
+    float: left;
+    width: 45%;
+    padding: 0 2%;
+}
+
+.right_pane img {
+    width: 100%;
+    height: auto;
+}
+
+.right {
+    display: block;
+    width: 75%;
+    height: auto;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+p {
+    font-size: 14px;
+    font-family: helvetica;
+    text-indent: 2%;
+}
+
+.paragraph_style {
+    color: #000000;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: large;
+    font-weight: bold;
+    text-indent: 2%;
+}
+
+.military {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    height: auto;
+}
+
+#left_pane .military {
+    margin-top: 50px;
+}
+
+#right_pane .military {
+    margin-top: 100px;
+}
+.center {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 25%;
+}
+
+footer {
+    clear: both;
+    padding: unset;
+    text-align: center;
+    background-image: url("../images/flag_banner_2.jpg");
+    background-position: center;
+    background-size: contain;
+    background-repeat: repeat-x;
+    border-top: 2px solid #000000;
+}
+
+.footer_style {
+    padding: unset;
+    text-align: center;
+    font-style: oblique;
+    font-weight: bold;
+    color:#ffd700;
+}
+
+a:link {
+    color: #b8860b;
+    font-family: helvetica;
+}
+
+a:visited {
+    color: #000000;
+    font-family: helvetica;
+}
+
+a:hover {
+    color: #8b0000;
+    font-family: helvetica;
+}
+
+a:active {
+    color: #9932cc;
+    font-family: helvetica;
+}
+
+
+/* Media Queries are set below */
+
+
+@media screen and (max-width: 600px) {
+    .search_right input[type=text] {
+        float: none;
+        display: block;
+        text-align: left;
+        width: 100%;
+        margin: 0;
+        padding: 14px;
+    }
+    .search_right input[type=text] {
+        border: 1px solid #ccc;
+    }
+}
+
+@media only screen and (max-width: 60em) {
+	.js #menu {
+		display:none;
+	}
+	
+	.js .slicknav_menu {
+		display:flex;
+	}
+}
+
+@media screen and (max-width: 767px) {
+    
+    .left-banner {
+        width: 20%;
+        height: auto;
+        margin: 0;
+        padding: 0;
+        float: left;
+    }
+
+    .left-banner > a > img {
+        width: 100%;
+        height: auto;
+    }
+
+    .right-banner {
+        width: 60%;
+        height: 150px;
+        margin: 0 0 0 5%;
+        padding: 0;
+        float: left;
+    }
+
+    .right-banner > h1 {
+        font-size: 2.5em;
+        margin: 6% 0 0 0;
+        padding: 0;
+        font-weight: bold;
+        color: gold;
+    }
+
+    .right-banner > h4 {
+        font-size: 1.5em;
+        margin: 1.2% 0 0 0;
+        padding: 0;
+        font-weight: bold;
+        color: gold;
+    }
+
+    .right_pane {
+        float: none;
+        display: block;
+        text-align: left;
+        width: 90%;
+        margin: 0;
+        padding: 14px;
+    }
+    .left_pane {
+        float: none;
+        display: block;
+        text-align: left;
+        width: 90%;
+        margin: 0;
+        padding: 14px;
+    }
+    .right_pane img {
+        width: 90%;
+        height: auto;
+    }
+    
+    #left_img {
+        float: left;
+        width: 45%;
+        padding: 15% 2%;
+    }
+    
+    #right_img {
+        float: left;
+        width: 45%;
+        padding: 20% 2%;
+    }
+    
+    .right {
+        display: block;
+        width: 75%;
+        height: auto;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+@media screen and (max-width: 472px) {
+    .left-banner {
+        width: 20%;
+        height: auto;
+        margin: 0;
+        padding: 0;
+        float: left;
+    }
+
+    .left-banner > a > img {
+        width: 100%;
+        height: auto;
+    }
+
+    .right-banner {
+        width: 60%;
+        height: 100px;
+        margin: 0 0 0 5%;
+        padding: 0;
+        float: left;
+    }
+
+    .right-banner > h1 {
+        font-size: 1.5em;
+        margin: 6% 0 0 0;
+        padding: 0;
+        font-weight: bold;
+        color: gold;
+    }
+
+    .right-banner > h4 {
+        font-size: 0.5em;
+        margin: 1.2% 0 0 0;
+        padding: 0;
+        font-weight: bold;
+        color: gold;
+    }
+    
+    .right_pane {
+        float: none;
+        display: block;
+        text-align: left;
+        width: 90%;
+        margin: 0;
+        padding: 14px;
+    }
+    .left_pane {
+        float: none;
+        display: block;
+        text-align: left;
+        width: 90%;
+        margin: 0;
+        padding: 14px;
+    }
+    .right_pane img {
+        width: 90%;
+        height: auto;
+    }
+    
+    #left_img {
+        float: left;
+        width: 45%;
+        padding: 15% 2%;
+    }
+    
+    #right_img {
+        float: left;
+        width: 45%;
+        padding: 20% 2%;
+    }
+    
+    .right {
+        display: block;
+        width: 75%;
+        height: auto;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}

@@ -1,0 +1,41 @@
+Design Documents
+
+1. Wireframes for index.html and any notably different secondary pages in SVG, 
+    PNG, or JPG format
+2. A description of the primary user including, but not limited to, what the 
+    user wants to get from the site and what the site owner wants to get from 
+    those users. It is acceptable to include similar descriptions for other visitor types
+
+
+The Website
+1. Uses mobile first design and displays equally well in mobile and desktop
+2. The site has a custom favicon created by the student
+3. Made up of three or more HTML pages
+4. The main page is named index.html and this page resides in the top level of the root directory
+5. The header of the pages contains a custom logo image that is a link to index.html
+6. The header of the pages contains a search form
+7. The header of the pages contains a heading with the site name
+8. The header of the pages contains the tagline for the site
+9. All pages use normalize.css
+10. All pages share the same custom CSS file, though individual pages may include 
+    a second custom CSS file for page-specific items
+11. Custom CSS files must use media queries to adjust to different screen widths
+12. The site must use at least one web font
+13. Page layout uses grid or flexbox
+14. At least one page contains a form that is not a search form
+15. At least one page contains an image inside a figure with figure caption elements
+16. The site navigation is performed through either a horizontal or vertical nav-bar. 
+    The format of the nav bar must be consistent for all pages. It is acceptable 
+    to have site-section navigation that uses the alternate nav bar
+17. At least one page contains tabular data in a table - this includes table headings, 
+    multiple data rows, and a table footer
+18. All pages must have a footer containing at least a copyright and page owner information
+19. All HTML pages will pass validation by the W3C HTML Validator with no errors or warnings
+20. All CSS files will pass validation by the W3C CSS Validator with no errors or warnings
+21. CSS files must be in a CSS folder under the site root folder
+22. Image files must be in an images folder under the site root folder
+23. Any other media files used by the student must be in an appropriate subfolder
+24. Image or media files not explicitly owned by the student must be accompanied 
+    by a citation of the source of the file
+25. HTML files, other than index.html, may be in a sub-folder if appropriate
+

@@ -1,0 +1,67 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.17 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.17">
+  <diagram name="Page-1" id="03018318-947c-dd8e-b7a3-06fadd420f32">
+    <mxGraphModel dx="733" dy="613" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" background="none" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="677b7b8949515195-1" value="" style="whiteSpace=wrap;html=1;rounded=0;shadow=0;labelBackgroundColor=none;strokeColor=#000000;strokeWidth=1;fillColor=none;fontFamily=Verdana;fontSize=12;fontColor=#000000;align=center;comic=1;" parent="1" vertex="1">
+          <mxGeometry x="20" y="20" width="350" height="1090" as="geometry" />
+        </mxCell>
+        <mxCell id="677b7b8949515195-2" value="LOGO" style="whiteSpace=wrap;html=1;rounded=0;shadow=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=28;align=center;comic=1;" parent="1" vertex="1">
+          <mxGeometry x="40" y="60" width="50" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="677b7b8949515195-3" value="Search" style="strokeWidth=1;shadow=0;dashed=0;align=center;html=1;shape=mxgraph.mockup.forms.searchBox;strokeColor=#999999;mainText=;strokeColor2=#008cff;fontColor=#666666;fontSize=17;align=left;spacingLeft=3;rounded=0;labelBackgroundColor=none;comic=1;" parent="1" vertex="1">
+          <mxGeometry x="260" y="80" width="110" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="677b7b8949515195-9" value="" style="line;strokeWidth=1;html=1;rounded=0;shadow=0;labelBackgroundColor=none;fillColor=none;fontFamily=Verdana;fontSize=14;fontColor=#000000;align=center;comic=1;" parent="1" vertex="1">
+          <mxGeometry x="20" y="140" width="350" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="ubhy5sFj4Xcip8Dqailu-1" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;Patriot Thanks&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;span style=&quot;font-size: 18px;&quot;&gt;&lt;b&gt;Contact Us&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="100" y="60" width="170" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="ubhy5sFj4Xcip8Dqailu-5" value="" style="line;strokeWidth=1;html=1;rounded=0;shadow=0;labelBackgroundColor=none;fillColor=none;fontFamily=Verdana;fontSize=14;fontColor=#000000;align=center;comic=1;" parent="1" vertex="1">
+          <mxGeometry x="20" y="1040" width="350" height="10" as="geometry" />
+        </mxCell>
+        <mxCell id="ubhy5sFj4Xcip8Dqailu-6" value="Copyright footer&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;contact: email&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="1050" width="330" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="RWafx4XU2KkWU0paZ261-2" value="slick_nav&lt;div&gt;menu&lt;/div&gt;&lt;div&gt;button&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="300" y="20" width="60" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-8" value="&lt;div style=&quot;text-align: justify&quot;&gt;&lt;p style=&quot;font-size: large; font-family: &amp;quot;Times New Roman&amp;quot;, Times, serif; text-indent: 2%; font-weight: 700; text-align: start;&quot; class=&quot;paragraph_style&quot;&gt;Do you have questions, comments, or suggestions for us? Feel free to send us any of those, plus any other feedback you may have regarding our services and applications. Thank you very much for visiting our site, and we will respond within two (2) business days.&lt;/p&gt;&lt;/div&gt;" style="whiteSpace=wrap;html=1;rounded=0;shadow=0;labelBackgroundColor=none;strokeWidth=1;fillColor=none;fontFamily=Verdana;fontSize=12;align=center;verticalAlign=top;spacing=10;comic=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="180" width="330" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-9" value="" style="verticalLabelPosition=bottom;shadow=0;dashed=0;align=center;html=1;verticalAlign=top;strokeWidth=1;shape=mxgraph.mockup.graphics.simpleIcon;strokeColor=#000000;fontFamily=Helvetica;fontSize=17;fontColor=#ffffff;fontStyle=1;fillColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="60" y="800" width="270" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-10" value="First Name" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="400" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-11" value="Last Name" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="440" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-12" value="Email&lt;span style=&quot;color: rgba(0, 0, 0, 0); font-family: monospace; font-size: 0px; text-wrap: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22First%20Name%22%20style%3D%22text%3Bhtml%3D1%3Balign%3Dleft%3BverticalAlign%3Dmiddle%3BwhiteSpace%3Dwrap%3Brounded%3D0%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%2240%22%20y%3D%22400%22%20width%3D%22120%22%20height%3D%2230%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="480" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-13" value="Subject" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="520" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-14" value="&lt;font color=&quot;#999999&quot;&gt;First Name&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="120" y="400" width="240" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-15" value="&lt;font color=&quot;#999999&quot;&gt;Last Name&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="120" y="440" width="240" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-16" value="&lt;font color=&quot;#999999&quot;&gt;Email Address&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="120" y="480" width="240" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-17" value="&lt;font color=&quot;#999999&quot;&gt;Write Anything&lt;/font&gt;&lt;div&gt;&lt;font color=&quot;#999999&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#999999&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#999999&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#999999&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#999999&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#999999&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#999999&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#999999&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#999999&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="120" y="520" width="240" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="wyCWu3Q-i5CKo300T1sZ-18" value="Submit" style="strokeWidth=1;shadow=0;dashed=0;align=center;html=1;shape=mxgraph.mockup.buttons.button;strokeColor=#000000;fontColor=#ffffff;mainText=;buttonStyle=round;fontSize=17;fontStyle=1;fillColor=#ff0000;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="80" y="720" width="150" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

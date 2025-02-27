@@ -1,0 +1,356 @@
+/*
+FILE: forms.css
+AUTHOR: Edward G. McKeown
+DATE: 2024/10/08
+VERSION: 1.0.1
+DESCRIPTION:
+    This css file is strictly forthe CSS involved with the forms on certain
+    pages.
+ 
+*/
+ 
+
+input[type=text], select, textarea {
+    width: 75%;
+    padding: 12px;
+    border: 1px solid #000000; 
+    border-radius: 4px; 
+    box-sizing: border-box; 
+    margin-top: 6px; 
+    margin-bottom: 16px; 
+    resize: vertical;
+}
+
+input[type=email], select, textarea {
+    width: 75%; 
+    padding: 12px; 
+    border: 1px solid #000000; 
+    border-radius: 4px; 
+    box-sizing: border-box; 
+    margin-top: 6px; 
+    margin-bottom: 16px; 
+    resize: vertical; 
+}
+
+input[type=password], select, textarea {
+    width: 75%; 
+    padding: 12px; 
+    border: 1px solid #000000; 
+    border-radius: 4px; 
+    box-sizing: border-box; 
+    margin-top: 6px; 
+    margin-bottom: 16px; 
+    resize: vertical; 
+}
+
+input[type=submit] {
+background-color: #ff0000;
+color: #ffffff;
+padding: 12px 20px;
+border: none;
+border-radius: 4px;
+cursor: pointer;
+}
+
+input[type=submit]:hover {
+background-color: #0000ff;
+}
+
+/* The message box is shown when the user clicks on the password field */
+#message {
+    display:none;
+    color: #000000;
+    position: relative;
+    padding-left: 50px;
+    margin-top: 0;
+    border: 2px solid #000000;
+}
+
+#message p {
+    padding: 5px 5px;
+    font-size: 18px;
+}
+
+/* Add a green text color and a checkmark when the requirements are right */
+.valid {
+    color: green;
+}
+
+.valid:before {
+    position: relative;
+    left: -35px;
+    content: "✔";
+}
+
+/* Add a red text color and an "x" icon when the requirements are wrong */
+.invalid {
+    color: red;
+}
+
+.invalid:before {
+    position: relative;
+    left: -35px;
+    content: "✖";
+}
+
+.warning {
+    font-weight: bolder;
+    font-size: larger;
+    text-align: center;
+    color: #ff0000;
+}
+
+.place-picker-container {
+    padding: 20px;
+}
+
+#map {
+    height: 100%;
+    margin: auto;
+    padding: 0;
+}
+
+/* Style the search box inside the navigation bar */
+.search_database input[type=text] {
+    margin: auto;
+    width: 50%;
+    height: auto;
+    padding: 8px;
+    border: 1px solid #000000;
+    font-size: 17px;
+
+}
+
+fieldset {
+    border: 2px groove #000000;
+}
+
+/* Media Queries below here */
+@media screen and (max-width: 767px) {
+
+    input[type=text], select, textarea {
+        width: 75%;
+        padding: 12px;
+        border: 1px solid #000000; 
+        border-radius: 4px; 
+        box-sizing: border-box; 
+        margin-top: 6px; 
+        margin-bottom: 16px; 
+        resize: vertical;
+    }
+
+    input[type=email], select, textarea {
+        width: 75%; 
+        padding: 12px; 
+        border: 1px solid #000000; 
+        border-radius: 4px; 
+        box-sizing: border-box; 
+        margin-top: 6px; 
+        margin-bottom: 16px; 
+        resize: vertical; 
+    }
+
+    input[type=password], select, textarea {
+        width: 75%; 
+        padding: 12px; 
+        border: 1px solid #000000; 
+        border-radius: 4px; 
+        box-sizing: border-box; 
+        margin-top: 6px; 
+        margin-bottom: 16px; 
+        resize: vertical; 
+    }
+
+    input[type=submit] {
+    background-color: #ff0000;
+    color: #ffffff;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    }
+
+    input[type=submit]:hover {
+    background-color: #0000ff;
+    }
+
+    /* The message box is shown when the user clicks on the password field */
+    #message {
+        display:none;
+        color: #000000;
+        position: relative;
+        padding-left: 50px;
+        margin-top: 0;
+        border: 2px solid #000000;
+    }
+
+    #message p {
+        padding: 5px 5px;
+        font-size: 18px;
+    }
+
+    /* Add a green text color and a checkmark when the requirements are right */
+    .valid {
+        color: green;
+    }
+
+    .valid:before {
+        position: relative;
+        left: -35px;
+        content: "✔";
+    }
+
+    /* Add a red text color and an "x" icon when the requirements are wrong */
+    .invalid {
+        color: red;
+    }
+
+    .invalid:before {
+        position: relative;
+        left: -35px;
+        content: "✖";
+    }
+
+    .warning {
+        font-weight: bolder;
+        font-size: larger;
+        text-align: center;
+        color: #ff0000;
+    }
+
+    .place-picker-container {
+        padding: 20px;
+    }
+
+    #map {
+        height: 100%;
+        margin: auto;
+        padding: 0;
+    }
+
+    /* Style the search box inside the navigation bar */
+    .search_database input[type=text] {
+        margin: auto;
+        width: 50%;
+        height: auto;
+        padding: 8px;
+        border: 1px solid #000000;
+        font-size: 17px;
+
+    }
+}
+
+/* Media Queries below here */
+@media screen and (max-width: 472px) {
+
+    input[type=text], select, textarea {
+        width: 75%;
+        padding: 12px;
+        border: 1px solid #000000; 
+        border-radius: 4px; 
+        box-sizing: border-box; 
+        margin-top: 6px; 
+        margin-bottom: 16px; 
+        resize: vertical;
+    }
+
+    input[type=email], select, textarea {
+        width: 75%; 
+        padding: 12px; 
+        border: 1px solid #000000; 
+        border-radius: 4px; 
+        box-sizing: border-box; 
+        margin-top: 6px; 
+        margin-bottom: 16px; 
+        resize: vertical; 
+    }
+
+    input[type=password], select, textarea {
+        width: 75%; 
+        padding: 12px; 
+        border: 1px solid #000000; 
+        border-radius: 4px; 
+        box-sizing: border-box; 
+        margin-top: 6px; 
+        margin-bottom: 16px; 
+        resize: vertical; 
+    }
+
+    input[type=submit] {
+    background-color: #ff0000;
+    color: #ffffff;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    }
+
+    input[type=submit]:hover {
+    background-color: #0000ff;
+    }
+
+    /* The message box is shown when the user clicks on the password field */
+    #message {
+        display:none;
+        color: #000000;
+        position: relative;
+        padding-left: 50px;
+        margin-top: 0;
+        border: 2px solid #000000;
+    }
+
+    #message p {
+        padding: 5px 5px;
+        font-size: 18px;
+    }
+
+    /* Add a green text color and a checkmark when the requirements are right */
+    .valid {
+        color: green;
+    }
+
+    .valid:before {
+        position: relative;
+        left: -35px;
+        content: "✔";
+    }
+
+    /* Add a red text color and an "x" icon when the requirements are wrong */
+    .invalid {
+        color: red;
+    }
+
+    .invalid:before {
+        position: relative;
+        left: -35px;
+        content: "✖";
+    }
+
+    .warning {
+        font-weight: bolder;
+        font-size: larger;
+        text-align: center;
+        color: #ff0000;
+    }
+
+    .place-picker-container {
+        padding: 20px;
+    }
+
+    #map {
+        height: 100%;
+        margin: auto;
+        padding: 0;
+    }
+
+    /* Style the search box inside the navigation bar */
+    .search_database input[type=text] {
+        margin: auto;
+        width: 50%;
+        height: auto;
+        padding: 8px;
+        border: 1px solid #000000;
+        font-size: 17px;
+
+    }
+}
