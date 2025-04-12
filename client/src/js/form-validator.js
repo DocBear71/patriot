@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function submitToMongoDB(data) {
         console.log("Submitting data to API:", data);
 
-        fetch('https://your-vercel-app.vercel.app/api/registration', {
+        fetch('/api/registration', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
