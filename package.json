@@ -28,6 +28,5 @@
   "homepage": "https://github.com/DocBear71/patriot#readme",
   "devDependencies": {
     "nodemon": "^3.1.9"
-  },
-
+  }
 }
