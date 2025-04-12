@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function submitToMongoDB(data) {
         console.log("Submitting data to API:", data);
 
-        fetch('api/index/registration', {
+        fetch('/api/index', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -81,7 +81,6 @@ document.addEventListener('DOMContentLoaded', function() {
         })
             .then(response => {
                 console.log("Response status:", response.status);
-                console.log("Response headers:", [...response.headers.entries()]);
 
                 return response.text().then(text => {
                     console.log("Raw API response:", text);
@@ -89,13 +88,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     try {
                         if (text) {
                             const json = JSON.parse(text);
+                            if (!response.ok) {
+                                throw new Error(json.message || 'Registration failed');
+                            }
                             return json;
                         } else {
                             throw new Error("Empty response received");
                         }
                     } catch (e) {
-                        console.error("Response is not valid JSON:", e);
-                        throw new Error("Server returned an invalid response: " + text);
+                        console.error("Response parse error:", e);
+                        throw new Error("Server returned an invalid response");
                     }
                 });
             })
