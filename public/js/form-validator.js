@@ -70,8 +70,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to submit data to MongoDB
     function submitToMongoDB(data) {
-        // Use fetch API to send data to your Next.js API endpoint
-        fetch('/api/registration', {
+        console.log("Submitting data to API:", data);
+
+        fetch('/api/index', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -79,12 +80,26 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify(data)
         })
             .then(response => {
-                if (!response.ok) {
-                    return response.json().then(data => {
-                        throw new Error(data.message || 'Registration failed');
-                    });
-                }
-                return response.json();
+                console.log("Response status:", response.status);
+
+                return response.text().then(text => {
+                    console.log("Raw API response:", text);
+
+                    try {
+                        if (text) {
+                            const json = JSON.parse(text);
+                            if (!response.ok) {
+                                throw new Error(json.message || 'Registration failed');
+                            }
+                            return json;
+                        } else {
+                            throw new Error("Empty response received");
+                        }
+                    } catch (e) {
+                        console.error("Response parse error:", e);
+                        throw new Error("Server returned an invalid response");
+                    }
+                });
             })
             .then(data => {
                 console.log('Success:', data);

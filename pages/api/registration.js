@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
         // Log successful connection
         console.log('MongoDB connected');
 
-        const db = client.db(process.env.MONGODB_DB || 'patriotThanks');
+        const db = client.db(process.env.MONGODB_DB || 'patriot');
 
         // Check if email already exists
         const existingUser = await db.collection('users').findOne({ email: data.email });
