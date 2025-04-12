@@ -1,54 +1,76 @@
+<?php
+// Set headers to handle CORS and JSON
+header("Access-Control-Allow-Origin: *");
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: POST");
+header("Access-Control-Max-Age: 3600");
+header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-<!DOCTYPE html>
-<html lang='en'>
-    <head>
-        <title>Thank you for Registering</title>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <meta name="author" content="Edward G. McKeown">
-        <meta name="date" content="2024/10/01">
-        <meta name="description" content=" ">
-        <meta name="keywords" content=" ">
-        <link href="images/docbearlogov4.png" rel="icon" type="image/x-icon">
-        <link href="css/normalize.css" rel="stylesheet">
-        <link href="css/slicknav.min.css" rel="stylesheet">
-        <link href="css/style.css" rel="stylesheet">
-        <script src="js/jquery.slicknav.min.js"></script>
-        <script src="http://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+// Get raw posted data
+$data = json_decode(file_get_contents("php://input"), true);
 
-    </head>
-    <body>
-        <header>
-            <h1>Patriot Thanks<br>
-                Registration Complete
-            </h1>
-        </header>
-        <nav>
-            <ol id="menu">
-                <li><a href="index.html" class="active">Home</a></li>
-                <li><a href="register.html">Register/Login</a></li>
-                <li><a href="search.html">Search for a Business</a></li>
-                <li><a href="correction.html">Submit Corrections</a></li>
-                <li><a href="about.html">About Us</a></li>
-                <li><a href="contact.html">Contact</a></li>
-            </ol>
-            <script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
-            <script src="js/jquery.slicknav.js"></script>
-            <script type="text/javascript">
-            $(document).ready(function(){
-                $('#menu').slicknav();
-            });
-            </script>
-        </nav>
-        <main>
-            <p>Thank you for Registering with Patriot Thanks. Please verify your registration via the email 
-                that was sent to your provided email address.
-        </main>
-        <footer>
-            <p>&copy; Copyright 2024 Edward G. McKeown</p>
-            <address>
-            <p>email to: <a href="emailto:edward-mckeown@student.kirkwood.edu">edward-mckeown@student.kirkwood.edu</a></p>
-            </address>
-        </footer>
-    </body>
-</html>
+// Validate data
+if (
+    empty($data['fname']) ||
+    empty($data['lname']) ||
+    empty($data['address1']) ||
+    empty($data['city']) ||
+    empty($data['state']) ||
+    empty($data['zip']) ||
+    empty($data['status']) ||
+    empty($data['email']) ||
+    empty($data['password']) ||
+    empty($data['psw_repeat'])
+) {
+    // Return error response
+    http_response_code(400);
+    echo json_encode(["message" => "Missing required fields"]);
+    exit;
+}
+
+// Optional: Hash the password for security
+// If you're storing plain text passwords in MongoDB (not recommended),
+// comment these lines out
+$data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+$data['psw_repeat'] = password_hash($data['psw_repeat'], PASSWORD_DEFAULT);
+
+try {
+    // Connect to MongoDB
+    $mongoClient = new MongoDB\Client("mongodb+srv://DocBear:1369Butterfly81!!@cluster0.8jjmw.mongodb.net/patriot?retryWrites=true&w=majority&appName=Cluster0");
+
+    // Select database and collection
+    $database = $mongoClient->patriotThanks;
+    $collection = $database->users;
+
+    // Check if email already exists
+    $existingUser = $collection->findOne(['email' => $data['email']]);
+    if ($existingUser) {
+        http_response_code(400);
+        echo json_encode(["message" => "Email already registered"]);
+        exit;
+    }
+
+    // Insert document
+    $result = $collection->insertOne($data);
+
+    if ($result->getInsertedCount() > 0) {
+        // Return success response
+        http_response_code(201);
+        echo json_encode([
+            "message" => "User registered successfully",
+            "id" => (string)$result->getInsertedId()
+        ]);
+    } else {
+        // Return error response
+        http_response_code(503);
+        echo json_encode(["message" => "Unable to register user"]);
+    }
+} catch (Exception $e) {
+    // Return error response
+    http_response_code(500);
+    echo json_encode([
+        "message" => "Database error",
+        "error" => $e->getMessage()
+    ]);
+}
+?>

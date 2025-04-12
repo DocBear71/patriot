@@ -51,7 +51,8 @@ module.exports = {
             patterns: [
                 {from: './src/images', to: 'images'},
                 {from: './src/css', to: 'css'},
-                {from: './src/js', to: 'js'}
+                {from: './src/js', to: 'js'},
+                {from: './src/*.html', to: '[name][ext]', globOptions: {ignore: ['**/index.html']}}
             ]
         })
     ],

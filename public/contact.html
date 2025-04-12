@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang='en'>
+    <head>
+        <title>Patriot Thanks: Contact Us</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <meta name="author" content="Edward G. McKeown">
+        <meta name="date" content="2024/09/27">
+        <meta name="description" content="Completion of Final Project for Fundamentals of Web Program 2024FA CRF01.">
+        <meta name="keywords" content="Final Project, assignment, homework, Mark Bromwich, 
+                                        Fundamentals of Web Program, 2024FA, CRF01 ">
+        <link href="./images//docbearlogov4.png" rel="icon" type="image/x-icon">
+        <link href="./css/normalize.css" rel="stylesheet">
+        <link href="./css/slicknav.min.css" rel="stylesheet">
+        <link href="./css/style.css" rel="stylesheet">
+        <link href="./css/forms.css" rel="stylesheet">
+        <script src="./js/jquery.slicknav.min.js"></script>
+        <script src="http://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    </head>
+    <body id="page_layout">
+
+        <header>
+            <div class="search_right">
+                <input type="text" placeholder="Search.." >
+            </div>
+            <div class="left-banner">
+                <a href="index.html">
+                    <img src="./images/docbearlogov4.png" alt="DocBear logo">
+                </a>
+            </div>
+            <div class="right-banner">
+                <h1>Patriot Thanks</h1>
+                <hr>
+                <h4>Contact Us</h4>
+                </div>
+                <div style="clear:left;"></div>
+        </header>
+        <nav class="sticky-menu">
+            <ol id="menu">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="register.html">Register/Login</a></li>
+                <li><a href="search.html">Search for a Business</a></li>
+                <li><a href="correction.html">Submit Corrections</a></li>
+                <li><a href="about.html">About Us</a></li>
+                <li><a href="contact.html" class="active">Contact</a></li>
+            </ol>
+            <script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+            <script src="./js/jquery.slicknav.js"></script>
+            <script>
+            $(document).ready(function(){
+                $('#menu').slicknav();
+            });
+            </script>
+        </nav>
+        <main>
+            <p class="paragraph_style">Do you have questions, comments, or suggestions for us? Feel free to send us any of those, plus any 
+                other feedback you may have regarding our services and applications. Thank you very much for visiting 
+                our site, and we will respond within two (2) business days.</p><br>
+            <div class="left_pane">
+                <fieldset>
+                    <legend>
+                        <h2 class="caveat">Contact Us</h2>
+                    </legend>
+                    <form action="./php/contact.php" method="POST">
+                        <label for="fname">First Name</label>
+                        <input type="text" id="fname" name="firstname" placeholder="Your name..">
+                        <br>
+                        <label for="lname">Last Name</label>
+                        <input type="text" id="lname" name="lastname" placeholder="Your last name..">
+                        <br>
+                        <label for="email">E-mail&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;    </label>
+                        <input type="email" id="email" name="email" placeholder="address@company.com">
+                        <br>
+                        <label for="subject">Subject</label><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        <textarea id="subject" name="subject" placeholder="Write something.." style="height:200px"></textarea>
+                        <br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        <input type="submit" value="Submit">
+                        <br>
+                    </form>
+                </fieldset>
+            </div>
+            <div class="right_pane"> 
+                <img src="./images/military_flags.png" alt="military flags" class="right">
+                <img src="./images/military_branches.jpg" alt="coins displaying military branches" class="right">
+            </div>
+        </main>
+        <footer class = "footer_style"><br>
+            <p>&copy; Copyright 2024 Edward G. McKeown</p>
+            <address>
+                <p>email to: <a href="emailto:edward-mckeown@student.kirkwood.edu">
+                    edward-mckeown@student.kirkwood.edu</a></p><br>
+            </address>
+        </footer>
+    </body>
+</html>

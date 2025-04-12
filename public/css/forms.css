@@ -101,6 +101,22 @@ background-color: #0000ff;
     color: #ff0000;
 }
 
+.valid-input {
+    border: 2px solid green;
+}
+
+.invalid-input {
+    border: 2px solid red;
+}
+.valid-field {
+    border: 2px solid green !important;
+}
+
+.invalid-field {
+    border: 2px solid red !important;
+}
+
+
 .place-picker-container {
     padding: 20px;
 }
