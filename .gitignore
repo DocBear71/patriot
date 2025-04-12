@@ -1,5 +1,6 @@
 node_modules/
 /.env
+.env
 .idea/
 client/src/MarketPlace
 /.idea/
