@@ -16,7 +16,7 @@
   "main": "api/index.js",
   "scripts": {
     "dev": "next dev",
-    "build": "next build && cd client && npm run build",
+    "build": "next build && cd client && npm install && npm run build",
     "start": "next start"
   },
   "repository": {
