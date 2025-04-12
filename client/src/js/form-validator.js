@@ -80,20 +80,22 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify(data)
         })
             .then(response => {
-                // Log the raw response for debugging
+                console.log("Response status:", response.status);
+                console.log("Response headers:", [...response.headers.entries()]);
+
                 return response.text().then(text => {
                     console.log("Raw API response:", text);
 
                     try {
-                        // Try to parse as JSON
-                        const json = JSON.parse(text);
-                        if (!response.ok) {
-                            throw new Error(json.message || 'Registration failed');
+                        if (text) {
+                            const json = JSON.parse(text);
+                            return json;
+                        } else {
+                            throw new Error("Empty response received");
                         }
-                        return json;
                     } catch (e) {
                         console.error("Response is not valid JSON:", e);
-                        throw new Error("Server returned an invalid response");
+                        throw new Error("Server returned an invalid response: " + text);
                     }
                 });
             })
