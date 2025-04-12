@@ -70,42 +70,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to submit data to MongoDB
     function submitToMongoDB(data) {
-        fetch('php/test.php')
-            .then(response => response.text())
-            .then(text => {
-                console.log('Raw response:', text);
-                try {
-                    const json = JSON.parse(text);
-                    console.log('Parsed JSON:', json);
-                } catch (e) {
-                    console.error('Not valid JSON:', e);
+        // Use fetch API to send data to your Next.js API endpoint
+        fetch('/api/registration', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.message || 'Registration failed');
+                    });
                 }
+                return response.json();
             })
-            .catch(error => console.error('Fetch error:', error));
-        // Use fetch API to send data to your backend endpoint
-    //     fetch('php/registration.php', {
-    //         method: 'POST',
-    //         headers: {
-    //             'Content-Type': 'application/json'
-    //         },
-    //         body: JSON.stringify(data)
-    //     })
-    //         .then(response => {
-    //             if (!response.ok) {
-    //                 throw new Error('Network response was not ok');
-    //             }
-    //             return response.json();
-    //         })
-    //         .then(data => {
-    //             console.log('Success:', data);
-    //             // Handle successful registration
-    //             alert("Registration successful!");
-    //             window.location.href = "index.html"; // Redirect to home page or login page
-    //         })
-    //         .catch(error => {
-    //             console.error('Error:', error);
-    //             alert("There was a problem with your registration. Please try again.");
-    //         });
+            .then(data => {
+                console.log('Success:', data);
+                alert("Registration successful!");
+                window.location.href = "index.html";
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert("Registration error: " + error.message);
+            });
     }
 
     // Add input event listeners for visual feedback

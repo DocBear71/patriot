@@ -4,16 +4,20 @@
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
     "jquery": "^3.7.1",
-    "mongoose": "^8.13.2"
+    "mongodb": "^6.15.0",
+    "mongoose": "^8.13.2",
+    "next": "^15.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "name": "patriot",
   "version": "1.0.0",
-  "description": "",
+  "description": "This is a new readme file for testing.",
   "main": "api/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node api/index.js",
-    "dev": "nodemon api/index.js"
+    "dev": "next dev",
+    "build": "next build && cd client && npm run build",
+    "start": "next start"
   },
   "repository": {
     "type": "git",
