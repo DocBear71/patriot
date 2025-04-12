@@ -1,6 +1,6 @@
-import { MongoClient } from 'mongodb';
+const { MongoClient } = require('mongodb');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     // Only allow POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method not allowed' });
@@ -23,14 +23,14 @@ export default async function handler(req, res) {
         // Check if email already exists
         const existingUser = await db.collection('users').findOne({ email: data.email });
         if (existingUser) {
-            client.close();
+            await client.close();
             return res.status(400).json({ message: 'Email already registered' });
         }
 
         // Insert the user
         const result = await db.collection('users').insertOne(data);
 
-        client.close();
+        await client.close();
 
         // Return success response
         return res.status(201).json({
@@ -42,4 +42,4 @@ export default async function handler(req, res) {
         console.error('Registration error:', error);
         return res.status(500).json({ message: 'Server error', error: error.message });
     }
-}
+};
