@@ -1,0 +1,32 @@
+npm install --save-dev @babel/core
+npm install --save-dev @babel/preset-env
+npm install -D babel-loader @babel/core @babel/preset-env webpack
+npm install --save-dev css-loader
+npm i --save-dev html-webpack-plugin
+npm install --save-dev mini-css-extract-plugin
+npm install --save-dev style-loader
+npm install --save-dev webpack-cli
+npm install webpack-dev-server --save-dev
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
