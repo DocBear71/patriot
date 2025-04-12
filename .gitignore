@@ -2,3 +2,5 @@ node_modules/
 .env
 .idea/
 client/src/MarketPlace
+/.idea/
+/client/src/MarketPlace/
