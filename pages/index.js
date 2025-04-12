@@ -1,3 +1,3 @@
-export default function Home() {
+module.exports = function Home() {
     return null;
 }

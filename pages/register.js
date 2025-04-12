@@ -1,3 +1,3 @@
-export default function Register() {
+module.exports = function Register() {
     return null;
 }
