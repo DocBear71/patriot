@@ -5,6 +5,7 @@
  */
 ;(function ($, document, window) {
     var
+
     // default settings object.
         defaults = {
             label: 'MENU',

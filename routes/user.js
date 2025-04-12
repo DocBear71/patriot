@@ -15,6 +15,7 @@ userRouter.put('/:id', updateSingleUser);
 // Delete a single user
 userRouter.delete('/:id', deleteSingleUser);
 
+
 // Route handlers
 async function getUsers (req, res) {
     try {

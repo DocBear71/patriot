@@ -21,6 +21,7 @@ app.use(express.static('public')); // This will display /public/index.html when 
 const userRouter = require("../routes/user");
 app.use("/api/user", userRouter);
 
+
 app.use("*", fileNotFound);
 app.use(errorHandler);
 // Route handlers

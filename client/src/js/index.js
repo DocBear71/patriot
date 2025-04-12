@@ -13,6 +13,7 @@ initMap();
 
 
 
+
 async function init() {
     await customElements.whenDefined('gmp-map');
 

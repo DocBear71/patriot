@@ -7,6 +7,7 @@ regForm.addEventListener('input', function(event) {
     if (newSearch !== '') {
         searchField = {title: newSearch};
 
+
         fetch('localhost:3000/register', {
             method: 'POST',
             body: JSON.stringify(newSearch),
