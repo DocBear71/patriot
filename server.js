@@ -15,12 +15,19 @@ app.use(cors());
 const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
 const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
 
+// Add a debug middleware to log all requests
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // Serve static files from the client directory
 app.use(express.static(path.join(__dirname, 'client')));
 
-// API endpoint for registration
-app.post('/api/register', async (req, res) => {
+// Register both /api/registration and /api/register routes for compatibility
+app.post(['/api/register', '/api/registration'], async (req, res) => {
     console.log("Registration API hit:", req.method);
+    console.log("Request body:", req.body);
 
     try {
         console.log("Connecting to MongoDB...");
@@ -75,6 +82,15 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
+// Create a simple GET endpoint for the registration API to test
+app.get(['/api/register', '/api/registration'], (req, res) => {
+    res.status(200).json({
+        message: 'Registration API is available',
+        method: 'Use POST to submit registration data',
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Test API endpoint
 app.get('/api/test', (req, res) => {
     res.status(200).json({
@@ -92,9 +108,11 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 // Start server
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}
 
 // Export for Vercel
 module.exports = app;

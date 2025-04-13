@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function() {
         status: document.getElementById("status")
     };
 
-
     // Get the form element
     const registerForm = document.getElementById("register-form");
 
@@ -69,9 +68,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+
     async function submitToMongoDB(formData) {
         try {
-            // Use the Express API endpoint
+            // Use the absolute URL to your Vercel deployment with the new endpoint
             const apiUrl = 'https://patriotthanks.vercel.app/api/register';
             console.log("Submitting to API at:", apiUrl);
 
