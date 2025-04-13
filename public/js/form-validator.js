@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     const path = require('path');
-    const apiIndex = path.resolve(path.join(__dirname, "api", "index.js"));
+    const apiIndex = require(path.join(__dirname, "api", "index.js"));
     // Function to submit data to MongoDB
     function submitToMongoDB(data) {
         console.log("Submitting data to API:", data);
