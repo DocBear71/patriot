@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const { MongoClient } = require('mongodb');
 const cors = require('cors');
+const fs = require('fs');
 
 // Create Express app
 const app = express();
@@ -11,20 +12,20 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// MongoDB connection details
-const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
-const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
-
 // Add a debug middleware to log all requests
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
 });
 
+// MongoDB connection details
+const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
+const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
+
 // Serve static files from the client directory
 app.use(express.static(path.join(__dirname, 'client')));
 
-// Register both /api/registration and /api/register routes for compatibility
+// Register both /api/register and /api/registration routes for compatibility
 app.post(['/api/register', '/api/registration'], async (req, res) => {
     console.log("Registration API hit:", req.method);
     console.log("Request body:", req.body);
@@ -99,9 +100,42 @@ app.get('/api/test', (req, res) => {
     });
 });
 
-// For any other GET request, serve the index.html file
-app.get('*', (req, res) => {
+// Map specific HTML pages
+app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'client', 'index.html'));
+});
+
+app.get('/register', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client', 'register.html'));
+});
+
+app.get('/about', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client', 'about.html'));
+});
+
+app.get('/contact', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client', 'contact.html'));
+});
+
+app.get('/search', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client', 'search.html'));
+});
+
+app.get('/correction', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client', 'correction.html'));
+});
+
+// For any other GET request, check if the file exists in client directory
+app.get('*', (req, res) => {
+    const filePath = path.join(__dirname, 'client', req.path);
+
+    // Check if the file exists
+    if (fs.existsSync(filePath)) {
+        res.sendFile(filePath);
+    } else {
+        // If file doesn't exist, serve index.html (for SPA-like behavior)
+        res.sendFile(path.join(__dirname, 'client', 'index.html'));
+    }
 });
 
 // Set port
