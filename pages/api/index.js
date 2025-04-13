@@ -1,3 +1,17 @@
+const express = require("express");
+const cors = require("cors");
+const path = require("node:path");
+const app = express();
+
+
+app.use(cors());
+app.get('/path-join', (req, res) => {
+    const joinedPath = path.join(__dirname, "api", "index.js");
+    res.json({result: joinedPath});
+})
+
+
+
 const { MongoClient } = require('mongodb');
 
 module.exports = async function handler(req, res) {

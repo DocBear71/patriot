@@ -1,4 +1,4 @@
-import path from "node:path";
+
 
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -70,6 +70,13 @@ document.addEventListener('DOMContentLoaded', function() {
             submitToMongoDB(formData);
         }
     });
+
+    async function apiIndex(a, b) {
+        const response = await fetch(`https://localhost:3000/path-join?a=${a}&b=${b}`);
+        const data = await response.json();
+        return data.result;
+    }
+
     const apiIndex = path.resolve(path.join(__dirname, "api", "index.js"))
     // Function to submit data to MongoDB
     function submitToMongoDB(data) {
