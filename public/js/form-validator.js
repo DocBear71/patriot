@@ -1,4 +1,5 @@
-const path = require('path');
+import path from "node:path";
+
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Form validator loaded!");
