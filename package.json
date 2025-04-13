@@ -14,11 +14,11 @@
   "name": "patriot",
   "version": "1.0.0",
   "description": "This is a new readme file for testing.",
-  "main": "pages/api/index.js",
+  "main": "server.js",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build && cd client && npm install && npm run build",
-    "start": "next start"
+    "dev": "node server.js",
+    "build": "cd client && npm install && npm run build",
+    "start": "node server.js"
   },
   "repository": {
     "type": "git",
