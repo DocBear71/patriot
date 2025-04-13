@@ -1,43 +1,35 @@
-// server.js
-const express = require('express');
-const path = require('path');
+// MongoDB connection configuration - add this at the top of your server.js
 const { MongoClient } = require('mongodb');
-const cors = require('cors');
-const fs = require('fs');
 
-// Create Express app
-const app = express();
+// MongoDB connection details - update these constants
+const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot';
+const MONGODB_DB = 'patriot'; // Your database name
+const USERS_COLLECTION = 'users'; // Your collection name
 
-// Enable JSON parsing and CORS
-app.use(express.json());
-app.use(cors());
-
-// Add a debug middleware to log all requests
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    next();
-});
-
-// MongoDB connection details
-const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
-const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
-
-// Serve static files from the client directory
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Register both /api/register and /api/registration routes for compatibility
+// The registration endpoint with updated MongoDB references
 app.post(['/api/register', '/api/registration'], async (req, res) => {
     console.log("Registration API hit:", req.method);
     console.log("Request body:", req.body);
 
+    let client = null;
+
     try {
         console.log("Connecting to MongoDB...");
+        console.log("Database:", MONGODB_DB);
+        console.log("Collection:", USERS_COLLECTION);
 
-        // Connect to MongoDB
-        const client = await MongoClient.connect(MONGODB_URI);
+        // Connect to MongoDB with timeout options
+        client = await MongoClient.connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000, // 5 seconds
+            connectTimeoutMS: 10000, // 10 seconds
+            socketTimeoutMS: 15000, // 15 seconds
+        });
+
         console.log("Connected to MongoDB");
 
+        // Get reference to the database and collection
         const db = client.db(MONGODB_DB);
+        const collection = db.collection(USERS_COLLECTION);
 
         // Extract user data from request body
         const userData = req.body;
@@ -48,8 +40,20 @@ app.post(['/api/register', '/api/registration'], async (req, res) => {
             return res.status(400).json({ message: 'Email and password are required' });
         }
 
-        // Check if user already exists
-        const existingUser = await db.collection('users').findOne({ email: userData.email });
+        // Check if user already exists - with timeout
+        let existingUser = null;
+        try {
+            existingUser = await Promise.race([
+                collection.findOne({ email: userData.email }),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Database query timeout')), 5000)
+                )
+            ]);
+        } catch (err) {
+            console.error("Error checking for existing user:", err);
+            // Continue even if this check times out
+        }
+
         if (existingUser) {
             return res.status(409).json({ message: 'User with this email already exists' });
         }
@@ -64,89 +68,40 @@ app.post(['/api/register', '/api/registration'], async (req, res) => {
         }
 
         console.log("Inserting user data...");
-        // Insert user data
-        const result = await db.collection('users').insertOne(userData);
-        console.log("User inserted successfully:", result.insertedId);
+        // Insert user data with timeout
+        let result;
+        try {
+            result = await Promise.race([
+                collection.insertOne(userData),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Database insert timeout')), 5000)
+                )
+            ]);
 
-        // Close connection
-        await client.close();
+            console.log("User inserted successfully:", result.insertedId);
 
-        // Return success response
-        return res.status(201).json({
-            message: 'User registered successfully',
-            userId: result.insertedId
-        });
+            // Return success response
+            return res.status(201).json({
+                message: 'User registered successfully',
+                userId: result.insertedId
+            });
+        } catch (err) {
+            console.error("Error inserting user:", err);
+            throw err; // Re-throw to be caught by the outer catch block
+        }
 
     } catch (error) {
         console.error('Registration error:', error);
         return res.status(500).json({ message: 'Server error during registration: ' + error.message });
+    } finally {
+        // Make sure to close the connection even if there's an error
+        if (client) {
+            try {
+                await client.close();
+                console.log("MongoDB connection closed");
+            } catch (err) {
+                console.error("Error closing MongoDB connection:", err);
+            }
+        }
     }
 });
-
-// Create a simple GET endpoint for the registration API to test
-app.get(['/api/register', '/api/registration'], (req, res) => {
-    res.status(200).json({
-        message: 'Registration API is available',
-        method: 'Use POST to submit registration data',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// Test API endpoint
-app.get('/api/test', (req, res) => {
-    res.status(200).json({
-        message: 'API is working!',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// Map specific HTML pages
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.get('/register', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'register.html'));
-});
-
-app.get('/about', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'about.html'));
-});
-
-app.get('/contact', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'contact.html'));
-});
-
-app.get('/search', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'search.html'));
-});
-
-app.get('/correction', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'correction.html'));
-});
-
-// For any other GET request, check if the file exists in client directory
-app.get('*', (req, res) => {
-    const filePath = path.join(__dirname, 'public', req.path);
-
-    // Check if the file exists
-    if (fs.existsSync(filePath)) {
-        res.sendFile(filePath);
-    } else {
-        // If file doesn't exist, serve index.html (for SPA-like behavior)
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    }
-});
-
-// Set port
-const PORT = process.env.PORT || 3000;
-
-// Start server
-if (process.env.NODE_ENV !== 'production') {
-    app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-    });
-}
-
-// Export for Vercel
-module.exports = app;
