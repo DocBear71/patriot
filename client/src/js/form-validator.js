@@ -69,11 +69,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-
     async function submitToMongoDB(formData) {
         try {
-            // Use the absolute URL to your Vercel deployment
-            const apiUrl = 'https://patriotthanks.vercel.app/api/registration';
+            // Use the absolute URL to your Vercel deployment with the new endpoint
+            const apiUrl = 'https://patriotthanks.vercel.app/api/register';
             console.log("Submitting to API at:", apiUrl);
 
             const response = await fetch(apiUrl, {
