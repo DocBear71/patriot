@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get form elements
     const form = {
         businessName: document.getElementById("business-name"),
-        address: document.getElementById("address"),
+        streetAddress: document.getElementById("streetAddress"),
     };
 
     // Get the form element
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const invalidFields = [];
 
         if (!isNotEmpty(form.businessName.value)) invalidFields.push("Business Name");
-        if (!isNotEmpty(form.address.value)) invalidFields.push("Address");
+        if (!isNotEmpty(form.streetAddress.value)) invalidFields.push("streetAddress");
 
         console.log("Invalid fields:", invalidFields);
 
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             const formData = {
                 businessName: form.businessName.value,
-                address: form.address.value,
+                streetAddress: form.streetAddress.value,
             };
 
             console.log("Form data to submit:", formData);
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const queryParams = new URLSearchParams({
                 businessName: formData.businessName,
-                address: formData.address
+                streetAddress: formData.address
             }).toString();
             // Use the absolute URL to your Vercel deployment with the new endpoint
             const apiUrl = `https://patriotthanks.vercel.app/api/business-search?${queryParams}`;
@@ -81,32 +81,50 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function displaySearchResults(businesses) {
-        // get the table body
+        // Get the table body
         const tableBody = document.querySelector('#business_search tbody');
 
-        // Clear the existing rows
+        // Clear existing rows
         tableBody.innerHTML = '';
 
         if (businesses.length === 0) {
+            // Show no results message
             alert("No businesses found matching your search criteria.");
             return;
         }
 
-        // Show the table results (it has h5 with "hidden" content)
+        // Show the search results table (it has h5 with "hidden" content)
         document.getElementById('search_table').querySelector('h5').style.display = 'none';
         document.getElementById('business_search').style.display = 'block';
 
-        // now add each business to the table
+        // Add each business to the table
         businesses.forEach(business => {
-            const row = document.createElement("tr");
+            const row = document.createElement('tr');
+
+            // Get a placeholder image based on business type
+            let imageSrc = './images/placeholder.jpg';
+            if (business.type === 'Restaurant' || business.type === 'REST') {
+                imageSrc = './images/red_lobster.jpg';
+            } else if (business.type === 'RETAIL' || business.type === 'Retail') {
+                imageSrc = './images/home_depot.jpg';
+            } else if (business.type === 'AUTO') {
+                imageSrc = './images/milex.jpg';
+            } else if (business.type === 'HARDW') {
+                imageSrc = './images/lowes.jpg';
+            }
+
+            // Format the address line
+            const addressLine = business.address2
+                ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
+                : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
 
             row.innerHTML = `
-                <th><img src="./images/placeholder.jpg" alt="${business.businessName}" class="business-image"></th>
-                <th class="left_table">${business.businessName}</th>
-                <th class="left_table">${business.address}<br>${business.city}, ${business.state} ${business.zip}</th>
-                <th class="left_table">${business.phone}</th>
-                <th class="left_table">${business.type}</th>
-            `;
+            <th><img src="${imageSrc}" alt="${business.bname}" class="business-image"></th>
+            <th class="left_table">${business.bname}</th>
+            <th class="left_table">${addressLine}</th>
+            <th class="left_table">Business type: ${business.type}</th>
+            <th class="right_table">Phone: ${business.phone}</th>
+        `;
 
             tableBody.appendChild(row);
         });
@@ -114,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add input event listeners for visual feedback
     form.businessName.addEventListener('input', function() { validateField(this, isNotEmpty); });
-    form.address.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    form.streetAddress.addEventListener('input', function() { validateField(this, isNotEmpty); });
 
 
     // Validation functions
@@ -143,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function validateForm() {
         const requiredFields = [
             { element: form.businessName, validator: isNotEmpty },
-            { element: form.address, validator: isNotEmpty },
+            { element: form.streetAddress, validator: isNotEmpty },
 
         ];
 

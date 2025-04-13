@@ -138,7 +138,6 @@ app.post(['/api/business', '/api/businesses'], async (req, res) => {
     }
 });
 
-// Add this to your server.js file
 app.get(['/api/business', '/api/business-search'], async (req, res) => {
     console.log("Business search API hit:", req.method);
     console.log("Query parameters:", req.query);
@@ -160,7 +159,7 @@ app.get(['/api/business', '/api/business-search'], async (req, res) => {
         const query = {};
 
         if (req.query.businessName) {
-            // Use case-insensitive search with regex
+            // Use case-insensitive search with regex for the bname field
             query.bname = { $regex: req.query.businessName, $options: 'i' };
         }
 
