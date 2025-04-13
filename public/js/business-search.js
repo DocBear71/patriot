@@ -3,20 +3,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Get form elements
     const form = {
-        businessName: document.getElementById("bname"),
-        address1: document.getElementById("address1"),
-        city: document.getElementById("city"),
-        state: document.getElementById("state"),
-        zip: document.getElementById("zip"),
-        phone: document.getElementById("phone"),
-        type: document.getElementById("type"),
+        businessName: document.getElementById("business-name"),
+        address: document.getElementById("address"),
     };
 
     // Get the form element
-    const submitBusiness = document.getElementById("business-form");
+    const findBusiness = document.getElementById("business-search-form");
 
     // Add form submission handler
-    submitBusiness.addEventListener('submit', function(event) {
+    findBusiness.addEventListener('submit', function(event) {
         // Prevent the form from submitting immediately
         event.preventDefault();
 
@@ -24,12 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const invalidFields = [];
 
         if (!isNotEmpty(form.businessName.value)) invalidFields.push("Business Name");
-        if (!isNotEmpty(form.address1.value)) invalidFields.push("Address");
-        if (!isNotEmpty(form.city.value)) invalidFields.push("City");
-        if (!isNotEmpty(form.state.value)) invalidFields.push("State");
-        if (!isValidZip(form.zip.value)) invalidFields.push("Zip Code");
-        if (!isValidPhone(form.phone.value)) invalidFields.push("Phone Number");
-        if (!isNotEmpty(form.type.value)) invalidFields.push("Type");
+        if (!isNotEmpty(form.address.value)) invalidFields.push("Address");
 
         console.log("Invalid fields:", invalidFields);
 
@@ -40,36 +30,34 @@ document.addEventListener('DOMContentLoaded', function() {
             alert(message);
         } else {
             const formData = {
-                bname: form.businessName.value,
-                address1: form.address1.value,
-                address2: document.getElementById("address2").value,
-                city: form.city.value,
-                state: form.state.value,
-                zip: form.zip.value,
-                phone: form.phone.value,
-                type: form.type.value,
+                businessName: form.businessName.value,
+                address: form.address.value,
             };
 
             console.log("Form data to submit:", formData);
 
             // Submit the data to MongoDB
-            submitToMongoDB(formData);
+            retrieveFromMongoDB(formData);
         }
     });
 
 
-    async function submitToMongoDB(formData) {
+    async function retrieveFromMongoDB(formData) {
         try {
+            const queryParams = new URLSearchParams({
+                businessName: formData.businessName,
+                address: formData.address
+            }).toString();
             // Use the absolute URL to your Vercel deployment with the new endpoint
-            const apiUrl = 'https://patriotthanks.vercel.app/api/business';
-            console.log("Submitting to API at:", apiUrl);
+            const apiUrl = `https://patriotthanks.vercel.app/api/business-search?${queryParams}`;
+            console.log("Submitting search to API at:", apiUrl);
 
             const response = await fetch(apiUrl, {
-                method: "POST",
+                method: "GET",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(formData),
+
             });
 
             console.log("Response status:", response.status);
@@ -77,46 +65,61 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error("Error response:", errorText);
-                throw new Error(`Failed to submit data to MongoDB: ${response.status} ${errorText}`);
+                throw new Error(`Failed to retrieve data from MongoDB: ${response.status} ${errorText}`);
             }
 
             const data = await response.json();
             console.log("Success:", data);
 
-            // Show success message to user
-            alert("Submission successful! The business is now available in our database.");
-
-            // Optional: Clear form or redirect
-            submitBusiness.reset();
+            // Display results in the table
+            displaySearchResults(data.results);
 
         } catch (error) {
             console.error("Error:", error);
-            alert("Registration failed: " + error.message);
+            alert("Retrieval failed: " + error.message);
         }
+    }
+
+    function displaySearchResults(businesses) {
+        // get the table body
+        const tableBody = document.querySelector('#business_search tbody');
+
+        // Clear the existing rows
+        tableBody.innerHTML = '';
+
+        if (businesses.length === 0) {
+            alert("No businesses found matching your search criteria.");
+            return;
+        }
+
+        // Show the table results (it has h5 with "hidden" content)
+        document.getElementById('search_table').querySelector('h5').style.display = 'none';
+        document.getElementById('business_search').style.display = 'block';
+
+        // now add each business to the table
+        businesses.forEach(business => {
+            const row = document.createElement("tr");
+
+            row.innerHTML = `
+                <th><img src="./images/placeholder.jpg" alt="${business.businessName}" class="business-image"></th>
+                <th class="left_table">${business.businessName}</th>
+                <th class="left_table">${business.address}<br>${business.city}, ${business.state} ${business.zip}</th>
+                <th class="left_table">${business.phone}</th>
+                <th class="left_table">${business.type}</th>
+            `;
+
+            tableBody.appendChild(row);
+        });
     }
 
     // Add input event listeners for visual feedback
     form.businessName.addEventListener('input', function() { validateField(this, isNotEmpty); });
-    form.address1.addEventListener('input', function() { validateField(this, isNotEmpty); });
-    form.city.addEventListener('input', function() { validateField(this, isNotEmpty); });
-    form.state.addEventListener('change', function() { validateField(this, isNotEmpty); });
-    form.zip.addEventListener('input', function() { validateField(this, isValidZip); });
-    form.phone.addEventListener('input', function() { validateField(this, isValidPhone); });
-    form.type.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    form.address.addEventListener('input', function() { validateField(this, isNotEmpty); });
+
 
     // Validation functions
     function isNotEmpty(value) {
         return value.trim() !== '';
-    }
-
-    function isValidZip(value) {
-        const zipPattern = /^\d{5}(-\d{4})?$/;
-        return zipPattern.test(value);
-    }
-
-    function isValidPhone(value) {
-        const phonePattern = /^\d{3}(-\d{3}(-\d{4}))?$/
-        return phonePattern.test(value);
     }
 
     // Apply validation styling to a field
@@ -140,12 +143,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function validateForm() {
         const requiredFields = [
             { element: form.businessName, validator: isNotEmpty },
-            { element: form.address1, validator: isNotEmpty },
-            { element: form.city, validator: isNotEmpty },
-            { element: form.state, validator: isNotEmpty },
-            { element: form.zip, validator: isValidZip },
-            { element: form.phone, validator: isValidPhone },
-            { element: form.type, validator: isNotEmpty },
+            { element: form.address, validator: isNotEmpty },
+
         ];
 
         let businessIsValid = true;

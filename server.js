@@ -130,8 +130,59 @@ app.post(['/api/business', '/api/businesses'], async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Registration error:', error);
-        return res.status(500).json({ message: 'Server error during registration: ' + error.message });
+        console.error('Submission error:', error);
+        return res.status(500).json({ message: 'Server error during Submission: ' + error.message });
+    } finally {
+        // Close the connection
+        if (client) await client.close();
+    }
+});
+
+// Add this to your server.js file
+app.get(['/api/business', '/api/business-search'], async (req, res) => {
+    console.log("Business search API hit:", req.method);
+    console.log("Query parameters:", req.query);
+
+    let client = null;
+
+    try {
+        // Connect to MongoDB
+        client = await MongoClient.connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 10000,
+            socketTimeoutMS: 15000,
+        });
+
+        const db = client.db(MONGODB_DB);
+        const collection = db.collection(BUSINESS_COLLECTION);
+
+        // Build query based on provided parameters
+        const query = {};
+
+        if (req.query.businessName) {
+            // Use case-insensitive search with regex
+            query.bname = { $regex: req.query.businessName, $options: 'i' };
+        }
+
+        if (req.query.address) {
+            // Search in both address fields
+            query.$or = [
+                { address1: { $regex: req.query.address, $options: 'i' } },
+                { address2: { $regex: req.query.address, $options: 'i' } }
+            ];
+        }
+
+        // Find businesses matching the query
+        const businesses = await collection.find(query).toArray();
+
+        return res.status(200).json({
+            message: 'Search successful',
+            results: businesses
+        });
+
+    } catch (error) {
+        console.error('Search error:', error);
+        return res.status(500).json({ message: 'Server error during search: ' + error.message });
     } finally {
         // Close the connection
         if (client) await client.close();

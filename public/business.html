@@ -19,6 +19,7 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
         <script src="./js/init.js"></script>
         <script src="./js/business-validator.js" type="module"></script>
+        <script src="./js/business-search.js" type="module"></script>
     </head>
     <body id="page_layout">
 
@@ -161,6 +162,28 @@
                     <br><br><br>
                 </form>
             </div>
+            <div class="right_pane">
+                <fieldset>
+                    <legend>
+                        <h3 class="caveat">Search for a Business</h3>
+                    </legend>
+                    <form id="business-search-form" onsubmit="return false">
+                        <br>
+                        <label for="business-name">Business Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                        <input type="text" id="business-name" name="business_name" placeholder="Business Name...">
+                        <br>
+                        <label for="address">Street Address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                        <input type="text" id="address" name="address" >
+                        <br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        <input type="submit" value="Search Business">
+                    </form>
+                </fieldset>
+                <br><br><br>
+
+            </div>
+
             <section id="search_table">
                 <h5>hidden</h5>
                 <figure id="business_search" class="middle">

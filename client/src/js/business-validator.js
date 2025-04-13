@@ -84,11 +84,10 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log("Success:", data);
 
             // Show success message to user
-            alert("Registration successful! You can now log in.");
+            alert("Submission successful! The business is now available in our database.");
 
             // Optional: Clear form or redirect
             submitBusiness.reset();
-            // Or redirect: window.location.href = '/login.html';
 
         } catch (error) {
             console.error("Error:", error);
