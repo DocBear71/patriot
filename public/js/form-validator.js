@@ -1,3 +1,5 @@
+import * as path from "node:path";
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Form validator loaded!");
 
@@ -67,12 +69,12 @@ document.addEventListener('DOMContentLoaded', function() {
             submitToMongoDB(formData);
         }
     });
-
+    const apiIndex = require(path.join(__dirname, "api", "index.js"))
     // Function to submit data to MongoDB
     function submitToMongoDB(data) {
         console.log("Submitting data to API:", data);
 
-        fetch('/api/index', {
+        fetch(apiIndex, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
