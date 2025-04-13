@@ -13,7 +13,7 @@
   "name": "patriot",
   "version": "1.0.0",
   "description": "This is a new readme file for testing.",
-  "main": "api/index.js",
+  "main": "pages/api/index.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build && cd client && npm install && npm run build",

@@ -19,7 +19,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.static('public')); // This will display /public/index.html when the server loads
 
 const userRouter = require("../routes/user");
-app.use("/api/user", userRouter);
+app.use("/oldAPI/user", userRouter);
 
 
 app.use("*", fileNotFound);
