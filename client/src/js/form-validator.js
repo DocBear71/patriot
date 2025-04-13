@@ -1,5 +1,5 @@
 import path from "node:path";
-import cors from "cors";
+const cors = require("cors");
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Form validator loaded!");
