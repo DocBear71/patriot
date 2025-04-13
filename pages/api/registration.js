@@ -5,8 +5,8 @@ const { MongoClient } = require('mongodb');
 const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
 const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
 
-// Export a function that Next.js recognizes as an API route handler
-export default async function handler(req, res) {
+// Export the handler function using CommonJS syntax
+module.exports = async function handler(req, res) {
     console.log("API route hit:", req.method);
 
     // Only allow POST method
