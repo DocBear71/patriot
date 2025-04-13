@@ -1,3 +1,5 @@
+import path from "node:path";
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Form validator loaded!");
 
@@ -67,8 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
             submitToMongoDB(formData);
         }
     });
-    const path = require('path');
-    const apiIndex = require(path.join(__dirname, "api", "index.js"));
+    const apiIndex = path.resolve(path.join(__dirname, "api", "index.js"))
     // Function to submit data to MongoDB
     function submitToMongoDB(data) {
         console.log("Submitting data to API:", data);
