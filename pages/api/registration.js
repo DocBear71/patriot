@@ -1,68 +1,60 @@
-const { MongoClient } = require('mongodb');
+// pages/api/register.js
+import { MongoClient } from 'mongodb';
 
-module.exports = async function handler(req, res) {
-    // Log request details for debugging
-    console.log('API request received:', req.method);
+// Replace with your MongoDB connection string
+const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
+const MONGODB_DB = process.env.MONGODB_DB || 'patriot-thanks';
 
-    // Only allow POST requests
+export default async function handler(req, res) {
+    // Only allow POST method
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method not allowed' });
     }
 
     try {
-        // Log request body
-        console.log('Request body:', req.body);
-
-        // Get form data from request body
-        const data = req.body;
-
-        // Validate required fields
-        if (!data.fname || !data.lname || !data.address1 || !data.city ||
-            !data.state || !data.zip || !data.email || !data.password) {
-            return res.status(400).json({ message: 'Missing required fields' });
-        }
-
-        // Log MongoDB connection attempt
-        console.log('Attempting to connect to MongoDB...');
-
-        // Check if env vars are available
-        if (!process.env.MONGODB_URI_PATRIOT) {
-            console.error('MONGODB_URI environment variable is not set');
-            return res.status(500).json({ message: 'Database configuration error' });
-        }
-
         // Connect to MongoDB
-        const client = await MongoClient.connect(process.env.MONGODB_URI_PATRIOT);
+        const client = await MongoClient.connect(MONGODB_URI, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+        });
 
-        // Log successful connection
-        console.log('MongoDB connected');
+        const db = client.db(MONGODB_DB);
 
-        const db = client.db(process.env.MONGODB_DB || 'patriot.users');
+        // Extract user data from request body
+        const userData = req.body;
 
-        // Check if email already exists
-        const existingUser = await db.collection('users').findOne({ email: data.email });
-        if (existingUser) {
-            await client.close();
-            return res.status(400).json({ message: 'Email already registered' });
+        // Basic validation
+        if (!userData.email || !userData.password) {
+            return res.status(400).json({ message: 'Email and password are required' });
         }
 
-        // Insert the user
-        const result = await db.collection('users').insertOne(data);
+        // Check if user already exists
+        const existingUser = await db.collection('users').findOne({ email: userData.email });
+        if (existingUser) {
+            return res.status(409).json({ message: 'User with this email already exists' });
+        }
 
-        await client.close();
+        // Remove password repeat field before storing
+        delete userData.psw_repeat;
+
+        // Rename password field to match your schema
+        userData.password = userData.password;
+        delete userData.psw;
+
+        // Insert user data
+        const result = await db.collection('users').insertOne(userData);
+
+        // Close connection
+        client.close();
 
         // Return success response
         return res.status(201).json({
             message: 'User registered successfully',
-            userId: result.insertedId.toString()
+            userId: result.insertedId
         });
 
     } catch (error) {
         console.error('Registration error:', error);
-        return res.status(500).json({
-            message: 'Server error',
-            error: error.message,
-            stack: error.stack
-        });
+        return res.status(500).json({ message: 'Server error during registration' });
     }
-};
+}

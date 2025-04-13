@@ -1,6 +1,3 @@
-
-
-
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Form validator loaded!");
 
@@ -72,43 +69,35 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 
-    async function submitToMongoDB(formData) { // make the submitToMongoDB function async
+    async function submitToMongoDB(formData) {
         try {
-            // Get the correct api index.
-            const apiIndex = await getApiIndex(); //await the promise's return
-            // If apiIndex is null, throw an error
-            if (apiIndex === null) {
-                throw new Error("apiIndex is null");
-            }
-            const response = await fetch(apiIndex, { //await the response, since fetch is also async
+            // Make a direct API call to your endpoint
+            const response = await fetch('/api/registration', {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify(formData),
             });
+
             if (!response.ok) {
-                // If status is not ok, log an error
-                throw new Error("Failed to submit data to MongoDB");
+                const errorText = await response.text();
+                throw new Error(`Failed to submit data to MongoDB: ${response.status} ${errorText}`);
             }
+
             const data = await response.json();
             console.log("Success:", data);
+
+            // Show success message to user
+            alert("Registration successful! You can now log in.");
+
+            // Optional: Clear form or redirect
+            registerForm.reset();
+            // Or redirect: window.location.href = '/login.html';
+
         } catch (error) {
             console.error("Error:", error);
-        }
-    }
-
-    async function getApiIndex() {
-        try {
-            // Replace this fetch with your actual code.
-            const response = await fetch('/api/index.js')
-            if (!response.ok) {
-                throw new Error('Could not get index.')
-            }
-            return await response.text();
-        } catch (error) {
-            console.error("Error getting index:", error);
-            return null;
+            alert("Registration failed: " + error.message);
         }
     }
 
