@@ -26,6 +26,9 @@
     "webpack-dev-server": "^5.2.1"
   },
   "dependencies": {
+    "es5-shim": "^4.6.7",
+    "es6": "^0.0.7",
+    "es6-shim": "^0.35.8",
     "jquery": "^3.7.1"
   }
 }
