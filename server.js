@@ -23,12 +23,14 @@ if (!MONGODB_URI) {
 
 const MONGODB_DB = 'patriot';
 const USERS_COLLECTION = 'users';
+const BUSINESS_COLLECTION = 'business';
 
 // Add a debug middleware to log all requests
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
 });
+
 // Simplified registration endpoint for serverless
 app.post(['/api/register', '/api/registration'], async (req, res) => {
     console.log("Registration API hit:", req.method);
@@ -75,6 +77,56 @@ app.post(['/api/register', '/api/registration'], async (req, res) => {
         return res.status(201).json({
             message: 'User registered successfully',
             userId: result.insertedId
+        });
+
+    } catch (error) {
+        console.error('Registration error:', error);
+        return res.status(500).json({ message: 'Server error during registration: ' + error.message });
+    } finally {
+        // Close the connection
+        if (client) await client.close();
+    }
+});
+
+// Simplified registration endpoint for serverless
+app.post(['/api/business', '/api/businesses'], async (req, res) => {
+    console.log("Business API hit:", req.method);
+
+    let client = null;
+
+    try {
+        // Connect to MongoDB
+        client = await MongoClient.connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 10000,
+            socketTimeoutMS: 15000,
+        });
+
+        const db = client.db(MONGODB_DB);
+        const collection = db.collection(BUSINESS_COLLECTION);
+
+        // Extract business data from request body
+        const businessData = req.body;
+
+        // Check if business already exists
+        const existingBusiness = await db.collection('business').findOne({
+            address1: businessData.address1,
+            address2: businessData.address2,
+            city: businessData.city,
+            state: businessData.state,
+            zip: businessData.zip
+        });
+        if (existingBusiness) {
+            return res.status(409).json({ message: 'Business with this address already exists' });
+        }
+
+        // Insert business data
+        const result = await collection.insertOne(businessData);
+
+        // Return success response
+        return res.status(201).json({
+            message: 'business registered successfully',
+            businessId: result.insertedId
         });
 
     } catch (error) {
