@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    js
+
     async function submitToMongoDB(formData) { // make the submitToMongoDB function async
         try {
             // Get the correct api index.
