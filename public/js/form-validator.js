@@ -101,13 +101,13 @@ document.addEventListener('DOMContentLoaded', function() {
     async function getApiIndex() {
         try {
             // Replace this fetch with your actual code.
-            const response = await fetch('/api/getApiIndex')
+            const response = await fetch('/api/index')
             if (!response.ok) {
-                throw new Error('Could not get API index.')
+                throw new Error('Could not get index.')
             }
             return await response.text();
         } catch (error) {
-            console.error("Error getting api index:", error);
+            console.error("Error getting index:", error);
             return null;
         }
     }
