@@ -71,13 +71,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    async function apiIndex(a, b) {
-        const response = await fetch(`https://localhost:3000/path-join?a=${a}&b=${b}`);
+    async function getJoinedPath() {
+        const response = await fetch(`./path-joined`);
         const data = await response.json();
         return data.result;
     }
 
-    const apiIndex = path.resolve(path.join(__dirname, "api", "index.js"))
+    const apiIndex = getJoinedPath();
     // Function to submit data to MongoDB
     function submitToMongoDB(data) {
         console.log("Submitting data to API:", data);
