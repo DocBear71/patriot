@@ -71,55 +71,45 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    async function getJoinedPath() {
-        const response = await fetch(`./path-joined`);
-        const data = await response.json();
-        return data.result;
+    js
+    async function submitToMongoDB(formData) { // make the submitToMongoDB function async
+        try {
+            // Get the correct api index.
+            const apiIndex = await getApiIndex(); //await the promise's return
+            // If apiIndex is null, throw an error
+            if (apiIndex === null) {
+                throw new Error("apiIndex is null");
+            }
+            const response = await fetch(apiIndex, { //await the response, since fetch is also async
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(formData),
+            });
+            if (!response.ok) {
+                // If status is not ok, log an error
+                throw new Error("Failed to submit data to MongoDB");
+            }
+            const data = await response.json();
+            console.log("Success:", data);
+        } catch (error) {
+            console.error("Error:", error);
+        }
     }
 
-    const apiIndex = getJoinedPath();
-    // Function to submit data to MongoDB
-    function submitToMongoDB(data) {
-        console.log("Submitting data to API:", data);
-
-        fetch(apiIndex, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-            .then(response => {
-                console.log("Response status:", response.status);
-
-                return response.text().then(text => {
-                    console.log("Raw API response:", text);
-
-                    try {
-                        if (text) {
-                            const json = JSON.parse(text);
-                            if (!response.ok) {
-                                throw new Error(json.message || 'Registration failed');
-                            }
-                            return json;
-                        } else {
-                            throw new Error("Empty response received");
-                        }
-                    } catch (e) {
-                        console.error("Response parse error:", e);
-                        throw new Error("Server returned an invalid response");
-                    }
-                });
-            })
-            .then(data => {
-                console.log('Success:', data);
-                alert("Registration successful!");
-                window.location.href = "index.html";
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert("Registration error: " + error.message);
-            });
+    async function getApiIndex() {
+        try {
+            // Replace this fetch with your actual code.
+            const response = await fetch('/api/getApiIndex')
+            if (!response.ok) {
+                throw new Error('Could not get API index.')
+            }
+            return await response.text();
+        } catch (error) {
+            console.error("Error getting api index:", error);
+            return null;
+        }
     }
 
     // Add input event listeners for visual feedback
