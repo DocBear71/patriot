@@ -27,8 +27,8 @@ module.exports = async function handler(req, res) {
             }
 
             // Connect to MongoDB
-            const client = await MongoClient.connect(process.env.MONGODB_URI);
-            const db = client.db(process.env.MONGODB_DB || 'patriot');
+            const client = await MongoClient.connect(process.env.MONGODB_URI_PATRIOT);
+            const db = client.db(process.env.MONGODB_DB || 'patriot.users');
 
             // Check if email already exists
             const existingUser = await db.collection('users').findOne({ email: data.email });

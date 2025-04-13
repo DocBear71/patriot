@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function submitToMongoDB(data) {
         console.log("Submitting data to API:", data);
 
-        fetch('/pages/api/registration', {
+        fetch('/api/index', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

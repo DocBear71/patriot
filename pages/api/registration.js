@@ -26,18 +26,18 @@ module.exports = async function handler(req, res) {
         console.log('Attempting to connect to MongoDB...');
 
         // Check if env vars are available
-        if (!process.env.MONGODB_URI) {
+        if (!process.env.MONGODB_URI_PATRIOT) {
             console.error('MONGODB_URI environment variable is not set');
             return res.status(500).json({ message: 'Database configuration error' });
         }
 
         // Connect to MongoDB
-        const client = await MongoClient.connect(process.env.MONGODB_URI);
+        const client = await MongoClient.connect(process.env.MONGODB_URI_PATRIOT);
 
         // Log successful connection
         console.log('MongoDB connected');
 
-        const db = client.db(process.env.MONGODB_DB || 'patriot');
+        const db = client.db(process.env.MONGODB_DB || 'patriot.users');
 
         // Check if email already exists
         const existingUser = await db.collection('users').findOne({ email: data.email });
