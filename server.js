@@ -157,19 +157,27 @@ app.get(['/api/business', '/api/business-search'], async (req, res) => {
 
         // Build query based on provided parameters
         const query = {};
+        const searchConditions = [];
 
-        if (req.query.businessName) {
-            // Use case-insensitive search with regex for the bname field
-            query.bname = { $regex: req.query.businessName, $options: 'i' };
+        if (req.query.businessName && req.query.businessName.trim() !== '') {
+            // Search by business name
+            searchConditions.push({ bname: { $regex: req.query.businessName, $options: 'i' } });
         }
 
-        if (req.query.address) {
-            // Search in both address fields
-            query.$or = [
-                { address1: { $regex: req.query.address, $options: 'i' } },
-                { address2: { $regex: req.query.address, $options: 'i' } }
-            ];
+        if (req.query.address && req.query.address.trim() !== '') {
+            // Search in multiple address fields
+            searchConditions.push({ address1: { $regex: req.query.address, $options: 'i' } });
+            searchConditions.push({ address2: { $regex: req.query.address, $options: 'i' } });
+            searchConditions.push({ city: { $regex: req.query.address, $options: 'i' } });
+            searchConditions.push({ zip: { $regex: req.query.address, $options: 'i' } });
         }
+
+        // If we have search conditions, use $or to match any of them
+        if (searchConditions.length > 0) {
+            query.$or = searchConditions;
+        }
+
+        console.log("MongoDB Query:", JSON.stringify(query, null, 2));
 
         // Find businesses matching the query
         const businesses = await collection.find(query).toArray();

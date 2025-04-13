@@ -15,23 +15,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Prevent the form from submitting immediately
         event.preventDefault();
 
-        // Validate all fields
-        const invalidFields = [];
-
-        if (!isNotEmpty(form.businessName.value)) invalidFields.push("Business Name");
-        if (!isNotEmpty(form.streetAddress.value)) invalidFields.push("streetAddress");
-
-        console.log("Invalid fields:", invalidFields);
-
-        // If there are invalid fields, show an alert
-        if (invalidFields.length > 0) {
-            let message = "Please complete the following required fields:\n";
-            message += invalidFields.join("\n");
-            alert(message);
+        // Only require at least one search field to be filled
+        if (!isNotEmpty(form.businessName.value) && !isNotEmpty(form.address.value)) {
+            alert("Please enter either a business name or address to search");
         } else {
             const formData = {
                 businessName: form.businessName.value,
-                streetAddress: form.streetAddress.value,
+                address: form.address.value,
             };
 
             console.log("Form data to submit:", formData);
@@ -44,11 +34,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function retrieveFromMongoDB(formData) {
         try {
-            const queryParams = new URLSearchParams({
-                businessName: formData.businessName,
-                streetAddress: formData.address
-            }).toString();
-            // Use the absolute URL to your Vercel deployment with the new endpoint
+            // Only include non-empty parameters in the query
+            const params = {};
+            if (formData.businessName && formData.businessName.trim() !== '') {
+                params.businessName = formData.businessName;
+            }
+            if (formData.address && formData.address.trim() !== '') {
+                params.address = formData.address;
+            }
+
+            const queryParams = new URLSearchParams(params).toString();
+
+            // Use the absolute URL with query parameters
             const apiUrl = `https://patriotthanks.vercel.app/api/business-search?${queryParams}`;
             console.log("Submitting search to API at:", apiUrl);
 
@@ -56,8 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
-                },
-
+                }
             });
 
             console.log("Response status:", response.status);
@@ -71,12 +67,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             console.log("Success:", data);
 
-            // Display results in the table
+            // Display the results instead of showing an alert
             displaySearchResults(data.results);
 
         } catch (error) {
             console.error("Error:", error);
-            alert("Retrieval failed: " + error.message);
+            alert("Search failed: " + error.message);
         }
     }
 
