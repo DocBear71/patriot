@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
         status: document.getElementById("status")
     };
 
+
     // Get the form element
     const registerForm = document.getElementById("register-form");
 
