@@ -5,26 +5,30 @@ const { MongoClient } = require('mongodb');
 const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
 const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
 
-module.exports = async function handler(req, res) {
+// Export a function that Next.js recognizes as an API route handler
+export default async function handler(req, res) {
+    console.log("API route hit:", req.method);
+
     // Only allow POST method
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method not allowed' });
     }
 
     try {
+        console.log("Connecting to MongoDB...");
+
         // Connect to MongoDB
-        const client = await MongoClient.connect(MONGODB_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
+        const client = await MongoClient.connect(MONGODB_URI);
+        console.log("Connected to MongoDB");
 
         const db = client.db(MONGODB_DB);
 
         // Extract user data from request body
         const userData = req.body;
+        console.log("Received user data:", userData);
 
         // Basic validation
-        if (!userData.email || !userData.password) {
+        if (!userData.email || (!userData.password && !userData.psw)) {
             return res.status(400).json({ message: 'Email and password are required' });
         }
 
@@ -35,7 +39,7 @@ module.exports = async function handler(req, res) {
         }
 
         // Remove password repeat field before storing
-        delete userData.psw_repeat;
+        if (userData.psw_repeat) delete userData.psw_repeat;
 
         // Rename password field if necessary
         if (userData.psw && !userData.password) {
@@ -43,11 +47,13 @@ module.exports = async function handler(req, res) {
             delete userData.psw;
         }
 
+        console.log("Inserting user data...");
         // Insert user data
         const result = await db.collection('users').insertOne(userData);
+        console.log("User inserted successfully:", result.insertedId);
 
         // Close connection
-        client.close();
+        await client.close();
 
         // Return success response
         return res.status(201).json({
@@ -57,6 +63,6 @@ module.exports = async function handler(req, res) {
 
     } catch (error) {
         console.error('Registration error:', error);
-        return res.status(500).json({ message: 'Server error during registration' });
+        return res.status(500).json({ message: 'Server error during registration: ' + error.message });
     }
 }

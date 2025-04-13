@@ -72,8 +72,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function submitToMongoDB(formData) {
         try {
-            // Make a direct API call to your endpoint
-            const response = await fetch('/api/registration', {
+            // Use the absolute URL to your deployed API endpoint
+            const response = await fetch('https://patriotthanks.vercel.app/api/registration', {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
