@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!isNotEmpty(form.state.value)) invalidFields.push("State");
         if (!isValidZip(form.zip.value)) invalidFields.push("Zip Code");
         if (!isValidPhone(form.phone.value)) invalidFields.push("Phone Number");
-        if (isNotEmpty(form.type.value)) invalidFields.push("Type");
+        if (!isNotEmpty(form.type.value)) invalidFields.push("Type");
 
         console.log("Invalid fields:", invalidFields);
 
