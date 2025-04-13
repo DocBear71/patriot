@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get form elements
     const form = {
         businessName: document.getElementById("business-name"),
-        streetAddress: document.getElementById("streetAddress"),
+        address: document.getElementById("address"),
     };
 
     // Get the form element
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add input event listeners for visual feedback
     form.businessName.addEventListener('input', function() { validateField(this, isNotEmpty); });
-    form.streetAddress.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    form.address.addEventListener('input', function() { validateField(this, isNotEmpty); });
 
 
     // Validation functions
@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function validateForm() {
         const requiredFields = [
             { element: form.businessName, validator: isNotEmpty },
-            { element: form.streetAddress, validator: isNotEmpty },
+            { element: form.address, validator: isNotEmpty },
 
         ];
 
