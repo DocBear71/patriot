@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { element: form.type, validator: isNotEmpty },
         ];
 
-        let bussinessIsValid = true;
+        let businessIsValid = true;
 
         // Validate each field and update its visual state
         requiredFields.forEach(field => {
