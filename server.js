@@ -1,4 +1,4 @@
-// server.js - Updated for serverless compatibility
+// server.js
 const express = require('express');
 const path = require('path');
 const { MongoClient } = require('mongodb');
@@ -11,11 +11,24 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// MongoDB connection details
-const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot';
+// MongoDB connection details - UPDATED CODE HERE
+console.log("Environment variable available:", !!process.env.MONGODB_URI_PATRIOT);
+const MONGODB_URI = process.env.MONGODB_URI_PATRIOT;
+
+// If environment variable is missing, log an error
+if (!MONGODB_URI) {
+    console.error("ERROR: MONGODB_URI_PATRIOT environment variable is not set!");
+    // Don't use a fallback in production - it won't work on Vercel
+}
+
 const MONGODB_DB = 'patriot';
 const USERS_COLLECTION = 'users';
 
+// Add a debug middleware to log all requests
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
 // Simplified registration endpoint for serverless
 app.post(['/api/register', '/api/registration'], async (req, res) => {
     console.log("Registration API hit:", req.method);
