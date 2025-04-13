@@ -72,8 +72,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function submitToMongoDB(formData) {
         try {
-            // Use the absolute URL to your deployed API endpoint
-            const response = await fetch('https://patriotthanks.vercel.app/pages/api/registration.js', {
+            // Use the absolute URL to your Vercel deployment
+            const apiUrl = 'https://patriotthanks.vercel.app/api/registration';
+            console.log("Submitting to API at:", apiUrl);
+
+            const response = await fetch(apiUrl, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -81,8 +84,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(formData),
             });
 
+            console.log("Response status:", response.status);
+
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error("Error response:", errorText);
                 throw new Error(`Failed to submit data to MongoDB: ${response.status} ${errorText}`);
             }
 
