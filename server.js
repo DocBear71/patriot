@@ -1,7 +1,7 @@
 // server.js
 const express = require('express');
 const path = require('path');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const cors = require('cors');
 
 // Create Express app
@@ -11,7 +11,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// MongoDB connection details - UPDATED CODE HERE
+// MongoDB connection details
 console.log("Environment variable available:", !!process.env.MONGODB_URI_PATRIOT);
 const MONGODB_URI = process.env.MONGODB_URI_PATRIOT;
 
@@ -24,6 +24,7 @@ if (!MONGODB_URI) {
 const MONGODB_DB = 'patriot';
 const USERS_COLLECTION = 'users';
 const BUSINESS_COLLECTION = 'business';
+const INCENTIVES_COLLECTION = 'incentives';
 
 // Add a debug middleware to log all requests
 app.use((req, res, next) => {
@@ -88,7 +89,7 @@ app.post(['/api/register', '/api/registration'], async (req, res) => {
     }
 });
 
-// Simplified registration endpoint for serverless
+// Business registration endpoint
 app.post(['/api/business', '/api/businesses'], async (req, res) => {
     console.log("Business API hit:", req.method);
 
@@ -138,6 +139,7 @@ app.post(['/api/business', '/api/businesses'], async (req, res) => {
     }
 });
 
+// Business search endpoint
 app.get(['/api/business', '/api/business-search'], async (req, res) => {
     console.log("Business search API hit:", req.method);
     console.log("Query parameters:", req.query);
@@ -190,6 +192,111 @@ app.get(['/api/business', '/api/business-search'], async (req, res) => {
     } catch (error) {
         console.error('Search error:', error);
         return res.status(500).json({ message: 'Server error during search: ' + error.message });
+    } finally {
+        // Close the connection
+        if (client) await client.close();
+    }
+});
+
+// NEW API: Add incentives to a business
+app.post('/api/incentives/add', async (req, res) => {
+    console.log("Incentives API hit:", req.method);
+    console.log("Request body:", req.body);
+
+    let client = null;
+
+    try {
+        // Connect to MongoDB
+        client = await MongoClient.connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 10000,
+            socketTimeoutMS: 15000,
+        });
+
+        const db = client.db(MONGODB_DB);
+        const incentivesCollection = db.collection(INCENTIVES_COLLECTION);
+        const businessCollection = db.collection(BUSINESS_COLLECTION);
+
+        // Extract incentive data from request body
+        const incentiveData = req.body;
+
+        // Basic validation
+        if (!incentiveData.business_id) {
+            return res.status(400).json({ message: 'Business ID is required' });
+        }
+
+        // Check if the business exists
+        const businessExists = await businessCollection.findOne({
+            _id: new ObjectId(incentiveData.business_id)
+        });
+
+        if (!businessExists) {
+            return res.status(404).json({ message: 'Business not found' });
+        }
+
+        // Prepare incentive data for insertion
+        const incentive = {
+            business_id: incentiveData.business_id,
+            is_available: incentiveData.is_available,
+            type: incentiveData.type || '',
+            amount: parseFloat(incentiveData.amount) || 0,
+            information: incentiveData.information || '',
+            created_at: new Date(),
+            updated_at: new Date()
+        };
+
+        // Insert incentive data
+        const result = await incentivesCollection.insertOne(incentive);
+
+        // Return success response
+        return res.status(201).json({
+            message: 'Incentive added successfully',
+            incentiveId: result.insertedId
+        });
+
+    } catch (error) {
+        console.error('Incentive submission error:', error);
+        return res.status(500).json({ message: 'Server error during incentive submission: ' + error.message });
+    } finally {
+        // Close the connection
+        if (client) await client.close();
+    }
+});
+
+// NEW API: Get incentives for a business
+app.get('/api/incentives/:businessId', async (req, res) => {
+    console.log("Get incentives API hit:", req.method);
+    console.log("Business ID:", req.params.businessId);
+
+    let client = null;
+
+    try {
+        // Connect to MongoDB
+        client = await MongoClient.connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 10000,
+            socketTimeoutMS: 15000,
+        });
+
+        const db = client.db(MONGODB_DB);
+        const incentivesCollection = db.collection(INCENTIVES_COLLECTION);
+
+        // Get business ID from path parameter
+        const businessId = req.params.businessId;
+
+        // Find incentives for the business
+        const incentives = await incentivesCollection.find({
+            business_id: businessId
+        }).toArray();
+
+        return res.status(200).json({
+            message: 'Incentives retrieved successfully',
+            results: incentives
+        });
+
+    } catch (error) {
+        console.error('Get incentives error:', error);
+        return res.status(500).json({ message: 'Server error while retrieving incentives: ' + error.message });
     } finally {
         // Close the connection
         if (client) await client.close();

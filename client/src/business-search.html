@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <title>Patriot Thanks: Search for a Business</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2025/4/12">
+    <meta name="description" content="Completion of Final Project for Web Application Development.">
+    <meta name="keywords" content="Final Project, assignment, homework, Marc Hauschildt,
+		Web Application Development I, 2025SP, CRF01 ">
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link rel="stylesheet" href="./css/slicknav.min.css">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/forms.css" rel="stylesheet">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="./js/jquery.slicknav.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="./js/init.js"></script>
+    <script src="./js/business-search.js" type="module"></script>
+</head>
+<body id="page_layout">
+
+<header>
+
+    <div class="left-banner">
+        <a href="index.html">
+            <img src="./images/docbearlogov4.png" alt="DocBear logo">
+        </a>
+    </div>
+    <div class="right-banner">
+        <h1>Patriot Thanks</h1>
+        <hr>
+        <h4>Search for a Business</h4>
+    </div>
+    <div style="clear:left;"></div>
+</header>
+<nav  class="sticky-menu">
+    <ol id="menu">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="register.html">Register/Login</a></li>
+        <li><a href="business.html" class="active">Business Menu</a>
+            <ol>
+                <li><a href="./business-add.html">Add a Business</a></li>
+                <li><a href="./business-search.html" class="active">Search for a Business</a> </li>
+            </ol>
+        </li>
+        <li><a href="incentives.html">Submit Corrections</a></li>
+        <li><a href="about.html">About Us</a></li>
+        <li><a href="contact.html">Contact</a></li>
+    </ol>
+</nav>
+<main>
+    <section class="container">
+        <h2>Search for a business within our database</h2>
+        <p class="paragraph_style">In Patriot Thanks, you can search for a businesses within your local
+            area that offers discounts and/or incentives for "active duty, veterans, first responders, and their
+            spouses." If you know of a business that offers discounts and/or incentives, Please add them in the add a business section. </p>
+    </section>
+    <div class="left_pane">
+        <fieldset>
+            <legend>
+                <h3 class="caveat">Search for a Business</h3>
+            </legend>
+            <form id="business-search-form" onsubmit="return false">
+                <br>
+                <label for="business-name">Business Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                <input type="text" id="business-name" name="business_name" placeholder="Business Name...">
+                <br>
+                <label for="address">Street Address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                <input type="text" id="address" name="street-address" placeholder="Street Address..." >
+                <br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <input type="submit" value="Search Business">
+            </form>
+        </fieldset>
+        <br><br><br>
+
+    </div>
+    <div class="right_pane">
+    <img src="images/home_free.webp" alt="Home of the free patriotic picture" id="home_free">
+
+    </div>
+    <div style="clear:both"></div>
+    <br><br><br>
+    <div class="spacer"></div>
+    <div id="business-search-results"></div>
+    <section id="search_table">
+        <br><br><br>
+        <h5>hidden</h5>
+        <figure id="business_search" class="middle">
+            <figcaption  class="caveat">Businesses Found</figcaption>
+            <table>
+                <thead>
+                <tr>
+                    <th>Business</th>
+                    <th>Name</th>
+                    <th>Location</th>
+                    <th>Description</th>
+                    <th>Offers/Incentives</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <th><img src="./images/red_lobster.jpg" alt="Red Lobster Restaurant" class="red_lobster"></th>
+                    <th class="left_table">Red Lobster</th>
+                    <th class="left_table">163 Collins Rd NE <br>Cedar Rapids, IA 52402</th>
+                    <th class="left_table">Lively chain restaurant serving American seafood standards amid New England-themed decor.</th>
+                    <th class="right_table">10% off everyday<br><br>Special meal on Veterans Day</th>
+                </tr>
+                <tr>
+                    <th><img src="./images/capriottis.jpg" alt="Capriotti's Sandwich Shop" class="capriotti"> </th>
+                    <th class="left_table">Capriotti's Sandwich Shop</th>
+                    <th class="left_table">4640 1st Ave NE <br>Cedar Rapids, IA 52402</th>
+                    <th class="left_table">Counter-service deli chain crafting hearty signature subs, salads & kids' meals in a casual setting.</th>
+                    <th class="right_table">10% off everyday</th>
+                </tr>
+                <tr>
+                    <th><img src="./images/lowes.jpg" alt="Lowe's Home Improvement" class="lowes"></th>
+                    <th class="left_table">Lowe's Home Improvement</th>
+                    <th class="left_table">5300 Blairs Forest Blvd NE<br>Cedar Rapids, IA 52402</th>
+                    <th class="left_table">Home improvement chain for appliances & gardening supplies, plus tools & hardware</th>
+                    <th class="right_table">10% off most items <br><br>Must register and be approved through <br><a href="https://www.lowes.com/military/validation">Lowe's validation site</a></th>
+                </tr>
+                <tr>
+                    <th><img src="./images/milex.jpg" alt="Milex Complete Car Care" class="milex"></th>
+                    <th class="left_table">Milex Complete Car Care</th>
+                    <th class="left_table">2010 Sylvia Ave NE <br>Cedar Rapids, IA 52402</th>
+                    <th class="left_table">Long-standing chain offering a range of car maintenance and repair services, plus oil changes.</th>
+                    <th class="right_table">10% off Parts</th>
+                </tr>
+                <tr>
+                    <th><img src="./images/home_depot.jpg" alt="The Home Depot" class="home_depot"></th>
+                    <th class="left_table">The Home Depot</th>
+                    <th class="left_table">4501 1st Ave SE<br>Cedar Rapids, IA 52402</th>
+                    <th class="left_table">Chain home improvement retailer for tools, appliances & other products (some offer truck rentals).</th>
+                    <th class="right_table">10% off elegible items <br><br>Must register and be approved through <br><a href="https://www.homedepot.com/c/military">The Home Depot validation site</a></th>
+                </tr>
+                </tbody>
+                <tfoot>
+                <tr>
+                    <th>Business</th>
+                    <th>Name</th>
+                    <th>Location</th>
+                    <th>Description</th>
+                    <th>Offers/Incentives</th>
+                </tr>
+                </tfoot>
+            </table>
+        </figure>
+    </section>
+    </div>
+</main>
+<footer class = "footer_style"><br>
+    <p>&copy; Copyright 2024 Edward G. McKeown</p>
+    <address>
+        <p>email to <a href='emailto:edward-mckeown@student.kirkwood.edu'>
+            edward-mckeown@student.kirkwood.edu</a></p><br>
+    </address>
+</footer>
+
+</body>
+</html>

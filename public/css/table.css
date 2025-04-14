@@ -15,7 +15,20 @@ hr {
     border: 3px solid #000000;
 }
 
+.spacer {
+    height: 40px; /* Adjust this value to control the amount of space */
+    width: 100%;
+    clear: both;
+}
 
+#business-search-results {
+    clear: both;
+    width: auto;
+    padding: 15px;
+    margin-top: 30px; /* Add more top margin */
+    margin-left: auto;
+    margin-right: auto;
+}
 
 #search_table > figure > .middle {
     margin-left: auto;
@@ -36,6 +49,7 @@ hr {
     border: 1px solid #000000;
     width: auto;
     padding: 15px;
+    margin-top: 10px;
     margin-left: auto;
     margin-right: auto;
 }
