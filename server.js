@@ -245,6 +245,11 @@ app.post('/api/incentives/add', async (req, res) => {
             updated_at: new Date()
         };
 
+        // Add the other_description field if provided
+        if (incentiveData.type === 'OT' && incentiveData.other_description) {
+            incentive.other_description = incentiveData.other_description;
+        }
+
         // Insert incentive data
         const result = await incentivesCollection.insertOne(incentive);
 
