@@ -24,7 +24,7 @@ body {
 #page_layout {
     width: 90%;
     font-weight:bold;
-    margin: 2.5% auto 2.5% auto;
+    margin: 0 auto 2.5% auto;
     border: 2px solid #000000;
     padding: 0;
 }
@@ -285,13 +285,13 @@ main {
 
 .left_pane {
     float: left;
-    width: 45%;
+    width: 50%;
     padding: 0 2%;
 }
 
 .right_pane {
     float: left;
-    width: 45%;
+    width: 40%;
     padding: 0 2%;
 }
 
@@ -592,5 +592,14 @@ a:active {
         height: auto;
         margin-left: auto;
         margin-right: auto;
+    }
+}
+
+@media (max-width: 767px) {
+    /* For mobile screens */
+    .navbar .dropleft .dropdown-menu {
+        left: auto !important;
+        right: 0 !important;
+        transform: none !important;
     }
 }

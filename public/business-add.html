@@ -10,18 +10,28 @@
     <meta name="keywords" content="Final Project, assignment, homework, Marc Hauschildt,
 		Web Application Development I, 2025SP, CRF01 ">
     <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css" >
     <link href="./css/normalize.css" rel="stylesheet">
-    <link rel="stylesheet" href="./css/slicknav.min.css">
     <link href="./css/style.css" rel="stylesheet">
     <link href="./css/forms.css" rel="stylesheet">
     <script src="./js/jquery-3.7.1.js"></script>
-    <script src="./js/jquery.slicknav.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
-    <script src="./js/init.js"></script>
-    <script src="./js/business-validator.js" type="module"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="./js/business-validator.js"></script>
 </head>
-<body id="page_layout">
 
+<body style="padding-top: 70px" id="page_layout">
+<!--Navigation bar-->
+<div id="nav-placeholder">
+</div>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html");
+    });
+</script>
+<!--end of Navigation bar-->
 <header>
 
     <div class="left-banner">
@@ -36,26 +46,6 @@
     </div>
     <div style="clear:left;"></div>
 </header>
-<nav class="sticky-menu">
-    <ol id="menu">
-        <li><a href="index.html">Home</a></li>
-        <li><a href="register.html">Register/Login</a></li>
-        <li><a href="business.html" class="active">Business Menu</a>
-            <ol>
-                <li><a href="./business-add.html" class="active">Add a Business</a></li>
-                <li><a href="./business-search.html">Search for a Business</a> </li>
-            </ol>
-        </li>
-        <li><a href="incentives.html">Business Incentives</a>
-            <ol>
-                <li><a href="./incentive-add.html">Add an incentive to a business</a></li>
-                <li><a href="./incentive-view.html">View incentives for a business</a> </li>
-            </ol>
-        </li>
-        <li><a href="about.html">About Us</a></li>
-        <li><a href="contact.html">Contact</a></li>
-    </ol>
-</nav>
 <main>
     <section class="container">
         <h2>Add a business to our database</h2>
@@ -73,13 +63,13 @@
                     <legend>
                         <h2 class="caveat">Basic Info</h2>
                     </legend>
-                    <label for="bname">Business Name&nbsp;&nbsp;&nbsp;</label>
+                    <label for="bname">Business Name&nbsp;&nbsp;</label>
                     <input type="text" id="bname" name="business-name" placeholder="Business name...">
                     <br>
-                    <label for="address1">Address Line 1&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <label for="address1">Address Line 1&nbsp;&nbsp;</label>
                     <input type="text" id="address1" name="address1" placeholder="Address Line 1...">
                     <br>
-                    <label for="address2">Address Line 2&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <label for="address2">Address Line 2&nbsp;&nbsp;</label>
                     <input type="text" id="address2" name="address2" placeholder="Address Line 2...">
                     <br>
                     <label for="city">City&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
@@ -147,7 +137,7 @@
                     <label for="phone">Phone Number&nbsp;&nbsp;</label>
                     <input type="text" id="phone" name="phone-number" placeholder="Business phone number...">
                     <br>
-                    <label for="type">Type&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <label for="type">Type&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                     <select name="type" id="type">
                         <option value="" selected="selected">Select a Business Type</option>
                         <option value="AUTO">Automotive</option>
@@ -171,7 +161,16 @@
             <br><br><br>
         </form>
     </div>
+    <div class="right_pane">
+        <fieldset>
+            <legend>
+                <h3 class="caveat">Image to go here</h3>
+            </legend>
 
+        </fieldset>
+        <br><br><br>
+
+    </div>
 </main>
 <footer class = "footer_style"><br>
     <p>&copy; Copyright 2024 Edward G. McKeown</p>

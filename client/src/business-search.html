@@ -11,17 +11,27 @@
 		Web Application Development I, 2025SP, CRF01 ">
     <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
     <link href="./css/normalize.css" rel="stylesheet">
-    <link rel="stylesheet" href="./css/slicknav.min.css">
     <link href="./css/style.css" rel="stylesheet">
     <link href="./css/forms.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css" >
     <script src="./js/jquery-3.7.1.js"></script>
-    <script src="./js/jquery.slicknav.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
-    <script src="./js/init.js"></script>
-    <script src="./js/business-search.js" type="module"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="./js/business-search.js"></script>
 </head>
-<body id="page_layout">
 
+<body style="padding-top: 70px" id="page_layout">
+<!--Navigation bar-->
+<div id="nav-placeholder">
+</div>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html");
+    });
+</script>
+<!--end of Navigation bar-->
 <header>
 
     <div class="left-banner">
@@ -36,26 +46,6 @@
     </div>
     <div style="clear:left;"></div>
 </header>
-<nav class="sticky-menu">
-    <ol id="menu">
-        <li><a href="index.html">Home</a></li>
-        <li><a href="register.html">Register/Login</a></li>
-        <li><a href="business.html" class="active">Business Menu</a>
-            <ol>
-                <li><a href="./business-add.html">Add a Business</a></li>
-                <li><a href="./business-search.html" class="active">Search for a Business</a> </li>
-            </ol>
-        </li>
-        <li><a href="incentives.html">Business Incentives</a>
-            <ol>
-                <li><a href="./incentive-add.html">Add an incentive to a business</a></li>
-                <li><a href="./incentive-view.html">View incentives for a business</a> </li>
-            </ol>
-        </li>
-        <li><a href="about.html">About Us</a></li>
-        <li><a href="contact.html">Contact</a></li>
-    </ol>
-</nav>
 <main>
     <section class="container">
         <h2>Search for a business within our database</h2>
@@ -73,8 +63,8 @@
                 <label for="business-name">Business Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
                 <input type="text" id="business-name" name="business_name" placeholder="Business Name...">
                 <br>
-                <label for="address">Street Address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                <input type="text" id="address" name="street-address" placeholder="Street Address..." >
+                <label for="address">Address Search&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                <input type="text" id="address" name="street-address" placeholder="Address, City, State, or Zip" >
                 <br>
                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
