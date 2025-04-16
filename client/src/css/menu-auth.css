@@ -1,0 +1,50 @@
+/* Styles for authentication-related UI elements */
+
+/* Style for disabled menu items */
+.dropdown-item.disabled {
+    color: #adb5bd;
+    pointer-events: none;
+    background-color: transparent;
+    cursor: not-allowed;
+}
+
+/* Style for disabled menu items on hover */
+.dropdown-item.disabled:hover {
+    background-color: transparent;
+}
+
+/* Add a small indicator for authenticated user button */
+.btn-authenticated {
+    position: relative;
+}
+
+.btn-authenticated::after {
+    content: '✓';
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: #28a745;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Style for profile dropdown items */
+.dropdown-menu .dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* Visual feedback when menu items are enabled after login */
+@keyframes enabledAnimation {
+    0% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.dropdown-item:not(.disabled) {
+    animation: enabledAnimation 0.5s ease;
+}

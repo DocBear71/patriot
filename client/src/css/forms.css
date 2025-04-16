@@ -5,14 +5,14 @@ AUTHOR: Edward G. McKeown
 DATE: 2024/10/08
 VERSION: 1.0.1
 DESCRIPTION:
-    This css file is strictly forthe CSS involved with the forms on certain
+    This css file is strictly for the CSS involved with the forms on certain
     pages.
  
 */
  
 
 input[type=text], select, textarea {
-    width: 50%;
+    width: 75%;
     padding: 12px;
     border: 1px solid #000000; 
     border-radius: 4px; 
@@ -23,7 +23,7 @@ input[type=text], select, textarea {
 }
 
 input[type=email], select, textarea {
-    width: 50%;
+    width: 75%;
     padding: 12px; 
     border: 1px solid #000000; 
     border-radius: 4px; 
@@ -34,7 +34,7 @@ input[type=email], select, textarea {
 }
 
 input[type=password], select, textarea {
-    width: 50%;
+    width: 75%;
     padding: 12px; 
     border: 1px solid #000000; 
     border-radius: 4px; 
@@ -68,7 +68,7 @@ background-color: #0000ff;
 }
 
 #message p {
-    padding: 5px 5px;
+    padding: 0 5px;
     font-size: 18px;
 }
 
@@ -140,11 +140,14 @@ background-color: #0000ff;
 
 fieldset {
     border: 2px groove #000000;
+    text-align: left;
+    margin: 10px;
 }
 
-fieldset {
-    text-align: left;
+legend {
+    width: auto;
 }
+
 
 fieldset label, fieldset input, fieldset select, fieldset textarea {
     display: inline-block;

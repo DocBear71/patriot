@@ -14,6 +14,8 @@
 		<link href="./css/normalize.css" rel="stylesheet">
         <link href="./css/style.css" rel="stylesheet">
 		<link href="./css/forms.css" rel="stylesheet">
+        <link href="./css/menu-auth.css" rel="stylesheet">
+        <link href="./css/form-validation.css" rel="stylesheet">
         <script src="./js/jquery-3.7.1.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
@@ -56,8 +58,7 @@
 				for incorrect or missing information about a local business.  
 			</p>
             <p>Required Items are outlined in Red</p>
-			<p class="issue">If you are already registered, please go ahead and login for complete access.</p><br>
-			<div class="left_pane">
+
                 <form id="register-form" onsubmit="return false;">
                   	<fieldset>
 						<legend>
@@ -153,11 +154,12 @@
                         </select>
                     </fieldset>
                 	<br>
+                        <div class="left_pane">
                 	<fieldset>
 						<legend>
-							<h2 class="caveat">User Name and Password</h2>
+							<h2 class="caveat">Username and Password</h2>
 						</legend>
-						<label for="email">E-mail Address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+						<label for="email">E-mail Address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
 						<input type="email" id="email" name="email" placeholder="address@company.com   (this will be your username)">
 						<br>
 						<label for="psw">Password&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
@@ -166,34 +168,33 @@
 						<label for="psw_repeat"><b>Confirm Password</b></label>
 						<input type="password" placeholder="Repeat Password" name="psw-repeat" id="psw_repeat" required>
 						<br>
-						<div id="message">
-							<h2>Password must contain the following:</h2>
-							<p id="letter" class="invalid">A <b>lowercase</b> letter</p>
-							<p id="capital" class="invalid">A <b>capital (uppercase)</b> letter</p>
-							<p id="number" class="invalid">A <b>number</b></p>
-							<p id="length" class="invalid">Minimum <b>8 characters</b></p>
-                            <p id="special" class="invalid">A <b>special character</b> (!@#$%^&*)</p>
-                            <p id="match" class="invalid">Passwords <b>match</b></p>
-						</div>
-                        <div id="divCheckPassword">
-                        <!-- validation moved to password-validation.js file -->
-                    </div>
+
 						<br>
 						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 						<input type="submit" id="submit" value="Register">
 					</fieldset>
-              	</fieldset>
-              	<br><br><br>
-                </form>
-            </div>
-        	<div class="right_pane">
+                        </div>
 
-            	<br><br><br>
-            	<div class="right_img">
-              		<img src="./images/home_free.webp" alt="Home of the Free, Because of the Brave picture">
-            	</div>
-        	</div>
+                    <div class="right_pane">
+                        <br><br>
+                        <div id="message">
+                            <h2>Password must contain the following:</h2>
+                            <p id="letter" class="invalid">A <b>lowercase</b> letter</p>
+                            <p id="capital" class="invalid">A <b>capital (uppercase)</b> letter</p>
+                            <p id="number" class="invalid">A <b>number</b></p>
+                            <p id="length" class="invalid">Minimum <b>8 characters</b></p>
+                            <p id="special" class="invalid">A <b>special character</b> (!@#$%^&*)</p>
+                            <p id="match" class="invalid">Passwords <b>match</b></p>
+                        </div>
+                        <div id="divCheckPassword">
+                            <!-- validation moved to password-validation.js file -->
+                        </div>
+                    </div>
+                    </fieldset>
+                </form>
+
+
             <div id="validation-message" class="validation-message" style="display: none;">
                 <div class="validation-message-content">
                     <span class="close-btn">&times;</span>

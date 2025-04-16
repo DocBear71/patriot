@@ -17,8 +17,9 @@
                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     Business Menu </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="./business-add.html">Add a Business</a>
-                    <a class="dropdown-item" href="./business-search.html">Search for a Business</a>
+                    <!-- Add disabled class by default -->
+                    <a class="dropdown-item disabled" href="./business-add.html">Add a Business</a>
+                    <a class="dropdown-item disabled" href="./business-search.html">Search for a Business</a>
                 </div>
             </li>
             <li class="nav-item dropdown">
@@ -26,11 +27,12 @@
                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     Incentives Menu </a>
                 <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <a class="dropdown-item" href="./incentive-add.html">Add an Incentive for a Business</a>
-                    <a class="dropdown-item" href="./incentive-view.html">View an Incentive for a Business</a>
+                    <!-- Add disabled class by default -->
+                    <a class="dropdown-item disabled" href="./incentive-add.html">Add an Incentive for a Business</a>
+                    <a class="dropdown-item disabled" href="./incentive-view.html">View an Incentive for a Business</a>
                 </div>
         </ul>
-            <ul class="navbar-nav ml-auto">
+        <ul class="navbar-nav ml-auto">
             <li>
                 <div class="btn-group dropdown-menu-right">
                     <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown"
@@ -64,3 +66,7 @@
         </ul>
     </div>
 </nav>
+
+<!-- Add authentication scripts -->
+<script src="./js/login-handler.js"></script>
+<script src="./js/login-form-validator.js"></script>
