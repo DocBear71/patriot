@@ -74,11 +74,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (document.getElementById('search_table')) {
                 // it is the business-search.html page
                 displaySearchResults(data.results);
-            } else if (document.getElementById('businesss-search-results')) {
+            } else if (document.getElementById('business-search-results')) {
                 // it is the incentive-view.html or the incentive-add.html page
                 displayBusinessSearchResults(data.results);
             } else {
-                console.error("Coult not determine which page we are on");
+                console.error("Could not determine which page we are on");
             }
         } catch (error) {
             console.error("Error:", error);
