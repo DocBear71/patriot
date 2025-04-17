@@ -1,121 +1,89 @@
-// login-handler.js - Handles user authentication
+// login-handler.js - Simple login handler
 
-// Function to authenticate a user
-async function loginUser(email, password, rememberMe) {
+// Global function to handle login
+function handleLogin() {
+    console.log("Handle login function called");
+
+    // Get form values
+    const email = document.getElementById('DropdownFormEmail1').value;
+    const password = document.getElementById('DropdownFormPassword1').value;
+    const rememberMe = document.getElementById('dropdownCheck')?.checked || false;
+
     console.log("Login attempt with:", email, "Remember me:", rememberMe);
 
-    try {
-        // Call your authentication API
-        const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email, password }),
+    // For now, just simulate a successful login
+    if (email && password) {
+        console.log("Login successful");
+
+        // Store authentication status
+        if (rememberMe) {
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('userEmail', email);
+        } else {
+            sessionStorage.setItem('isLoggedIn', 'true');
+            sessionStorage.setItem('userEmail', email);
+        }
+
+        // Update UI - Change sign in button text
+        const signInButton = document.querySelector('.btn-secondary.dropdown-toggle');
+        if (signInButton) {
+            signInButton.textContent = email;
+        }
+
+        // Enable restricted menu items
+        document.querySelectorAll('.dropdown-item.disabled').forEach(item => {
+            item.classList.remove('disabled');
         });
 
-        // Parse the JSON response
-        const data = await response.json();
-
-        if (response.ok) {
-            // Login successful
-            console.log("Login successful");
-
-            // Store authentication status in localStorage or sessionStorage
-            if (rememberMe) {
-                localStorage.setItem('isLoggedIn', 'true');
-                localStorage.setItem('userEmail', email);
-                localStorage.setItem('userId', data.userId);
-                localStorage.setItem('userStatus', data.status || 'US');
-            } else {
-                sessionStorage.setItem('isLoggedIn', 'true');
-                sessionStorage.setItem('userEmail', email);
-                sessionStorage.setItem('userId', data.userId);
-                sessionStorage.setItem('userStatus', data.status || 'US');
-            }
-
-            // Update UI to reflect logged-in state
-            updateUIAfterLogin(email, data.status);
-
-            // Close the dropdown
-            const dropdown = document.querySelector('.dropdown-menu');
-            if (dropdown) {
-                $(dropdown).parent().removeClass('show');
-                $(dropdown).removeClass('show');
-            }
-
-            return true;
-        } else {
-            // Login failed
-            console.error("Login failed:", data.message);
-            alert(data.message || "Invalid email or password. Please try again.");
-            return false;
+        // Close the dropdown
+        const dropdown = document.querySelector('.dropdown-menu');
+        if (dropdown) {
+            $(dropdown).parent().removeClass('show');
+            $(dropdown).removeClass('show');
         }
-    } catch (error) {
-        console.error("Login error:", error);
-        alert("An error occurred during login. Please try again.");
-        return false;
+
+        alert("Login successful!");
+    } else {
+        console.error("Login failed: Missing email or password");
+        alert("Please enter both email and password.");
     }
 }
 
-// Function to update UI after successful login
-function updateUIAfterLogin(email, status) {
-    // Replace the Sign In button with user info
-    const signInButton = document.querySelector('.btn-secondary.dropdown-toggle');
-    if (signInButton) {
-        signInButton.textContent = email;
-    }
-
-    // Enable restricted menu items based on user status
-    document.querySelectorAll('.dropdown-item.disabled').forEach(item => {
-        // Enable all items for regular users
-        item.classList.remove('disabled');
-
-        // If this is an admin user, enable additional features
-        if (status === 'AD') {
-            // Enable admin-specific features here if needed
-        }
-    });
-}
-
-// Function to check if user is already logged in
+// Check if user is already logged in
 function checkLoginStatus() {
+    console.log("Checking login status");
+
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true' ||
         sessionStorage.getItem('isLoggedIn') === 'true';
 
     if (isLoggedIn) {
+        console.log("User is already logged in");
+
         const userEmail = localStorage.getItem('userEmail') ||
             sessionStorage.getItem('userEmail');
-        const userStatus = localStorage.getItem('userStatus') ||
-            sessionStorage.getItem('userStatus') || 'US';
 
         if (userEmail) {
-            updateUIAfterLogin(userEmail, userStatus);
+            // Update UI
+            const signInButton = document.querySelector('.btn-secondary.dropdown-toggle');
+            if (signInButton) {
+                signInButton.textContent = userEmail;
+            }
+
+            // Enable restricted menu items
+            document.querySelectorAll('.dropdown-item.disabled').forEach(item => {
+                item.classList.remove('disabled');
+            });
         }
+    } else {
+        console.log("User is not logged in");
     }
 }
 
-// Check login status when the page loads
-document.addEventListener('DOMContentLoaded', function() {
-    checkLoginStatus();
-});
+// Make functions globally available
+window.handleLogin = handleLogin;
+window.checkLoginStatus = checkLoginStatus;
 
-// Logout function
-function logoutUser() {
-    // Clear authentication data
-    localStorage.removeItem('isLoggedIn');
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('userStatus');
-    sessionStorage.removeItem('isLoggedIn');
-    sessionStorage.removeItem('userEmail');
-    sessionStorage.removeItem('userId');
-    sessionStorage.removeItem('userStatus');
-
-    // Reload the page to reset the UI
-    window.location.reload();
-}
-
-// Export the functions for use in other scripts
-window.loginUser = loginUser;
-window.logoutUser = logoutUser;
+// Check login status when script loads
+console.log("Login handler script loaded, running initial check");
+// We'll call checkLoginStatus() after the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', checkLoginStatus);

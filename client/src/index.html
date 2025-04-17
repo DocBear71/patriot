@@ -30,16 +30,13 @@
          $(function(){
              $("#nav-placeholder").load("NavBar.html", function() {
                  // This callback function runs after NavBar.html is loaded
-                 // Now we can safely initialize the login scripts
                  $.getScript("./js/login-handler.js")
                  .done(function() {
-                     $.getScript("./js/login-form-validator.js")
-                     .done(function() {
-                         console.log("Both authentication scripts loaded successfully");
-                     })
-                     .fail(function() {
-                         console.error("Failed to load login-form-validator.js");
-                     });
+                     console.log("Login handler script loaded successfully");
+                     // Try to run checkLoginStatus after everything is loaded
+                     if (typeof checkLoginStatus === 'function') {
+                         checkLoginStatus();
+                     }
                  })
                  .fail(function() {
                      console.error("Failed to load login-handler.js");
