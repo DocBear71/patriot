@@ -1,3 +1,5 @@
+import {error} from "next/dist/build/output/log";
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Form validator loaded!");
 
@@ -11,26 +13,29 @@ document.addEventListener('DOMContentLoaded', function() {
     const findBusiness = document.getElementById("business-search-form");
 
     // Add form submission handler
-    findBusiness.addEventListener('submit', function(event) {
-        // Prevent the form from submitting immediately
-        event.preventDefault();
+    if (findBusiness) {
+        findBusiness.addEventListener('submit', function (event) {
+            // Prevent the form from submitting immediately
+            event.preventDefault();
 
-        // Only require at least one search field to be filled
-        if (!isNotEmpty(form.businessName.value) && !isNotEmpty(form.address.value)) {
-            alert("Please enter either a business name or address to search");
-        } else {
-            const formData = {
-                businessName: form.businessName.value,
-                address: form.address.value,
-            };
+            // Only require at least one search field to be filled
+            if (!isNotEmpty(form.businessName.value) && !isNotEmpty(form.address.value)) {
+                alert("Please enter either a business name or address to search");
+            } else {
+                const formData = {
+                    businessName: form.businessName.value,
+                    address: form.address.value,
+                };
 
-            console.log("Form data to submit:", formData);
+                console.log("Form data to submit:", formData);
 
-            // Submit the data to MongoDB
-            retrieveFromMongoDB(formData);
-        }
-    });
-
+                // Submit the data to MongoDB
+                retrieveFromMongoDB(formData);
+            }
+        });
+    }else {
+        console.warn("Business search form not found in the DOM");
+    }
 
     async function retrieveFromMongoDB(formData) {
         try {
@@ -67,9 +72,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             console.log("Success:", data);
 
-            // Display the results instead of showing an alert
-            displaySearchResults(data.results);
-
+            // Check which page we're on and display the results accordingly
+            if (document.getElementById('search_table')) {
+                // it is the business-search.html page
+                displaySearchResults(data.results);
+            } else if (document.getElementById('businesss-search-results')) {
+                // it is the incentive-view.html or the incentive-add.html page
+                displayBusinessSearchResults(data.results);
+            } else {
+                console.error("Coult not determine which page we are on");
+            }
         } catch (error) {
             console.error("Error:", error);
             alert("Search failed: " + error.message);
@@ -144,33 +156,162 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
 
                 tableBody.appendChild(row);
-
-
-            row.innerHTML = `
-                <th><img src="${imageSrc}" alt="${business.bname}" class="business-image"></th>
-                <th class="left_table">${business.bname}</th>
-                <th class="left_table">${addressLine}</th>
-                <th class="left_table">Business type: ${business.type}</th>
-                <th class="right_table">Phone: ${business.phone}</th>
-            `;
-
-            tableBody.appendChild(row);
         });
 
         // Scroll to the results
         searchTableContainer.scrollIntoView({ behavior: 'smooth' });
+
     } catch(error) {
         console.error("Error displaying search results: ", error);
         alert("There was an error displaying the search results: " + error.message);
         }
     }
 
+    // Function to display the business search results in the incentive- pages.
+    function displayBusinessSearchResults(businesses) {
+        try {
+            // retrieve the business saerch results container
+            const resultsContainer = document.getElementById('business_search-results');
+
+            if (!resultsContainer) {
+                console.error("Business search results container not found");
+                alert("There was an error displaying search results. The page might not be properly configured.");
+                return;
+            }
+
+            // create the table for display
+            const table = document.createElement('table');
+            table.classname = 'results-table';
+
+            // create the header for the table
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+                <tr>
+                    <th>Business Name</th>
+                    <th>Address</th>
+                    <th>City</th>
+                    <th>State</th>
+                    <th>Zip</th>
+                    <th>Action</th>
+                </tr>
+            `;
+            table.appendChild(thead);
+
+            // create the table body then add each business to the talbe
+            const tbody = document.createElement('tbody');
+
+            businesses.forEach(business => {
+                const row = document.createElement('tr');
+
+                row.innerHTML = `
+                    <td>${business.bname}</td>
+                    <td>${business.address1}${business.address2 ? '<br>' + business.address2 : ''}</td>
+                    <td>${business.city}</td>
+                    <td>${business.state}</td>
+                    <td>${business.zip}</td>
+                    <td><button class="select-business" data-business-id="${business._id}">Select</button></td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            table.appendChild(tbody);
+            resultsContainer.appendChild(table);
+
+            // add the event listeners for the "select" buttons
+            const selectBussions = document.querySelectorAll('.select-business');
+            selectButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const businessId = this.getAttribute('data-business-id');
+                    // Now find the business object based on that ID
+                    const selectedBusiness = business.find(business => business._id === businessId);
+
+                    // Check to see if we are on incentive-add or incentive-view page
+                    if (typeof selectBusinessForIncentive === 'function') {
+                        // for incentive-add, call business-incentive-handler.js
+                        selectBusinessForIncentive(selectedBusiness)
+                    } else if (typeof viewBusinessIncentives === 'function') {
+                        // for incentive-add, call business-incentive-viewer.js
+                        viewBusinessIncentives(selectedBusiness);
+                    } else {
+                        console.error("No handler function found for that select button");
+                        // fallback if needed
+                        const selectedBusinessIdField = document.getElementById('selected-business-id');
+                        if (selectedBusinessIdField) {
+                            selectedBusinessIdField.value = businessId;
+                            // show the business info
+                            const businessInfoSection = document.getElementById('business-info-section');
+                            if (businessInfoSection) {
+                                populateBusinessInfo(selectedBusiness);
+                                businessInfoSection.style.display = 'block';
+                            }
+                        }
+                    }
+                });
+            });
+
+            // have the browser scroll to the results
+            resultsContainer.scrollIntoView({ behavior: 'smooth'});
+
+        } catch (error) {
+            console.error("Error displaying business search results: " + error);
+            const resultsContainer = document.getElementById('business-search-results');
+            if (resultsContainer) {
+                resultsContainer.innerHTML = `<div class="error">Error displaying search results: ${error.message}</div>`;
+            } else {
+                alert("Error displaying search results: " + error.message);
+            }
+        }
+    }
+
+    // helper function to populate business information fields
+    function populateBusinessInfo(business) {
+        // set the values of the fields
+        document.getElementById('bname').value = business.bname || '';
+        document.getElementById('address1').value = business.address1 || '';
+        document.getElementById('Address2').value = business.address2 || '';
+        document.getElementById('City').value = business.city || '';
+
+        const stateSelect = documentById('state');
+        if (stateSelect) {
+            const stateValue = business.state || '';
+            for (let i = 0; i < stateSelect.options.length; i++) {
+                if (stateSelect.options[i].value === stateValue) {
+                    stateSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+        document.getElementById('zip').value = business.zip || '';
+        document.getElementById('phone').value = business.phone || '';
+
+        const typeSelect = documentById('type');
+        if (typeSelect) {
+            const typeValue = business.type || '';
+            for (let i = 0; i < stateSelect.options.length; i++) {
+                if (typeSelect.options[i].value === typeValue) {
+                    typeSelect.seletedIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // set the hidden business ID field
+        const selectedBusinessIdField = document.getElementById('selected-business-id');
+        if (selectedBusinessIdField) {
+            selectedBusinessIdField.value = business._id || '';
+        }
+    }
+
     // Add input event listeners for visual feedback
-    form.businessName.addEventListener('input', function() { validateField(this, isNotEmpty); });
-    form.address.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    if (form.businessName) {
+        form.businessName.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    }
 
+    if (form.address) {
+            form.address.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    }
 
-    // Validation functions
+    // function validation
     function isNotEmpty(value) {
         return value.trim() !== '';
     }
