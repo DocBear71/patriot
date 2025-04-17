@@ -71,6 +71,10 @@ app.post(['/api/register', '/api/registration'], async (req, res) => {
             delete userData.psw;
         }
 
+        // Hash the password - THIS LINE IS CRITICAL
+        const hashedPassword = await bcrypt.hash(userData.password, 10);
+        userData.password = hashedPassword;
+
         // Insert user data
         const result = await collection.insertOne(userData);
 

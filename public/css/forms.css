@@ -169,10 +169,10 @@ fieldset label, fieldset input, fieldset select, fieldset textarea {
     padding-right: 10px;
 }
 
-.form-group input, .form-group select, .form-group textarea {
-    text-align: left;
-    width: 40%;
-}
+/*.form-group input, .form-group select, .form-group textarea {*/
+/*    text-align: left;*/
+/*    width: 40%;*/
+/*}*/
 
 /* Special styling for radio buttons */
 .radio-group {
