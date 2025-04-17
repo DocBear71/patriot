@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const { MongoClient, ObjectId } = require('mongodb');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
 
 // Create Express app
 const app = express();
