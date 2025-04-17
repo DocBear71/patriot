@@ -77,53 +77,92 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function displaySearchResults(businesses) {
-        // Get the table body
-        const tableBody = document.querySelector('#business_search tbody');
+        try {
+            const businessSearchTable = document.getElementById('business_search');
+            const searchTableContainer = document.getElementById('serach_table');
 
-        // Clear existing rows
-        tableBody.innerHTML = '';
+            if (!businessSearchTable || !searchTableContainer) {
+                console.error("Requred elements not found in the DOM");
+                alert("There was an error displaying search results. Please try again later.");
+                return;
+            }
+            // Get the table body
+            let tableBody = businessSearchTable.querySelector('tbody');
 
-        if (businesses.length === 0) {
-            // Show no results message
-            alert("No businesses found matching your search criteria.");
-            return;
-        }
+            if (!tableBody) {
+                console.error("Table body not found within business_search table");
+                alert("There was an error displaying search results. Please try again later.");
+                return;
+            }
+            // Clear existing rows
+            tableBody.innerHTML = '';
 
-        // Show the search results table (it has h5 with "hidden" content)
-        document.getElementById('search_table').querySelector('h5').style.display = 'none';
-        document.getElementById('business_search').style.display = 'block';
-
-        // Add each business to the table
-        businesses.forEach(business => {
-            const row = document.createElement('tr');
-
-            // Get a placeholder image based on business type
-            let imageSrc = './images/placeholder.jpg';
-            if (business.type === 'Restaurant' || business.type === 'REST') {
-                imageSrc = './images/red_lobster.jpg';
-            } else if (business.type === 'RETAIL' || business.type === 'Retail') {
-                imageSrc = './images/home_depot.jpg';
-            } else if (business.type === 'AUTO') {
-                imageSrc = './images/milex.jpg';
-            } else if (business.type === 'HARDW') {
-                imageSrc = './images/lowes.jpg';
+            if (businesses.length === 0) {
+                // Show no results message
+                alert("No businesses found matching your search criteria.");
+                return;
             }
 
-            // Format the address line
-            const addressLine = business.address2
-                ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
-                : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
+            // Show the search results table by making the block visible
+            searchTableContainer.style.display = 'block';
+
+            // Hide the "hidden" test in the h5.
+            const searchTableH5 = searchTableContainer.querySelector('h5');
+            if (searchTableH5) {
+                searchTableH5.style.display = 'none';
+            }
+
+            // Add each business to the table
+            businesses.forEach(business => {
+                // Get a placeholder image based on business type
+                let imageSrc = './images/placeholder.jpg';
+                if (business.type === 'Restaurant' || business.type === 'REST') {
+                    imageSrc = './images/red_lobster.jpg';
+                } else if (business.type === 'RETAIL' || business.type === 'Retail') {
+                    imageSrc = './images/home_depot.jpg';
+                } else if (business.type === 'AUTO') {
+                    imageSrc = './images/milex.jpg';
+                } else if (business.type === 'HARDW') {
+                    imageSrc = './images/lowes.jpg';
+                }
+
+                // Format the address line
+                const addressLine = business.address2
+                    ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
+                    : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
+
+                // Then create a new row
+                const row = document.createElement('tr');
+
+                // Set the row content
+                row.innerHTML = `
+                    <th><img src="${imageSrc}" alt="${business.bname}" class="business-image"></th>
+                    <th class="left_table">${business.bname}</th>
+                    <th class="left_table">${addressLine}</th>
+                    <th class="left_table">Business type: ${business.type}</th>
+                    <th class="right_table">${business.incentive || 'No incentives listed'}</th>
+                `;
+
+                tableBody.appendChild(row);
+
 
             row.innerHTML = `
-            <th><img src="${imageSrc}" alt="${business.bname}" class="business-image"></th>
-            <th class="left_table">${business.bname}</th>
-            <th class="left_table">${addressLine}</th>
-            <th class="left_table">Business type: ${business.type}</th>
-            <th class="right_table">Phone: ${business.phone}</th>
-        `;
+                <th><img src="${imageSrc}" alt="${business.bname}" class="business-image"></th>
+                <th class="left_table">${business.bname}</th>
+                <th class="left_table">${addressLine}</th>
+                <th class="left_table">Business type: ${business.type}</th>
+                <th class="right_table">Phone: ${business.phone}</th>
+            `;
 
             tableBody.appendChild(row);
         });
+
+        // Scroll to the results
+        searchTableContainer.scrollIntoView({ behavior: 'smooth' });
+    } catch(error) {
+        console.error("Error displaying search results: ", error);
+        alert("There was an error displaying the search results: " + error.message);
+        }
     }
 
     // Add input event listeners for visual feedback
