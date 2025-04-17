@@ -1,94 +1,64 @@
-// login-form-validator.js - Handles validation of login form in navbar dropdown
+// login-handler.js - Handles user authentication
+function loginUser(email, password, rememberMe) {
+    console.log("Login attempt with:", email, "Remember me:", rememberMe);
+
+    // Here you would typically make an AJAX call to your authentication server
+    // For now, let's simulate a successful login
+
+    // Example authentication logic (replace with your actual authentication)
+    if (email && password) {
+        // Simulate successful login
+        console.log("Login successful");
+
+        // Store authentication status in localStorage or sessionStorage
+        if (rememberMe) {
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('userEmail', email);
+        } else {
+            sessionStorage.setItem('isLoggedIn', 'true');
+            sessionStorage.setItem('userEmail', email);
+        }
+
+        // Update UI to reflect logged-in state
+        updateUIAfterLogin(email);
+
+        // Close the dropdown
+        const dropdown = document.querySelector('.dropdown-menu');
+        if (dropdown) {
+            $(dropdown).parent().removeClass('show');
+            $(dropdown).removeClass('show');
+        }
+    } else {
+        console.error("Login failed: Invalid credentials");
+        alert("Invalid email or password. Please try again.");
+    }
+}
+
+// Function to update UI after successful login
+function updateUIAfterLogin(email) {
+    // Replace the Sign In button with user info
+    const signInButton = document.querySelector('.btn-secondary.dropdown-toggle');
+    if (signInButton) {
+        signInButton.textContent = email;
+    }
+
+    // Enable restricted menu items
+    document.querySelectorAll('.dropdown-item.disabled').forEach(item => {
+        item.classList.remove('disabled');
+    });
+}
+
+// Check if user is already logged in on page load
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Login form validator loaded");
+    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true' ||
+        sessionStorage.getItem('isLoggedIn') === 'true';
 
-    // Get the login form and its elements
-    const loginForm = document.querySelector('.dropdown-menu form');
+    if (isLoggedIn) {
+        const userEmail = localStorage.getItem('userEmail') ||
+            sessionStorage.getItem('userEmail');
 
-    // Exit if the form doesn't exist
-    if (!loginForm) {
-        console.log("Login form not found");
-        return;
-    }
-
-    console.log("Login form found");
-
-    // Get form elements
-    const emailInput = document.getElementById('DropdownFormEmail1');
-    const passwordInput = document.getElementById('DropdownFormPassword1');
-    const loginButton = loginForm.querySelector('button[type="submit"]');
-
-    // Add validation listener for email
-    if (emailInput) {
-        emailInput.addEventListener('input', validateForm);
-    }
-
-    // Add validation listener for password
-    if (passwordInput) {
-        passwordInput.addEventListener('input', validateForm);
-    }
-
-    // Add form submission handler
-    if (loginForm) {
-        loginForm.addEventListener('submit', function(event) {
-            // Prevent the default form submission
-            event.preventDefault();
-
-            // Revalidate form
-            if (validateForm()) {
-                // If valid, attempt login
-                const email = emailInput.value;
-                const password = passwordInput.value;
-                const rememberMe = document.getElementById('dropdownCheck')?.checked || false;
-
-                // Use the login function from login-handler.js
-                if (typeof loginUser === 'function') {
-                    loginUser(email, password, rememberMe);
-                } else {
-                    console.error("loginUser function not found. Make sure login-handler.js is loaded before this script.");
-                    alert("Login functionality is not available. Please try again later.");
-                }
-            }
-        });
-    }
-
-    // Form validation function
-    function validateForm() {
-        if (!emailInput || !passwordInput || !loginButton) {
-            return false;
+        if (userEmail) {
+            updateUIAfterLogin(userEmail);
         }
-
-        let isValid = true;
-
-        // Validate email format
-        const emailValue = emailInput.value.trim();
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const isEmailValid = emailPattern.test(emailValue);
-
-        if (!isEmailValid) {
-            emailInput.classList.add('is-invalid');
-            isValid = false;
-        } else {
-            emailInput.classList.remove('is-invalid');
-            emailInput.classList.add('is-valid');
-        }
-
-        // Validate password (simple non-empty check for login)
-        const passwordValue = passwordInput.value;
-        if (passwordValue.length === 0) {
-            passwordInput.classList.add('is-invalid');
-            isValid = false;
-        } else {
-            passwordInput.classList.remove('is-invalid');
-            passwordInput.classList.add('is-valid');
-        }
-
-        // Enable/disable submit button
-        loginButton.disabled = !isValid;
-
-        return isValid;
     }
-
-    // Initial validation
-    validateForm();
 });
