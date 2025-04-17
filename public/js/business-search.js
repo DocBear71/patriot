@@ -79,10 +79,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function displaySearchResults(businesses) {
         try {
             const businessSearchTable = document.getElementById('business_search');
-            const searchTableContainer = document.getElementById('serach_table');
+            const searchTableContainer = document.getElementById('search_table');
 
             if (!businessSearchTable || !searchTableContainer) {
-                console.error("Requred elements not found in the DOM");
+                console.error("Required elements not found in the DOM");
                 alert("There was an error displaying search results. Please try again later.");
                 return;
             }
