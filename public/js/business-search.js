@@ -74,11 +74,35 @@ document.addEventListener('DOMContentLoaded', function() {
             if (document.getElementById('search_table')) {
                 // it is the business-search.html page
                 displaySearchResults(data.results);
-            } else if (document.getElementById('business-search-results')) {
-                // it is the incentive-view.html or the incentive-add.html page
-                displayBusinessSearchResults(data.results);
             } else {
-                console.error("Could not determine which page we are on");
+                // on the incentive-add.html or incentive-view.html pages
+                let resultsContainer = document.getElementById('business-search-results');
+
+                if (!resultsContainer) {
+                    //if it doesn't exist, find a suitable parent element
+                    const mainElement = document.querySelector('main');
+                    const fieldsetElement = document.querySelector('fieldset');
+
+                    if (mainElement || fieldsetElement) {
+                        // create the container
+                        resultsContainer = document.createElement('div');
+                        resultsContainer.id = 'business-search-results';
+
+                        // insert either after the fieldset or the beginning of main
+                        if (fieldsetElement) {
+                            fieldsetElement.parentNode.insertBefore(resultsContainer, fieldsetElement.nextSibling);
+                        } else {
+                            mainElement.insertBefore(resultsContainer, mainElement.firstChild);
+                        }
+                        console.log("Created business-search-results container");
+                    } else {
+                        console.error("Could not find appropriate container for search results");
+                        alert("There was an error displaying search results. The page might not be configured properly");
+                        return;
+                    }
+                }
+
+                displayBusinessSearchResults(data.results, resultsContainer);
             }
         } catch (error) {
             console.error("Error:", error);
@@ -166,18 +190,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Function to display the business search results in the incentive- pages.
-    function displayBusinessSearchResults(businesses) {
+    function displayBusinessSearchResults(businesses, resultsContainer) {
         try {
-            // retrieve the business saerch results container
-            const resultsContainer = document.getElementById('business_search-results');
+            // clear any existing content
+            resultsContainer.innerHTML = '';
 
-            if (!resultsContainer) {
-                console.error("Business search results container not found");
-                alert("There was an error displaying search results. The page might not be properly configured.");
+            if (businesses.length === 0) {
+                resultsContainer.innerHTML = '<div class="error">No Businesses found matching your search criteria.</div>';
                 return;
             }
 
-            // create the table for display
+            // create table
             const table = document.createElement('table');
             table.classname = 'results-table';
 
@@ -216,12 +239,12 @@ document.addEventListener('DOMContentLoaded', function() {
             resultsContainer.appendChild(table);
 
             // add the event listeners for the "select" buttons
-            const selectBussions = document.querySelectorAll('.select-business');
+            const selectButtons = document.querySelectorAll('.select-business');
             selectButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     const businessId = this.getAttribute('data-business-id');
                     // Now find the business object based on that ID
-                    const selectedBusiness = business.find(business => business._id === businessId);
+                    const selectedBusiness = businesses.find(business => business._id === businessId);
 
                     // Check to see if we are on incentive-add or incentive-view page
                     if (typeof selectBusinessForIncentive === 'function') {
