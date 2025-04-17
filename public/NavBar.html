@@ -33,13 +33,13 @@
                 </div>
         </ul>
         <ul class="navbar-nav ml-auto">
-            <li>
-                <div class="btn-group dropdown-menu-left">
+            <li class="nav-item dropdown">
+                <div class="btn-group">
                     <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown"
                             aria-haspopup="true" aria-expanded="false">
                         Sign In
                     </button>
-                    <div class="dropdown-menu dropdown-menu-left">
+                    <div class="dropdown-menu dropdown-menu-right">
                         <form class="px-4 py-3">
                             <div class="form-group">
                                 <label for="DropdownFormEmail1">Email address</label>
@@ -70,3 +70,25 @@
 <!-- Add authentication scripts -->
 <script src="../../public/js/login-handler.js"></script>
 <script src="../../public/js/login-form-validator.js"></script>
+
+<!-- Add custom styles for dropdown positioning -->
+<style>
+    /* Fix dropdown positioning for sign in menu */
+    .dropdown-menu-right {
+        right: 0;
+        left: auto !important;
+    }
+
+    /* Add a min-width to prevent the dropdown from being too narrow */
+    .navbar-nav .dropdown-menu {
+        min-width: 300px;
+    }
+
+    /* Ensure the dropdown doesn't exceed viewport width on mobile */
+    @media (max-width: 576px) {
+        .navbar-nav .dropdown-menu {
+            min-width: 100%;
+            width: 100%;
+        }
+    }
+</style>

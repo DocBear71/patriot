@@ -15,7 +15,7 @@
   \**********************/
 /***/ (() => {
 
-eval("var searchForm = document.getElementById('searching');\nregForm.addEventListener('input', function (event) {\n  event.preventDefault();\n  var newSearch = event.target.firstElementChild.value;\n  var searchField;\n  if (newSearch !== '') {\n    searchField = {\n      title: newSearch\n    };\n    fetch('localhost:3000/register', {\n      method: 'POST',\n      body: JSON.stringify(newSearch),\n      headers: {\n        'Content-Type': 'application/json; charset=UTF-8'\n      }\n    }).then(function (res) {\n      return console.log(res.json());\n    });\n  }\n});\n\n//# sourceURL=webpack://client/./src/index.js?");
+eval("// const searchForm = document.getElementById('searching')\n//\n// regForm.addEventListener('input', function(event) {\n//     event.preventDefault()\n//     const newSearch = event.target.firstElementChild.value;\n//     let searchField;\n//     if (newSearch !== '') {\n//         searchField = {title: newSearch};\n//\n//\n//         fetch('localhost:3000/register', {\n//             method: 'POST',\n//             body: JSON.stringify(newSearch),\n//             headers: {'Content-Type': 'application/json; charset=UTF-8'}\n//         }).then(res => console.log(res.json()));\n//\n//     }\n// });\n//\n\n//# sourceURL=webpack://client/./src/index.js?");
 
 /***/ })
 
