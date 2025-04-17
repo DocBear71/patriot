@@ -28,7 +28,23 @@
     </div>
     <script>
         $(function(){
-            $("#nav-placeholder").load("NavBar.html");
+            $("#nav-placeholder").load("NavBar.html", function() {
+                // This callback function runs after NavBar.html is loaded
+                // Now we can safely initialize the login scripts
+                $.getScript("./js/login-handler.js")
+                .done(function() {
+                    $.getScript("./js/login-form-validator.js")
+                    .done(function() {
+                        console.log("Both authentication scripts loaded successfully");
+                    })
+                    .fail(function() {
+                        console.error("Failed to load login-form-validator.js");
+                    });
+                })
+                .fail(function() {
+                    console.error("Failed to load login-handler.js");
+                });
+            });
         });
     </script>
     <!--end of Navigation bar-->
@@ -243,9 +259,7 @@
         </footer>
 
         <script src="./js/password-validation.js"></script>
-    <!-- Add authentication scripts -->
-    <script src="./js/login-handler.js"></script>
-    <script src="./js/login-form-validator.js"></script>
+
 
      </body>
 </html>
