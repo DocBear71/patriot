@@ -202,7 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // create table
             const table = document.createElement('table');
-            table.classname = 'results-table';
+            table.id = 'results-table';
 
             // create the header for the table
             const thead = document.createElement('thead');
