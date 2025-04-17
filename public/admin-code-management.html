@@ -1,0 +1,85 @@
+<!-- admin-code-management.html - Only accessible to existing admins -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Admin Code Management - Patriot Thanks</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2025/4/12">
+    <meta name="description" content="Completion of Final Project for Web Application Development.">
+    <meta name="keywords" content="Final Project, assignment, homework, Marc Hauschildt,
+		Web Application Development I, 2025SP, CRF01 ">
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link href="./css/bootstrap-4.0.0.css" rel="stylesheet">
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/forms.css" rel="stylesheet">
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/form-validation.css" rel="stylesheet">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="js/form-validator.js" type="module"> </script>
+</head>
+<body>
+<div class="container mt-5">
+    <h2>Admin Access Code Management</h2>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>Create New Access Code</h4>
+        </div>
+        <div class="card-body">
+            <form id="create-code-form">
+                <div class="form-group">
+                    <label for="accessCode">Access Code:</label>
+                    <input type="text" id="accessCode" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="codeDescription">Description:</label>
+                    <input type="text" id="codeDescription" class="form-control" placeholder="What this code grants access to" required>
+                </div>
+                <div class="form-group">
+                    <label for="expirationDate">Expiration Date (Optional):</label>
+                    <input type="date" id="expirationDate" class="form-control">
+                </div>
+                <button type="submit" class="btn btn-primary">Create Access Code</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h4>Existing Access Codes</h4>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                <tr>
+                    <th>Access Code</th>
+                    <th>Description</th>
+                    <th>Expiration</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody id="codes-table-body">
+                <!-- Codes will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // JavaScript to handle admin code management
+    // This would include functions to:
+    // - Load existing codes
+    // - Add new codes
+    // - Delete codes
+    // - Update codes
+</script>
+</body>
+</html>
