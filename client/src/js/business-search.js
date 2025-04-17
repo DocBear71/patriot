@@ -79,27 +79,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 let resultsContainer = document.getElementById('business-search-results');
 
                 if (!resultsContainer) {
-                    //if it doesn't exist, find a suitable parent element
-                    const mainElement = document.querySelector('main');
-                    const fieldsetElement = document.querySelector('fieldset');
+                    //if it doesn't exist, create it
+                    resultsContainer = document.createElement('div');
+                    resultsContainer.id = 'business-search-results';
 
-                    if (mainElement || fieldsetElement) {
-                        // create the container
-                        resultsContainer = document.createElement('div');
-                        resultsContainer.id = 'business-search-results';
-
-                        // insert either after the fieldset or the beginning of main
-                        if (fieldsetElement) {
-                            fieldsetElement.parentNode.insertBefore(resultsContainer, fieldsetElement.nextSibling);
-                        } else {
-                            mainElement.insertBefore(resultsContainer, mainElement.firstChild);
-                        }
-                        console.log("Created business-search-results container");
+                    // find a good place to insert it after the first fieldset, perhaps
+                    const fieldset = document.createElement('fieldset');
+                    if (fieldset) {
+                        fieldset.parentNode.insertBefore(resultsContainer, fieldset.nextSibling);
                     } else {
-                        console.error("Could not find appropriate container for search results");
-                        alert("There was an error displaying search results. The page might not be configured properly");
-                        return;
+                        const main = document.querySelector('main');
+                        if (main) {
+                            main.insertBefore(resultsContainer, main.firstChild);
+                        } else {
+                            // last resort, just append to the body
+                            document.body.appendChild(resultsContainer);
+                        }
                     }
+
+                    console.log("Created business-search-results container");
                 }
 
                 displayBusinessSearchResults(data.results, resultsContainer);
@@ -244,28 +242,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 button.addEventListener('click', function() {
                     const businessId = this.getAttribute('data-business-id');
                     // Now find the business object based on that ID
-                    const selectedBusiness = businesses.find(business => business._id === businessId);
+                    const selectedBusiness = businesses.find(bus => bus._id === businessId);
+
+                    const currentPagePath = window.location.pathname;
+                    console.log("Current page: ", currentPagePath);
 
                     // Check to see if we are on incentive-add or incentive-view page
-                    if (typeof selectBusinessForIncentive === 'function') {
+                    if (currentPagePath.includes('incentive-add.html')) {
+                        console.log("On incentive-add page");
                         // for incentive-add, call business-incentive-handler.js
-                        selectBusinessForIncentive(selectedBusiness)
-                    } else if (typeof viewBusinessIncentives === 'function') {
-                        // for incentive-add, call business-incentive-viewer.js
-                        viewBusinessIncentives(selectedBusiness);
-                    } else {
-                        console.error("No handler function found for that select button");
-                        // fallback if needed
-                        const selectedBusinessIdField = document.getElementById('selected-business-id');
-                        if (selectedBusinessIdField) {
-                            selectedBusinessIdField.value = businessId;
-                            // show the business info
-                            const businessInfoSection = document.getElementById('business-info-section');
-                            if (businessInfoSection) {
-                                populateBusinessInfo(selectedBusiness);
-                                businessInfoSection.style.display = 'block';
-                            }
+                        if (typeof window.selectBusinessForIncentive === 'function') {
+                            window.selectBusinessForIncentive(selectedBusiness);
+                        } else {
+                            handleBusinessSelection(selectedBusiness);
                         }
+                    } else if (currentPagePath.includes('incentive-view.html')) {
+                        console.log("On incentive-view page");
+                        // for incentive-add, call business-incentive-viewer.js
+                        if (typeof window.viewBusinessIncentives === 'function') {
+                            window.viewBusinessIncentives(selectedBusiness);
+                        } else {
+                            handleBusinessSelection(selectedBusiness);
+                        }
+                    } else {
+                        console.error("Using fallback business selection handler");
+                        handleBusinessSelection(selectedBusiness);
                     }
                 });
             });
@@ -285,41 +286,93 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // helper function to populate business information fields
+    function handleBusinessSelection(business) {
+        console.log("Handling business selection with fallback: ", business);
+
+        try {
+            // only to proceed if the necessary elements are available
+            const businessInfoSection = document.getElementById('business-info-section');
+            if (!businessInfoSection) {
+                console.error("business-info-section not found");
+                return;
+            }
+
+            // set the bsuiness ID if the field exists
+            const selectedBusinessIdField = document.getElementById('selected-business-id');
+            if (selectedBusinessIdField) {
+                selectedBusinessId = business.id || '';
+            }
+
+            // now lets populate the business info fields
+            populateBusinessInfo(business);
+
+            // for incentive-add page, show the incentive section if it exists.
+            const incentiveSection = document.getElementById('incentive-section');
+            if (incentiveSection) {
+                incentiveSection.style.display = 'block';
+            }
+
+            // now scroll to the business info section
+            businessInfoSection.scrollIntoView({ behavior: 'smooth' });
+        } catch (error) {
+            console.error("Error in handleBusinessSection: " + error);
+            alert("There was an error selecting the business: " + error.message);
+        }
+    }
+
     function populateBusinessInfo(business) {
-        // set the values of the fields
-        document.getElementById('bname').value = business.bname || '';
-        document.getElementById('address1').value = business.address1 || '';
-        document.getElementById('Address2').value = business.address2 || '';
-        document.getElementById('City').value = business.city || '';
-
-        const stateSelect = documentById('state');
-        if (stateSelect) {
-            const stateValue = business.state || '';
-            for (let i = 0; i < stateSelect.options.length; i++) {
-                if (stateSelect.options[i].value === stateValue) {
-                    stateSelect.selectedIndex = i;
-                    break;
-                }
-            }
-        }
-        document.getElementById('zip').value = business.zip || '';
-        document.getElementById('phone').value = business.phone || '';
-
-        const typeSelect = documentById('type');
-        if (typeSelect) {
-            const typeValue = business.type || '';
-            for (let i = 0; i < stateSelect.options.length; i++) {
-                if (typeSelect.options[i].value === typeValue) {
-                    typeSelect.seletedIndex = i;
-                    break;
-                }
-            }
+        if (!business) {
+            console.error("No business data provided to populateBusinessInfo");
+            return;
         }
 
-        // set the hidden business ID field
-        const selectedBusinessIdField = document.getElementById('selected-business-id');
-        if (selectedBusinessIdField) {
-            selectedBusinessIdField.value = business._id || '';
+        try {
+            // set the values for all business fields if they exist
+            const bnameField = document.getElementById('bname');
+            if (bnameField) bnameField.value = business.bname || '';
+
+            const address1Field = document.getElementById('address1');
+            if (address1Field) address1Field.value = business.address1 || '';
+
+            const address2Field = document.getElementById('address2');
+            if (address2Field) address2Field.value = business.address2 || '';
+
+            const cityField = document.getElementById('city');
+            if (cityField) cityField.value = business.city || '';
+
+            const zipField = document.getElementById('zip');
+            if (zipField) zipField.value = business.zip || '';
+
+            const phoneField = document.getElementById('phone');
+            if (phoneField) phoneField.value = business.phone || '';
+
+            // for the select statements of state and business type
+            // they are set differently
+            const stateSelect = document.getElementById('state');
+            if (stateSelect) {
+                const stateValue = business.state || '';
+                for (let i = 0; i < stateSelect.options.length; i++) {
+                    if (stateSelect.options[i].value === stateValue) {
+                        stateSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            const typeSelect = document.getElementById('type');
+            if (typeSelect) {
+                const typeValue = business.type || '';
+                for (let i = 0; i < typeSelect.options.length; i++) {
+                    if (typeSelect.options[i].value === typeValue) {
+                        typeSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            console.log("Business info populated successfully");
+        } catch (error) {
+            console.error("Error in populateBusinessInfo: " + error);
         }
     }
 
