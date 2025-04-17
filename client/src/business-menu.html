@@ -28,7 +28,17 @@
 </div>
 <script>
     $(function(){
-        $("#nav-placeholder").load("NavBar.html");
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
+            // Load the login handler after the navbar is loaded
+            $.getScript("./js/login-handler.js")
+            .done(function() {
+                console.log("Login handler script loaded successfully");
+            })
+            .fail(function() {
+                console.error("Failed to load login-handler.js");
+            });
+        });
     });
 </script>
 <!--end of Navigation bar-->

@@ -1,4 +1,4 @@
-// login-handler.js - Enhanced login handler with dropdown menu changes
+// login-handler.js - Enhanced login handler with session storage compatible with profile-manager.js
 console.log("Login handler script loaded");
 
 // Function to handle login
@@ -16,14 +16,27 @@ function handleLogin() {
     if (email && password) {
         console.log("Login successful");
 
-        // Store authentication status
-        if (rememberMe) {
-            localStorage.setItem('isLoggedIn', 'true');
-            localStorage.setItem('userEmail', email);
-        } else {
-            sessionStorage.setItem('isLoggedIn', 'true');
-            sessionStorage.setItem('userEmail', email);
-        }
+        // Create a session object matching the format used by profile-manager.js
+        const session = {
+            user: {
+                _id: generateTempId(), // Generate a temporary ID until real authentication is implemented
+                email: email,
+                // Add other user properties that might be needed
+                fname: '',
+                lname: '',
+                status: 'US' // Default status
+            },
+            token: 'simulated-token',
+            timestamp: new Date().getTime(),
+            expiresIn: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+        };
+
+        // Store the session in localStorage
+        localStorage.setItem('patriotThanksSession', JSON.stringify(session));
+
+        // Also store the old format for backward compatibility
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userEmail', email);
 
         // Update UI with dropdown changes
         updateUIAfterLogin(email);
@@ -38,6 +51,11 @@ function handleLogin() {
         console.error("Login failed: Missing email or password");
         alert("Please enter both email and password.");
     }
+}
+
+// Helper function to generate a temporary ID
+function generateTempId() {
+    return 'temp_' + Math.random().toString(36).substr(2, 9);
 }
 
 // Function to update UI after login
@@ -86,7 +104,8 @@ function updateUIAfterLogin(email) {
 function logoutUser() {
     console.log("Logging out user");
 
-    // Clear authentication data
+    // Clear authentication data in both formats
+    localStorage.removeItem('patriotThanksSession');
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('userEmail');
     sessionStorage.removeItem('isLoggedIn');
@@ -157,33 +176,63 @@ function attachLoginListeners() {
 function checkLoginStatus() {
     console.log("Checking login status");
 
+    // Check for session in the format expected by profile-manager.js
+    const sessionData = localStorage.getItem('patriotThanksSession');
+
+    if (sessionData) {
+        try {
+            const session = JSON.parse(sessionData);
+            const currentTime = new Date().getTime();
+
+            // Check if session is still valid
+            if (currentTime < session.timestamp + session.expiresIn) {
+                console.log("User is already logged in (session found)");
+
+                // Update UI with dropdown changes
+                updateUIAfterLogin(session.user.email);
+                return true;
+            }
+        } catch (error) {
+            console.error("Error parsing session data:", error);
+        }
+    }
+
+    // Fallback to the old format
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true' ||
         sessionStorage.getItem('isLoggedIn') === 'true';
 
     if (isLoggedIn) {
-        console.log("User is already logged in");
+        console.log("User is already logged in (old format)");
 
         const userEmail = localStorage.getItem('userEmail') ||
             sessionStorage.getItem('userEmail');
 
         if (userEmail) {
+            // Create a new session object in the format expected by profile-manager.js
+            const session = {
+                user: {
+                    _id: generateTempId(),
+                    email: userEmail,
+                    fname: '',
+                    lname: '',
+                    status: 'US'
+                },
+                token: 'simulated-token',
+                timestamp: new Date().getTime(),
+                expiresIn: 24 * 60 * 60 * 1000 // 24 hours
+            };
+
+            // Store the new session format
+            localStorage.setItem('patriotThanksSession', JSON.stringify(session));
+
             // Update UI with dropdown changes
             updateUIAfterLogin(userEmail);
-        }
-    } else {
-        console.log("User is not logged in");
-
-        // If on a restricted page, show not logged in message
-        if (window.location.pathname.includes('profile.html')) {
-            const profileContainer = document.getElementById('profile-container');
-            const notLoggedIn = document.getElementById('not-logged-in');
-
-            if (profileContainer && notLoggedIn) {
-                profileContainer.style.display = 'none';
-                notLoggedIn.style.display = 'block';
-            }
+            return true;
         }
     }
+
+    console.log("User is not logged in");
+    return false;
 }
 
 // Make functions globally available

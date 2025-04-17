@@ -23,7 +23,25 @@
     <script src="./js/bootstrap-4.0.0.js"></script>
     <script src="js/form-validator.js" type="module"> </script>
 </head>
-<body>
+<body style="padding-top: 70px" id="page_layout">
+<!--Navigation bar-->
+<div id="nav-placeholder">
+</div>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
+            // Load the login handler after the navbar is loaded
+            $.getScript("./js/login-handler.js")
+            .done(function() {
+                console.log("Login handler script loaded successfully");
+            })
+            .fail(function() {
+                console.error("Failed to load login-handler.js");
+            });
+        });
+    });
+</script>
 <div class="container mt-5">
     <h2>Admin Access Code Management</h2>
 
