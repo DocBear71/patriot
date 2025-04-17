@@ -1,6 +1,7 @@
-// login-handler.js - Simple login handler
+// login-handler.js - Simple login handler that works with dynamically loaded content
+console.log("Login handler script loaded");
 
-// Global function to handle login
+// Function to handle login
 function handleLogin() {
     console.log("Handle login function called");
 
@@ -49,7 +50,27 @@ function handleLogin() {
     }
 }
 
-// Check if user is already logged in
+// Function to attach event listeners
+function attachLoginListeners() {
+    console.log("Attaching login event listeners");
+
+    // Use event delegation to catch clicks on the login button
+    $(document).on('click', '#login-button', function(e) {
+        console.log("Login button clicked");
+        e.preventDefault();
+        handleLogin();
+    });
+
+    // Also handle form submission (even though we changed the button type)
+    $(document).on('submit', '#login-form', function(e) {
+        console.log("Login form submitted");
+        e.preventDefault();
+        handleLogin();
+        return false;
+    });
+}
+
+// Function to check login status
 function checkLoginStatus() {
     console.log("Checking login status");
 
@@ -79,11 +100,10 @@ function checkLoginStatus() {
     }
 }
 
-// Make functions globally available
-window.handleLogin = handleLogin;
-window.checkLoginStatus = checkLoginStatus;
-
-// Check login status when script loads
-console.log("Login handler script loaded, running initial check");
-// We'll call checkLoginStatus() after the DOM is fully loaded
-document.addEventListener('DOMContentLoaded', checkLoginStatus);
+// Attach event listeners when jQuery is ready
+$(function() {
+    console.log("jQuery ready in login-handler.js");
+    attachLoginListeners();
+    // Set a timeout to check login status after everything has loaded
+    setTimeout(checkLoginStatus, 500);
+});

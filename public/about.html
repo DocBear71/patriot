@@ -28,14 +28,11 @@
     <script>
         $(function(){
             $("#nav-placeholder").load("NavBar.html", function() {
-                // This callback function runs after NavBar.html is loaded
+                console.log("NavBar loaded");
+                // Load the login handler after the navbar is loaded
                 $.getScript("./js/login-handler.js")
                 .done(function() {
                     console.log("Login handler script loaded successfully");
-                    // Try to run checkLoginStatus after everything is loaded
-                    if (typeof checkLoginStatus === 'function') {
-                        checkLoginStatus();
-                    }
                 })
                 .fail(function() {
                     console.error("Failed to load login-handler.js");
