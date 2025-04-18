@@ -1,5 +1,6 @@
 // business-incentive-handler.js - Handles business search and incentive addition
 document.addEventListener('DOMContentLoaded', function() {
+    testApiConnection();
     console.log("Business Incentive Handler Loaded!");
 
     // Initialize business info section display
@@ -323,6 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function addIncentive(incentiveData) {
         console.log("adding Incentive: ", incentiveData);
 
+
         // show the loading indicator
         const submitButton = document.querySelector('#incentive-form input[type="submit"]');
         let originalText = 'Submit Incentive';
@@ -333,18 +335,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // make the api call to the server
-        const apiURL = 'https://patriotthanks.vercel.app/api/incentive/add';
+        // const apiURL = 'https://patriotthanks.vercel.app/api/incentive/add';
+        const apiURL = 'https://patriotthanks.vercel.app/api/test-incentive-path';
+        console.log("Attempting to submit to: ", apiURL);
 
         fetch(apiURL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json; charset=UTF-8'
             },
             body: JSON.stringify(incentiveData)
         })
             .then(res => {
+                console.log("response status:", res.status);
+                console.log("response Headers:", [...res.headers.entries()]);
                 if (!res.ok) {
-                    throw new Error(`Server responded with status ${res.status}`);
+                    return res.text().then(text => {
+                        console.log("Error response body: ", text);
+                        throw new Error(`Server responded with status ${res.status}`);
+                    });
                 }
                 return res.json();
             })
@@ -394,6 +403,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     `;
     document.head.appendChild(style);
+
+    function testApiConnection() {
+        console.log("Testing API connection...");
+
+        fetch('https://patriotthanks.vercel.app/api/test')
+            .then(res => {
+                console.log("Test API response status:", res.status);
+                return res.json();
+            })
+            .then(data => {
+                console.log("Test API response:", data);
+            })
+            .catch(error => {
+                console.error("Error testing API:", error);
+            });
+    }
 });
 
 

@@ -203,6 +203,15 @@ app.get(['/api/business', '/api/business-search'], async (req, res) => {
     }
 });
 
+// Add this to your server.js
+app.post('/api/test-incentive-path', (req, res) => {
+    console.log("Test incentive path hit:", req.body);
+    res.status(200).json({
+        message: 'Test incentive path is working!',
+        receivedData: req.body
+    });
+});
+
 // NEW API: Add incentives to a business
 app.post('/api/incentives/add', async (req, res) => {
     console.log("Incentives API hit:", req.method);
