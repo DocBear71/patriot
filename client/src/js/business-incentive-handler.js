@@ -98,7 +98,8 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
 
             // Get incentive form values
-            const businessId = document.getElementById('selected-business-id').value;
+            const businessIdElement = document.getElementById('selected-business-id');
+            const businessId = businessIdElement ? businessIdElement.value : '';
             const checkedRadio = document.querySelector('input[name="incentiveAvailable"]:checked');
             const incentiveAvailable = checkedRadio ? checkedRadio.value : null;
 
@@ -114,9 +115,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // get the other form values here
-            const incentiveType = document.getElementById('IncentiveType').value;
-            const incentiveAmount = document.getElementById('incentiveAmount').value;
-            const incentiveInfo = document.getElementById('incentiveInfo').value;
+            const incentiveTypeElement = document.getElementById('IncentiveType');
+            const incentiveType = incentiveTypeElement ? incentiveTypeElement.value : '';
+            const incentiveAmountElement = document.getElementById('incentiveAmount');
+            const incentiveAmount = incentiveAmountElement ? incentiveAmountElement.value : '';
+            const incentiveInfoElement = document.getElementById('incentiveInfo');
+            const incentiveInfo = incentiveInfoElement ? incentiveInfoElement.value : '';
 
             if (incentiveAvailable === 'true' && (!incentiveType || !incentiveAmount)) {
                 alert('Please provide incentive type and amount');
