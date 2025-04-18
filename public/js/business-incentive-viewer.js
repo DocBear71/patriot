@@ -14,7 +14,7 @@ window.viewBusinessIncentives = function(selectedBusiness) {
     // Set the business ID in the hidden h5 field
     const selectedBusinessIdField = document.getElementById('selected-business-id');
     if (selectedBusinessIdField) {
-        selectedBusinessIdField.value = selectedBusinessId || '';
+        selectedBusinessIdField.value = selectedBusiness._Id || '';
     }
 
     // Then popoulate the business information fields
