@@ -99,15 +99,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Get incentive form values
             const businessId = document.getElementById('selected-business-id').value;
-            const incentiveRadios = document.querySelectorAll('input[name="incentiveAvailable"]');
-            let incentiveAvailable = null;
-
-            // Find the checked radio button
-            incentiveRadios.forEach(radio => {
-                if (radio.checked) {
-                    incentiveAvailable = radio.value;
-                }
-            });
+            const checkedRadio = document.querySelector('input[name="incentiveAvailable"]:checked');
+            const incentiveAvailable = checkedRadio ? checkedRadio.value : null;
 
             // Validate incentive input
             if (!businessId) {
