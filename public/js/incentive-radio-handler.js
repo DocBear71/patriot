@@ -1,7 +1,15 @@
 document.addEventListener('DOMContentLoaded', function() {
+    console.log("Incentive radio handler loaded!");
+
     //get the radio buttons
     const incentiveAvailable = document.getElementById('incentiveAvailable');
     const incentiveNotAvailable = document.getElementById('incentiveNotAvailable');
+
+    // only proceed if the radio buttons exist
+    if (!incentiveAvailable || !incentiveNotAvailable) {
+        console.log("Radio buttons not found, skipping radio handler setup");
+        return;
+    }
 
     // get the fields that will be disabled when no incentive is available.
     const incentiveFields = [
@@ -39,9 +47,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!isIncentiveAvailable) {
                 otherTypeContainer.style.display = 'none';
                 otherTypeDescription.classList.add('disabled-field');
-            } else if (document.getElementById('IncentiveType').value === 'OT') {
-                otherTypeContainer.style.display = 'block';
-                otherTypeDescription.classList.remove('disabled-field');
+            } else {
+                const incentiveTypeSelect = document.getElementById('incentiveType');
+                if (incentiveTypeSelect && incentiveTypeSelect.value === 'OT') {
+                    otherTypeContainer.style.display = 'block';
+                    otherTypeDescription.classList.remove('disabled-field');
+                } else {
+                    otherTypeContainer.style.display = 'none';
+                }
             }
         }
 
@@ -62,20 +75,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (otherTypeDescription) {
                 otherTypeDescription.value = '';
             }
-        } else if (incentiveFields[2]) {
-            // reset the textarea when incentive is available
+        } else if (incentiveFields[2] && incentiveFields[2].tagName === 'TEXTAREA'
+            && incentiveFields[2].value === 'No incentives available at this business.') {
             incentiveFields[2].value = 'Please enter information about the discount/incentive';
         }
     }
 
     // add the listeners for the radio buttons
-    if (incentiveAvailable) {
-        incentiveAvailable.addEventListener('change', toggleIncentiveFields);
-    }
-
-    if (incentiveAvailable) {
-        incentiveNotAvailable.addEventListener('change', toggleIncentiveFields);
-    }
+    incentiveAvailable.addEventListener('change', toggleIncentiveFields);
+    incentiveNotAvailable.addEventListener('change', toggleIncentiveFields);
 
     // now set up the IncentiveType dropdown item to show/hide the "other' field.
     const incentiveTypeSelect = document.getElementById('incentiveType');
@@ -90,9 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // initialize the form state in case the radio button is checked by default
-    if (incentiveAvailable || incentiveNotAvailable) {
         toggleIncentiveFields();
-    }
 
     // addition of css for the disabled fields
     const style = document.createElement('style');

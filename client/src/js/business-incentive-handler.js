@@ -1,10 +1,6 @@
 // business-incentive-handler.js - Handles business search and incentive addition
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Business Incentive Handler Loaded!");
-    // Get form elements
-    const searchForm = document.getElementById('business-search-form');
-    const incentiveForm = document.getElementById('incentive-form');
-    const resultsContainer = document.getElementById('business-search-results');
 
     // Initialize business info section display
     const businessInfoSection = document.getElementById('business-info-section');
@@ -19,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Set up the IncentiveType dropdown to show/hide the "other" field.
-    const incentiveTypeSelect = document.getElementById('incentiveAvailable');
+    const incentiveTypeSelect = document.getElementById('incentiveType');
     const otherTypeContainer = document.getElementById('otherTypeContainer');
     if (incentiveTypeSelect && otherTypeContainer) {
         incentiveTypeSelect.addEventListener('change', function() {
@@ -91,25 +87,27 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // event listener for the incentive form
-    if (incentiveAvailable) {
         incentiveAvailable.addEventListener('change', toggleIncentiveFields);
-    }
-
-    if (incentiveNotAvailable) {
         incentiveNotAvailable.addEventListener('change', toggleIncentiveFields);
-    }
 
-    // event listener for the incentive form
+
+    // event listener for the incentive form submission
+    const incentiveForm = document.getElementById('incentive-form');
     if (incentiveForm) {
         incentiveForm.addEventListener('submit', function(e) {
             e.preventDefault();
 
             // Get incentive form values
             const businessId = document.getElementById('selected-business-id').value;
-            const incentiveType = document.getElementById('IncentiveType').value;
-            const incentiveAmount = document.getElementById('incentiveAmount').value;
-            const incentiveInfo = document.getElementById('incentiveInfo').value;
-            const incentiveAvailable = document.querySelector('input[name="incentiveAvailable"]:checked')?.value;
+            const incentiveRadios = document.querySelector('input[name="incentiveAvailable"]');
+            let incentiveAvailable = null;
+
+            // Find the checked radio button
+            incentiveRadios.forEach(radio => {
+                if (radio.checked) {
+                    incentiveAvailable = radio.value;
+                }
+            });
 
             // Validate incentive input
             if (!businessId) {
@@ -117,10 +115,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            if (!incentiveAvailable) {
+            if (incentiveAvailable === null) {
                 alert('Please specify if an incentive is available');
                 return;
             }
+
+            // get the other form values here
+            const incentiveType = document.getElementById('IncentiveType').value;
+            const incentiveAmount = document.getElementById('incentiveAmount').value;
+            const incentiveInfo = document.getElementById('incentiveInfo').value;
 
             if (incentiveAvailable === 'true' && (!incentiveType || !incentiveAmount)) {
                 alert('Please provide incentive type and amount');
@@ -138,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // handle the "other" type description
             if (incentiveType === 'OT') {
-                const otherDescription = document.getElementById('otherTypeDescription')?.value;
+                const otherDescription = document.getElementById('otherTypeDescription')?.value || '';
                 if (!otherDescription) {
                     alert('Please provide a description for the "Other" incentive type');
                     return;
@@ -155,19 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.selectedBusinessForIncentive = function(businessData) {
         console.log("selectedBusinessForIncentive called with: ", businessData);
 
-        // call the existing selectBusiness function with the ID and data
-        if (businessData && businessData._id) {
-            selectBusiness(businessData._id, businessData);
-        } else {
-            console.error('Invalid business data provided to selectBusinessForIncentive');
-        }
-    };
-
-    // function to select a business and populate the incentive form
-    function selectBusiness(businessId, businessData) {
-        console.log("Selecting business: ", businessData);
-
-        // show the hidden business info section
+        // show the business info section
         if (businessInfoSection) {
             businessInfoSection.style.display = 'block';
         }
@@ -175,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // populate the hidden field with the business ID
         const businessIdField = document.getElementById('selected-business-id');
         if (businessIdField) {
-            businessIdField.value = businessId;
+            businessIdField.value = businessData._id || '';
         }
 
         // populate the business information fields for confirmation of correct business
@@ -183,13 +174,12 @@ document.addEventListener('DOMContentLoaded', function() {
         populateField('address1', businessData.address1);
         populateField('address2', businessData.address2);
         populateField('city', businessData.city);
-
-        // special handling for select fields
-        populateSelectField('state', businessData.state);
-        populateSelectField('type', businessData.type);
-
         populateField('zip', businessData.zip);
         populateField('phone', businessData.phone);
+
+        // special handling for the select fields
+        populateSelectField('state', businessData.state);
+        populateSelectField('type', businessData.type);
 
         // make the business information fields readonly since they are just for display purposes
         document.querySelectorAll('#business-info-section input, #business-info-section select').forEach(element => {
@@ -230,21 +220,88 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const valueToSet = value || '';
-        let found = false;
-
         for (let i = 0; i < field.options.length; i++) {
-            if (field.options[i].value === valueToSet) {
+            if (field.options[i].value === value) {
                 field.selectedIndex = i;
-                found = true;
-                console.log(`Selected ${valueToSet} in ${fieldId}`);
-                break;
+                console.log(`Selected ${value} in ${fieldId}`);
+                return;
             }
         }
 
-        if (!found) {
-            console.warn(`Value ${valueToSet} not found in options for ${fieldId}`);
+        // in the exact match fails, try a case-insensitive match for state abbreviations
+        if (fieldId === 'state' && value) {
+            // try to match state abbreviates, such as IA for Iowa
+            const stateAbbreviations = {
+                'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
+                'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA',
+                'hawaii': 'HI', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA',
+                'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA', 'maine': 'ME', 'maryland': 'MD',
+                'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO',
+                'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+                'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', 'ohio': 'OH',
+                'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+                'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
+                'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY'
+            };
+
+            // now try abbreviations to full name
+            if (value.length === 2) {
+                // then value is the abbreviation and find the option with the full name
+                const fullStateName = Object.keys(stateAbbreviations).find(key => stateAbbreviations[key].toLowerCase() === value.toLowerCase());
+
+                if (fullStateName) {
+                    for (let i = 0; i < field.options.length; i++) {
+                        if (field.options[i].text.toLowerCase() === fullStateName) {
+                            field.selectedIndex = i;
+                            console.log(`Selected state by full name: ${fullStateName}`);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // now try full name to abbreviation
+            else {
+                // the value is a full name, lets find the abbreviation.
+                const stateAbbr = stateAbbreviations[value.toLowerCase()];
+                if (stateAbbr) {
+                    for (let i = 0; i < field.options.length; i++) {
+                        if (field.options[i].text.toLowerCase() === stateAbbr.toLowerCase()) {
+                            field.selectedIndex = i;
+                            console.log(`Selected state by abbreviation: ${stateAbbr}`);
+                        }
+                    }
+                }
+            }
         }
+
+        // Handle the business type field
+        if (fieldId === 'type' && value) {
+            const businessTypes = {
+                'restaurant': 'REST',
+                'automotive': 'AUTO',
+                'entertainment': 'ENT',
+                'hardware': 'HARDW',
+                'pharmacy': 'RX',
+                'retail': 'RETAIL',
+                'technology': 'Tech',
+                'other': 'OTHER'
+            };
+
+            // now to try and find the matching type
+            const typeCode = businessTypes[value.toLowerCase()];
+            if (typeCode) {
+                for (let i = 0; i < field.options.length; i++) {
+                    if (field.options[i].value === typeCode) {
+                        field.selectedIndex = i;
+                        console.log(`Selected business type: ${typeCode}`);
+                        return;
+                    }
+                }
+            }
+        }
+
+        console.warn(`Could not find a matching option for ${value} in ${fieldId}`);
     }
 
     // Function to add an Incentive
