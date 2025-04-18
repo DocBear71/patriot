@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.warn(`Field ${fieldId} not found.`);
             return;
         }
-
+        // try for a direct match first
         for (let i = 0; i < field.options.length; i++) {
             if (field.options[i].value === value) {
                 field.selectedIndex = i;
@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // in the exact match fails, try a case-insensitive match for state abbreviations
         if (fieldId === 'state' && value) {
-            // try to match state abbreviates, such as IA for Iowa
+            // try to match state names to abbreviates, such as Iowa to IA
             const stateAbbreviations = {
                 'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
                 'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA',
@@ -244,33 +244,51 @@ document.addEventListener('DOMContentLoaded', function() {
                 'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV', 'wisconsin': 'WI', 'wyoming': 'WY'
             };
 
-            // now try abbreviations to full name
-            if (value.length === 2) {
-                // then value is the abbreviation and find the option with the full name
-                const fullStateName = Object.keys(stateAbbreviations).find(key => stateAbbreviations[key].toLowerCase() === value.toLowerCase());
+            // now we do the reverse for abbreviations to state names
+            const stateNames = {};
+            for (const [name, abbr] of Object.entries(stateAbbreviations)) {
+                stateNames[abbr.toLowerCase()] = name;
+            }
 
-                if (fullStateName) {
-                    for (let i = 0; i < field.options.length; i++) {
-                        if (field.options[i].text.toLowerCase() === fullStateName) {
-                            field.selectedIndex = i;
-                            console.log(`Selected state by full name: ${fullStateName}`);
-                            return;
-                        }
+            const valueLower = value.toLowerCase();
+
+            // check to see if the value is the full name and get the abbreviation
+            if (stateAbbreviations[valueLower]) {
+                const abbr = stateAbbreviations[valueLower];
+
+                // loop through the abbreviations to find the correct state name
+                for (let i = 0; i < field.options.length; i++) {
+                    if (field.options[i].value.toLowerCase() === abbr.toLowerCase()) {
+                        field.selectedIndex = i;
+                        console.log(`Selected state by abbreviation: ${abbr} for ${value}`);
+                        return;
                     }
                 }
             }
 
-            // now try full name to abbreviation
-            else {
-                // the value is a full name, lets find the abbreviation.
-                const stateAbbr = stateAbbreviations[value.toLowerCase()];
-                if (stateAbbr) {
-                    for (let i = 0; i < field.options.length; i++) {
-                        if (field.options[i].text.toLowerCase() === stateAbbr.toLowerCase()) {
-                            field.selectedIndex = i;
-                            console.log(`Selected state by abbreviation: ${stateAbbr}`);
-                        }
+            // now  reverse and try abbreviations to full name
+            else if (valueLower.length === 2 && stateNames[valueLower]) {
+                const fullName = stateNames[valueLower];
+
+                // loop through the options to find the full name
+                for (let i = 0; i < field.options.length; i++) {
+                    if (field.options[i].text.toLowerCase().includes(fullName)) {
+                        field.selectedIndex = i;
+                        console.log(`Selected state by full name: ${fullName} for ${value}`);
+                        return;
                     }
+                }
+            }
+
+            // As a last resort try to find a fuzzy match for the state
+            for (let i = 0; i < field.options.length; i++) {
+                const optionText = field.options[i].text.toLowerCase();
+                const optionValue = field.options[i].text.toLowerCase();
+
+                if (optionText.includes(valueLower) || valueLower.includes(optionText) ||
+                    optionValue.includes(valueLower) || valueLower.includes(optionValue)) {
+                    field.selectedIndex = i;
+                    console.log(`Fuzzy matched state: ${field.options[i].text} for ${value}`);
                 }
             }
         }
