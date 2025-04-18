@@ -333,7 +333,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // make the api call to the server
-        const apiURL = 'https://patriotthanks.vercel.app/api/incentive-add';
+        const apiURL = 'https://patriotthanks.vercel.app/api/incentive/add';
 
         fetch(apiURL, {
             method: 'POST',
