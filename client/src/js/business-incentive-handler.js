@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Get incentive form values
             const businessId = document.getElementById('selected-business-id').value;
-            const incentiveRadios = document.querySelector('input[name="incentiveAvailable"]');
+            const incentiveRadios = document.querySelectorAll('input[name="incentiveAvailable"]');
             let incentiveAvailable = null;
 
             // Find the checked radio button
@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ** define the selectBusinessForIncentive function in the global scope so business-search.js can find it **
-    window.selectedBusinessForIncentive = function(businessData) {
+    window.selectBusinessForIncentive = function(businessData) {
         console.log("selectedBusinessForIncentive called with: ", businessData);
 
         // show the business info section
@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 resetField('incentiveType');
                 resetField('incentiveAmount');
                 resetField('incentiveInfo', 'Please enter information about the discount/incentive.');
-                document.querySelector('input[name="incentiveAvailable"]').forEach(radio => {
+                document.querySelectorAll('input[name="incentiveAvailable"]').forEach(radio => {
                     radio.checked = false;
                 });
             })

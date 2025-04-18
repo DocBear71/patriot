@@ -300,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // set the bsuiness ID if the field exists
             const selectedBusinessIdField = document.getElementById('selected-business-id');
             if (selectedBusinessIdField) {
-                selectedBusinessId = business.id || '';
+                selectedBusinessId = business._id || '';
             }
 
             // now lets populate the business info fields
