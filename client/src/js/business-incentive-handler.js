@@ -1,10 +1,10 @@
 // business-incentive-handler.js - Handles business search and incentive addition
-
 document.addEventListener('DOMContentLoaded', function() {
+    console.log("Business Incentive Handler Loaded!");
     // Get form elements
     const searchForm = document.getElementById('business-search-form');
     const incentiveForm = document.getElementById('incentive-form');
-    const resultsContainer = document.getElementById('search-results');
+    const resultsContainer = document.getElementById('business-search-results');
 
     // Initialize business info section display
     const businessInfoSection = document.getElementById('business-info-section');
@@ -18,27 +18,88 @@ document.addEventListener('DOMContentLoaded', function() {
         incentiveSection.style.display = 'none';
     }
 
-    // Event listener for the business search form
-    if (searchForm) {
-        searchForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            // Get search form values
-            const businessName = document.getElementById('business-name').value.trim();
-            const address = document.getElementById('address').value.trim();
-
-            // Validate search input
-            if (!businessName && !address) {
-                alert('Please enter a business name or address to search');
-                return;
+    // Set up the IncentiveType dropdown to show/hide the "other" field.
+    const incentiveTypeSelect = document.getElementById('incentiveAvailable');
+    const otherTypeContainer = document.getElementById('otherTypeContainer');
+    if (incentiveTypeSelect && otherTypeContainer) {
+        incentiveTypeSelect.addEventListener('change', function() {
+            if (this.value === 'OT') {
+                otherTypeContainer.style.display = 'block';
+            } else {
+                otherTypeContainer.style.display = 'none';
             }
-
-            // Perform the search
-            searchBusiness(businessName, address);
         });
     }
 
-    // Event listener for the incentive form
+    // handle the radio buttons for incentive availability
+    const incentiveAvailable = document.getElementById('incentiveAvailable');
+    const incentiveNotAvailable = document.getElementById('incentiveNotAvailable');
+    const incentiveFields = [
+        document.getElementById('incentiveType'),
+        document.getElementById('incentiveAmount'),
+        document.getElementById('incentiveInfo')
+    ];
+
+    function toggleIncentiveFields() {
+        const isIncentiveAvailable = incentiveAvailable.checked;
+
+        incentiveFields.forEach(field => {
+            if (field) {
+                field.disabled = !isIncentiveAvailable;
+
+                if (!isIncentiveAvailable) {
+                    field.classList.add('disabled-field')
+                } else {
+                    field.classList.remove('disabled-field');
+                }
+            }
+        });
+
+
+        if (otherTypeContainer && document.getElementById('otherTypeDescription')) {
+            const otherTypeDescription = document.getElementById('otherTypeDescription');
+            otherTypeDescription.disabled = !isIncentiveAvailable;
+
+            if (!isIncentiveAvailable) {
+                otherTypeContainer.style.display = 'none';
+                otherTypeDescription.classList.add('disabled-field');
+            } else if (document.getElementById('incentiveType').value === 'OT') {
+                otherTypeContainer.style.display = 'block';
+                otherTypeDescription.classList.remove('disabled-field');
+            }
+        }
+
+        if (!isIncentiveAvailable) {
+            incentiveFields.forEach(field => {
+                if (field) {
+                    if (field.tagName === 'SELECT') {
+                        field.selectedIndex = 0;
+                    } else if (field.tagName === 'TEXTAREA') {
+                        field.value = 'No incentives available at this business.';
+                    } else if (field.type === 'number') {
+                        field.value = '0';
+                    }
+                }
+            });
+
+            if (document.getElementById('otherTypeDescription')) {
+                document.getElementById('otherTypeDescription').value = '';
+            }
+        } else if (incentiveFields[2]) {
+            incentiveFields[2].value = 'Please enter information about the discount/incentive.';
+        }
+    }
+
+    // event listener for the incentive form
+    if (incentiveAvailable) {
+        incentiveAvailable.addEventListener('change', toggleIncentiveFields);
+    }
+
+    if (incentiveNotAvailable) {
+        incentiveNotAvailable.addEventListener('change', toggleIncentiveFields);
+    }
+
+    // event listener for the incentive form
     if (incentiveForm) {
         incentiveForm.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -75,160 +136,122 @@ document.addEventListener('DOMContentLoaded', function() {
                 information: incentiveInfo
             };
 
+            // handle the "other" type description
+            if (incentiveType === 'OT') {
+                const otherDescription = document.getElementById('otherTypeDescription')?.value;
+                if (!otherDescription) {
+                    alert('Please provide a description for the "Other" incentive type');
+                    return;
+                }
+                incentiveData.other_description = otherDescription;
+            }
+
             // Submit the incentive
             addIncentive(incentiveData);
         });
     }
 
-    // Function to search for businesses
-    function searchBusiness(businessName, address) {
-        // Show loading indicator
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '<p>Searching...</p>';
+    // ** define the selectBusinessForIncentive function in the global scope so business-search.js can find it **
+    window.selectedBusinessForIncentive = function(businessData) {
+        console.log("selectedBusinessForIncentive called with: ", businessData);
+
+        // call the existing selectBusiness function with the ID and data
+        if (businessData && businessData._id) {
+            selectBusiness(businessData._id, businessData);
+        } else {
+            console.error('Invalid business data provided to selectBusinessForIncentive');
         }
+    };
 
-        // Build query parameters
-        const queryParams = new URLSearchParams();
-        if (businessName) queryParams.append('businessName', businessName);
-        if (address) queryParams.append('address', address);
-
-        // Make API call to your server endpoint
-        fetch(`/api/business-search?${queryParams.toString()}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.results && Array.isArray(data.results)) {
-                    displaySearchResults(data.results);
-                } else {
-                    throw new Error('Invalid response format');
-                }
-            })
-            .catch(error => {
-                if (resultsContainer) {
-                    resultsContainer.innerHTML = `<p class="error">Error searching for businesses: ${error.message}</p>`;
-                }
-            });
-    }
-
-    // Function to display search results
-    function displaySearchResults(results) {
-        if (!resultsContainer) return;
-
-        if (results.length === 0) {
-            resultsContainer.innerHTML = '<p>No businesses found matching your search criteria.</p>';
-            return;
-        }
-
-        // Create a table to display results
-        let html = `
-            <h3>Search Results</h3>
-            <table class="results-table">
-                <thead>
-                    <tr>
-                        <th>Business Name</th>
-                        <th>Address</th>
-                        <th>City</th>
-                        <th>State</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-
-        // Add each business to the table
-        results.forEach(business => {
-            html += `
-                <tr>
-                    <td>${business.bname || 'N/A'}</td>
-                    <td>${business.address1 || 'N/A'} ${business.address2 ? business.address2 : ''}</td>
-                    <td>${business.city || 'N/A'}</td>
-                    <td>${business.state || 'N/A'}</td>
-                    <td><button class="select-business" data-id="${business._id}" data-business='${JSON.stringify(business)}'>Select</button></td>
-                </tr>
-            `;
-        });
-
-        html += `
-                </tbody>
-            </table>
-        `;
-
-        // Update the results container
-        resultsContainer.innerHTML = html;
-
-        // Add event listeners to the select buttons
-        document.querySelectorAll('.select-business').forEach(button => {
-            button.addEventListener('click', function() {
-                const businessId = this.getAttribute('data-id');
-                const businessData = JSON.parse(this.getAttribute('data-business'));
-                selectBusiness(businessId, businessData);
-            });
-        });
-    }
-
-    // Function to select a business and populate the incentive form
+    // function to select a business and populate the incentive form
     function selectBusiness(businessId, businessData) {
-        // Show the business info section
+        console.log("Selecting business: ", businessData);
+
+        // show the hidden business info section
         if (businessInfoSection) {
             businessInfoSection.style.display = 'block';
         }
 
-        // Populate the hidden field with the business ID
+        // populate the hidden field with the business ID
         const businessIdField = document.getElementById('selected-business-id');
         if (businessIdField) {
             businessIdField.value = businessId;
         }
 
-        // Populate the business info fields for confirmation
+        // populate the business information fields for confirmation of correct business
         populateField('bname', businessData.bname);
         populateField('address1', businessData.address1);
         populateField('address2', businessData.address2);
         populateField('city', businessData.city);
-        populateField('state', businessData.state);
+
+        // special handling for select fields
+        populateSelectField('state', businessData.state);
+        populateSelectField('type', businessData.type);
+
         populateField('zip', businessData.zip);
         populateField('phone', businessData.phone);
-        populateField('type', businessData.type);
 
-        // Make business info fields readonly since we're just displaying selected business
-        document.querySelectorAll('#business-info-section input, #business-info-section select').forEach(el => {
-            if (el.tagName.toLowerCase() === 'select') {
-                el.disabled = true;
+        // make the business information fields readonly since they are just for display purposes
+        document.querySelectorAll('#business-info-section input, #business-info-section select').forEach(element => {
+            if (element.tagName.toLowerCase() === 'select') {
+                element.disabled = true;
             } else {
-                el.setAttribute('readonly', true);
+                element.setAttribute('readonly', true);
             }
         });
 
-        // Show the incentive section
+        // Now show the incentive section
         if (incentiveSection) {
             incentiveSection.style.display = 'block';
         }
 
-        // Scroll to the incentive section
+        // scroll for initiative
         if (incentiveSection) {
-            incentiveSection.scrollIntoView({ behavior: 'smooth' });
+            incentiveSection.scrollIntoView({behavior: 'smooth'});
         }
     }
 
-    // Helper function to safely populate form fields
+    // helper function to safely populate all the fields
     function populateField(fieldId, value) {
         const field = document.getElementById(fieldId);
         if (field) {
             field.value = value || '';
+            console.log(`populated ${fieldId} with:`, value);
+        } else {
+            console.warn(`Field ${fieldId} not found.`);
         }
     }
 
-    // Function to add an incentive
+    // now to safely populate the select fields
+    function populateSelectField(fieldId, value) {
+        const field = document.getElementById(fieldId);
+        if (!field) {
+            console.warn(`Field ${fieldId} not found.`);
+            return;
+        }
+
+        const valueToSet = value || '';
+        let found = false;
+
+        for (let i = 0; i < field.options.length; i++) {
+            if (field.options[i].value === valueToSet) {
+                field.selectedIndex = i;
+                found = true;
+                console.log(`Selected ${valueToSet} in ${fieldId}`);
+                break;
+            }
+        }
+
+        if (!found) {
+            console.warn(`Value ${valueToSet} not found in options for ${fieldId}`);
+        }
+    }
+
+    // Function to add an Incentive
     function addIncentive(incentiveData) {
-        // Show loading indicator
+        console.log("adding Incentive: ", incentiveData);
+
+        // show the loading indicator
         const submitButton = document.querySelector('#incentive-form input[type="submit"]');
         let originalText = 'Submit Incentive';
         if (submitButton) {
@@ -237,47 +260,78 @@ document.addEventListener('DOMContentLoaded', function() {
             submitButton.disabled = true;
         }
 
-        // Make API call to your server endpoint
-        fetch('/api/incentives/add', {
+        // make the api call to the server
+        const apiURL = 'https://patriotthanks.vercel.app/api/incentive-add';
+
+        fetch(apiURL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(incentiveData)
         })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`Server responded with status ${res.status}`);
                 }
-                return response.json();
+                return res.json();
             })
             .then(data => {
+                console.log("Incentive added successfully: ", data);
                 alert('Incentive added successfully!');
-                // Reset the incentive form but keep the business selected
-                resetField('IncentiveType');
+
+                // Reset the incentive form but keep the selected business
+                resetField('incentiveType');
                 resetField('incentiveAmount');
                 resetField('incentiveInfo', 'Please enter information about the discount/incentive.');
-                document.querySelectorAll('input[name="incentiveAvailable"]').forEach(radio => {
+                document.querySelector('input[name="incentiveAvailable"]').forEach(radio => {
                     radio.checked = false;
                 });
             })
             .catch(error => {
+                console.error("Error adding incentive: ", error);
                 alert(`Error adding incentive: ${error.message}`);
             })
             .finally(() => {
-                // Restore submit button
+                // time to restore the submit button
                 if (submitButton) {
                     submitButton.value = originalText;
                     submitButton.disabled = false;
                 }
             });
-    }
+        }
 
-    // Helper function to safely reset form fields
+    // helper function to safey rest form fields
     function resetField(fieldId, defaultValue = '') {
         const field = document.getElementById(fieldId);
         if (field) {
             field.value = defaultValue;
         }
     }
+
+    // Lets add some css for the disabled fields
+    const style = document.createElement('style');
+    style.textContent = `
+        .disabled-field {
+            background-color: #f0f0f0;
+            color: #888;
+            cursor: not-allowed;
+        }
+        textarea.disabled-field {
+            resize: none;
+        }
+    `;
+    document.head.appendChild(style);
 });
+
+
+
+
+
+
+
+
+
+
+
+
