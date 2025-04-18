@@ -335,8 +335,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // make the api call to the server
-        // const apiURL = 'https://patriotthanks.vercel.app/api/incentive/add';
-        const apiURL = 'https://patriotthanks.vercel.app/api/test-incentive-path';
+        const apiURL = 'https://patriotthanks.vercel.app/api/incentives/add';
+        // const apiURL = 'https://patriotthanks.vercel.app/api/test-incentive-path';
         console.log("Attempting to submit to: ", apiURL);
 
         fetch(apiURL, {
