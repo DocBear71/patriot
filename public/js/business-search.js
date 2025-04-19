@@ -206,8 +206,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const row = document.createElement('tr');
 
                 // Set the row content
-                row.innerHTML = `
-<!--                    <th><img src="${imageSrc}" alt="${business.bname}" class="business-image"></th>-->
+                row.innerHTML =
+                    // <th><img src="${imageSrc}" alt="${business.bname}" class="business-image"></th>
+                `
                     <th class="left_table">${business.bname}</th>
                     <th class="left_table">${addressLine}</th>
                     <th class="left_table">Business type: ${business.type}</th>
