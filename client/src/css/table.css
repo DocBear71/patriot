@@ -30,7 +30,7 @@ hr {
     margin-right: auto;
 }
 
-#search_table > figure > .middle {
+#search_table > .middle {
     margin-left: auto;
     margin-right: auto;
     width: 932px;
@@ -92,11 +92,6 @@ tbody tr:nth-child(even) {
 
 tbody tr:nth-child(odd) {
     background-color: #d3d3d3;
-}
-
-.red_lobster, .lowes, .milex, .capriotti, .home_depot {
-    width: 100%;
-    height: auto;
 }
 
 /* MEDIA QUERIES ARE BELOW */
@@ -166,11 +161,6 @@ tbody tr:nth-child(odd) {
     .right_table {
         text-align: right;
     }
-    
-    .red_lobster, .lowes, .milex, .capriotti, .home_depot {
-        width: 100%;
-        height: auto;
-    }
 
 }
 /* MEDIA QUERIES ARE BELOW */
@@ -239,11 +229,6 @@ tbody tr:nth-child(odd) {
     
     .right_table {
         text-align: right;
-    }
-
-    .red_lobster, .lowes, .milex, .capriotti, .home_depot {
-        width: 100%;
-        height: auto;
     }
 
 } 
