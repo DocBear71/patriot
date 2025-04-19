@@ -1,6 +1,7 @@
 // api/business-search.js - Business search endpoint
-const mongoose = require('mongoose');
-const connect = require('../config/db');
+// const mongoose = require('mongoose');
+// const connect = require('../config/db');
+const { MongoClient } = require('mongodb');
 
 module.exports = async (req,res) => {
     // enable CORS
@@ -23,13 +24,33 @@ module.exports = async (req,res) => {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
+    let client = null;
+
     try {
         console.log("Business search API hit:", req.method);
         console.log("Query parameters:", req.query);
 
         // Conect tot the MongoDB using mongoose
-        await connect();
-        console.log("Connected to MongoDB using Mongoose");
+        // await connect();
+        // console.log("Connected to MongoDB using Mongoose");
+
+        // mongodb connection details
+        const MONGODB_URI = process.env.MONGODB_URI_PATRIOT;
+        const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot';
+
+        if (!MONGODB_URI) {
+            throw new Error('MONGODB_URI_PATRIOT environment variable is not set');
+        }
+
+        // connect directly to MongoDB
+        client = await MongoClient.connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 10000,
+            socketTimeoutMS: 15000,
+        });
+
+        const dp = client.db(MONGODB_DB);
+        const collection = db.collection('business');
 
         // Check if business_name or businessName is present
         const businessNameValue = req.query.business_name || req.query.businessName || '';
