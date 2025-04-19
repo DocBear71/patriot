@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Set the row content
                 row.innerHTML = `
-                    <th><img src="${imageSrc}" alt="${business.bname}" class="business-image"></th>
+<!--                    <th><img src="${imageSrc}" alt="${business.bname}" class="business-image"></th>-->
                     <th class="left_table">${business.bname}</th>
                     <th class="left_table">${addressLine}</th>
                     <th class="left_table">Business type: ${business.type}</th>
