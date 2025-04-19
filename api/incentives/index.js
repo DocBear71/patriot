@@ -1,69 +1,49 @@
-// api/incentives/index.js - Get incentives for a business
-const express = require('express');
-const { MongoClient, ObjectId } = require('mongodb');
-const cors = require('cors');
+// api/incentives/[businessId].js - Get incentives for a business
+const { connectToDatabase } = require('../../lib/mongodb');
 
-// Create an Express server instance
-const app = express();
+module.exports = async (req, res) => {
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    );
 
-// Enable JSON body parsing
-app.use(express.json());
+    // handle the OPTIONS request
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
 
-// Enable CORS for all routes
-app.use(cors());
-
-// MongoDB connection details
-const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
-const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
-const INCENTIVES_COLLECTION = 'incentives';
-
-// Handle OPTIONS preflight requests
-app.options('*', cors());
-
-// GET endpoint for retrieving incentives by business ID
-app.get('/:businessId', async (req, res) => {
-    console.log("Get incentives API hit:", req.method);
-    console.log("Business ID:", req.params.businessId);
-
-    let client = null;
+    // only allow GET requests
+    if (req.method !== 'GET') {
+        return res.status(405).json({ message: 'Method Not Allowed' });
+    }
 
     try {
-        // Connect to MongoDB
-        client = await MongoClient.connect(MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000,
-            connectTimeoutMS: 10000,
-            socketTimeoutMS: 15000,
-        });
+        console.log("Get Incentives API hit:", req.method);
 
-        const db = client.db(MONGODB_DB);
-        const incentivesCollection = db.collection(INCENTIVES_COLLECTION);
+        // get the business ID from the URL
+        const businessId = req.query.businessId || req.url.split('/').pop();
+        console.log("Business ID:", businessId);
 
-        // Get business ID from path parameter
-        const businessId = req.params.businessId;
+        // conect to the MongoDB
+        const { db } = await connectToDatabase();
+        const incentivesCollection = db.collection('incentives');
 
-        // Find incentives for the business
+        // find the incentives for the selected business ID
         const incentives = await incentivesCollection.find({
             business_id: businessId
         }).toArray();
 
         return res.status(200).json({
-            message: 'Incentives retrieved successfully',
+            message: 'Incentives retrieved successfully.',
             results: incentives
         });
-
     } catch (error) {
-        console.error('Get incentives error:', error);
-        return res.status(500).json({ message: 'Server error while retrieving incentives: ' + error.message });
-    } finally {
-        // Close the connection
-        if (client) await client.close();
+        console.error("get incentives error", error);
+        return res.status(500).json({message: 'Server error while retrieving incentives: ' + error.message});
     }
-});
-
-// GET endpoint for testing
-app.get('/', (req, res) => {
-    res.status(200).json({ message: 'Incentives API is available' });
-});
-
-// Export the Express API
-module.exports = app;
+};

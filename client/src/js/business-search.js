@@ -48,63 +48,67 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const queryParams = new URLSearchParams(params).toString();
 
-            // Use the absolute URL with query parameters
-            const apiUrl = `https://patriotthanks.vercel.app/api/business-search?${queryParams}`;
-            console.log("Submitting search to API at:", apiUrl);
+            // Determine the base URL of local or production
+            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `https://${window.location.host}`
+                : `https://patriotthanks.vercel.app`;
 
-            const response = await fetch(apiUrl, {
-                method: "GET",
+            // use the API endpoint with the baseURL
+            const apiURL = `${baseURL}/api/business-search?${queryParams}`;
+            console.log("submitting search to API at: ", apiURL);
+
+            const res = await fetch(apiURL, {
+                method: 'GET',
                 headers: {
-                    "Content-Type": "application/json; charset=utf-8 ",
+                    'Content-Type': 'application/json; charset=UTF-8',
                 }
             });
 
-            console.log("Response status:", response.status);
+            console.log("response status: ", res.status);
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error("Error response:", errorText);
-                throw new Error(`Failed to retrieve data from MongoDB: ${response.status} ${errorText}`);
+            if (!res) {
+                const errorText = await res.text();
+                console.error("Error response: ", errorText);
+                throw new Error(`Failed to retrieve data from MongoDB: ${res.status} ${errorText}`);
             }
 
-            const data = await response.json();
-            console.log("Success:", data);
+            const data = await res.json();
+            console.log("Success: ", data);
 
-            // Check which page we're on and display the results accordingly
+            // check the page to make sure the results display properly
             if (document.getElementById('search_table')) {
-                // it is the business-search.html page
+                // we are on the business-search.html page
                 displaySearchResults(data.results);
             } else {
-                // on the incentive-add.html or incentive-view.html pages
+                // if on the incentive-add.html or incentive-view.html pages
                 let resultsContainer = document.getElementById('business-search-results');
 
                 if (!resultsContainer) {
-                    //if it doesn't exist, create it
+                    // create the container if it doesn't exist
                     resultsContainer = document.createElement('div');
                     resultsContainer.id = 'business-search-results';
 
-                    // find a good place to insert it after the first fieldset, perhaps
-                    const fieldset = document.createElement('fieldset');
-                    if (fieldset) {
-                        fieldset.parentNode.insertBefore(resultsContainer, fieldset.nextSibling);
+                    // decide where to insert the container
+                    const firstFieldset = document.querySelector('fieldset');
+                    if (firstFieldset) {
+                        firstFieldset.parentNode.insertBefore(resultsContainer, firstFieldset.nextSibling);
                     } else {
                         const main = document.querySelector('main');
                         if (main) {
-                            main.insertBefore(resultsContainer, main.firstChild);
+                            main.appendChild(resultsContainer);
                         } else {
-                            // last resort, just append to the body
+                            // if nothing else, just append the body
                             document.body.appendChild(resultsContainer);
                         }
                     }
 
                     console.log("Created business-search-results container");
                 }
-
                 displayBusinessSearchResults(data.results, resultsContainer);
             }
         } catch (error) {
-            console.error("Error:", error);
-            alert("Search failed: " + error.message);
+            console.error("Error: ", error);
+            alert(`Search failed: ${error.message}`);
         }
     }
 

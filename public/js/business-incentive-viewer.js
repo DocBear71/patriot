@@ -166,7 +166,7 @@ function fetchIncentives(businessId, businessName) {
     if (!incentivesContainer) {
         console.log("creating the incentives container");
         incentivesContainer = document.createElement('div');
-        incentivesContainer.id = "incentives-container";
+        incentivesContainer.id = 'incentives-container';
 
         // now find a good place to put it
         const businessInfoSection = document.getElementById('business-info-section')
@@ -209,10 +209,9 @@ function fetchIncentives(businessId, businessName) {
                 // create the fieldset for the incentives to be shown
                 let html = `
                     <fieldset id="incentives-section">
-                        <legent>
+                        <legend>
                             <h3 class="caveat">Step 3: View Incentives for ${businessName}</h3>
-                        </legent>
-                    </fieldset>
+                        </legend>
                 `;
 
                 if (!data.results || data.results.length === 0) {

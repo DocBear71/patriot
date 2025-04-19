@@ -1,44 +1,36 @@
 // api/incentives/add.js - Add incentives to a business
-const express = require('express');
-const { MongoClient, ObjectId } = require('mongodb');
-const cors = require('cors');
+const { connectToDatabase } = require('../../lib/mongodb');
+const { ObjectId } = require('mongodb');
 
-// Create an Express server instance
-const app = express();
+module.exports = async (req, res) => {
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    );
 
-// Enable JSON body parsing
-app.use(express.json());
+    // Handle preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
 
-// Enable CORS for all routes
-app.use(cors());
+    // Handle GET request for testing
+    if (req.method === 'GET') {
+        return res.status(200).json({ message: 'Incentives Add API is available' });
+    }
 
-// MongoDB connection details
-const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
-const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
-const INCENTIVES_COLLECTION = 'incentives';
-const BUSINESS_COLLECTION = 'business';
-
-// Handle OPTIONS preflight requests
-app.options('*', cors());
-
-// POST endpoint for adding an incentive
-app.post('/', async (req, res) => {
-    console.log("Incentives add API hit:", req.method);
-    console.log("Request body:", req.body);
-
-    let client = null;
+    // Only allow POST requests for actual operations
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
 
     try {
-        // Connect to MongoDB
-        client = await MongoClient.connect(MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000,
-            connectTimeoutMS: 10000,
-            socketTimeoutMS: 15000,
-        });
-
-        const db = client.db(MONGODB_DB);
-        const incentivesCollection = db.collection(INCENTIVES_COLLECTION);
-        const businessCollection = db.collection(BUSINESS_COLLECTION);
+        console.log("Incentives add API hit:", req.method);
+        console.log("Request body:", req.body);
 
         // Extract incentive data from request body
         const incentiveData = req.body;
@@ -47,6 +39,11 @@ app.post('/', async (req, res) => {
         if (!incentiveData.business_id) {
             return res.status(400).json({ message: 'Business ID is required' });
         }
+
+        // Connect to MongoDB
+        const { db } = await connectToDatabase();
+        const incentivesCollection = db.collection('incentives');
+        const businessCollection = db.collection('business');
 
         // Check if the business exists
         const businessExists = await businessCollection.findOne({
@@ -85,16 +82,5 @@ app.post('/', async (req, res) => {
     } catch (error) {
         console.error('Incentive submission error:', error);
         return res.status(500).json({ message: 'Server error during incentive submission: ' + error.message });
-    } finally {
-        // Close the connection
-        if (client) await client.close();
     }
-});
-
-// GET endpoint for testing
-app.get('/', (req, res) => {
-    res.status(200).json({ message: 'Incentives Add API is available' });
-});
-
-// Export the Express API
-module.exports = app;
+};
