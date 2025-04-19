@@ -60,51 +60,38 @@ module.exports = async (req,res) => {
         console.log("Address value:", addressValue);
 
         // buidl the query based on the provided parameters
-        let query;
+        let queryConditions = [];
 
+        // only use business name if a value is provided
         if (businessNameValue && businessNameValue.trim() !== '') {
-            // then search by business name
-            const nameValue = businessNameValue.trim();
-            query.bname = { $regex: nameValue, $options: 'i' };
+            queryConditions.push({
+                bname: {$regex: businessNameValue, $options: 'i'}
+            });
         }
 
         if (addressValue && addressValue.trim() !== '') {
-            const addressRegex = {$regex: addressValue.trim(), $options: 'i'};
-
-            if (query.bname) {
-                // create an $or query for address fields, combined with existing bname query
-                query = {
-                    $and: [
-                        {bname: query.bname},
-                        {
-                            $or: [
-                                {address1: addressRegex},
-                                {address2: addressRegex},
-                                {city: addressRegex},
-                                {state: addressRegex},
-                                {zip: addressRegex},
-                            ]
-                        }
-                    ]
-                };
-            } else {
-                // or else just query by address fields
-                query = {
-                    $or: [
-                        {address1: addressRegex},
-                        {address2: addressRegex},
-                        {city: addressRegex},
-                        {state: addressRegex},
-                        {zip: addressRegex},
-                    ]
-                };
-            }
+            const addressString = addressValue.trim();
+            queryConditions.push({
+                $or: [
+                    {address1: addressString},
+                    {address2: addressString},
+                    {city: addressString},
+                    {state: addressString},
+                    {zip: addressString},
+                ]
+            });
         }
 
-        console.log("MongoDB Query: ", JSON.stringify(query, null, 2));
+        // construct the final query
+        let finalQuery = {};
+        if (queryConditions.length > 0) {
+            finalQuery = { $and: queryConditions };
+        }
+
+        console.log("MongoDB Query: ", JSON.stringify(finalQuery, null, 2));
 
         // now find a business matching the query
-        const businesses = await Business.find(query).exec();
+        const businesses = await Business.find(finalQuery).lean.exec();
         console.log("Found", businesses.length, "matching businesses");
 
         return res.status(200).json({
