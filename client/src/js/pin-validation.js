@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", function() {
         try {
             // call the api to verify the admin code
             const res = await fetch('/api/verify-admin-code', {
-                method: 'POST',
+                method: 'GET',
                 headers: {
                     'Content-Type': 'application/json; charset=UTF-8',
                 },

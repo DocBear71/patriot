@@ -36,7 +36,7 @@ app.use('/api/contact', contactApi);
 app.use('/api/incentives', incentivesApi);
 app.use('/api/incentives/add', incentivesAddApi);
 app.use('/api/login', loginApi);
-app.use('/api/register', loginApi);
+app.use('/api/register', registerApi);
 app.use('/api/test', testApi);
 app.use('/api/users/password', usersPasswordApi);
 app.use('/api/users/update', usersUpdateApi);
