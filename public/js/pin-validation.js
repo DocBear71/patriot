@@ -53,23 +53,65 @@ document.addEventListener("DOMContentLoaded", function() {
         const pinError = document.getElementById('pinError');
         const membershipSelect = document.getElementById('membership-level');
 
+        const ADMIN_PIN = "488444204"
+
         try {
-            // Use the absolute URL to your Vercel deployment with the new endpoint
-            const apiUrl = 'https://patriotthanks.vercel.app/api/verify-admin-code';
-            console.log("Submitting admin code to API at:", apiUrl);
+            const deployedURL = 'https://patriotthanks.vercel.app/api/verify-admin-code';
+            const localURL = '/api/verify-admin-code';
 
-            const res = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json; charset=UTF-8',
-                },
-                body: JSON.stringify({code: pinInput}),
-            });
+            console.log("Attempting to verify admin code using deployed API...");
+            let res;
 
-            const data = res.json();
+            // // Use the absolute URL to your Vercel deployment with the new endpoint
+            // const apiUrl =
+            // console.log("Submitting admin code to API at:", apiUrl);
+            try {
+                res = await fetch(deployedURL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json; charset=utf-8",
+                    },
+                    body: JSON.stringify({ code: pinInput }),
+                });
+            } catch (error) {
+                console.log("Deployed API call failed, trying local API...");
+                // if deployed fails, try local
+                res = await fetch(localURL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json; charset=utf-8",
+                    },
+                    body: JSON.stringify({ code: pinInput }),
+                });
+            }
 
+            // if valid response, process it
             if (res.ok && data.access) {
-                // PIN correct - upgrade to Admin
+                const data = await res.json();
+                if (data.access) {
+                    // PIN correct - upgrade to Admin
+                    membershipSelect.value = "Admin";
+                    lastValidSelection = "Admin";
+                    isAdminVerified = true;
+
+                    // hide the modal
+                    $('#adminAccessModal').modal('hide');
+
+                    // show a success message
+                    alert("Admin access verified successfully.");
+                    return;
+                } else {
+                    // show an error message
+                    pinError.style.display = 'block';
+                    pinError.textContent = data.message || 'Invalid admin access code';
+                    return;
+                }
+            }
+
+            // if the api call failed or returned a non-OK status, fall back to hardcoded PIN
+            console.log("API verification failed, falling back to hardcoded PIN");
+            if (pinInput === ADMIN_PIN) {
+                // PIN correct, update to Admin
                 membershipSelect.value = "Admin";
                 lastValidSelection = "Admin";
                 isAdminVerified = true;
