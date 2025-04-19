@@ -51,7 +51,7 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById('verifyPinBtn').addEventListener('click', async function () {
         const pinInput = document.getElementById('adminPinCode').value;
         const pinError = document.getElementById('pinError');
-        const statusSelect = document.getElementById('membership-level');
+        const membershipSelect = document.getElementById('membership-level');
 
         try {
             // call the api to verify the admin code
