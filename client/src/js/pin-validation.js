@@ -54,12 +54,16 @@ document.addEventListener("DOMContentLoaded", function() {
         const membershipSelect = document.getElementById('membership-level');
 
         try {
-            // call the api to verify the admin code
-            const res = await fetch('/api/verify-admin-code', {
-                method: 'GET',
+            // Use the absolute URL to your Vercel deployment with the new endpoint
+            const apiUrl = 'https://patriotthanks.vercel.app/api/verify-admin-code';
+            console.log("Submitting admin code to API at:", apiUrl);
+
+            const res = await fetch(apiUrl, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json; charset=UTF-8',
-                }
+                },
+                body: JSON.stringify({code: pinInput}),
             });
 
             const data = res.json();
