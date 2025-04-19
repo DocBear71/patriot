@@ -1,26 +1,18 @@
 // api/business-search.js - Business search endpoint
-// const mongoose = require('mongoose');
-// const connect = require('../config/db');
-const { MongoClient } = require('mongodb');
+const mongoose = require('mongoose');
+const connect = require('../config/db');
+
 
 module.exports = async (req,res) => {
-    // enable CORS
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    );
+    // CORS handled by next.config.js
 
-    // handle the OPTIONS request
+    // handle the OPTIONS request, if next.config.js doesn't handle it properly
     if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
+        return res.status(200).end();
     }
 
-    // only allow GET requests
-    if (req.method !== 'GET') {
+    // handle only specific https methods
+    if (req.method !== 'POST' && req.method !== 'GET') {
         return res.status(405).json({ message: 'Method Not Allowed' });
     }
 
@@ -31,26 +23,11 @@ module.exports = async (req,res) => {
         console.log("Query parameters:", req.query);
 
         // Conect tot the MongoDB using mongoose
-        // await connect();
+        await connect();
         // console.log("Connected to MongoDB using Mongoose");
 
-        // mongodb connection details
-        const MONGODB_URI = process.env.MONGODB_URI_PATRIOT;
-        const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot';
-
-        if (!MONGODB_URI) {
-            throw new Error('MONGODB_URI_PATRIOT environment variable is not set');
-        }
-
-        // connect directly to MongoDB
-        client = await MongoClient.connect(MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000,
-            connectTimeoutMS: 10000,
-            socketTimeoutMS: 15000,
-        });
-
-        const db = client.db(MONGODB_DB);
-        const collection = db.collection('business');
+        // now use the connection
+        const collection = mongoose.connection.db.collection('business');
 
         // Check if business_name or businessName is present
         const businessNameValue = req.query.business_name || req.query.businessName || '';

@@ -1,20 +1,13 @@
 // api/business.js - Business registration endpoint
-const { connectToDatabase } = require('../lib/mongodb');
+const connect = require('../config/db');
+const mongoose = require('mongoose');
 
 module.exports = async (req,res) => {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    );
+    // CORS is handled by next.config.js
 
-    // handle the Options request
+    // handle the Options request if not properly handled in next.config.js
     if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
+        return res.status(200).end();
     }
 
     // Onlyu allo0w Post requests
@@ -34,8 +27,10 @@ module.exports = async (req,res) => {
         console.log("Business Data: ", businessData);
 
         // Connect to the MongoDB
-        const { db } = await connectToDatabase();
-        const collection = db.collection('business');
+        await connect();
+
+        // now use the connection
+        const collection = mongoose.connection.db.collection('business');
 
         // does the business already exist in the database?
         const existingBusiness = await collection.findOne({
