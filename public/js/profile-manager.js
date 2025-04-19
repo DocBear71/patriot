@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch(apiUrl, {
                 method: "PUT",
                 headers: {
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/json; charset=utf-8",
                 },
                 body: JSON.stringify(passwordData),
             });

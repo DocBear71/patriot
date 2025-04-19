@@ -20,7 +20,8 @@
   "scripts": {
     "dev": "node server.js",
     "build": "cd client && npm install && npm run build",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev:watch": "nodemon server.js"
   },
   "repository": {
     "type": "git",

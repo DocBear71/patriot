@@ -1,51 +1,90 @@
-// api/login.js - Vercel serverless function for user login
-import { connectToDatabase } from '../lib/mongodb';
-import bcrypt from 'bcryptjs';
+// api/login.js - User login endpoint
+const express = require('express');
+const { MongoClient } = require('mongodb');
+const bcrypt = require('bcryptjs');
+const cors = require('cors');
 
-export default async function handler(req, res) {
-    // Only allow POST requests
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+// Create an Express server instance
+const app = express();
+
+// Enable JSON body parsing
+app.use(express.json());
+
+// Enable CORS for all routes
+app.use(cors());
+
+// MongoDB connection details
+const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
+const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
+const USERS_COLLECTION = 'users';
+
+// Handle OPTIONS preflight requests
+app.options('*', cors());
+
+// POST endpoint for user login
+app.post('/', async (req, res) => {
+    console.log("Login API hit:", req.method);
+
+    let client = null;
 
     try {
+        // Connect to MongoDB
+        client = await MongoClient.connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 10000,
+            socketTimeoutMS: 15000,
+        });
+
+        const db = client.db(MONGODB_DB);
+        const collection = db.collection(USERS_COLLECTION);
+
+        // Extract login credentials from request body
         const { email, password } = req.body;
 
-        // Validate input
+        // Basic validation
         if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
+            return res.status(400).json({ message: 'Email and password are required' });
         }
-
-        // Connect to MongoDB
-        const { db } = await connectToDatabase();
-        const usersCollection = db.collection('users');
 
         // Find user by email
-        const user = await usersCollection.findOne({ email });
+        const user = await collection.findOne({ email });
 
-        // Check if user exists
         if (!user) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ message: 'Invalid email or password' });
         }
 
-        // Verify password
+        // Compare passwords
         const isPasswordValid = await bcrypt.compare(password, user.password);
 
         if (!isPasswordValid) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ message: 'Invalid email or password' });
         }
 
-        // Remove password from user object before sending response
-        const { password: _, ...userWithoutPassword } = user;
+        // Return success response with user info (excluding password)
+        const userInfo = { ...user };
+        delete userInfo.password;
 
-        // Send successful response with user data
         return res.status(200).json({
-            success: true,
             message: 'Login successful',
-            user: userWithoutPassword
+            userId: user._id,
+            email: user.email,
+            status: user.status || 'US',
+            // Add any other fields you want to return
         });
+
     } catch (error) {
         console.error('Login error:', error);
-        return res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ message: 'Server error during login: ' + error.message });
+    } finally {
+        // Close the connection
+        if (client) await client.close();
     }
-}
+});
+
+// GET endpoint for testing
+app.get('/', (req, res) => {
+    res.status(200).json({ message: 'Login API is available' });
+});
+
+// Export the Express API
+module.exports = app;

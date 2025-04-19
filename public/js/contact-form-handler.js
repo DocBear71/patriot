@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("Contact form handler loaded!");
 
     // Get form element
-    const contactForm = document.querySelector('form[action="./php/contact.php"]');
+    const contactForm = document.querySelector('form[action="./api/contact"]');
 
     // Get form fields
     const form = {
