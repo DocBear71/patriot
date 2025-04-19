@@ -6,18 +6,58 @@
       "use": "@vercel/node"
     },
     {
-      "src": "public/**",
+      "src": "public/**/*",
       "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "src": "/api/business",
+      "dest": "/api/business.js"
+    },
+    {
+      "src": "/api/business-search",
+      "dest": "/api/business-search.js"
+    },
+    {
+      "src": "/api/contact",
+      "dest": "/api/contact.js"
+    },
+    {
+      "src": "/api/incentives",
+      "dest": "/api/incentives/index.js"
+    },
+    {
+      "src": "/api/incentives/add",
+      "dest": "/api/incentives/add.js"
+    },
+    {
+      "src": "/api/login",
+      "dest": "/api/login.js"
+    },
+    {
+      "src": "/api/register",
+      "dest": "/api/register.js"
+    },
+    {
+      "src": "/api/test",
+      "dest": "/api/test.js"
+    },
+    {
+      "src": "/api/users/password",
+      "dest": "/api/users/password.js"
+    },
+    {
+      "src": "/api/users/update",
+      "dest": "/api/users/update.js"
+    },
+    {
+      "src": "/api/verify-admin-code",
+      "dest": "/api/verify-admin-code.js"
     },
     {
       "src": "/(.*)",
-      "dest": "public/$1"
+      "dest": "/public/$1"
     }
   ]
 }

@@ -60,14 +60,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function submitToMongoDB(formData) {
         try {
-            // Use the absolute URL to your Vercel deployment with the new endpoint
-            const apiUrl = 'https://patriotthanks.vercel.app/api/business';
-            console.log("Submitting to API at:", apiUrl);
+            // determine the base URL, local or production
+            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `https://${window.location.host}`
+                : `https://patriotthanks.vercel.app`;
 
-            const response = await fetch(apiUrl, {
+
+            // use the api endpoint with the baseURL
+            const apiURL = `${baseURL}/api/business`;
+            console.log("Submitting to API at:", apiURL);
+
+            const response = await fetch(apiURL, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/json; charset=utf-8",
                 },
                 body: JSON.stringify(formData),
             });
@@ -87,11 +93,19 @@ document.addEventListener('DOMContentLoaded', function() {
             alert("Submission successful! The business is now available in our database.");
 
             // Optional: Clear form or redirect
-            submitBusiness.reset();
+            resetForm();
 
         } catch (error) {
             console.error("Error:", error);
             alert("Registration failed: " + error.message);
+        }
+    }
+
+    // helper function for reset form
+    function resetForm() {
+        const form = document.getElementById('business-form');
+        if (form) {
+            form.reset();
         }
     }
 

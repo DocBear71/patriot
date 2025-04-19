@@ -1,86 +1,66 @@
 // api/business.js - Business registration endpoint
-const express = require('express');
-const { MongoClient } = require('mongodb');
-const cors = require('cors');
+const { connectToDatabase } = require('../lib/mongodb');
 
-// Create an Express server instance
-const app = express();
+module.exports = async (req,res) => {
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    );
 
-// Enable JSON body parsing
-app.use(express.json());
+    // handle the Options request
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
 
-// Enable CORS for all routes
-app.use(cors());
-
-// MongoDB connection details
-const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
-const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
-const BUSINESS_COLLECTION = 'business';
-
-// Handle OPTIONS preflight requests
-app.options('*', cors());
-
-// POST endpoint for business registration
-app.post('/', async (req, res) => {
-    console.log("Business API hit:", req.method);
-
-    let client = null;
+    // Onlyu allo0w Post requests
+    if (req.method !== 'POST') {
+        // For Get requests, use the API info
+        if (req.method === 'GET') {
+            return res.status(200).json({message: 'Business API is available'});
+        }
+        return res.status(405).json({message: 'Method Not Allowed'});
+    }
 
     try {
-        console.log("Connecting to MongoDB...");
+        console.log("Business API hit: ", req.method );
 
-        // Connect to MongoDB
-        client = await MongoClient.connect(MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000,
-            connectTimeoutMS: 10000,
-            socketTimeoutMS: 15000,
-        });
-        console.log("Connected to MongoDB");
-
-        const db = client.db(MONGODB_DB);
-        const collection = db.collection(BUSINESS_COLLECTION);
-
-        // Extract business data from request body
+        // get the business data from the request
         const businessData = req.body;
-        console.log("Received business data:", businessData);
+        console.log("Business Data: ", businessData);
 
-        // Check if business already exists
+        // Connect to the MongoDB
+        const { db } = await connectToDatabase();
+        const collection = db.collection('business');
+
+        // does the business already exist in the database?
         const existingBusiness = await collection.findOne({
             address1: businessData.address1,
             address2: businessData.address2,
             city: businessData.city,
             state: businessData.state,
-            zip: businessData.zip
+            zip: businessData.zip,
         });
 
         if (existingBusiness) {
-            return res.status(409).json({ message: 'Business with this address already exists' });
+            return res.status(409).json({ message: 'Business with this address already exists'});
         }
-
-        console.log("Inserting business data...");
-        // Insert business data
+        // lets insert the data
+        console.log("Inserting business data");
         const result = await collection.insertOne(businessData);
-        console.log("Business registered successfully:", result.insertedId);
+        console.log("Business registered successfully: ", result.insertedId);
 
-        // Return success response
-        return res.status(201).json({
+        // return a success response
+        return res.status(200).json({
             message: 'Business registered successfully',
             businessId: result.insertedId
         });
-
     } catch (error) {
-        console.error('Business submission error:', error);
+        console.error('Business submission error: ', error);
         return res.status(500).json({ message: 'Server error during business submission: ' + error.message });
-    } finally {
-        // Close the connection
-        if (client) await client.close();
     }
-});
-
-// GET endpoint for testing
-app.get('/', (req, res) => {
-    res.status(200).json({ message: 'Business API is available' });
-});
-
-// Export the Express API
-module.exports = app;
+};
