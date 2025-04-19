@@ -49,7 +49,7 @@ module.exports = async (req,res) => {
             socketTimeoutMS: 15000,
         });
 
-        const dp = client.db(MONGODB_DB);
+        const db = client.db(MONGODB_DB);
         const collection = db.collection('business');
 
         // Check if business_name or businessName is present
