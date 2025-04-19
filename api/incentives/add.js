@@ -1,6 +1,41 @@
 // api/incentives/add.js - Add incentives to a business
-const { connectToDatabase } = require('../../lib/mongodb');
-const { ObjectId } = require('mongodb');
+const connect = require('../../config/db');
+const mongoose = require('mongoose');
+
+// define the schemas for business and incentives
+const businessSchema = new mongoose.Schema({
+    bname: String,
+    address1: String,
+    address2: String,
+    city: String,
+    state: String,
+    zip: String,
+    phone: String,
+    type: String
+});
+
+const incentiveSchema = new mongoose.Schema({
+    business_id: String,
+    is_available: Boolean,
+    type: String,
+    amount: Number,
+    information: String,
+    other_description: String,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now },
+});
+
+// create the models if they don't already exist
+let Business, Incentive;
+try {
+    // try to fetch the existing models
+    Business = mongoose.model('Business');
+    Incentive = mongoose.model('Incentive');
+} catch (error) {
+    // lets define the models if they do not exist
+    Business = mongoose.model('Business', businessSchema, 'business');
+    Incentive = mongoose.model('Incentive', incentiveSchema, 'incentive');
+}
 
 module.exports = async (req, res) => {
     // Enable CORS
@@ -40,16 +75,12 @@ module.exports = async (req, res) => {
             return res.status(400).json({ message: 'Business ID is required' });
         }
 
-        // Connect to MongoDB
-        const { db } = await connectToDatabase();
-        const incentivesCollection = db.collection('incentives');
-        const businessCollection = db.collection('business');
+        // Connect to MongoDB using Mongoose
+        await connect();
+        console.log("Connected to MongoDB using Mongoose");
 
         // Check if the business exists
-        const businessExists = await businessCollection.findOne({
-            _id: new ObjectId(incentiveData.business_id)
-        });
-
+        const businessExists = await Business.findById(incentiveData.business_id).exec();
         if (!businessExists) {
             return res.status(404).json({ message: 'Business not found' });
         }
@@ -71,12 +102,13 @@ module.exports = async (req, res) => {
         }
 
         // Insert incentive data
-        const result = await incentivesCollection.insertOne(incentive);
+        const savedIncentive = await incentive.save();
+        console.log("Saved incentive:", savedIncentive._id);
 
         // Return success response
         return res.status(201).json({
             message: 'Incentive added successfully',
-            incentiveId: result.insertedId
+            incentiveId: savedIncentive._id
         });
 
     } catch (error) {

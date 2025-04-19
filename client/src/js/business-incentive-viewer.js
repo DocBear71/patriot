@@ -14,7 +14,7 @@ window.viewBusinessIncentives = function(selectedBusiness) {
     // Set the business ID in the hidden h5 field
     const selectedBusinessIdField = document.getElementById('selected-business-id');
     if (selectedBusinessIdField) {
-        selectedBusinessIdField.value = selectedBusiness._Id || '';
+        selectedBusinessIdField.value = selectedBusiness._id || '';
     }
 
     // Then popoulate the business information fields
@@ -128,7 +128,7 @@ function populateBusinessInfo(business) {
         const stateSelect = document.getElementById('state');
         if (stateSelect) {
             const stateValue = business.state || '';
-            console.log(`Setting state to ${state.value}`);
+            console.log(`Setting state to ${stateValue}`);
             for (let i = 0; i < stateSelect.options.length; i++) {
                 if (stateSelect.options[i].value === stateValue) {
                     stateSelect.selectedIndex = i;
@@ -192,7 +192,7 @@ function fetchIncentives(businessId, businessName) {
             ? `https://${window.location.host}`
             : `https://patriotthanks.vercel.app`;
 
-        const apiURL = `${baseURL}/api/incentives/${businessId}`;
+        const apiURL = `${baseURL}/api/incentives?businessId=${businessId}`;
         console.log("Fetching from URL: ", apiURL);
 
         // make fetch happen for incentives from the API

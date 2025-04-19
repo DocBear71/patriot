@@ -25,7 +25,7 @@
     },
     {
       "src": "/api/incentives",
-      "dest": "/api/incentives/index.js"
+      "dest": "/api/incentives.js"
     },
     {
       "src": "/api/incentives/add",
