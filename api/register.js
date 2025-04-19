@@ -54,6 +54,15 @@ app.post('/', async (req, res) => {
             return res.status(409).json({ message: 'User with this email already exists' });
         }
 
+        // add timestamp fields
+        userData.created_at = new Date();
+        userData.updated_at = new Date();
+
+        // check if Admin level and set isAdmin flag
+        if (userData.level === 'Admin') {
+            userData.isAdmin = true;
+        }
+
         // Remove password repeat field before storing
         if (userData.psw_repeat) delete userData.psw_repeat;
 

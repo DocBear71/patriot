@@ -10,7 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
         state: document.getElementById("state"),
         zip: document.getElementById("zip"),
         email: document.getElementById("email"),
-        status: document.getElementById("status")
+        status: document.getElementById("status"),
+        level: document.getElementById("membership-level")
     };
 
     // Get the form element
@@ -32,11 +33,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!isValidZip(form.zip.value)) invalidFields.push("Zip Code");
         if (!isValidEmail(form.email.value)) invalidFields.push("Email");
         if (!isNotEmpty(form.status.value)) invalidFields.push("Status");
+        if (!isNotEmpty(form.level.value)) invalidFields.push("Membership Level");
 
         // Check password validation
         const passwordMatch = document.getElementById("match");
         if (passwordMatch && !passwordMatch.classList.contains("valid")) {
             invalidFields.push("Password (must meet all requirements and match)");
+        }
+
+        // check if admin verification is required but not completed
+        if (form.level.value ==="Admin" && (typeof window.isAdminVerified !== 'function' || !window.isAdminVerified())) {
+            invalidFields.push("Admin access code verification");
+            alert("Admin access must be verified with a valid access code before registration.");
+            return;
         }
 
         console.log("Invalid fields:", invalidFields);
@@ -56,6 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 state: form.state.value,
                 zip: form.zip.value,
                 status: form.status.value,
+                level: form.level.value,
                 email: form.email.value,
                 password: document.getElementById("psw").value,
                 psw_repeat: document.getElementById("psw_repeat").value
@@ -75,31 +85,29 @@ document.addEventListener('DOMContentLoaded', function() {
             const apiUrl = 'https://patriotthanks.vercel.app/api/register';
             console.log("Submitting to API at:", apiUrl);
 
-            const response = await fetch(apiUrl, {
+            const res = await fetch(apiUrl, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/json; charset=utf-8",
                 },
                 body: JSON.stringify(formData),
             });
 
-            console.log("Response status:", response.status);
+            console.log("Response status:", res.status);
 
-            if (!response.ok) {
-                const errorText = await response.text();
+            if (!res.ok) {
+                const errorText = await res.text();
                 console.error("Error response:", errorText);
-                throw new Error(`Failed to submit data to MongoDB: ${response.status} ${errorText}`);
+                throw new Error(`Failed to submit data to MongoDB: ${res.status} ${errorText}`);
             }
 
-            const data = await response.json();
+            const data = await res.json();
             console.log("Success:", data);
 
             // Show success message to user
             alert("Registration successful! You can now log in.");
 
-            // Optional: Clear form or redirect
-            registerForm.reset();
-            // Or redirect: window.location.href = '/login.html';
+            window.location.href = '../index.html';
 
         } catch (error) {
             console.error("Error:", error);
@@ -116,6 +124,12 @@ document.addEventListener('DOMContentLoaded', function() {
     form.zip.addEventListener('input', function() { validateField(this, isValidZip); });
     form.email.addEventListener('input', function() { validateField(this, isValidEmail); });
     form.status.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    form.level.addEventListener('input', function() {
+        validateField(this, isNotEmpty); });
+        // if changing back from admin level, clear the admin verification flag
+        if (this.value !== "Admin" && typeof window.isAdminVerified === 'function') {
+            window.isAdminVerified = function() { return false; };
+        }
 
     // Validation functions
     function isNotEmpty(value) {
@@ -159,7 +173,8 @@ document.addEventListener('DOMContentLoaded', function() {
             { element: form.state, validator: isNotEmpty },
             { element: form.zip, validator: isValidZip },
             { element: form.email, validator: isValidEmail },
-            { element: form.status, validator: isNotEmpty }
+            { element: form.status, validator: isNotEmpty },
+            { element: form.level, validator: isNotEmpty },
         ];
 
         let formIsValid = true;

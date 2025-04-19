@@ -253,6 +253,38 @@
         </footer>
 
         <script src="./js/password-validation.js"></script>
+        <script src="./js/pin-validation.js"></script>
+
+    <!-- script loading order -->
+    <script>
+        // Ensure scripts load in the correct order
+        $(function() {
+            // First load pin-validation.js
+            $.getScript("./js/pin-validation.js")
+            .done(function() {
+                console.log("Pin validation script loaded successfully");
+                // Then load form-validator.js
+                $.getScript("./js/form-validator.js")
+                .done(function() {
+                    console.log("Form validator script loaded successfully");
+                })
+                .fail(function() {
+                    console.error("Failed to load form-validator.js");
+                });
+            })
+            .fail(function() {
+                console.error("Failed to load pin-validation.js");
+                // Try to load form-validator anyway
+                $.getScript("./js/form-validator.js")
+                .done(function() {
+                    console.log("Form validator script loaded successfully");
+                })
+                .fail(function() {
+                    console.error("Failed to load form-validator.js");
+                });
+            });
+        });
+    </script>
 
 
      </body>
