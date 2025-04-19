@@ -59,8 +59,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json; charset=UTF-8',
-                },
-                body: JSON.stringify({code: pinInput}),
+                }
             });
 
             const data = res.json();
@@ -83,7 +82,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         } catch (error) {
             console.error("Error verifying admin access code", error);
-            ;
+
             pinError.style.display = 'block';
             pinError.textContent = 'Error verifying code: ' + error.message;
         }
