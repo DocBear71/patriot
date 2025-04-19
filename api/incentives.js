@@ -18,9 +18,9 @@ const incentiveSchema = new mongoose.Schema({
 let incentive;
 try {
     // try to fetch the model if exists
-    Incentive = mongoose.model('Incentive');
+    incentive = mongoose.model('Incentive');
 } catch (error) {
-    Incentive = mongoose.model('Incentive', incentiveSchema, 'incentive');
+    incentive = mongoose.model('Incentive', incentiveSchema, 'incentive');
 }
 
 module.exports = async (req, res) => {
