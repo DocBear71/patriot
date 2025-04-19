@@ -20,7 +20,7 @@ try {
     // try to fetch the model if exists
     incentive = mongoose.model('Incentive');
 } catch (error) {
-    incentive = mongoose.model('Incentive', incentiveSchema, 'incentive');
+    incentive = mongoose.model('Incentive', incentiveSchema, 'incentives');
 }
 
 module.exports = async (req, res) => {
