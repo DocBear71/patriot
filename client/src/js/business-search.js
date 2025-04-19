@@ -66,14 +66,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log("response status: ", res.status);
 
-            if (!res) {
+            if (!res.ok) {
                 const errorText = await res.text();
                 console.error("Error response: ", errorText);
                 throw new Error(`Failed to retrieve data from MongoDB: ${res.status} ${errorText}`);
             }
 
             const data = await res.json();
-            console.log("Success: ", data);
+            console.log("Search results:", data);
+
+            // Check if data and data.results exist before proceeding
+            if (!data || !data.results) {
+                console.error("Invalid response format - missing results property");
+                throw new Error("Invalid response format from server");
+            }
 
             // check the page to make sure the results display properly
             if (document.getElementById('search_table')) {
@@ -108,7 +114,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error("Error: ", error);
-            alert(`Search failed: ${error.message}`);
+            // Show an error message to the user
+            let errorContainer;
+
+            if (document.getElementById('search_table')) {
+                errorContainer = document.getElementById('search_table');
+            } else {
+                errorContainer = document.getElementById('business-search-results');
+                if (!errorContainer) {
+                    errorContainer = document.createElement('div');
+                    errorContainer.id = 'business-search-results';
+                    const firstFieldset = document.querySelector('fieldset');
+                    if (firstFieldset) {
+                        firstFieldset.parentNode.insertBefore(errorContainer, firstFieldset.nextSibling);
+                    } else {
+                        document.body.appendChild(errorContainer);
+                    }
+                }
+            }
+
+            errorContainer.innerHTML = `<div class="error">Search failed: ${error.message}</div>`;
+            errorContainer.style.display = 'block';
         }
     }
 
@@ -133,9 +159,16 @@ document.addEventListener('DOMContentLoaded', function() {
             // Clear existing rows
             tableBody.innerHTML = '';
 
+            // Make sure businesses is an array
+            if (!Array.isArray(businesses)) {
+                console.error("businesses is not an array:", businesses);
+                businesses = [];
+            }
+
             if (businesses.length === 0) {
                 // Show no results message
-                alert("No businesses found matching your search criteria.");
+                searchTableContainer.style.display = 'block';
+                tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
                 return;
             }
 
@@ -150,6 +183,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Add each business to the table
             businesses.forEach(business => {
+                if (!business) return; // skip null or undefined entries
+
                 // Get a placeholder image based on business type
                 let imageSrc = './images/placeholder.jpg';
                 if (business.type === 'Restaurant' || business.type === 'REST') {
@@ -197,6 +232,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // clear any existing content
             resultsContainer.innerHTML = '';
 
+            // Make sure businesses is an array
+            if (!Array.isArray(businesses)) {
+                console.error("businesses is not an array:", businesses);
+                businesses = [];
+            }
+
             if (businesses.length === 0) {
                 resultsContainer.innerHTML = '<div class="error">No Businesses found matching your search criteria.</div>';
                 return;
@@ -224,6 +265,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const tbody = document.createElement('tbody');
 
             businesses.forEach(business => {
+                if (!business) return; // again, skill the null or undefined
+
                 const row = document.createElement('tr');
 
                 row.innerHTML = `
@@ -245,8 +288,19 @@ document.addEventListener('DOMContentLoaded', function() {
             selectButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     const businessId = this.getAttribute('data-business-id');
+                    if (!businessId) {
+                        console.error("No business ID found on button");
+                        return;
+                    }
+
                     // Now find the business object based on that ID
                     const selectedBusiness = businesses.find(bus => bus._id === businessId);
+                    if (!selectedBusiness) {
+                        console.error("Could not find business with ID: " + businessId);
+                        return;
+                    }
+
+                    console.log("Selected business: ", selectedBusiness);
 
                     const currentPagePath = window.location.pathname;
                     console.log("Current page: ", currentPagePath);
@@ -260,9 +314,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         } else {
                             handleBusinessSelection(selectedBusiness);
                         }
-                    } else if (currentPagePath.includes('incentive-view.html')) {
+                    } else if (currentPagePath.includes('incentive-view.html') || currentPagePath.endsWith('business-search.html')) {
                         console.log("On incentive-view page");
-                        // for incentive-add, call business-incentive-viewer.js
+                        // for incentive-view, call business-incentive-viewer.js
                         if (typeof window.viewBusinessIncentives === 'function') {
                             window.viewBusinessIncentives(selectedBusiness);
                         } else {
