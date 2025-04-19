@@ -63,6 +63,7 @@ module.exports = async (req, res) => {
         console.log("Connected to MongoDB using Mongoose")
 
         // Find incentives for the business
+        console.log("Query being exicuted:", { business_id: businessId });
         const incentives = await incentive.find({ business_id: businessId }).exec();
         console.log(`Found ${incentives.length} incentives for business ${businessId}`);
 
