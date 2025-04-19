@@ -160,7 +160,7 @@ function populateBusinessInfo(business) {
 }
 
 // function to make fetch happen and display the incentives for the selected business
-function fetchIncentives(businessId, businessName) {
+function fetchIncentives(business_id, businessName) {
     // get the incentives container we made earlier
     let incentivesContainer = document.getElementById('incentives-container');
     if (!incentivesContainer) {
@@ -184,7 +184,7 @@ function fetchIncentives(businessId, businessName) {
 
         // display a loading indicator
         incentivesContainer.innerHTML = '<p>Loading incentives...</p>';
-        console.log("Fetching incentives for business ID: ", businessId);
+        console.log("Fetching incentives for business ID: ", business_id);
 
         // Now to construct the API URL
         // local versus production
@@ -192,7 +192,7 @@ function fetchIncentives(businessId, businessName) {
             ? `https://${window.location.host}`
             : `https://patriotthanks.vercel.app`;
 
-        const apiURL = `${baseURL}/api/incentives?businessId=${businessId}`;
+        const apiURL = `${baseURL}/api/incentives?business_id=${business_id}`;
         console.log("Fetching from URL: ", apiURL);
 
         // make fetch happen for incentives from the API
