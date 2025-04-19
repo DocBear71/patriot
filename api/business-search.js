@@ -34,18 +34,25 @@ module.exports = async (req,res) => {
         const query = {};
         const searchConditions = [];
 
-        if (businessName && businessName.trim() !== '') {
-            // then search by business name
-            searchConditions.push({ bname: { $regex: businessName, $options: 'i' } });
+        console.log("All query parameters:", req.query);
+
+        // check if business_name or businessName are present
+        const businessNameValue = req.query.business_Name || req.query.businessName || '';
+        const addressValue = req.query.address || '';
+
+        if (businessNameValue && String(businessNameValue).trim() !== '') {
+            // then search by business name, ensure it is a string
+            searchConditions.push({ bname: { $regex: String(businessNameValue).trim(), $options: 'i' } });
         }
 
-        if (address && address.trim() !== '') {
+        if (addressValue && String(addressValue).trim() !== '') {
+            const addressString = String(addressValue.trim());
             // search using multiple field options
-            searchConditions.push({ address1: { $regex: address1, $options: 'i' } });
-            searchConditions.push({ address2: { $regex: address2, $options: 'i' } });
-            searchConditions.push({ city: { $regex: city, $options: 'i' } });
-            searchConditions.push({ state: { $regex: state, $options: 'i' } });
-            searchConditions.push({ zip: { $regex: zip, $options: 'i' } });
+            searchConditions.push({ address1: { $regex: addressString, $options: 'i' } });
+            searchConditions.push({ address2: { $regex: addressString, $options: 'i' } });
+            searchConditions.push({ city: { $regex: addressString, $options: 'i' } });
+            searchConditions.push({ state: { $regex: addressString, $options: 'i' } });
+            searchConditions.push({ zip: { $regex: addressString, $options: 'i' } });
         }
 
         if (searchConditions.length > 0) {

@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Only include non-empty parameters in the query
             const params = {};
             if (formData.businessName && formData.businessName.trim() !== '') {
-                params.businessName = formData.businessName;
+                params.business_Name = formData.businessName;
             }
             if (formData.address && formData.address.trim() !== '') {
                 params.address = formData.address;
