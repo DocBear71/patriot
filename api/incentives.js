@@ -50,7 +50,7 @@ module.exports = async (req, res) => {
         console.log("Query parameters:", req.query);
 
         // Get the business ID from the query parameters
-        const businessId = req.query.businessId;
+        const businessId = req.query.business_id;
 
         if (!businessId) {
             return res.status(400).json({ message: 'Business ID is required as a query parameter' });
