@@ -1,27 +1,6 @@
 // api/business-search.js - Business search endpoint
-const connect = require('../config/db');
 const mongoose = require('mongoose');
-
-// define the schema for business
-const businessSchema = new mongoose.Schema({
-    bname: String,
-    address1: String,
-    address2: String,
-    city: String,
-    state: String,
-    zip: String,
-    phone: String,
-    type: String
-});
-
-// create a model if it doesn't already exist
-let Business;
-try {
-    // lets try and fetch an existing model
-    Business = mongoose.model('Business');
-} catch(error) {
-    Business = mongoose.model('Business', businessSchema, 'business');
-}
+const connect = require('../config/db');
 
 module.exports = async (req,res) => {
     // enable CORS
@@ -60,38 +39,28 @@ module.exports = async (req,res) => {
         console.log("Address value:", addressValue);
 
         // buidl the query based on the provided parameters
-        let queryConditions = [];
+        let query = {};
 
         // only use business name if a value is provided
         if (businessNameValue && businessNameValue.trim() !== '') {
-            queryConditions.push({
-                bname: {$regex: businessNameValue, $options: 'i'}
-            });
-        }
+            query.bname = {$regex: businessNameValue.trim(), $options: 'i'}
+            }
 
         if (addressValue && addressValue.trim() !== '') {
-            const addressString = addressValue.trim();
-            queryConditions.push({
-                $or: [
-                    {address1: addressString},
-                    {address2: addressString},
-                    {city: addressString},
-                    {state: addressString},
-                    {zip: addressString},
-                ]
-            });
+            const addressRegex = { $regex: addressValue.trim(), $options: 'i'};
+            query.$or = [
+                    {address1: addressRegex},
+                    {address2: addressRegex},
+                    {city: addressRegex},
+                    {state: addressRegex},
+                    {zip: addressRegex}
+            ];
         }
 
-        // construct the final query
-        let finalQuery = {};
-        if (queryConditions.length > 0) {
-            finalQuery = { $and: queryConditions };
-        }
-
-        console.log("MongoDB Query: ", JSON.stringify(finalQuery, null, 2));
+        console.log("MongoDB Query: ", JSON.stringify(query, null, 2));
 
         // now find a business matching the query
-        const businesses = await Business.find(finalQuery).lean.exec();
+        const businesses = await collection.find(query).toArray();
         console.log("Found", businesses.length, "matching businesses");
 
         return res.status(200).json({
