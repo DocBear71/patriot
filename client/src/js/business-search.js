@@ -186,16 +186,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!business) return; // skip null or undefined entries
 
                 // Get a placeholder image based on business type
-                let imageSrc = './images/placeholder.jpg';
-                if (business.type === 'Restaurant' || business.type === 'REST') {
-                    imageSrc = './images/red_lobster.jpg';
-                } else if (business.type === 'RETAIL' || business.type === 'Retail') {
-                    imageSrc = './images/home_depot.jpg';
-                } else if (business.type === 'AUTO') {
-                    imageSrc = './images/milex.jpg';
-                } else if (business.type === 'HARDW') {
-                    imageSrc = './images/lowes.jpg';
-                }
+                // let imageSrc = './images/placeholder.jpg';
+                // if (business.type === 'Restaurant' || business.type === 'REST') {
+                //     imageSrc = './images/red_lobster.jpg';
+                // } else if (business.type === 'RETAIL' || business.type === 'Retail') {
+                //     imageSrc = './images/home_depot.jpg';
+                // } else if (business.type === 'AUTO') {
+                //     imageSrc = './images/milex.jpg';
+                // } else if (business.type === 'HARDW') {
+                //     imageSrc = './images/lowes.jpg';
+                // }
 
                 // Format the address line
                 const addressLine = business.address2
