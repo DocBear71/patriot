@@ -1,36 +1,48 @@
 // api/contact.js - Contact form submission endpoint
-const express = require('express');
-const { MongoClient } = require('mongodb');
-const cors = require('cors');
+const connect = require('../config/db');
+const mongoose = require('mongoose');
 
-// Create an Express server instance
-const app = express();
+const contactSchema = new mongoose.Schema({
+    firstname: String,
+    lastname: String,
+    email: String,
+    subject: String,
+    created_at: { type: Date, default: Date.now },
+});
 
-// Enable JSON body parsing
-app.use(express.json());
+// create the model if they don't already exist
+let Contact;
+try {
+    // try to fetch the existing model
+    Contact = mongoose.model('Contact');
+} catch (error) {
+    // define the model if it doesn't exist
+    Contact = mongoose.model('Contact', contactSchema, 'contact');
+}
 
-// Enable CORS for all routes
-app.use(cors());
+module.exports = async (req, res) => {
+    // Handle preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
 
-// MongoDB connection details
-const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
-const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
+    // Handle GET request for testing
+    if (req.method === 'GET') {
+        return res.status(200).json({ message: 'Contact API is available' });
+    }
 
-// Handle OPTIONS preflight requests
-app.options('*', cors());
-
-// POST endpoint for contact form submission
-app.post('/', async (req, res) => {
-    console.log("Contact API route hit:", req.method);
+    // Only allow POST requests for actual operations
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
 
     try {
+        console.log("Contact API route hit:", req.method);
         console.log("Connecting to MongoDB...");
 
-        // Connect to MongoDB
-        const client = await MongoClient.connect(MONGODB_URI);
+        await connect();
         console.log("Connected to MongoDB");
-
-        const db = client.db(MONGODB_DB);
 
         // Extract contact data from request body
         const contactData = req.body;
@@ -45,29 +57,19 @@ app.post('/', async (req, res) => {
         contactData.created_at = new Date();
 
         console.log("Inserting contact submission...");
-        // Insert contact data
-        const result = await db.collection('contacts').insertOne(contactData);
-        console.log("Contact submitted successfully:", result.insertedId);
-
-        // Close connection
-        await client.close();
+        // Insert contact data using mongoose
+        const newContact = new Contact(contactData);
+        const result = await newContact.save();
+        console.log("Contact submitted successfully:", result._id);
 
         // Return success response
         return res.status(201).json({
             message: 'Message sent successfully',
-            contactId: result.insertedId
+            contactId: result._id
         });
 
     } catch (error) {
         console.error('Contact submission error:', error);
-        return res.status(500).json({ message: 'Server error during contact submission: ' + error.message });
+        return res.status(500).json({ message: 'Server error during contact submission: ' + error.message })
     }
-});
-
-// GET endpoint for testing
-app.get('/', (req, res) => {
-    res.status(200).json({ message: 'Contact API is available' });
-});
-
-// Export the Express API
-module.exports = app;
+}
