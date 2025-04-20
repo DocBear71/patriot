@@ -7,6 +7,7 @@ const contactSchema = new mongoose.Schema({
     lastname: String,
     email: String,
     subject: String,
+    message: String,
     created_at: { type: Date, default: Date.now },
 });
 
@@ -49,7 +50,7 @@ module.exports = async (req, res) => {
         console.log("Received contact data:", contactData);
 
         // Basic validation
-        if (!contactData.email || !contactData.firstname || !contactData.lastname || !contactData.subject) {
+        if (!contactData.email || !contactData.firstname || !contactData.lastname || !contactData.subject || !contactData.message) {
             return res.status(400).json({ message: 'All fields are required' });
         }
 

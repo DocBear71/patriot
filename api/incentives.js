@@ -52,7 +52,7 @@ module.exports = async (req, res) => {
         console.log("Business ID from query:", businessId);
 
         // Connect to MongoDB
-        await connect();
+        await connect;
         console.log("Connected to MongoDB using Mongoose")
 
         // Find incentives for the business

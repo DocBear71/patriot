@@ -1,33 +1,59 @@
 // api/users/password.js - Update user password
-const express = require('express');
-const { MongoClient, ObjectId } = require('mongodb');
+const connect = require('../../config/db');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const cors = require('cors');
+const { ObjectId } = mongoose.Types;
 
-// Create an Express server instance
-const app = express();
+const userSchema = new mongoose.Schema({
+    fname: String,
+    lname: String,
+    address1: String,
+    address2: String,
+    city: String,
+    state: String,
+    zip: String,
+    status: String,
+    level: String,
+    email: String,
+    password: String,
+    isAdmin: Boolean,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now },
+});
 
-// Enable JSON body parsing
-app.use(express.json());
-
-// Enable CORS for all routes
-app.use(cors());
-
-// MongoDB connection details
-const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
-const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
-const USERS_COLLECTION = 'users';
-
-// Handle OPTIONS preflight requests
-app.options('*', cors());
-
+let User;
+try {
+    // try to fetch the existing models
+    User = mongoose.model('User');
+} catch (error) {
+    // lets define the models if they do not exist
+    User = mongoose.model('User', userSchema, 'user');
+}
 // PUT endpoint for updating password
-app.put('/', async (req, res) => {
+module.exports = async (req, res) => {
+    // CORS enabled through next.config.js
     console.log("Password update API hit:", req.method);
 
-    let client = null;
+    // Handle preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+
+    // Handle GET request for testing
+    if (req.method === 'GET') {
+        return res.status(200).json({ message: 'password Add API is available' });
+    }
+
+    // Only allow POST requests for actual operations
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
 
     try {
+        console.log("Password update API hit:", req.method);
+        console.log("Request body:", req.body);
+
         // Extract password data from request body
         const { userId, currentPassword, newPassword } = req.body;
 
@@ -38,25 +64,17 @@ app.put('/', async (req, res) => {
             });
         }
 
-        // Connect to MongoDB
-        client = await MongoClient.connect(MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000,
-            connectTimeoutMS: 10000,
-            socketTimeoutMS: 15000,
-        });
-
-        const db = client.db(MONGODB_DB);
-        const collection = db.collection(USERS_COLLECTION);
+        await connect;
 
         // Find the user
-        const user = await collection.findOne({ _id: new ObjectId(userId) });
+        const userExists = await User.findOne({ _id: new ObjectId(userId) });
 
-        if (!user) {
+        if (!userExists) {
             return res.status(404).json({ message: 'User not found' });
         }
 
         // Verify current password
-        const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+        const isPasswordValid = await bcrypt.compare(currentPassword, userExists.password);
 
         if (!isPasswordValid) {
             return res.status(401).json({ message: 'Current password is incorrect' });
@@ -66,7 +84,7 @@ app.put('/', async (req, res) => {
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
         // Update the password
-        const result = await collection.updateOne(
+        const result = await User.updateOne(
             { _id: new ObjectId(userId) },
             { $set: { password: hashedPassword, updated_at: new Date() } }
         );
@@ -82,16 +100,5 @@ app.put('/', async (req, res) => {
         return res.status(500).json({
             message: 'Server error during password update: ' + error.message
         });
-    } finally {
-        // Close the connection
-        if (client) await client.close();
     }
-});
-
-// GET endpoint for testing
-app.get('/', (req, res) => {
-    res.status(200).json({ message: 'Password Update API is available' });
-});
-
-// Export the Express API
-module.exports = app;
+};

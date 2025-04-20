@@ -149,7 +149,7 @@
                     <input type="text" id="zip" name="zip" placeholder="Your Zip Code...">
                     <br>
                     <label for="status">Status&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                    <select name="status" id="status">
+                    <select name="status" id="status" >
                         <option value="" selected="selected">Select a Status</option>
                         <option value="VT">Veteran</option>
                         <option value="AD">Active Duty</option>
@@ -157,6 +157,17 @@
                         <option value="SP">Spouse</option>
                         <option value="BO">Business Owner</option>
                         <option value="SU">Supporter</option>
+                    </select>
+                    <br>
+                    <label for="membership-level">Access Level&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <select name="membership-level" id="membership-level">
+                        <option value="" selected="selected">Select a Membership Level</option>
+                        <option value="Free">Free</option>
+                        <option value="Basic">Basic</option>
+                        <option value="Premium">Premium</option>
+                        <option value="VIP">V.I.P.</option>
+                        <option value="Admin" data-restricted="true">Admin</option>
+                        <option value="Test" disabled title="Only used during testing procedures">Test User</option>
                     </select>
                 </fieldset>
                 <br>

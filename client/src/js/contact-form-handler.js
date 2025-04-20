@@ -14,8 +14,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Get form fields
             const formData = {
-                firstName: document.getElementById("fname").value,
-                lastName: document.getElementById("lname").value,
+                firstname: document.getElementById("fname").value,
+                lastname: document.getElementById("lname").value,
                 email: document.getElementById("email").value,
                 subject: document.getElementById("subject").value,
                 message: document.getElementById("message").value,
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(apiUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json; charset=UTF-8',
             },
             body: JSON.stringify(formData)
         })
