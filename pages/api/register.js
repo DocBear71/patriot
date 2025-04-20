@@ -1,57 +1,74 @@
 // api/register.js - User registration endpoint
-const express = require('express');
-const { MongoClient } = require('mongodb');
+const connect = require('../config/db');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const cors = require('cors');
 
-// Create an Express server instance
-const app = express();
 
-// Enable JSON body parsing
-app.use(express.json());
+const userSchema = new mongoose.Schema({
+    fname: String,
+    lname: String,
+    address1: String,
+    address2: String,
+    city: String,
+    state: String,
+    zip: String,
+    status: String,
+    level: String,
+    email: String,
+    password: String,
+    isAdmin: Boolean,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now },
+});
 
-// Enable CORS for all routes
-app.use(cors());
+// create the model if they don't already exist
+let User;
+try {
+    // try to fetch the existing model
+    User = mongoose.model('User');
+} catch (error) {
+    // define the model if it doesn't exist
+    User = mongoose.model('User', userSchema, 'users');
+}
 
-// MongoDB connection details
-const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
-const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot';
+module.exports = async (req, res) => {
+    // CORS enabled thorugh next.config.js
 
-// Handle OPTIONS preflight requests
-app.options('*', cors());
+    // handle Options request
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
 
-// POST endpoint for user registration
-app.post('/', async (req, res) => {
-    console.log("Registration API hit:", req.method);
+    // handle GET reqests for testing
+    if (req.method === 'GET') {
+        return res.status(200).json({message: 'User registration API is available.'});
+    }
 
-    let client = null;
+    // only allow POST requests for actual operations
+    if (req.method !== 'POST') {
+        return res.status(405).json({message: 'Method Not Allowed'});
+    }
 
     try {
-        console.log("Connecting to MongoDB...");
+        console.log("User add API hit:", req.method);
+        console.log("Request body:", req.body);
 
-        // Connect to MongoDB
-        client = await MongoClient.connect(MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000,
-            connectTimeoutMS: 10000,
-            socketTimeoutMS: 15000,
-        });
-        console.log("Connected to MongoDB");
-
-        const db = client.db(MONGODB_DB);
-
-        // Extract user data from request body
         const userData = req.body;
-        console.log("Received user data:", userData);
+
+        // connect to MongoDB using mongoose
+        await connect();
+        console.log("Connected to MongoDB using Mongoose");
 
         // Basic validation
         if (!userData.email || (!userData.password && !userData.psw)) {
-            return res.status(400).json({ message: 'Email and password are required' });
+            return res.status(400).json({message: 'Email and password are required'});
         }
 
         // Check if user already exists
-        const existingUser = await db.collection('users').findOne({ email: userData.email });
+        const existingUser = await User.findOne({ email: userData.email });
         if (existingUser) {
-            return res.status(409).json({ message: 'User with this email already exists' });
+            return res.status(409).json({message: 'User with this email already exists'});
         }
 
         // add timestamp fields
@@ -77,29 +94,19 @@ app.post('/', async (req, res) => {
         userData.password = hashedPassword;
 
         console.log("Inserting user data...");
-        // Insert user data
-        const result = await db.collection('users').insertOne(userData);
-        console.log("User inserted successfully:", result.insertedId);
+        // Insert user data using mongoose
+        const newUser = new User(userData);
+        const result = await newUser.save();
+        console.log("User inserted successfully:", result._id);
 
         // Return success response
         return res.status(201).json({
             message: 'User registered successfully',
-            userId: result.insertedId
+            userId: result._id
         });
-
     } catch (error) {
-        console.error('Registration error:', error);
-        return res.status(500).json({ message: 'Server error during registration: ' + error.message });
-    } finally {
-        // Close the connection
-        if (client) await client.close();
+        console.error('User creation failed:', error);
+        return res.status(500).json({message: 'Server error during user creation: ' + error.message});
+
     }
-});
-
-// GET endpoint for testing
-app.get('/', (req, res) => {
-    res.status(200).json({ message: 'Register API is available' });
-});
-
-// Export the Express API
-module.exports = app;
+};

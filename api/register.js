@@ -16,6 +16,9 @@ const userSchema = new mongoose.Schema({
     level: String,
     email: String,
     password: String,
+    isAdmin: Boolean,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now },
 });
 
 // create the model if they don't already exist
@@ -43,16 +46,15 @@ module.exports = async (req, res) => {
     }
 
     // only allow POST requests for actual operations
-    if (req.method === 'POST') {
+    if (req.method !== 'POST') {
         return res.status(405).json({message: 'Method Not Allowed'});
     }
-
-    const userData = req.body;
-    let client = null;
 
     try {
         console.log("User add API hit:", req.method);
         console.log("Request body:", req.body);
+
+        const userData = req.body;
 
         // connect to MongoDB using mongoose
         await connect();
@@ -64,7 +66,7 @@ module.exports = async (req, res) => {
         }
 
         // Check if user already exists
-        const existingUser = await db.collection('users').findOne({email: userData.email});
+        const existingUser = await User.findOne({ email: userData.email });
         if (existingUser) {
             return res.status(409).json({message: 'User with this email already exists'});
         }
@@ -92,21 +94,19 @@ module.exports = async (req, res) => {
         userData.password = hashedPassword;
 
         console.log("Inserting user data...");
-        // Insert user data
-        const result = await db.collection('users').insertOne(userData);
-        console.log("User inserted successfully:", result.insertedId);
+        // Insert user data using mongoose
+        const newUser = new User(userData);
+        const result = await newUser.save();
+        console.log("User inserted successfully:", result._id);
 
         // Return success response
         return res.status(201).json({
             message: 'User registered successfully',
-            userId: result.insertedId
+            userId: result._id
         });
     } catch (error) {
         console.error('User creation failed:', error);
         return res.status(500).json({message: 'Server error during user creation: ' + error.message});
 
-    } finally {
-        // Close the connection
-        if (client) await client.close();
     }
 };
