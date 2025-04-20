@@ -86,7 +86,7 @@ module.exports = async (req, res) => {
         }
 
         // Prepare incentive data for insertion
-        const incentive = {
+        const newIncentive = new Incentive({
             business_id: incentiveData.business_id,
             is_available: incentiveData.is_available,
             type: incentiveData.type || '',
@@ -94,7 +94,7 @@ module.exports = async (req, res) => {
             information: incentiveData.information || '',
             created_at: new Date(),
             updated_at: new Date()
-        };
+        });
 
         // Add the other_description field if provided
         if (incentiveData.type === 'OT' && incentiveData.other_description) {
@@ -102,7 +102,7 @@ module.exports = async (req, res) => {
         }
 
         // Insert incentive data
-        const savedIncentive = await incentive.save();
+        const savedIncentive = await newIncentive.save();
         console.log("Saved incentive:", savedIncentive._id);
 
         // Return success response
