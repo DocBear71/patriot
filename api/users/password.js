@@ -42,7 +42,7 @@ module.exports = async (req, res) => {
 
     // Handle GET request for testing
     if (req.method === 'GET') {
-        return res.status(200).json({ message: 'password Add API is available' });
+        return res.status(200).json({ message: 'password update API is available' });
     }
 
     // Only allow POST requests for actual operations

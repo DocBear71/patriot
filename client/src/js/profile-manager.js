@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch(apiUrl, {
                 method: "PUT",
                 headers: {
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/json; charset=UTF-8",
                 },
                 body: JSON.stringify(updatedUserData),
             });
@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const apiUrl = 'https://patriotthanks.vercel.app/api/users/password';
 
             const response = await fetch(apiUrl, {
-                method: "PUT",
+                method: "POST",
                 headers: {
                     "Content-Type": "application/json; charset=utf-8",
                 },

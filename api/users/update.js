@@ -1,32 +1,59 @@
 // api/users/update.js - Update user profile
-const express = require('express');
-const { MongoClient, ObjectId } = require('mongodb');
-const cors = require('cors');
+const connect = require('../../config/db');
+const mongoose = require('mongoose');
+const { ObjectId } = mongoose.Types;
 
-// Create an Express server instance
-const app = express();
+// Define user schema
+const userSchema = new mongoose.Schema({
+    fname: String,
+    lname: String,
+    address1: String,
+    address2: String,
+    city: String,
+    state: String,
+    zip: String,
+    status: String,
+    level: String,
+    email: String,
+    password: String,
+    isAdmin: Boolean,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now },
+});
 
-// Enable JSON body parsing
-app.use(express.json());
+// Initialize the User model
+let User;
+try {
+    // Try to fetch the existing model
+    User = mongoose.model('User');
+} catch (error) {
+    // Define the model if it doesn't exist
+    User = mongoose.model('User', userSchema, 'user');
+}
 
-// Enable CORS for all routes
-app.use(cors());
+module.exports = async (req, res) => {
+    // CORS handled through next.config.js
 
-// MongoDB connection details
-const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
-const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
-const USERS_COLLECTION = 'users';
+    // Handle preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
 
-// Handle OPTIONS preflight requests
-app.options('*', cors());
+    // Handle GET request for testing
+    if (req.method === 'GET') {
+        return res.status(200).json({ message: 'User update API is available' });
+    }
 
-// PUT endpoint for updating user profile
-app.put('/', async (req, res) => {
-    console.log("User update API hit:", req.method);
-
-    let client = null;
+    // Only allow PUT requests for user updates (to match your frontend)
+    if (req.method !== 'PUT') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
 
     try {
+        console.log("User update API hit:", req.method);
+        console.log("Request body:", req.body);
+
         // Extract user data from request body
         const userData = req.body;
 
@@ -36,47 +63,44 @@ app.put('/', async (req, res) => {
         }
 
         // Connect to MongoDB
-        client = await MongoClient.connect(MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000,
-            connectTimeoutMS: 10000,
-            socketTimeoutMS: 15000,
-        });
+        await connect;
 
-        const db = client.db(MONGODB_DB);
-        const collection = db.collection(USERS_COLLECTION);
+        // Find the user by ID to verify it exists
+        const existingUser = await User.findOne({ _id: new ObjectId(userData._id) });
+
+        if (!existingUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
 
         // Prepare data for update (exclude _id field)
         const { _id, ...updateData } = userData;
 
-        // Update user profile
-        const result = await collection.updateOne(
+        // Add updated timestamp
+        updateData.updated_at = new Date();
+
+        // Update the user
+        const result = await User.updateOne(
             { _id: new ObjectId(_id) },
             { $set: updateData }
         );
 
-        if (result.matchedCount === 0) {
-            return res.status(404).json({ message: 'User not found' });
+        if (result.modifiedCount === 0) {
+            return res.status(200).json({
+                message: 'No changes were made to the user profile',
+                success: true
+            });
         }
 
         // Return success response
         return res.status(200).json({
             message: 'User profile updated successfully',
-            modifiedCount: result.modifiedCount
+            success: true
         });
 
     } catch (error) {
-        console.error('Profile update error:', error);
-        return res.status(500).json({ message: 'Server error during profile update: ' + error.message });
-    } finally {
-        // Close the connection
-        if (client) await client.close();
+        console.error('User update error:', error);
+        return res.status(500).json({
+            message: 'Server error during user update: ' + error.message
+        });
     }
-});
-
-// GET endpoint for testing
-app.get('/', (req, res) => {
-    res.status(200).json({ message: 'User Update API is available' });
-});
-
-// Export the Express API
-module.exports = app;
+};
