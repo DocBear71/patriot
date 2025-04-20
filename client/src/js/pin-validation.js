@@ -2,6 +2,12 @@
 let lastValidSelection = "";
 let isAdminVerified = false;
 
+// Export the verification status for form-validator.js to use
+window.isAdminVerified = function() {
+    console.log("IsAdminVerified function called, returning: ", isAdminVerified);
+    return isAdminVerified;
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Pin validation loaded!");
 
@@ -77,8 +83,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Export the verification status for form-validator.js to use
-    window.isAdminVerified = function() {
-        return isAdminVerified;
-    };
+
 });

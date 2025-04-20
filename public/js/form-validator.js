@@ -1,3 +1,6 @@
+// form-validator.js -- handles the validation of the registration form.
+const isAdminVerified = window.isAdminVerified || function() { return false; };
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Form validator loaded!");
 
@@ -42,11 +45,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // check if admin verification is required but not completed
-        if (form.level.value ==="Admin" && (typeof window.isAdminVerified !== 'function' || !window.isAdminVerified())) {
+        if (form.level.value ==="Admin" && !isAdminVerified()) {console.log("Admin verification failed");
             invalidFields.push("Admin access code verification");
-            alert("Admin access must be verified with a valid access code before registration.");
+            alert("Admin access must be verified with a valid code before registration");
             return;
-        }
+        } else if (form.level.value === "Admin") {
+            console.log("Admin verification passed, proceeding with registration");
+            }
+
 
         console.log("Invalid fields:", invalidFields);
 
