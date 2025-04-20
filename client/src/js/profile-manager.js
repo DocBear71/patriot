@@ -117,6 +117,79 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function loadUserProfile(userData) {
+        console.log("Loading user profile with data: ", userData);
+         const fnameElement = document.getElementById('fname');
+         if (fnameElement) {
+             console.log("Found fname element, setting to: ", userData.fname || '');
+             fnameElement.value = userData.fname || '';
+         } else {
+             console.error("Element with ID fname not found");
+         }
+        const lnameElement = document.getElementById('fname');
+        if (lnameElement) {
+            console.log("Found lname element, setting to: ", userData.fname || '');
+            lnameElement.value = userData.fname || '';
+        } else {
+            console.error("Element with ID lname not found");
+        }
+        const address1Element = document.getElementById('fname');
+        if (address1Element) {
+            console.log("Found address1 element, setting to: ", userData.fname || '');
+            address1Element.value = userData.fname || '';
+        } else {
+            console.error("Element with ID address1 not found");
+        }
+        const address2Element = document.getElementById('fname');
+        if (address2Element) {
+            console.log("Found address2 element, setting to: ", userData.fname || '');
+            address2Element.value = userData.fname || '';
+        } else {
+            console.error("Element with ID address2 not found");
+        }
+        const cityElement = document.getElementById('fname');
+        if (cityElement) {
+            console.log("Found city element, setting to: ", userData.fname || '');
+            cityElement.value = userData.fname || '';
+        } else {
+            console.error("Element with ID city not found");
+        }
+        const stateElement = document.getElementById('fname');
+        if (stateElement) {
+            console.log("Found state element, setting to: ", userData.fname || '');
+            stateElement.value = userData.fname || '';
+        } else {
+            console.error("Element with ID state not found");
+        }
+        const zipElement = document.getElementById('fname');
+        if (zipElement) {
+            console.log("Found zip element, setting to: ", userData.fname || '');
+            zipElement.value = userData.fname || '';
+        } else {
+            console.error("Element with ID zip not found");
+        }
+        const statusElement = document.getElementById('fname');
+        if (statusElement) {
+            console.log("Found status element, setting to: ", userData.fname || '');
+            statusElement.value = userData.fname || '';
+        } else {
+            console.error("Element with ID status not found");
+        }
+        const levelElement = document.getElementById('fname');
+        if (levelElement) {
+            console.log("Found level element, setting to: ", userData.fname || '');
+            levelElement.value = userData.fname || '';
+        } else {
+            console.error("Element with ID level not found");
+        }
+        const emailElement = document.getElementById('fname');
+        if (emailElement) {
+            console.log("Found email element, setting to: ", userData.fname || '');
+            emailElement.value = userData.fname || '';
+        } else {
+            console.error("Element with ID email not found");
+        }
+
+
         if (profileContainer) profileContainer.style.display = 'block';
         if (notLoggedInContainer) notLoggedInContainer.style.display = 'none';
 
