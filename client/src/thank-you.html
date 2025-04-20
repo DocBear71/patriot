@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <title>Patriot Thanks: Thank you!</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2024/09/27">
+    <meta name="description" content="Completion of Final Project for Fundamentals of Web Program 2024FA CRF01.">
+    <meta name="keywords" content="Final Project, assignment, homework, Mark Bromwich,
+                                        Fundamentals of Web Program, 2024FA, CRF01 ">
+    <link href="./images//docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css" >
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/forms.css" rel="stylesheet">
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/form-validation.css" rel="stylesheet">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="./js/contact-form-handler.js"></script>
+</head>
+
+<body style="padding-top: 70px" id="page_layout">
+<!--Navigation bar-->
+<div id="nav-placeholder">
+</div>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
+            // Load the login handler after the navbar is loaded
+            $.getScript("./js/login-handler.js")
+            .done(function() {
+                console.log("Login handler script loaded successfully");
+            })
+            .fail(function() {
+                console.error("Failed to load login-handler.js");
+            });
+        });
+    });
+</script>
+<!--end of Navigation bar-->
+<header>
+    <div class="left-banner">
+        <a href="index.html">
+            <img src="./images/docbearlogov4.png" alt="DocBear logo">
+        </a>
+    </div>
+    <div class="right-banner">
+        <h1>Patriot Thanks</h1>
+        <hr>
+        <h4>Thank you!</h4>
+    </div>
+    <div style="clear:left;"></div>
+</header>
+<body>
+<header>
+    <!-- Include your site header here -->
+</header>
+
+<main>
+    <div class="thank-you-container">
+        <h1 class="thank-you-header">Thank You for Contacting Us!</h1>
+        <p>Your message has been received. We appreciate you taking the time to reach out and will respond to your inquiry as soon as possible.</p>
+
+        <div class="message-details">
+            <h3>Your Message Details:</h3>
+
+            <div class="detail-row">
+                <div class="detail-label">Name:</div>
+                <div id="contact-name"></div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-label">Email:</div>
+                <div id="contact-email"></div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-label">Subject:</div>
+                <div id="contact-subject"></div>
+            </div>
+
+            <div class="detail-row">
+                <div class="detail-label">Message:</div>
+                <div id="contact-message" class="message-content"></div>
+            </div>
+        </div>
+
+        <a href="index.html" class="btn-primary">Return to Homepage</a>
+    </div>
+</main>
+
+<footer class = "footer_style"><br>
+    <p>&copy; Copyright 2024 Edward G. McKeown</p>
+    <address>
+        <p>email to: <a href="emailto:edward-mckeown@student.kirkwood.edu">
+            edward-mckeown@student.kirkwood.edu</a></p><br>
+    </address>
+</footer>
+<style>
+    .thank-you-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 2rem;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .message-details {
+        background-color: white;
+        padding: 1.5rem;
+        border-radius: 6px;
+        margin-top: 1.5rem;
+        border-left: 4px solid #0d6efd;
+    }
+
+    .detail-row {
+        margin-bottom: 1rem;
+    }
+
+    .detail-label {
+        font-weight: bold;
+        color: #495057;
+    }
+
+    .message-content {
+        white-space: pre-wrap;
+        background-color: #f1f1f1;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-top: 0.5rem;
+    }
+
+    .thank-you-header {
+        color: #0d6efd;
+        border-bottom: 2px solid #e9ecef;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .btn-primary {
+        background-color: #0d6efd;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        color: white;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-block;
+        margin-top: 1.5rem;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
+
+    .btn-primary:hover {
+        background-color: #0b5ed7;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Retrieve form data from session storage
+        const formData = JSON.parse(sessionStorage.getItem('contactFormData'));
+
+        if (formData) {
+            // Display the submitted information
+            document.getElementById('contact-name').textContent = formData.firstname + ' ' + formData.lastname;
+            document.getElementById('contact-email').textContent = formData.email;
+            document.getElementById('contact-subject').textContent = formData.subject;
+            document.getElementById('contact-message').textContent = formData.message;
+
+            // Clear the session storage to avoid showing the data if the page is refreshed
+            sessionStorage.removeItem('contactFormData');
+        } else {
+            // If no form data is found, display a generic message
+            document.querySelector('.message-details').innerHTML = '<p>No message details available. You may have refreshed the page or accessed it directly.</p>';
+        }
+    });
+</script>
+</body>
+</html>
