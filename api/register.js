@@ -15,7 +15,7 @@ app.use(cors());
 
 // MongoDB connection details
 const MONGODB_URI = process.env.MONGODB_URI_PATRIOT || 'mongodb://localhost:27017/patriot-thanks';
-const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot-thanks';
+const MONGODB_DB = process.env.MONGODB_DB_PATRIOT || 'patriot';
 
 // Handle OPTIONS preflight requests
 app.options('*', cors());
