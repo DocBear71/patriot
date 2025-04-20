@@ -136,7 +136,21 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (userData.status) {
-                document.getElementById('status').value = userData.status;
+                const statusSelect = document.getElementById('status');
+                statusSelect.value = userData.status;
+                if (statusSelect.value !== userData.status) {
+                    console.log("Status not found in the options, default to first option");
+                    statusSelect.selectedIndex = 0;
+                }
+            }
+            if (userData.level) {
+                const membershipSelect = document.getElementById('membership-level');
+                membershipSelect.value = userData.level;
+
+                if (membershipSelect.value !== userData.level) {
+                    console.log("Membership level not found in the options, default to first option");
+                    membershipSelect.selectedIndex = 0;
+                }
             }
         }
     }
