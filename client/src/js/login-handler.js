@@ -213,68 +213,117 @@ function attachLoginListeners() {
     });
 }
 
-// Function to check login status
-function checkLoginStatus() {
-    console.log("Checking login status");
 
-    // Check for session in the format expected by profile-manager.js
-    const sessionData = localStorage.getItem('patriotThanksSession');
+    // Function to check login status
+    function checkLoginStatus() {
+        console.log("Checking login status");
 
-    if (sessionData) {
-        try {
-            const session = JSON.parse(sessionData);
-            const currentTime = new Date().getTime();
+        // Check for session in the format expected by profile-manager.js
+        const sessionData = localStorage.getItem('patriotThanksSession');
 
-            // Check if session is still valid
-            if (currentTime < session.timestamp + session.expiresIn) {
-                console.log("User is already logged in (session found)");
+        if (sessionData) {
+            try {
+                const session = JSON.parse(sessionData);
+                const currentTime = new Date().getTime();
+
+                // Check if session is still valid
+                if (currentTime < session.timestamp + session.expiresIn) {
+                    console.log("User is already logged in (session found)");
+
+                    // Update UI with dropdown changes
+                    updateUIAfterLogin(session.user.email);
+                    return true;
+                }
+            } catch (error) {
+                console.error("Error parsing session data:", error);
+            }
+        }
+
+        // Fallback to the old format
+        const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true' ||
+            sessionStorage.getItem('isLoggedIn') === 'true';
+
+        if (isLoggedIn) {
+            console.log("User is already logged in (old format)");
+
+            const email = localStorage.getItem('userEmail') ||
+                sessionStorage.getItem('userEmail');
+
+            const userId = localStorage.getItem('userId') ||
+                sessionStorage.getItem('userId') || generateTempId();
+
+            const fname = localStorage.getItem('fname') ||
+                sessionStorage.getItem('fname') || '';
+
+            const lname = localStorage.getItem('lname') ||
+                sessionStorage.getItem('lname') || '';
+
+            const address1 = localStorage.getItem('address1') ||
+                sessionStorage.getItem('address1') || '';
+
+            const address2 = localStorage.getItem('address2') ||
+                sessionStorage.getItem('address2') || '';
+
+            const city = localStorage.getItem('city') ||
+                sessionStorage.getItem('city') || '';
+
+            const state = localStorage.getItem('state') ||
+                sessionStorage.getItem('state') || '';
+
+            const zip = localStorage.getItem('zip') ||
+                sessionStorage.getItem('zip') || '';
+
+            const status = localStorage.getItem('status') ||
+                sessionStorage.getItem('status') || '';
+
+            const level = localStorage.getItem('level') ||
+                sessionStorage.getItem('level') || '';
+
+            const isAdmin = localStorage.getItem('isAdmin') === 'true' ||
+                sessionStorage.getItem('isAdmin') === 'true';
+
+            const created_at = localStorage.getItem('created_at') ||
+                sessionStorage.getItem('created_at') || new Date().toISOString();
+
+            const updated_at = localStorage.getItem('updated_at') ||
+                sessionStorage.getItem('updated_at') || new Date().toISOString();
+
+            if (email) {
+                // Create a new session object in the format expected by profile-manager.js
+                const session = {
+                    user: {
+                        _id: userId,
+                        email: email,
+                        fname: fname,
+                        lname: lname,
+                        address1: address1,
+                        address2: address2,
+                        city: city,
+                        state: state,
+                        zip: zip,
+                        status: status,
+                        level: level,
+                        isAdmin: isAdmin,
+                        created_at: created_at,
+                        updated_at: updated_at,
+                    },
+                    token: 'simulated-token',
+                    timestamp: new Date().getTime(),
+                    expiresIn: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+                };
+
+                // Store the new session format
+                localStorage.setItem('patriotThanksSession', JSON.stringify(session));
 
                 // Update UI with dropdown changes
-                updateUIAfterLogin(session.user.email);
+                updateUIAfterLogin(email);
                 return true;
             }
-        } catch (error) {
-            console.error("Error parsing session data:", error);
         }
+
+        console.log("User is not logged in");
+        return false;
     }
-
-    // Fallback to the old format
-    const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true' ||
-        sessionStorage.getItem('isLoggedIn') === 'true';
-
-    if (isLoggedIn) {
-        console.log("User is already logged in (old format)");
-
-        const userEmail = localStorage.getItem('userEmail') ||
-            sessionStorage.getItem('userEmail');
-
-        if (userEmail) {
-            // Create a new session object in the format expected by profile-manager.js
-            const session = {
-                user: {
-                    _id: generateTempId(),
-                    email: userEmail,
-                    fname: '',
-                    lname: '',
-                    status: 'US'
-                },
-                token: 'simulated-token',
-                timestamp: new Date().getTime(),
-                expiresIn: 24 * 60 * 60 * 1000 // 24 hours
-            };
-
-            // Store the new session format
-            localStorage.setItem('patriotThanksSession', JSON.stringify(session));
-
-            // Update UI with dropdown changes
-            updateUIAfterLogin(userEmail);
-            return true;
-        }
-    }
-
-    console.log("User is not logged in");
-    return false;
-}
 
 // Make functions globally available
 window.loginUser = handleLogin;
