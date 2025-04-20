@@ -2,24 +2,54 @@
 let lastValidSelection = "";
 let isAdminVerified = false;
 
-document.addEventListener("DOMContentLoaded", function() {
-    console.log("Pin Validation Loaded!");
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("Pin validation loaded!");
 
-    // get the membership level selected element
-    const membershipSelect = document.getElementById("membership-level");
+    // Get membership level select element
+    const membershipSelect = document.getElementById('membership-level');
 
-    // and change event listener to check for restricted options
-    membershipSelect.addEventListener("change", function () {
+    // Add change event listener to check for restricted options
+    membershipSelect.addEventListener('change', function() {
         checkRestrictedOption(this);
     });
 
-    // check if selected option is restricted
+    // Add event listener for the verify button - SIMPLE VERSION WITH HARDCODED PIN
+    document.getElementById('verifyPinBtn').addEventListener('click', function() {
+        const pinInput = document.getElementById('adminPinCode').value;
+        const pinError = document.getElementById('pinError');
+        const membershipSelect = document.getElementById('membership-level');
+
+        console.log("Verifying pin:", pinInput);
+
+        // Simple hardcoded PIN check
+        const ADMIN_PIN = "4204";
+
+        if (pinInput === ADMIN_PIN) {
+            // PIN correct - update select to Admin
+            membershipSelect.value = "Admin";
+            lastValidSelection = "Admin"; // Update last valid selection
+            isAdminVerified = true;
+
+            // Hide modal
+            $('#adminAccessModal').modal('hide');
+
+            console.log("Admin access verified successfully!");
+            alert("Admin access verified successfully!");
+        } else {
+            // Show error message
+            pinError.style.display = 'block';
+            pinError.textContent = 'Invalid admin access code';
+            console.log("Invalid admin code entered");
+        }
+    });
+
+    // Check if selected option is restricted
     function checkRestrictedOption(selectElement) {
         const selectedOption = selectElement.options[selectElement.selectedIndex];
 
         // If this is the admin option (or any restricted option)
         if (selectedOption.dataset.restricted === "true") {
-            console.log("Restricted option selected: ", selectedOption.value);
+            console.log("Restricted option selected:", selectedOption.value);
 
             // Show the PIN modal
             $('#adminAccessModal').modal('show');
@@ -40,79 +70,15 @@ document.addEventListener("DOMContentLoaded", function() {
             // Update the last valid selection
             lastValidSelection = selectElement.value;
 
-            // reset admin verification status if not admin option
+            // Reset admin verification status if not admin option
             if (selectedOption.value !== "Admin") {
                 isAdminVerified = false;
             }
         }
     }
 
-    // Add event listener for the verify button
-    document.getElementById('verifyPinBtn').addEventListener('click', async function () {
-        const pinInput = document.getElementById('adminPinCode').value;
-        const pinError = document.getElementById('pinError');
-        const membershipSelect = document.getElementById('membership-level');
-
-        // get the current domain for local and deployed evironment
-        const currentDomain = window.location.origin;
-        const apiURL = `${currentDomain}/api/verify-admin-code`;
-
-        try {
-            const res = await fetch(apiURL, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json; charset=utf-8",
-                    },
-                    body: JSON.stringify({ code: pinInput }),
-                });
-            console.log("API response status: ", res.status);
-
-            // if valid response, process it
-            if (res.ok) {
-                const data = await res.json();
-                if (data.access) {
-                    // PIN correct - upgrade to Admin
-                    membershipSelect.value = "Admin";
-                    lastValidSelection = "Admin";
-                    isAdminVerified = true;
-                    // hide the modal
-                    $('#adminAccessModal').modal('hide');
-                    // show a success message
-                    alert("Admin access verified successfully.");
-                } else {
-                    // show an error message
-                    pinError.style.display = 'block';
-                    pinError.textContent = data.message || 'Invalid admin access code';
-                    return;
-                }
-            }
-
-            // if the api call failed or returned a non-OK status, fall back to hardcoded PIN
-            console.log("API verification failed, falling back to hardcoded PIN");
-            if (pinInput === "4204") {
-                // PIN correct, update to Admin
-                membershipSelect.value = "Admin";
-                lastValidSelection = "Admin";
-                isAdminVerified = true;
-                // hide the modal
-                $('#adminAccessModal').modal('hide');
-                // show a success message
-                alert("Admin access verified successfully.");
-            } else {
-                // show an error message
-                pinError.style.display = 'block';
-                pinError.textContent = data.message || 'Invalid admin access code';
-            }
-        } catch (error) {
-            console.error("Error verifying admin access code", error);
-
-            pinError.style.display = 'block';
-            pinError.textContent = 'Error verifying code: ' + error.message;
-        }
-    });
-
-    // export the verification status for the form-validator.js to use
-    window.isAdminVerified = function () {
+    // Export the verification status for form-validator.js to use
+    window.isAdminVerified = function() {
         return isAdminVerified;
     };
 });
