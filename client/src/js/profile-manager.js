@@ -218,66 +218,66 @@ document.addEventListener('DOMContentLoaded', function() {
          } else {
              console.error("Element with ID fname not found");
          }
-        const lnameElement = document.getElementById('fname');
+        const lnameElement = document.getElementById('lname');
         if (lnameElement) {
-            console.log("Found lname element, setting to: ", userData.fname || '');
-            lnameElement.value = userData.fname || '';
+            console.log("Found lname element, setting to: ", userData.lname || '');
+            lnameElement.value = userData.lname || '';
         } else {
             console.error("Element with ID lname not found");
         }
-        const address1Element = document.getElementById('fname');
+        const address1Element = document.getElementById('address1');
         if (address1Element) {
-            console.log("Found address1 element, setting to: ", userData.fname || '');
-            address1Element.value = userData.fname || '';
+            console.log("Found address1 element, setting to: ", userData.address1 || '');
+            address1Element.value = userData.address1 || '';
         } else {
             console.error("Element with ID address1 not found");
         }
-        const address2Element = document.getElementById('fname');
+        const address2Element = document.getElementById('address2');
         if (address2Element) {
-            console.log("Found address2 element, setting to: ", userData.fname || '');
-            address2Element.value = userData.fname || '';
+            console.log("Found address2 element, setting to: ", userData.address2 || '');
+            address2Element.value = userData.address2 || '';
         } else {
             console.error("Element with ID address2 not found");
         }
-        const cityElement = document.getElementById('fname');
+        const cityElement = document.getElementById('city');
         if (cityElement) {
-            console.log("Found city element, setting to: ", userData.fname || '');
-            cityElement.value = userData.fname || '';
+            console.log("Found city element, setting to: ", userData.city || '');
+            cityElement.value = userData.city || '';
         } else {
             console.error("Element with ID city not found");
         }
-        const stateElement = document.getElementById('fname');
+        const stateElement = document.getElementById('state');
         if (stateElement) {
-            console.log("Found state element, setting to: ", userData.fname || '');
-            stateElement.value = userData.fname || '';
+            console.log("Found state element, setting to: ", userData.state || '');
+            stateElement.value = userData.state || '';
         } else {
             console.error("Element with ID state not found");
         }
-        const zipElement = document.getElementById('fname');
+        const zipElement = document.getElementById('zip');
         if (zipElement) {
-            console.log("Found zip element, setting to: ", userData.fname || '');
-            zipElement.value = userData.fname || '';
+            console.log("Found zip element, setting to: ", userData.zip || '');
+            zipElement.value = userData.zip || '';
         } else {
             console.error("Element with ID zip not found");
         }
-        const statusElement = document.getElementById('fname');
+        const statusElement = document.getElementById('status');
         if (statusElement) {
-            console.log("Found status element, setting to: ", userData.fname || '');
-            statusElement.value = userData.fname || '';
+            console.log("Found status element, setting to: ", userData.status || '');
+            statusElement.value = userData.status || '';
         } else {
             console.error("Element with ID status not found");
         }
-        const levelElement = document.getElementById('fname');
+        const levelElement = document.getElementById('membership-level');
         if (levelElement) {
-            console.log("Found level element, setting to: ", userData.fname || '');
-            levelElement.value = userData.fname || '';
+            console.log("Found level element, setting to: ", userData.level || '');
+            levelElement.value = userData.level || '';
         } else {
             console.error("Element with ID level not found");
         }
-        const emailElement = document.getElementById('fname');
+        const emailElement = document.getElementById('email');
         if (emailElement) {
-            console.log("Found email element, setting to: ", userData.fname || '');
-            emailElement.value = userData.fname || '';
+            console.log("Found email element, setting to: ", userData.email || '');
+            emailElement.value = userData.email || '';
         } else {
             console.error("Element with ID email not found");
         }
@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // Use the absolute URL to your Vercel deployment
-            const apiUrl = 'https://patriotthanks.vercel.app/api/users/index';
+            const apiUrl = 'https://patriotthanks.vercel.app/api/users/index?userId=${userId}';
 
             const response = await fetch(apiUrl, {
                 method: "PUT",
