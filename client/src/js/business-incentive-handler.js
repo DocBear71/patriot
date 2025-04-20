@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // get the other form values here
-            const incentiveTypeElement = document.getElementById('IncentiveType');
+            const incentiveTypeElement = document.getElementById('incentiveType');
             const incentiveType = incentiveTypeElement ? incentiveTypeElement.value : '';
             const incentiveAmountElement = document.getElementById('incentiveAmount');
             const incentiveAmount = incentiveAmountElement ? incentiveAmountElement.value : '';
