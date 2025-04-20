@@ -22,7 +22,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const passwordMatch = document.getElementById('pwd-match');
 
     // Check login status
-    checkLoginStatus();
+    const isLoggedIn = checkLoginStatus();
+    if (isLoggedIn) {
+        // user is logged in, lets fetch the complete profile data
+        console.log("User is logged in, fetching profile data");
+        fetchUserProfileData();
+    }
 
     // Event listeners
     if (profileForm) {
@@ -110,6 +115,94 @@ document.addEventListener('DOMContentLoaded', function() {
 
         return false;
     }
+
+    async function fetchUserProfileData() {
+        try {
+            // Get current user ID from session
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (!sessionData) {
+                console.error("No session data found");
+                return;
+            }
+
+            const session = JSON.parse(sessionData);
+            const userId = session.user._id;
+
+            console.log("Fetching profile data for user:", userId);
+
+            // Make API call to get complete profile
+            const response = await fetch(`/api/users/profile?userId=${userId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch profile: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log("Received profile data:", data);
+
+            if (data.user) {
+                // Populate the form directly with the retrieved data
+                populateProfileForm(data.user);
+            }
+        } catch (error) {
+            console.error("Error fetching user profile:", error);
+        }
+    }
+
+    // Function to populate form with user data
+    function populateProfileForm(userData) {
+        console.log("Populating form with data:", userData);
+
+        // Set text input values
+        const fields = ['fname', 'lname', 'address1', 'address2', 'city', 'zip', 'email'];
+        fields.forEach(field => {
+            const element = document.getElementById(field);
+            if (element) {
+                element.value = userData[field] || '';
+                console.log(`Set ${field} to:`, element.value);
+            } else {
+                console.error(`Element with ID '${field}' not found`);
+            }
+        });
+
+        // Set dropdown values
+        const dropdowns = ['state', 'status', 'membership-level'];
+        dropdowns.forEach(dropdown => {
+            const element = document.getElementById(dropdown);
+            if (element) {
+                // Map field names from database to form field IDs
+                const fieldMap = {
+                    'state': 'state',
+                    'status': 'status',
+                    'membership-level': 'level'
+                };
+
+                const dataField = fieldMap[dropdown];
+                const value = userData[dataField];
+
+                if (value) {
+                    // Try to set the dropdown value
+                    element.value = value;
+                    console.log(`Tried to set ${dropdown} to:`, value);
+                    console.log(`Actual value after setting:`, element.value);
+
+                    // If value wasn't set properly, select default
+                    if (element.value !== value) {
+                        console.log(`Value ${value} not found in options for ${dropdown}`);
+                        element.selectedIndex = 0;
+                    }
+                }
+            } else {
+                console.error(`Dropdown with ID '${dropdown}' not found`);
+            }
+        });
+    }
+
 
     function showNotLoggedIn() {
         if (profileContainer) profileContainer.style.display = 'none';
