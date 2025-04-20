@@ -3,18 +3,6 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 
-// API route handlers
-const businessApi = require('./oldAPI/business');
-const businessSearchApi = require('./oldAPI/business-search');
-const contactApi = require('./api/contact');
-const incentivesApi = require('./oldAPI/incentives');
-const incentivesAddApi = require('./oldAPI/incentives/add');
-const loginApi = require('./oldAPI/login');
-const registerApi = require('./oldAPI/register');
-const usersPasswordApi = require('./oldAPI/password');
-const usersUpdateApi = require('./oldAPI/update');
-const verifyAdminCodeApi = require('./oldAPI/verify-admin-code');
-
 // Create Express app
 const app = express();
 
@@ -28,17 +16,46 @@ app.use((req, res, next) => {
     next();
 });
 
-// Mount API routes
-app.use('/api/business', businessApi);
-app.use('/api/business-search', businessSearchApi);
-app.use('/api/contact', contactApi);
-app.use('/api/incentives', incentivesApi);
-app.use('/api/incentives/add', incentivesAddApi);
-app.use('/api/login', loginApi);
-app.use('/api/register', registerApi);
-app.use('/api/users/password', usersPasswordApi);
-app.use('/api/users/update', usersUpdateApi);
-app.use('/api/verify-admin-code', verifyAdminCodeApi);
+// setup route handler function for API enpoints
+function createApiHandler(apiModule) {
+    return async (req, res) => {
+        try {
+            await apiModule(req, res);
+        } catch (error) {
+            console.error('API Error: ', error);
+            res.status(500).json({ message: 'Server error: ' + error.message });
+        }
+    };
+}
+
+// import consolidated API modules
+const authApi = require('./api/auth');
+const businessApi = require('./api/business');
+const contactApi = require('./api/contact');
+const incentivesApi = require('./api/incentives');
+const usersApi = require('./api/users');
+
+
+// Mount consolidated API routes
+app.all('/api/auth', createApiHandler(authApi));
+app.all('/api/business', createApiHandler(businessApi));
+app.all('/api/contact', createApiHandler(contactApi));
+app.all('/api/incentives', createApiHandler(incentivesApi));
+app.all('/api/users', createApiHandler(usersApi));
+
+// mount legacy API routes to maintain backward compatibility
+app.all('/api/login', createApiHandler(authApi));
+app.all('/api/register', createApiHandler(authApi));
+app.all('/api/verify-admin-code', createApiHandler(authApi));
+app.all('/api/business-search', createApiHandler(businessApi));
+app.all('/api/incentives/add', createApiHandler(incentivesApi));
+app.all('/api/users/password', createApiHandler(usersApi));
+app.all('/api/users/update', createApiHandler(usersApi));
+
+// test API route
+app.get('/api/test', (req, res) => {
+    res.status(200).json({ message: 'API is working!' });
+});
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));

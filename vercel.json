@@ -12,12 +12,12 @@
   ],
   "routes": [
     {
-      "src": "/api/business",
-      "dest": "/api/business.js"
+      "src": "/api/auth",
+      "dest": "/api/auth.js"
     },
     {
-      "src": "/api/business-search",
-      "dest": "/api/business-search.js"
+      "src": "/api/business",
+      "dest": "/api/business.js"
     },
     {
       "src": "/api/contact",
@@ -28,32 +28,49 @@
       "dest": "/api/incentives.js"
     },
     {
-      "src": "/api/incentives/add",
-      "dest": "/api/incentives/add.js"
-    },
-    {
-      "src": "/api/login",
-      "dest": "/api/login.js"
-    },
-    {
-      "src": "/api/register",
-      "dest": "/api/register.js"
+      "src": "/api/users",
+      "dest": "/api/users.js"
     },
     {
       "src": "/api/test",
       "dest": "/api/test.js"
     },
+
     {
-      "src": "/api/users/password",
-      "dest": "/api/users/password.js"
+      "src": "/api/login",
+      "dest": "/api/auth.js"
     },
     {
-      "src": "/api/users/update",
-      "dest": "/api/users/update.js"
+      "src": "/api/register",
+      "dest": "/api/auth.js"
     },
     {
       "src": "/api/verify-admin-code",
-      "dest": "/api/verify-admin-code.js"
+      "dest": "/api/auth.js"
+    },
+    {
+      "src": "/api/business-search",
+      "dest": "/api/business.js"
+    },
+    {
+      "src": "/api/incentives/add",
+      "dest": "/api/incentives.js"
+    },
+    {
+      "src": "/api/users/password",
+      "dest": "/api/users.js"
+    },
+    {
+      "src": "/api/users/update",
+      "dest": "/api/users.js"
+    },
+    {
+      "src": "/api/users/profile",
+      "dest": "/api/users.js"
+    },
+    {
+      "src": "/api/users/get",
+      "dest": "/api/users.js"
     },
     {
       "src": "/(.*)",
