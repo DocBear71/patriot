@@ -36,6 +36,9 @@ document.addEventListener('DOMContentLoaded', function() {
             lastValidSelection = "Admin"; // Update last valid selection
             isAdminVerified = true;
 
+            // Set global flag for other scripts
+            window.adminVerified = true;
+
             // Hide modal
             $('#adminAccessModal').modal('hide');
 

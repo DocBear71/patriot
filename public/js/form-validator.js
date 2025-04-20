@@ -44,8 +44,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // check if admin verification is required but not completed
-        if (form.level.value === "Admin" && (!window.isAdminVerified || !window.isAdminVerified())) {
-            console.log("Admin verification failed");
+        if (form.level.value === "Admin" && !window.adminVerified) {
+            console.log("Admin verification failed, window.adminVerified = ", window.adminVerified);
             invalidFields.push("Admin access code verification");
             alert("Admin access must be verified with a valid code before registration");
             return;
