@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const apiURL = `https://patriotthanks.vercel.app/api/users/index?operation=profile&userId=${userId}`;
 
             // Make API call to get complete profile
-            res = await fetch(apiURL, {
+            const res = await fetch(apiURL, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
