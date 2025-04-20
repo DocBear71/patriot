@@ -130,31 +130,122 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log("Fetching profile data for user:", userId);
 
-            const apiURL = `https://patriotthanks.vercel.app/api/users/index?operation=profile&userId=${userId}`;
-
-            // Make API call to get complete profile
-            const res = await fetch(apiURL, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
+            // Try different API endpoint patterns
+            const endpoints = [
+                // 1. Original with operation parameter
+                `https://patriotthanks.vercel.app/api/users/index?operation=profile&userId=${userId}`,
+                // 2. Try debug endpoint
+                `https://patriotthanks.vercel.app/api/debug`,
+                // 3. Try with different operation value
+                `https://patriotthanks.vercel.app/api/users/index?operation=get&id=${userId}`,
+                // 4. Try direct API endpoint without /index
+                `https://patriotthanks.vercel.app/api/users?operation=profile&userId=${userId}`,
+                // 5. Try with POST method
+                {
+                    url: `https://patriotthanks.vercel.app/api/users/index?operation=profile`,
+                    method: 'POST',
+                    body: JSON.stringify({ userId: userId })
                 }
-            });
+            ];
 
-            if (!res.ok) {
-                throw new Error(`Failed to fetch profile: ${res.status}`);
+            // Add more comprehensive error logging
+            for (const endpoint of endpoints) {
+                try {
+                    console.log(`Trying endpoint: ${typeof endpoint === 'string' ? endpoint : endpoint.url}`);
+
+                    let response;
+
+                    if (typeof endpoint === 'string') {
+                        // GET request
+                        response = await fetch(endpoint, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                    } else {
+                        // POST or other method
+                        response = await fetch(endpoint.url, {
+                            method: endpoint.method,
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: endpoint.body
+                        });
+                    }
+
+                    console.log(`Response status: ${response.status}`);
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error(`API response error: ${response.status} ${errorText}`);
+                        continue; // Try the next endpoint
+                    }
+
+                    const data = await response.json();
+                    console.log("Received profile data:", data);
+
+                    if (data.user) {
+                        // Populate the form directly with the retrieved data
+                        populateProfileForm(data.user);
+                        return; // Success! Exit the function
+                    } else if (data.message && data.message.includes('working')) {
+                        // Debug endpoint worked
+                        console.log("Debug endpoint is working, but user data endpoint is not");
+                        continue;
+                    }
+                } catch (endpointError) {
+                    console.error(`Error with endpoint ${typeof endpoint === 'string' ? endpoint : endpoint.url}:`, endpointError);
+                }
             }
 
-            const data = await res.json();
-            console.log("Received profile data:", data);
+            console.error("All endpoints failed");
+            alert("Could not fetch your profile data. Please try again later or contact support.");
 
-            if (data.user) {
-                // Populate the form directly with the retrieved data
-                populateProfileForm(data.user);
-            }
         } catch (error) {
-            console.error("Error fetching user profile:", error);
+            console.error("Fatal error fetching user profile:", error);
         }
     }
+
+    // async function fetchUserProfileData() {
+    //     try {
+    //         // Get current user ID from session
+    //         const sessionData = localStorage.getItem('patriotThanksSession');
+    //         if (!sessionData) {
+    //             console.error("No session data found");
+    //             return;
+    //         }
+    //
+    //         const session = JSON.parse(sessionData);
+    //         const userId = session.user._id;
+    //
+    //         console.log("Fetching profile data for user:", userId);
+    //
+    //         const apiURL = `https://patriotthanks.vercel.app/api/users/index?operation=profile&userId=${userId}`;
+    //
+    //         // Make API call to get complete profile
+    //         const res = await fetch(apiURL, {
+    //             method: 'GET',
+    //             headers: {
+    //                 'Content-Type': 'application/json'
+    //             }
+    //         });
+    //
+    //         if (!res.ok) {
+    //             throw new Error(`Failed to fetch profile: ${res.status}`);
+    //         }
+    //
+    //         const data = await res.json();
+    //         console.log("Received profile data:", data);
+    //
+    //         if (data.user) {
+    //             // Populate the form directly with the retrieved data
+    //             populateProfileForm(data.user);
+    //         }
+    //     } catch (error) {
+    //         console.error("Error fetching user profile:", error);
+    //     }
+    // }
 
     // Function to populate form with user data
     function populateProfileForm(userData) {
