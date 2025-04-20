@@ -130,19 +130,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log("Fetching profile data for user:", userId);
 
+            const apiURL = `https://patriotthanks.vercel.app/api/users/index?operation=profile&userId=${userId}`;
+
             // Make API call to get complete profile
-            const response = await fetch(`/api/users/index?userId=${userId}`, {
+            res = await fetch(apiURL, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
 
-            if (!response.ok) {
-                throw new Error(`Failed to fetch profile: ${response.status}`);
+            if (!res.ok) {
+                throw new Error(`Failed to fetch profile: ${res.status}`);
             }
 
-            const data = await response.json();
+            const data = await res.json();
             console.log("Received profile data:", data);
 
             if (data.user) {
@@ -348,9 +350,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // Use the absolute URL to your Vercel deployment
-            const apiUrl = 'https://patriotthanks.vercel.app/api/users/index?userId=${userId}';
+            const apiUrl = 'https://patriotthanks.vercel.app/api/users/index?operation=update';
 
-            const response = await fetch(apiUrl, {
+            const res = await fetch(apiUrl, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json; charset=UTF-8",
@@ -358,12 +360,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(updatedUserData),
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Profile update failed: ${response.status} ${errorText}`);
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`Profile update failed: ${res.status} ${errorText}`);
             }
 
-            const data = await response.json();
+            const data = await res.json();
             console.log("Profile update successful:", data);
 
             // Update session with new user data
@@ -405,9 +407,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // Use the absolute URL to your Vercel deployment
-            const apiUrl = 'https://patriotthanks.vercel.app/api/users/index';
+            const apiUrl = 'https://patriotthanks.vercel.app/api/users/index?operation=password';
 
-            const response = await fetch(apiUrl, {
+            const res = await fetch(apiUrl, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json; charset=utf-8",
@@ -415,12 +417,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(passwordData),
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Password change failed: ${response.status} ${errorText}`);
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`Password change failed: ${res.status} ${errorText}`);
             }
 
-            const data = await response.json();
+            const data = await res.json();
             console.log("Password change successful:", data);
 
             // Hide modal
