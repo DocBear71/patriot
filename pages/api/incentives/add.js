@@ -34,7 +34,7 @@ try {
 } catch (error) {
     // lets define the models if they do not exist
     Business = mongoose.model('Business', businessSchema, 'business');
-    Incentive = mongoose.model('Incentive', incentiveSchema, 'incentive');
+    Incentive = mongoose.model('Incentive', incentiveSchema, 'incentives');
 }
 
 module.exports = async (req, res) => {
