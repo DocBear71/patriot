@@ -4,16 +4,16 @@ const path = require('path');
 const cors = require('cors');
 
 // API route handlers
-const businessApi = require('./api/business');
-const businessSearchApi = require('./api/business-search');
+const businessApi = require('./oldAPI/business');
+const businessSearchApi = require('./oldAPI/business-search');
 const contactApi = require('./api/contact');
-const incentivesApi = require('./api/incentives/index');
-const incentivesAddApi = require('./api/incentives/add');
-const loginApi = require('./api/login');
-const registerApi = require('./api/register');
-const usersPasswordApi = require('./api/users/password');
-const usersUpdateApi = require('./api/users/update');
-const verifyAdminCodeApi = require('./api/verify-admin-code');
+const incentivesApi = require('./oldAPI/incentives');
+const incentivesAddApi = require('./oldAPI/incentives/add');
+const loginApi = require('./oldAPI/login');
+const registerApi = require('./oldAPI/register');
+const usersPasswordApi = require('./oldAPI/password');
+const usersUpdateApi = require('./oldAPI/update');
+const verifyAdminCodeApi = require('./oldAPI/verify-admin-code');
 
 // Create Express app
 const app = express();

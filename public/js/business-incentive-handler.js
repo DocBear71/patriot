@@ -88,8 +88,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // event listener for the incentive form
-        incentiveAvailable.addEventListener('change', toggleIncentiveFields);
-        incentiveNotAvailable.addEventListener('change', toggleIncentiveFields);
+    incentiveAvailable.addEventListener('change', toggleIncentiveFields);
+    incentiveNotAvailable.addEventListener('change', toggleIncentiveFields);
 
 
     // event listener for the incentive form submission
@@ -335,8 +335,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // make the api call to the server
-        const apiURL = 'https://patriotthanks.vercel.app/api/incentives/add';
-        // const apiURL = 'https://patriotthanks.vercel.app/api/test-incentive-path';
+        const apiURL = 'https://patriotthanks.vercel.app/api/incentives';
         console.log("Attempting to submit to: ", apiURL);
 
         fetch(apiURL, {
@@ -380,7 +379,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     submitButton.disabled = false;
                 }
             });
-        }
+    }
 
     // helper function to safey rest form fields
     function resetField(fieldId, defaultValue = '') {
@@ -420,15 +419,3 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 });
-
-
-
-
-
-
-
-
-
-
-
-

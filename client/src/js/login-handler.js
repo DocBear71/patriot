@@ -15,21 +15,57 @@ function handleLogin() {
     // For now, just simulate a successful login
     if (email && password) {
         console.log("Login successful");
-
-        // Create a session object matching the format used by profile-manager.js
-        const session = {
-            user: {
-                _id: generateTempId(), // Generate a temporary ID until real authentication is implemented
-                email: email,
-                // Add other user properties that might be needed
-                fname: '',
-                lname: '',
-                status: 'US' // Default status
-            },
-            token: 'simulated-token',
-            timestamp: new Date().getTime(),
-            expiresIn: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+        // prepare login data
+        const loginData = {
+            email: email,
+            password: password,
         };
+
+        // determine the base URL
+        const baseURL = window.location.hostname === "localhose" || window.location.hostname === '127.0.0.1'
+            ? `https://${window.location.host}`
+            : `https://patriotthanks.vercel.app`;
+
+        // Make API call to login endpoint
+        fetch(`${baseIRL}/api/auth?operation=login`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json; charset=UTF-8",
+            },
+            body: JSON.stringify(loginData),
+        })
+        .then(res => {
+            if (!res.ok) {
+                throw new Error('Login failed: ' + res.statusText);
+            }
+            return res.json();
+        })
+        .then(data => {
+            console.log("Login successful");
+
+            // create session object
+            const session = {
+                user: {
+                    _id: data.userId,
+                    email: data.email,
+                    fname: data.fname,
+                    lname: data.lname,
+                    address1: data.address1,
+                    address2: data.address2,
+                    city: data.city,
+                    state: data.state,
+                    zip: data.zip,
+                    status: data.status,
+                    level: data.level,
+                    isAdmin: data.isAdmin,
+                    created_at: data.created_at,
+                    updated_at: data.updated_at,
+                },
+                token: data.token || 'no-token-provided',
+                timestamp: new Date().getTime(),
+                expiresIn: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+            };
+
 
         // Store the session in localStorage
         localStorage.setItem('patriotThanksSession', JSON.stringify(session));
@@ -47,6 +83,11 @@ function handleLogin() {
             $(dropdown).parent().removeClass('show');
             $(dropdown).removeClass('show');
         }
+    })
+    .catch (error => {
+        console.error("Login error: ", error);
+        alert("Login failed: " + error.message);
+    });
     } else {
         console.error("Login failed: Missing email or password");
         alert("Please enter both email and password.");

@@ -1,3 +1,5 @@
+// pin-validation.js - Admin verification with MongoDB integration
+
 // Store the last selected option to revert back if pin verification fails
 let lastValidSelection = "";
 let isAdminVerified = false;
@@ -25,66 +27,154 @@ document.addEventListener('DOMContentLoaded', function() {
         const pinError = document.getElementById('pinError');
         const membershipSelect = document.getElementById('membership-level');
 
+        // validate input
+        if (!pinInput || pinInput.trim() === '') {
+            pinError.style.display = 'block';
+            pinError.textContent = 'Please enter an admin access code';
+        }
+
         console.log("Verifying pin:", pinInput);
 
-        // Simple hardcoded PIN check
-        const ADMIN_PIN = "4204";
+        // get user ID from sesstion if avaoiable
+        const userId = getUserIdFromSession();
 
-        if (pinInput === ADMIN_PIN) {
-            // PIN correct - update select to Admin
-            membershipSelect.value = "Admin";
-            lastValidSelection = "Admin"; // Update last valid selection
-            isAdminVerified = true;
 
-            // Set global flag for other scripts
-            window.adminVerified = true;
+        // Determine the base URL
+        const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? `http://${window.location.host}`
+            : 'https://patriotthanks.vercel.app';
 
-            // Hide modal
-            $('#adminAccessModal').modal('hide');
+        // Prepare verification data
+        const verificationData = {
+            code: pinInput,
+            userId: userId // include, if available
+        };
 
-            console.log("Admin access verified successfully!");
-            alert("Admin access verified successfully!");
-        } else {
-            // Show error message
-            pinError.style.display = 'block';
-            pinError.textContent = 'Invalid admin access code';
-            console.log("Invalid admin code entered");
-        }
+        // show loading state
+        const verifyBtn = document.getElementById('verifyPinBtn');
+        const originalBtnText = verifyBtn.textContent;
+        verifyBtn.textContent = 'Verifying...';
+        verifyBtn.disabled = true;
+
+        // Call the admin verification API
+        fetch(`${baseURL}/api/auth?operation=verify-admin`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json; charset=UTF-8'
+            },
+            body: JSON.stringify(verificationData)
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Verification failed');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.access) {
+                    // PIN correct - update select to Admin
+                    membershipSelect.value = "Admin";
+                    lastValidSelection = "Admin"; // Update last valid selection
+                    isAdminVerified = true;
+
+                    // Set global flag for other scripts
+                    window.adminVerified = true;
+
+                    // Hide modal
+                    $('#adminAccessModal').modal('hide');
+
+                    console.log("Admin access verified successfully!");
+                    alert(data.message || "Admin access verified successfully!");
+
+                    // update user status if verification included user update
+                    updateUserStatusIfNeeded(userId);
+                } else {
+                    // Show error message
+                    pinError.style.display = 'block';
+                    pinError.textContent = data.message || 'Invalid admin access code';
+                    console.log("Invalid admin code entered");
+                }
+            })
+            .catch(error => {
+                console.error("Admin verification error:", error);
+                pinError.style.display = 'block';
+                pinError.textContent = 'Error verifying admin code: ' + error.message;
+            })
+            .finally(() => {
+                // reset the state of the button
+                verifyBtn.textContent = originalBtnText;
+                verifyBtn.disabled = false;
+            });
     });
 
-    // Check if selected option is restricted
+    // check if selected option is restricted
     function checkRestrictedOption(selectElement) {
         const selectedOption = selectElement.options[selectElement.selectedIndex];
 
-        // If this is the admin option (or any restricted option)
-        if (selectedOption.dataset.restricted === "true") {
-            console.log("Restricted option selected:", selectedOption.value);
+        // if any restricted option, such as Admin
+        if (selectedOption.dataset.restricted === true) {
+            console.log('"Restricted option selected: "', selectedOption.value);
 
-            // Show the PIN modal
+            // show the PIN modal
             $('#adminAccessModal').modal('show');
 
-            // Reset pin input and error message
+            // reset pin input and error message
             document.getElementById('adminPinCode').value = '';
             document.getElementById('pinError').style.display = 'none';
 
-            // Remember the last valid selection to revert back if needed
+            // remember the last valid selection to revert back if needed
             if (lastValidSelection === "") {
-                // Default to first option if no previous selection
+                // default to the first option if no previous selection
                 lastValidSelection = selectElement.options[0].value;
             }
 
-            // Temporarily revert back to previous selection until pin is verified
+            // temporarily revert back to previous selection until pin is verified
             selectElement.value = lastValidSelection;
         } else {
-            // Update the last valid selection
+            // update the last valid seletion
             lastValidSelection = selectElement.value;
 
-            // Reset admin verification status if not admin option
+            // reset admin verification status if not admin option
             if (selectedOption.value !== "Admin") {
                 isAdminVerified = false;
             }
         }
     }
+    // Helper function to get user ID from session
+    function getUserIdFromSession() {
+        try {
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (sessionData) {
+                const session = JSON.parse(sessionData);
+                return session.user._id;
+            }
+        } catch (error) {
+            console.error("Error getting user ID from session:", error);
+        }
+        return null;
+    }
 
+    // Function to update UI if user status changed
+    function updateUserStatusIfNeeded(userId) {
+        if (!userId) return;
 
+        try {
+            // Get current session data
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (sessionData) {
+                const session = JSON.parse(sessionData);
+
+                // Update session with admin status
+                session.user.status = 'AD';
+                session.user.isAdmin = true;
+
+                // Save updated session
+                localStorage.setItem('patriotThanksSession', JSON.stringify(session));
+
+                console.log("User session updated with admin status");
+            }
+        } catch (error) {
+            console.error("Error updating user session:", error);
+        }
+    }
 });

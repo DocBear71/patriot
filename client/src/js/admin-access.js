@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 // Verify the code with the server
-                const response = await fetch('https://patriotthanks.vercel.app/api/verify-admin-code', {
+                const response = await fetch('https://patriotthanks.vercel.app/api/auth?operation=verify-admin', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

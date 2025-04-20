@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log("Fetching profile data for user:", userId);
 
             // Make API call to get complete profile
-            const response = await fetch(`/api/users/profile?userId=${userId}`, {
+            const response = await fetch(`/api/users/index?userId=${userId}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // Use the absolute URL to your Vercel deployment
-            const apiUrl = 'https://patriotthanks.vercel.app/api/users/update';
+            const apiUrl = 'https://patriotthanks.vercel.app/api/users/index';
 
             const response = await fetch(apiUrl, {
                 method: "PUT",
@@ -405,7 +405,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // Use the absolute URL to your Vercel deployment
-            const apiUrl = 'https://patriotthanks.vercel.app/api/users/password';
+            const apiUrl = 'https://patriotthanks.vercel.app/api/users/index';
 
             const response = await fetch(apiUrl, {
                 method: "POST",

@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
             // use the api endpoint with the baseURL
-            const apiURL = `${baseURL}/api/business`;
+            const apiURL = `${baseURL}/api/business?operation=register`;
             console.log("Submitting to API at:", apiURL);
 
             const response = await fetch(apiURL, {
