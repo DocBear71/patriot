@@ -28,57 +28,90 @@ document.addEventListener('DOMContentLoaded', function () {
     const confirmActionBtn = document.getElementById('confirm-action-btn');
     const addUserBtn = document.getElementById('add-user-btn');
 
-    // Check if the user is admin and load user data
-    checkAdminStatus().then(() => {
-        if (isAdminUser) {
-            // For development, use mock data if API is not ready
-            const useApiData = false; // Change this to true when the API is ready
-
-            if (useApiData) {
-                loadUsers();
-            } else {
-                loadMockUsers();
+    // Helper function for token retrieval
+    function getAuthToken() {
+        try {
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (!sessionData) {
+                console.error('No session data found');
+                return null;
             }
 
+            const session = JSON.parse(sessionData);
+            if (!session.token) {
+                console.error('No token found in session data');
+                return null;
+            }
+
+            return session.token;
+        } catch (error) {
+            console.error('Error retrieving auth token:', error);
+            return null;
+        }
+    }
+
+// Redirect function
+    function redirectToLogin() {
+        window.location.href = '/login.html?expired=true&redirect=' + encodeURIComponent(window.location.pathname);
+    }
+    
+    // Check if the user is admin and load user data
+    checkAdminStatus().then((isAdmin) => {
+        if (isAdmin) {
+            loadUsers();
             setupEventListeners();
         } else {
             showAccessDenied();
         }
+    }).catch(error => {
+        console.error('Error during initialization:', error);
+        showAccessDenied();
     });
 
     // Functions
     async function checkAdminStatus() {
         try {
-            // Get user session data
-            const sessionData = localStorage.getItem('patriotThanksSession');
-
-            if (!sessionData) {
-                console.error('No session data found');
+            // Get auth token
+            const token = getAuthToken();
+            if (!token) {
+                redirectToLogin();
                 return false;
             }
 
-            const session = JSON.parse(sessionData);
+            // Determine the base URL
+            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `http://${window.location.host}`
+                : 'https://patriotthanks.vercel.app';
 
-            if (!session.user || !session.user._id) {
-                console.error('Invalid session data');
+            // Verify token with a lightweight API call
+            const response = await fetch(`${baseURL}/api/verify-token`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    redirectToLogin();
+                }
                 return false;
             }
 
-            // Check if the user is admin
-            if (session.user.isAdmin === true || session.user.level === 'Admin') {
-                isAdminUser = true;
-                console.log('Admin access verified');
-                return true;
-            } else {
-                console.error('User is not an admin');
-                return false;
-            }
+            const data = await response.json();
+            isAdminUser = data.isAdmin === true || data.level === 'Admin';
+
+            console.log('Admin access verified:', isAdminUser);
+            return isAdminUser;
         } catch (error) {
             console.error('Error checking admin status:', error);
             return false;
         }
     }
 
+    function redirectToLogin() {
+        window.location.href = '/login.html?expired=true&redirect=' + encodeURIComponent(window.location.pathname);
+    }
     function showAccessDenied() {
         const adminContainer = document.querySelector('.admin-container');
         adminContainer.innerHTML = `
@@ -98,16 +131,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `https://${window.location.host}`
+                ? `http://${window.location.host}`
                 : 'https://patriotthanks.vercel.app';
 
-            // Get session data for authentication
-            const sessionData = localStorage.getItem('patriotThanksSession');
-            if (!sessionData) {
-                throw new Error('No session data found');
+            // Get auth token
+            const token = getAuthToken();
+            if (!token) {
+                throw new Error('Authentication required');
             }
-
-            const session = JSON.parse(sessionData);
 
             // Build the filter query
             let queryParams = new URLSearchParams({
@@ -134,9 +165,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.token}`
+                    'Authorization': `Bearer ${token}`
                 }
             });
+
+            // Handle token expiration
+            if (response.status === 401) {
+                // Token expired, redirect to login
+                window.location.href = '/login.html?expired=true&redirect=' + encodeURIComponent(window.location.pathname);
+                return;
+            }
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -556,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function saveUser() {
         try {
-            // Prepare for data
+            // Prepare user data
             const userData = {
                 fname: document.getElementById('fname').value.trim(),
                 lname: document.getElementById('lname').value.trim(),
@@ -573,16 +611,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `https://${window.location.host}`
+                ? `http://${window.location.host}`
                 : 'https://patriotthanks.vercel.app';
 
-            // Get session data for authentication
-            const sessionData = localStorage.getItem('patriotThanksSession');
-            if (!sessionData) {
-                throw new Error('No session data found');
+            // Get auth token
+            const token = getAuthToken();
+            if (!token) {
+                redirectToLogin();
+                return;
             }
-
-            const session = JSON.parse(sessionData);
 
             // Determine if creating or updating
             const method = editingUserId ? 'PUT' : 'POST';
@@ -602,10 +639,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 method: method,
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.token}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(userData)
             });
+
+            // Handle token expiration
+            if (response.status === 401) {
+                redirectToLogin();
+                return;
+            }
 
             if (!response.ok) {
                 const errorData = await response.json();
@@ -655,16 +698,15 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `https://${window.location.host}`
+                ? `http://${window.location.host}`
                 : 'https://patriotthanks.vercel.app';
 
-            // Get session data for authentication
-            const sessionData = localStorage.getItem('patriotThanksSession');
-            if (!sessionData) {
-                throw new Error('No session data found');
+            // Get auth token
+            const token = getAuthToken();
+            if (!token) {
+                redirectToLogin();
+                return;
             }
-
-            const session = JSON.parse(sessionData);
 
             console.log(`DELETE request to /api/admin/users/${editingUserId}`);
 
@@ -673,9 +715,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.token}`
+                    'Authorization': `Bearer ${token}`
                 }
             });
+
+            // Handle token expiration
+            if (response.status === 401) {
+                redirectToLogin();
+                return;
+            }
 
             if (!response.ok) {
                 const errorData = await response.json();
