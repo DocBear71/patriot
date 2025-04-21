@@ -1,4 +1,4 @@
-// admin-users.js - Admin user management functionality
+// admin-users.js - Admin user management functionality - Updated for API integration
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Admin Users Management loaded');
@@ -31,7 +31,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check if user is admin and load user data
     checkAdminStatus().then(() => {
         if (isAdminUser) {
-            loadUsers();
+            // For development, use mock data if API is not ready
+            const useApiData = false; // Change this to true when API is ready
+
+            if (useApiData) {
+                loadUsers();
+            } else {
+                loadMockUsers();
+            }
+
             setupEventListeners();
         } else {
             showAccessDenied();
@@ -119,6 +127,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 queryParams.append('level', currentFilters.level);
             }
 
+            console.log("Fetching users with query:", queryParams.toString());
+
             // Make API request
             const response = await fetch(`${baseURL}/api/admin/users?${queryParams.toString()}`, {
                 method: 'GET',
@@ -129,10 +139,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             if (!response.ok) {
-                throw new Error(`Error: ${response.status} ${response.statusText}`);
+                const errorText = await response.text();
+                console.error("API response:", response.status, errorText);
+                throw new Error(`Failed to load users: ${response.status} ${response.statusText}`);
             }
 
             const data = await response.json();
+            console.log("Users data:", data);
 
             users = data.users;
             totalPages = Math.ceil(data.total / itemsPerPage);
@@ -158,29 +171,40 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = document.createElement('tr');
 
             // Format created date
-            const createdDate = new Date(user.created_at);
-            const formattedDate = `${createdDate.toLocaleDateString()}`;
+            let formattedDate = 'N/A';
+            if (user.created_at) {
+                const createdDate = new Date(user.created_at);
+                formattedDate = `${createdDate.toLocaleDateString()}`;
+            }
 
-            // Status badge
+            // Status badge and text
             let statusBadge = '';
+            let statusText = 'Unknown';
+
             switch (user.status) {
                 case 'VT':
                     statusBadge = '<span class="badge badge-active">Veteran</span>';
+                    statusText = 'Veteran';
                     break;
                 case 'AD':
                     statusBadge = '<span class="badge badge-active">Active Duty</span>';
+                    statusText = 'Active Duty';
                     break;
                 case 'FR':
                     statusBadge = '<span class="badge badge-active">First Responder</span>';
+                    statusText = 'First Responder';
                     break;
                 case 'SP':
                     statusBadge = '<span class="badge badge-active">Spouse</span>';
+                    statusText = 'Spouse';
                     break;
                 case 'BO':
                     statusBadge = '<span class="badge badge-active">Business Owner</span>';
+                    statusText = 'Business Owner';
                     break;
                 case 'SU':
                     statusBadge = '<span class="badge badge-active">Supporter</span>';
+                    statusText = 'Supporter';
                     break;
                 default:
                     statusBadge = '<span class="badge badge-secondary">Unknown</span>';
@@ -209,8 +233,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             row.innerHTML = `
-                <td>${user.fname} ${user.lname}</td>
-                <td>${user.email}</td>
+                <td>${user.fname || ''} ${user.lname || ''}</td>
+                <td>${user.email || 'N/A'}</td>
                 <td>${user.city ? user.city + ', ' + user.state : 'N/A'}</td>
                 <td>${statusBadge}</td>
                 <td>${levelBadge}</td>
@@ -218,7 +242,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td>
                     <div class="action-buttons">
                         <button class="btn btn-sm btn-info edit-user" data-id="${user._id}">Edit</button>
-                        <button class="btn btn-sm btn-danger delete-user" data-id="${user._id}">Delete</button>
+                        <button class="btn btn-sm btn-danger delete-user" data-id="${user._id}" data-name="${user.fname} ${user.lname}">Delete</button>
                     </div>
                 </td>
             `;
@@ -237,7 +261,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.delete-user').forEach(btn => {
             btn.addEventListener('click', function() {
                 const userId = this.getAttribute('data-id');
-                showDeleteConfirmation(userId);
+                const userName = this.getAttribute('data-name');
+                showDeleteConfirmation(userId, userName);
             });
         });
     }
@@ -315,21 +340,34 @@ document.addEventListener('DOMContentLoaded', function() {
         userSearch.addEventListener('input', debounce(function() {
             currentFilters.search = this.value;
             currentPage = 1;
-            loadUsers();
+            if (isApiIntegrationEnabled()) {
+                loadUsers();
+            } else {
+                // For mock data, just filter client-side
+                filterMockUsers();
+            }
         }, 300));
 
         // Status filter
         statusFilter.addEventListener('change', function() {
             currentFilters.status = this.value;
             currentPage = 1;
-            loadUsers();
+            if (isApiIntegrationEnabled()) {
+                loadUsers();
+            } else {
+                filterMockUsers();
+            }
         });
 
         // Level filter
         levelFilter.addEventListener('change', function() {
             currentFilters.level = this.value;
             currentPage = 1;
-            loadUsers();
+            if (isApiIntegrationEnabled()) {
+                loadUsers();
+            } else {
+                filterMockUsers();
+            }
         });
 
         // Reset filters
@@ -343,7 +381,11 @@ document.addEventListener('DOMContentLoaded', function() {
             currentFilters.level = '';
 
             currentPage = 1;
-            loadUsers();
+            if (isApiIntegrationEnabled()) {
+                loadUsers();
+            } else {
+                loadMockUsers();
+            }
         });
 
         // Add user button
@@ -355,13 +397,21 @@ document.addEventListener('DOMContentLoaded', function() {
         // Save user button
         saveUserBtn.addEventListener('click', function() {
             if (validateUserForm()) {
-                saveUser();
+                if (isApiIntegrationEnabled()) {
+                    saveUser();
+                } else {
+                    mockSaveUser();
+                }
             }
         });
 
         // Confirm delete button
         confirmActionBtn.addEventListener('click', function() {
-            deleteUser();
+            if (isApiIntegrationEnabled()) {
+                deleteUser();
+            } else {
+                mockDeleteUser();
+            }
         });
     }
 
@@ -545,6 +595,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 delete userData.password;
             }
 
+            console.log(`${method} request to ${url}`, userData);
+
             // Make API request
             const response = await fetch(url, {
                 method: method,
@@ -562,6 +614,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Success
             const result = await response.json();
+            console.log("Save user response:", result);
 
             // Hide modal
             $('#userModal').modal('hide');
@@ -578,21 +631,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function showDeleteConfirmation(userId) {
-        // Find user in the array
-        const user = users.find(u => u._id === userId);
-
-        if (!user) {
-            console.error('User not found:', userId);
-            return;
-        }
-
+    function showDeleteConfirmation(userId, userName) {
         // Set user ID for deletion
         editingUserId = userId;
 
         // Update confirmation message
         document.getElementById('confirmation-message').textContent =
-            `Are you sure you want to delete the user ${user.fname} ${user.lname} (${user.email})?`;
+            `Are you sure you want to delete the user ${userName || 'selected user'}?`;
 
         // Update button text
         document.getElementById('confirm-action-btn').textContent = 'Delete';
@@ -621,6 +666,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const session = JSON.parse(sessionData);
 
+            console.log(`DELETE request to /api/admin/users/${editingUserId}`);
+
             // Make API request
             const response = await fetch(`${baseURL}/api/admin/users/${editingUserId}`, {
                 method: 'DELETE',
@@ -637,6 +684,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Success
             const result = await response.json();
+            console.log("Delete user response:", result);
 
             // Hide modal
             $('#confirmationModal').modal('hide');
@@ -656,27 +704,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Utility Functions
-
-    function validateEmail(email) {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(email);
+    // Helper function to check if API integration is enabled
+    function isApiIntegrationEnabled() {
+        // Change this to true when API is ready
+        return false;
     }
 
-    function debounce(func, wait) {
-        let timeout;
-        return function() {
-            const context = this;
-            const args = arguments;
-            clearTimeout(timeout);
-            timeout = setTimeout(() => {
-                func.apply(context, args);
-            }, wait);
-        };
-    }
-
-    // Temporary for testing/mockup without API
-    // This function can be used when the API is not available
+    // Mock functions for development without API
     function loadMockUsers() {
         // Mock user data
         const mockUsers = [
@@ -752,5 +786,202 @@ document.addEventListener('DOMContentLoaded', function() {
         totalPages = 1;
         renderUsers();
         renderPagination();
+    }
+
+    function filterMockUsers() {
+        // Load all mock users first
+        const allMockUsers = [
+            {
+                _id: '1',
+                fname: 'John',
+                lname: 'Doe',
+                email: 'john.doe@example.com',
+                address1: '123 Main St',
+                city: 'Anytown',
+                state: 'IA',
+                zip: '52404',
+                status: 'VT',
+                level: 'Admin',
+                created_at: '2024-02-15T00:00:00.000Z'
+            },
+            {
+                _id: '2',
+                fname: 'Jane',
+                lname: 'Smith',
+                email: 'jane.smith@example.com',
+                address1: '456 Oak Ave',
+                city: 'Cedar Rapids',
+                state: 'IA',
+                zip: '52402',
+                status: 'AD',
+                level: 'Premium',
+                created_at: '2024-03-01T00:00:00.000Z'
+            },
+            {
+                _id: '3',
+                fname: 'Robert',
+                lname: 'Johnson',
+                email: 'robert.johnson@example.com',
+                address1: '789 Pine Rd',
+                city: 'Marion',
+                state: 'IA',
+                zip: '52302',
+                status: 'FR',
+                level: 'Basic',
+                created_at: '2024-03-15T00:00:00.000Z'
+            },
+            {
+                _id: '4',
+                fname: 'Sarah',
+                lname: 'Williams',
+                email: 'sarah.williams@example.com',
+                address1: '101 Elm St',
+                city: 'Iowa City',
+                state: 'IA',
+                zip: '52240',
+                status: 'SP',
+                level: 'Free',
+                created_at: '2024-04-01T00:00:00.000Z'
+            },
+            {
+                _id: '5',
+                fname: 'Michael',
+                lname: 'Brown',
+                email: 'michael.brown@example.com',
+                address1: '202 Maple Dr',
+                city: 'Cedar Falls',
+                state: 'IA',
+                zip: '50613',
+                status: 'BO',
+                level: 'VIP',
+                created_at: '2024-04-10T00:00:00.000Z'
+            }
+        ];
+
+        // Filter based on current filters
+        let filteredUsers = [...allMockUsers];
+
+        if (currentFilters.search) {
+            const searchTerm = currentFilters.search.toLowerCase();
+            filteredUsers = filteredUsers.filter(user =>
+                (user.fname && user.fname.toLowerCase().includes(searchTerm)) ||
+                (user.lname && user.lname.toLowerCase().includes(searchTerm)) ||
+                (user.email && user.email.toLowerCase().includes(searchTerm))
+            );
+        }
+
+        if (currentFilters.status) {
+            filteredUsers = filteredUsers.filter(user => user.status === currentFilters.status);
+        }
+
+        if (currentFilters.level) {
+            filteredUsers = filteredUsers.filter(user => user.level === currentFilters.level);
+        }
+
+        // Update and render
+        users = filteredUsers;
+        totalPages = 1;
+        renderUsers();
+        renderPagination();
+    }
+
+    function mockSaveUser() {
+        try {
+            // Get form data
+            const userData = {
+                _id: editingUserId || (Math.floor(Math.random() * 1000) + 6).toString(),
+                fname: document.getElementById('fname').value.trim(),
+                lname: document.getElementById('lname').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                address1: document.getElementById('address1').value.trim(),
+                address2: document.getElementById('address2').value.trim(),
+                city: document.getElementById('city').value.trim(),
+                state: document.getElementById('state').value,
+                zip: document.getElementById('zip').value.trim(),
+                status: document.getElementById('status').value,
+                level: document.getElementById('level').value,
+                created_at: new Date().toISOString()
+            };
+
+            if (editingUserId) {
+                // Update existing user
+                const userIndex = users.findIndex(u => u._id === editingUserId);
+
+                if (userIndex !== -1) {
+                    users[userIndex] = { ...users[userIndex], ...userData };
+                }
+
+                alert('User updated successfully!');
+            } else {
+                // Add new user
+                users.push(userData);
+                alert('User created successfully!');
+            }
+
+            // Hide modal
+            $('#userModal').modal('hide');
+
+            // Reset editing state
+            editingUserId = null;
+
+            // Render updated users
+            renderUsers();
+
+        } catch (error) {
+            console.error('Error in mock save:', error);
+            alert('Error saving user. Please try again.');
+        }
+    }
+
+    function mockDeleteUser() {
+        if (!editingUserId) {
+            return;
+        }
+
+        try {
+            // Find user index
+            const userIndex = users.findIndex(u => u._id === editingUserId);
+
+            if (userIndex !== -1) {
+                // Remove user from array
+                users.splice(userIndex, 1);
+
+                // Hide modal
+                $('#confirmationModal').modal('hide');
+
+                // Show success message
+                alert('User deleted successfully!');
+
+                // Reset editing ID
+                editingUserId = null;
+
+                // Render updated users
+                renderUsers();
+            } else {
+                throw new Error('User not found');
+            }
+        } catch (error) {
+            console.error('Error in mock delete:', error);
+            alert('Error deleting user. Please try again.');
+        }
+    }
+
+    // Utility Functions
+
+    function validateEmail(email) {
+        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return re.test(email);
+    }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function() {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                func.apply(context, args);
+            }, wait);
+        };
     }
 });

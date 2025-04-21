@@ -1,11 +1,9 @@
-// api/admin/users/index.js - Admin user management API
+// api/admin/users/index.js - Simplified admin users endpoint
 const connect = require('../../../config/db');
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { ObjectId } = mongoose.Types;
 
-// Define user schema
+// Using the same User model as your existing code
 const userSchema = new mongoose.Schema({
     fname: String,
     lname: String,
@@ -23,7 +21,7 @@ const userSchema = new mongoose.Schema({
     updated_at: { type: Date, default: Date.now },
 });
 
-// Initialize the User model once
+// Initialize the User model
 let User;
 try {
     User = mongoose.model('User');
@@ -31,97 +29,68 @@ try {
     User = mongoose.model('User', userSchema, 'user');
 }
 
-/**
- * Middleware to verify admin access
- */
-async function verifyAdmin(req, res, next) {
-    // Get the authorization header
-    const authHeader = req.headers.authorization;
+// Main handler function
+module.exports = async (req, res) => {
+    console.log("Admin users API called:", req.method);
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authorization token required' });
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+        res.setHeader('Allow', 'GET, POST, OPTIONS');
+        return res.status(200).end();
     }
 
-    // Extract the token
-    const token = authHeader.split(' ')[1];
-
     try {
-        // Verify the token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+        // Get session token from request headers
+        const authHeader = req.headers.authorization;
 
-        // Check if user exists and is an admin
-        const user = await User.findById(decoded.userId);
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ message: 'Authorization required' });
+        }
+
+        const token = authHeader.split(' ')[1];
+
+        // Verify token and check admin status
+        let userId;
+        try {
+            // Using the same JWT secret as your auth system
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+            userId = decoded.userId;
+        } catch (error) {
+            console.error("Token verification error:", error);
+            return res.status(401).json({ message: 'Invalid or expired token' });
+        }
+
+        // Connect to database
+        await connect;
+
+        // Check if user exists and is admin
+        const user = await User.findById(userId);
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
         if (user.level !== 'Admin' && user.isAdmin !== true) {
-            return res.status(403).json({ message: 'Access denied. Admin privileges required.' });
+            return res.status(403).json({ message: 'Admin access required' });
         }
 
-        // Add user ID to request
-        req.userId = decoded.userId;
-        next();
-    } catch (error) {
-        console.error('Token verification error:', error);
-        return res.status(401).json({ message: 'Invalid or expired token' });
-    }
-}
-
-/**
- * Main handler for admin user operations
- */
-module.exports = async (req, res) => {
-    // Handle OPTIONS request for CORS
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
-
-    try {
-        // Connect to database
-        await connect;
-
-        // Verify admin access first (except for OPTIONS)
-        if (req.method !== 'OPTIONS') {
-            await verifyAdmin(req, res, function() {
-                // Determine the operation based on method and path
-                if (req.url.match(/\/[a-zA-Z0-9]+$/)) {
-                    // URL pattern matches "/api/admin/users/{id}"
-                    const userId = req.url.split('/').pop();
-
-                    switch (req.method) {
-                        case 'GET':
-                            return getUserById(req, res, userId);
-                        case 'PUT':
-                            return updateUser(req, res, userId);
-                        case 'DELETE':
-                            return deleteUser(req, res, userId);
-                        default:
-                            return res.status(405).json({ message: 'Method not allowed' });
-                    }
-                } else {
-                    // URL pattern matches "/api/admin/users"
-                    switch (req.method) {
-                        case 'GET':
-                            return getUsers(req, res);
-                        case 'POST':
-                            return createUser(req, res);
-                        default:
-                            return res.status(405).json({ message: 'Method not allowed' });
-                    }
-                }
-            });
+        // Handle different HTTP methods
+        switch (req.method) {
+            case 'GET':
+                return await getUsers(req, res);
+            case 'POST':
+                return await createUser(req, res);
+            default:
+                return res.status(405).json({ message: 'Method not allowed' });
         }
     } catch (error) {
-        console.error('Admin Users API error:', error);
+        console.error("Admin users API error:", error);
         return res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
 
 /**
- * Get users with filtering, pagination
+ * Get users with filtering and pagination
  */
 async function getUsers(req, res) {
     try {
@@ -153,6 +122,8 @@ async function getUsers(req, res) {
             filter.level = req.query.level;
         }
 
+        console.log("User filter:", filter);
+
         // Get total count
         const total = await User.countDocuments(filter);
 
@@ -163,6 +134,8 @@ async function getUsers(req, res) {
             .skip(skip)
             .limit(limit)
             .lean();
+
+        console.log(`Found ${users.length} users`);
 
         return res.status(200).json({
             users,
@@ -178,163 +151,14 @@ async function getUsers(req, res) {
 }
 
 /**
- * Get user by ID
- */
-async function getUserById(req, res, userId) {
-    try {
-        // Find user by ID
-        const user = await User.findById(userId).select('-password').lean();
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        return res.status(200).json({ user });
-    } catch (error) {
-        console.error('Error getting user:', error);
-        return res.status(500).json({ message: 'Error retrieving user', error: error.message });
-    }
-}
-
-/**
- * Create new user
+ * Create a new user
  */
 async function createUser(req, res) {
     try {
-        const {
-            fname, lname, email, password, address1, address2,
-            city, state, zip, status, level
-        } = req.body;
-
-        // Validate required fields
-        if (!fname || !lname || !email || !password || !status || !level) {
-            return res.status(400).json({
-                message: 'Missing required fields',
-                required: ['fname', 'lname', 'email', 'password', 'status', 'level']
-            });
-        }
-
-        // Check if email already exists
-        const existingUser = await User.findOne({ email });
-
-        if (existingUser) {
-            return res.status(409).json({ message: 'Email already registered' });
-        }
-
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Create user object
-        const newUser = new User({
-            fname,
-            lname,
-            email,
-            password: hashedPassword,
-            address1,
-            address2,
-            city,
-            state,
-            zip,
-            status,
-            level,
-            isAdmin: level === 'Admin',
-            created_at: new Date(),
-            updated_at: new Date()
-        });
-
-        // Save user
-        await newUser.save();
-
-        // Return success
-        return res.status(201).json({
-            message: 'User created successfully',
-            user: {
-                _id: newUser._id,
-                fname: newUser.fname,
-                lname: newUser.lname,
-                email: newUser.email
-            }
-        });
+        // Implementation will go here when needed
+        return res.status(501).json({ message: 'Not implemented yet' });
     } catch (error) {
         console.error('Error creating user:', error);
         return res.status(500).json({ message: 'Error creating user', error: error.message });
-    }
-}
-
-/**
- * Update user
- */
-async function updateUser(req, res, userId) {
-    try {
-        const userData = req.body;
-
-        // Find user
-        const user = await User.findById(userId);
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // If email is being changed, check if the new email already exists
-        if (userData.email && userData.email !== user.email) {
-            const existingUser = await User.findOne({ email: userData.email });
-
-            if (existingUser && existingUser._id.toString() !== userId) {
-                return res.status(409).json({ message: 'Email already registered by another user' });
-            }
-        }
-
-        // If password is provided, hash it
-        if (userData.password) {
-            userData.password = await bcrypt.hash(userData.password, 10);
-        }
-
-        // Set isAdmin based on level
-        if (userData.level) {
-            userData.isAdmin = userData.level === 'Admin';
-        }
-
-        // Set updated timestamp
-        userData.updated_at = new Date();
-
-        // Update user
-        const result = await User.findByIdAndUpdate(userId, userData, { new: true }).select('-password');
-
-        return res.status(200).json({
-            message: 'User updated successfully',
-            user: result
-        });
-    } catch (error) {
-        console.error('Error updating user:', error);
-        return res.status(500).json({ message: 'Error updating user', error: error.message });
-    }
-}
-
-/**
- * Delete user
- */
-async function deleteUser(req, res, userId) {
-    try {
-        // Find user
-        const user = await User.findById(userId);
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Prevent deleting self
-        if (userId === req.userId) {
-            return res.status(403).json({ message: 'You cannot delete your own account' });
-        }
-
-        // Delete user
-        await User.findByIdAndDelete(userId);
-
-        return res.status(200).json({
-            message: 'User deleted successfully'
-        });
-    } catch (error) {
-        console.error('Error deleting user:', error);
-        return res.status(500).json({ message: 'Error deleting user', error: error.message });
     }
 }
