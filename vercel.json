@@ -75,10 +75,5 @@
       "src": "/(.*)",
       "dest": "/public/$1"
     }
-  ],
-  "functions": {
-    "app/api/**/*": {
-      "maxDuration": 5
-    }
-  }
+  ]
 }
