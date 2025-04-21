@@ -44,8 +44,12 @@
       "dest": "/api/auth.js"
     },
     {
+      "src": "/api/verify-token",
+      "dest": "/api/verify-token.js"
+    },
+    {
       "src": "/api/verify-admin-code",
-      "dest": "/api/auth.js"
+      "dest": "/api/auth/index.js"
     },
     {
       "src": "/api/business-search",
