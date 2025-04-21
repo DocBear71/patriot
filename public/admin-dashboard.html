@@ -1,0 +1,524 @@
+<!-- admin-code-management.html - Only accessible to existing admins -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Admin Dashboard - Patriot Thanks</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2025/4/12">
+    <meta name="description" content="Completion of Final Project for Web Application Development.">
+    <meta name="keywords" content="Final Project, assignment, homework, Marc Hauschildt,
+		Web Application Development I, 2025SP, CRF01 ">
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link href="./css/bootstrap-4.0.0.css" rel="stylesheet">
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/forms.css" rel="stylesheet">
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/form-validation.css" rel="stylesheet">
+    <link href="./css/dashboard.css" rel="stylesheet">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="./js/form-validator.js" type="module"> </script>
+    <script src="./js/dashboard.js"></script>
+</head>
+<body style="padding-top: 70px" id="page_layout">
+<!--Navigation bar-->
+<div id="nav-placeholder">
+</div>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
+            // Load the login handler after the navbar is loaded
+            $.getScript("./js/login-handler.js")
+            .done(function() {
+                console.log("Login handler script loaded successfully");
+            })
+            .fail(function() {
+                console.error("Failed to load login-handler.js");
+            });
+        });
+    });
+</script>
+
+<div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>Admin Panel</h2>
+            <p>Manage your platform</p>
+        </div>
+        <div class="sidebar-menu">
+            <div class="menu-item active" data-section="dashboard">
+                <span class="menu-icon">📊</span>
+                <span>Dashboard</span>
+            </div>
+            <div class="menu-item" data-section="users">
+                <span class="menu-icon">👥</span>
+                <span>Users</span>
+            </div>
+            <div class="menu-item" data-section="businesses">
+                <span class="menu-icon">🏢</span>
+                <span>Businesses</span>
+            </div>
+            <div class="menu-item" data-section="incentives">
+                <span class="menu-icon">🎁</span>
+                <span>Incentives</span>
+            </div>
+            <div class="menu-item" data-section="settings">
+                <span class="menu-icon">⚙️</span>
+                <span>Settings</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="header">
+            <h1>Dashboard</h1>
+            <div class="search-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" placeholder="Search...">
+            </div>
+        </div>
+
+        <!-- Dashboard Panel -->
+        <div id="dashboard-panel" class="panel active">
+            <h2>Welcome to your Admin Dashboard</h2>
+            <p>Select a section from the sidebar to manage your platform.</p>
+            <div style="margin-top: 30px; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                <div style="background-color: #3498db; color: white; padding: 20px; border-radius: 5px;">
+                    <h3>Total Users</h3>
+                    <p style="font-size: 2rem; margin: 10px 0;">127</p>
+                    <p>↑ 12% from last month</p>
+                </div>
+                <div style="background-color: #2ecc71; color: white; padding: 20px; border-radius: 5px;">
+                    <h3>Businesses</h3>
+                    <p style="font-size: 2rem; margin: 10px 0;">42</p>
+                    <p>↑ 8% from last month</p>
+                </div>
+                <div style="background-color: #e74c3c; color: white; padding: 20px; border-radius: 5px;">
+                    <h3>Active Incentives</h3>
+                    <p style="font-size: 2rem; margin: 10px 0;">86</p>
+                    <p>↑ 23% from last month</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Panel -->
+        <div id="users-panel" class="panel">
+            <div class="tabs">
+                <div class="tab active" data-tab="users-list">Users List</div>
+                <div class="tab" data-tab="add-user">Add User</div>
+            </div>
+
+            <!-- Users List Tab -->
+            <div id="users-list" class="tab-content active">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                    <h3>All Users</h3>
+                    <button class="btn btn-primary" id="add-user-btn">Add New User</button>
+                </div>
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>John Doe</td>
+                        <td>john@example.com</td>
+                        <td>Administrator</td>
+                        <td>Active</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-edit">Edit</button>
+                                <button class="btn btn-danger">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>Jane Smith</td>
+                        <td>jane@example.com</td>
+                        <td>User</td>
+                        <td>Active</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-edit">Edit</button>
+                                <button class="btn btn-danger">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>Robert Johnson</td>
+                        <td>robert@example.com</td>
+                        <td>User</td>
+                        <td>Inactive</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-edit">Edit</button>
+                                <button class="btn btn-danger">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add User Tab -->
+            <div id="add-user" class="tab-content">
+                <div class="form-container">
+                    <h3 class="form-title">Add New User</h3>
+                    <form id="user-form">
+                        <div class="form-group">
+                            <label for="user-name">Full Name</label>
+                            <input type="text" id="user-name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="user-email">Email</label>
+                            <input type="email" id="user-email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="user-password">Password</label>
+                            <input type="password" id="user-password" name="password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="user-role">Role</label>
+                            <select id="user-role" name="role" required>
+                                <option value="">Select a role</option>
+                                <option value="admin">Administrator</option>
+                                <option value="user">User</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="user-status">Status</label>
+                            <select id="user-status" name="status" required>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn" id="cancel-user-btn">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save User</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Businesses Panel -->
+        <div id="businesses-panel" class="panel">
+            <div class="tabs">
+                <div class="tab active" data-tab="businesses-list">Businesses List</div>
+                <div class="tab" data-tab="add-business">Add Business</div>
+            </div>
+
+            <!-- Businesses List Tab -->
+            <div id="businesses-list" class="tab-content active">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                    <h3>All Businesses</h3>
+                    <button class="btn btn-primary" id="add-business-btn">Add New Business</button>
+                </div>
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Location</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>Acme Corporation</td>
+                        <td>New York, NY</td>
+                        <td>Technology</td>
+                        <td>Active</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-edit">Edit</button>
+                                <button class="btn btn-danger">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>Globex Industries</td>
+                        <td>Los Angeles, CA</td>
+                        <td>Manufacturing</td>
+                        <td>Active</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-edit">Edit</button>
+                                <button class="btn btn-danger">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>Oceanic Airlines</td>
+                        <td>Chicago, IL</td>
+                        <td>Transportation</td>
+                        <td>Inactive</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-edit">Edit</button>
+                                <button class="btn btn-danger">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add Business Tab -->
+            <div id="add-business" class="tab-content">
+                <div class="form-container">
+                    <h3 class="form-title">Add New Business</h3>
+                    <form id="business-form">
+                        <div class="form-group">
+                            <label for="business-name">Business Name</label>
+                            <input type="text" id="business-name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="business-email">Email</label>
+                            <input type="email" id="business-email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="business-phone">Phone</label>
+                            <input type="tel" id="business-phone" name="phone">
+                        </div>
+                        <div class="form-group">
+                            <label for="business-address">Address</label>
+                            <input type="text" id="business-address" name="address" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="business-city">City</label>
+                            <input type="text" id="business-city" name="city" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="business-state">State</label>
+                            <input type="text" id="business-state" name="state" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="business-zip">Zip Code</label>
+                            <input type="text" id="business-zip" name="zip" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="business-category">Category</label>
+                            <select id="business-category" name="category" required>
+                                <option value="">Select a category</option>
+                                <option value="technology">Technology</option>
+                                <option value="manufacturing">Manufacturing</option>
+                                <option value="transportation">Transportation</option>
+                                <option value="retail">Retail</option>
+                                <option value="healthcare">Healthcare</option>
+                                <option value="education">Education</option>
+                                <option value="food">Food & Beverage</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="business-status">Status</label>
+                            <select id="business-status" name="status" required>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn" id="cancel-business-btn">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Business</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Incentives Panel -->
+        <div id="incentives-panel" class="panel">
+            <div class="tabs">
+                <div class="tab active" data-tab="incentives-list">Incentives List</div>
+                <div class="tab" data-tab="add-incentive">Add Incentive</div>
+            </div>
+
+            <!-- Incentives List Tab -->
+            <div id="incentives-list" class="tab-content active">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                    <h3>All Incentives</h3>
+                    <button class="btn btn-primary" id="add-incentive-btn">Add New Incentive</button>
+                </div>
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Business</th>
+                        <th>Type</th>
+                        <th>Validity</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>Summer Sale</td>
+                        <td>Acme Corporation</td>
+                        <td>Discount</td>
+                        <td>Jun 1 - Aug 31, 2025</td>
+                        <td>Active</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-edit">Edit</button>
+                                <button class="btn btn-danger">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td>Free Trial</td>
+                        <td>Globex Industries</td>
+                        <td>Trial</td>
+                        <td>May 1 - Dec 31, 2025</td>
+                        <td>Active</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-edit">Edit</button>
+                                <button class="btn btn-danger">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td>Loyalty Program</td>
+                        <td>Oceanic Airlines</td>
+                        <td>Loyalty</td>
+                        <td>Jan 1 - Dec 31, 2025</td>
+                        <td>Inactive</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-edit">Edit</button>
+                                <button class="btn btn-danger">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add Incentive Tab -->
+            <div id="add-incentive" class="tab-content">
+                <div class="form-container">
+                    <h3 class="form-title">Add New Incentive</h3>
+                    <form id="incentive-form">
+                        <div class="form-group">
+                            <label for="incentive-name">Incentive Name</label>
+                            <input type="text" id="incentive-name" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="incentive-business">Business</label>
+                            <select id="incentive-business" name="business_id" required>
+                                <option value="">Select a business</option>
+                                <option value="1">Acme Corporation</option>
+                                <option value="2">Globex Industries</option>
+                                <option value="3">Oceanic Airlines</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="incentive-type">Type</label>
+                            <select id="incentive-type" name="type" required>
+                                <option value="">Select a type</option>
+                                <option value="discount">Discount</option>
+                                <option value="trial">Free Trial</option>
+                                <option value="loyalty">Loyalty Program</option>
+                                <option value="coupon">Coupon</option>
+                                <option value="gift">Gift</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="incentive-description">Description</label>
+                            <textarea id="incentive-description" name="description" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="incentive-start">Start Date</label>
+                            <input type="date" id="incentive-start" name="start_date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="incentive-end">End Date</label>
+                            <input type="date" id="incentive-end" name="end_date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="incentive-value">Value</label>
+                            <input type="text" id="incentive-value" name="value" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="incentive-code">Code (if applicable)</label>
+                            <input type="text" id="incentive-code" name="code">
+                        </div>
+                        <div class="form-group">
+                            <label for="incentive-status">Status</label>
+                            <select id="incentive-status" name="status" required>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn" id="cancel-incentive-btn">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Incentive</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div id="settings-panel" class="panel">
+            <h2>Settings</h2>
+            <div class="form-container" style="margin-top: 20px;">
+                <h3 class="form-title">General Settings</h3>
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label for="site-name">Site Name</label>
+                        <input type="text" id="site-name" name="site_name" value="Business Incentives Portal">
+                    </div>
+                    <div class="form-group">
+                        <label for="site-email">Admin Email</label>
+                        <input type="email" id="site-email" name="admin_email" value="admin@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="items-per-page">Items Per Page</label>
+                        <select id="items-per-page" name="items_per_page">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script src="script.js"></script>
+</body>
+</html>
