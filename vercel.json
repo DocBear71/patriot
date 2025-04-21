@@ -35,7 +35,6 @@
       "src": "/api/test",
       "dest": "/api/test.js"
     },
-
     {
       "src": "/api/login",
       "dest": "/api/auth.js"
@@ -76,5 +75,10 @@
       "src": "/(.*)",
       "dest": "/public/$1"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/**/*": {
+      "maxDuration": 5
+    }
+  }
 }
