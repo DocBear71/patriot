@@ -1,6 +1,6 @@
 // admin-users.js - Admin user management functionality - Updated for API integration
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('Admin Users Management loaded');
 
     // State variables
@@ -28,11 +28,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmActionBtn = document.getElementById('confirm-action-btn');
     const addUserBtn = document.getElementById('add-user-btn');
 
-    // Check if user is admin and load user data
+    // Check if the user is admin and load user data
     checkAdminStatus().then(() => {
         if (isAdminUser) {
             // For development, use mock data if API is not ready
-            const useApiData = false; // Change this to true when API is ready
+            const useApiData = false; // Change this to true when the API is ready
 
             if (useApiData) {
                 loadUsers();
@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return false;
             }
 
-            // Check if user is admin
+            // Check if the user is admin
             if (session.user.isAdmin === true || session.user.level === 'Admin') {
                 isAdminUser = true;
                 console.log('Admin access verified');
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <h4 class="alert-heading">Access Denied</h4>
                 <p>You do not have permission to access this page. Only administrators can access the user management dashboard.</p>
                 <hr>
-                <p class="mb-0">Please <a href="index.html">return to the homepage</a> or contact an administrator if you believe this is an error.</p>
+                <p class="mb-0">Please <a href="/index.html">return to the homepage</a> or contact an administrator if you believe this is an error.</p>
             </div>
         `;
     }
@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `http://${window.location.host}`
+                ? `https://${window.location.host}`
                 : 'https://patriotthanks.vercel.app';
 
             // Get session data for authentication
@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Status badge and text
-            let statusBadge = '';
+            let statusBadge;
             let statusText = 'Unknown';
 
             switch (user.status) {
@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Level badge
-            let levelBadge = '';
+            let levelBadge;
             switch (user.level) {
                 case 'Free':
                     levelBadge = '<span class="badge badge-free">Free</span>';
@@ -252,14 +252,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Add event listeners to action buttons
         document.querySelectorAll('.edit-user').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function () {
                 const userId = this.getAttribute('data-id');
                 editUser(userId);
             });
         });
 
         document.querySelectorAll('.delete-user').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function () {
                 const userId = this.getAttribute('data-id');
                 const userName = this.getAttribute('data-name');
                 showDeleteConfirmation(userId, userName);
@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
         prevLink.href = '#';
         prevLink.textContent = 'Previous';
         prevLink.classList.add(currentPage === 1 ? 'disabled' : '');
-        prevLink.addEventListener('click', function(e) {
+        prevLink.addEventListener('click', function (e) {
             e.preventDefault();
             if (currentPage > 1) {
                 currentPage--;
@@ -308,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 pageLink.classList.add('active');
             }
 
-            pageLink.addEventListener('click', function(e) {
+            pageLink.addEventListener('click', function (e) {
                 e.preventDefault();
                 currentPage = i;
                 loadUsers();
@@ -324,7 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
         nextLink.href = '#';
         nextLink.textContent = 'Next';
         nextLink.classList.add(currentPage === totalPages ? 'disabled' : '');
-        nextLink.addEventListener('click', function(e) {
+        nextLink.addEventListener('click', function (e) {
             e.preventDefault();
             if (currentPage < totalPages) {
                 currentPage++;
@@ -337,19 +337,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setupEventListeners() {
         // Search input
-        userSearch.addEventListener('input', debounce(function() {
+        userSearch.addEventListener('input', debounce(function () {
             currentFilters.search = this.value;
             currentPage = 1;
             if (isApiIntegrationEnabled()) {
                 loadUsers();
             } else {
-                // For mock data, just filter client-side
+                // For mock data, filter the client-side
                 filterMockUsers();
             }
         }, 300));
 
         // Status filter
-        statusFilter.addEventListener('change', function() {
+        statusFilter.addEventListener('change', function () {
             currentFilters.status = this.value;
             currentPage = 1;
             if (isApiIntegrationEnabled()) {
@@ -360,7 +360,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Level filter
-        levelFilter.addEventListener('change', function() {
+        levelFilter.addEventListener('change', function () {
             currentFilters.level = this.value;
             currentPage = 1;
             if (isApiIntegrationEnabled()) {
@@ -371,7 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Reset filters
-        resetFiltersBtn.addEventListener('click', function() {
+        resetFiltersBtn.addEventListener('click', function () {
             userSearch.value = '';
             statusFilter.value = '';
             levelFilter.value = '';
@@ -389,13 +389,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Add user button
-        addUserBtn.addEventListener('click', function() {
+        addUserBtn.addEventListener('click', function () {
             resetUserForm();
             $('#userModal').modal('show');
         });
 
         // Save user button
-        saveUserBtn.addEventListener('click', function() {
+        saveUserBtn.addEventListener('click', function () {
             if (validateUserForm()) {
                 if (isApiIntegrationEnabled()) {
                     saveUser();
@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Confirm delete button
-        confirmActionBtn.addEventListener('click', function() {
+        confirmActionBtn.addEventListener('click', function () {
             if (isApiIntegrationEnabled()) {
                 deleteUser();
             } else {
@@ -416,7 +416,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function editUser(userId) {
-        // Find user in the array
+        // Find the user in the array
         const user = users.find(u => u._id === userId);
 
         if (!user) {
@@ -441,10 +441,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('password').value = '';
         document.getElementById('confirm-password').value = '';
 
-        // Show small note about password
+        // Show a small note about password
         document.getElementById('password').nextElementSibling.style.display = 'block';
 
-        // Set editing state
+        // Set an editing state
         editingUserId = user._id;
 
         // Update modal title
@@ -464,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update modal title
         document.getElementById('userModalLabel').textContent = 'Add New User';
 
-        // Hide password note
+        // Hide the password note
         document.getElementById('password').nextElementSibling.style.display = 'none';
     }
 
@@ -511,13 +511,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Password validation (only if adding new user or changing password)
         if (!editingUserId || (editingUserId && password)) {
-            // For new users, password is required
+            // For new users, a password is required
             if (!editingUserId && !password) {
                 alert('Password is required for new users');
                 return false;
             }
 
-            // If password is provided, validate it
+            // If a password is provided, validate it
             if (password) {
                 if (password !== confirmPassword) {
                     alert('Passwords do not match');
@@ -556,7 +556,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function saveUser() {
         try {
-            // Prepare form data
+            // Prepare for data
             const userData = {
                 fname: document.getElementById('fname').value.trim(),
                 lname: document.getElementById('lname').value.trim(),
@@ -573,7 +573,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `http://${window.location.host}`
+                ? `https://${window.location.host}`
                 : 'https://patriotthanks.vercel.app';
 
             // Get session data for authentication
@@ -590,7 +590,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? `${baseURL}/api/admin/users/${editingUserId}`
                 : `${baseURL}/api/admin/users`;
 
-            // Don't send empty password when editing
+            // Don't send an empty password when editing
             if (editingUserId && !userData.password) {
                 delete userData.password;
             }
@@ -619,11 +619,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Hide modal
             $('#userModal').modal('hide');
 
-            // Show success message
+            // Show a success message
             alert(editingUserId ? 'User updated successfully!' : 'User created successfully!');
 
             // Reload users
-            loadUsers();
+            await loadUsers();
 
         } catch (error) {
             console.error('Error saving user:', error);
@@ -655,7 +655,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `http://${window.location.host}`
+                ? `https://${window.location.host}`
                 : 'https://patriotthanks.vercel.app';
 
             // Get session data for authentication
@@ -689,14 +689,14 @@ document.addEventListener('DOMContentLoaded', function() {
             // Hide modal
             $('#confirmationModal').modal('hide');
 
-            // Show success message
+            // Show a success message
             alert('User deleted successfully!');
 
             // Reset editing ID
             editingUserId = null;
 
             // Reload users
-            loadUsers();
+            await loadUsers();
 
         } catch (error) {
             console.error('Error deleting user:', error);
@@ -706,8 +706,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Helper function to check if API integration is enabled
     function isApiIntegrationEnabled() {
-        // Change this to true when API is ready
-        return false;
+        // Change this to true when the API is ready
+        return true;
     }
 
     // Mock functions for development without API
@@ -908,7 +908,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const userIndex = users.findIndex(u => u._id === editingUserId);
 
                 if (userIndex !== -1) {
-                    users[userIndex] = { ...users[userIndex], ...userData };
+                    users[userIndex] = {...users[userIndex], ...userData};
                 }
 
                 alert('User updated successfully!');
@@ -943,13 +943,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const userIndex = users.findIndex(u => u._id === editingUserId);
 
             if (userIndex !== -1) {
-                // Remove user from array
+                // Remove the user from an array
                 users.splice(userIndex, 1);
 
                 // Hide modal
                 $('#confirmationModal').modal('hide');
 
-                // Show success message
+                // Show a success message
                 alert('User deleted successfully!');
 
                 // Reset editing ID
@@ -975,7 +975,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function debounce(func, wait) {
         let timeout;
-        return function() {
+        return function () {
             const context = this;
             const args = arguments;
             clearTimeout(timeout);
