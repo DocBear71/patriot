@@ -130,7 +130,15 @@ async function handleLogin(req, res) {
             message: 'Login successful',
             userId: user._id,
             email: user.email,
-            status: user.status || 'US',
+            fname: user.fname,
+            lname: user.lname,
+            address1: user.address1,
+            address2: user.address2,
+            city: user.city,
+            state: user.state,
+            zip: user.zip,
+            level: user.level,
+            status: user.status,
             isAdmin: user.isAdmin || false
         });
     } catch (error) {

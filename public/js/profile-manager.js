@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log("Fetching profile data for user:", userId);
 
-            const apiURL = `https://patriotthanks.vercel.app/api/users/index?operation=profile&userId=${userId}`;
+            const apiURL = `https://patriotthanks.vercel.app/api/users/index?operation=userId=${userId}`;
 
             // Make API call to get complete profile
             const res = await fetch(apiURL, {
@@ -252,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Populating form with data:", userData);
 
         // Set text input values
-        const fields = ['fname', 'lname', 'address1', 'address2', 'city', 'zip', 'email'];
+        const fields = ['_id', 'fname', 'lname', 'address1', 'address2', 'city', 'zip', 'email', 'status', 'level'];
         fields.forEach(field => {
             const element = document.getElementById(field);
             if (element) {
