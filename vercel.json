@@ -28,8 +28,8 @@
       "dest": "/api/incentives.js"
     },
     {
-      "src": "/api/users",
-      "dest": "/api/users.js"
+      "src": "/api/users/index",
+      "dest": "/api/users/index.js"
     },
     {
       "src": "/api/test",
