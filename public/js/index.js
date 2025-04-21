@@ -1,59 +1,27 @@
-let map;
+// Add this to your index.js or main.js
+document.addEventListener('DOMContentLoaded', function() {
+    // Check URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const loginRequired = urlParams.get('login');
 
-async function initMap() {
-  const { Map } = await google.maps.importLibrary("maps");
+    if (loginRequired === 'required') {
+        // Find the login dropdown toggle button
+        const loginDropdown = document.querySelector('.dropdown-toggle');
+        if (loginDropdown) {
+            // Trigger a click to open the dropdown
+            setTimeout(() => {
+                loginDropdown.click();
 
-  map = new Map(document.getElementById("map"), {
-    center: { lat: 41.976392, lng: -91.669393 },
-    zoom: 14,
-  });
-}
-
-initMap();
-
-
-
-
-async function init() {
-    await customElements.whenDefined('gmp-map');
-
-    const map = document.querySelector('gmp-map');
-    const marker = document.querySelector('gmp-advanced-marker');
-    const placePicker = document.querySelector('gmpx-place-picker');
-    const infowindow = new google.maps.InfoWindow();
-
-    map.innerMap.setOptions({
-    mapTypeControl: false
-    });
-
-    placePicker.addEventListener('gmpx-placechange', () => {
-    const place = placePicker.value;
-
-    if (!place.location) {
-        window.alert(
-        "No details available for input: '" + place.name + "'"
-        );
-        infowindow.close();
-        marker.position = null;
-        return;
+                // Optionally show a message
+                const loginForm = document.querySelector('.dropdown-menu');
+                if (loginForm) {
+                    const message = document.createElement('div');
+                    message.className = 'alert alert-warning';
+                    message.style.margin = '10px';
+                    message.innerHTML = 'Please log in to access the requested page.';
+                    loginForm.insertBefore(message, loginForm.firstChild);
+                }
+            }, 500); // Small delay to ensure the page is fully loaded
+        }
     }
-
-    if (place.viewport) {
-        map.innerMap.fitBounds(place.viewport);
-    } else {
-        map.center = place.location;
-        map.zoom = 17;
-    }
-
-    marker.position = place.location;
-    infowindow.setContent(
-        `<strong>${place.displayName}</strong><br>
-        <span>${place.formattedAddress}</span>
-    `);
-    infowindow.open(map.innerMap, marker);
-    });
-}
-
-document.addEventListener('DOMContentLoaded', init);
-
-
+});

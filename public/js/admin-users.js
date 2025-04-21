@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function redirectToLogin() {
         window.location.href = '/login.html?expired=true&redirect=' + encodeURIComponent(window.location.pathname);
     }
-    
+
     // Check if the user is admin and load user data
     checkAdminStatus().then((isAdmin) => {
         if (isAdmin) {
@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function redirectToLogin() {
-        window.location.href = '/login.html?expired=true&redirect=' + encodeURIComponent(window.location.pathname);
+        window.location.href = '/index.html?login=required&redirect=' + encodeURIComponent(window.location.pathname);
     }
     function showAccessDenied() {
         const adminContainer = document.querySelector('.admin-container');
