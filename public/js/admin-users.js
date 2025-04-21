@@ -623,7 +623,7 @@ document.addEventListener('DOMContentLoaded', function () {
             alert(editingUserId ? 'User updated successfully!' : 'User created successfully!');
 
             // Reload users
-            await loadUsers();
+            loadUsers();
 
         } catch (error) {
             console.error('Error saving user:', error);
@@ -696,7 +696,7 @@ document.addEventListener('DOMContentLoaded', function () {
             editingUserId = null;
 
             // Reload users
-            await loadUsers();
+            loadUsers();
 
         } catch (error) {
             console.error('Error deleting user:', error);
