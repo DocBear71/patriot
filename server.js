@@ -2,6 +2,53 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
+const crypto = require('crypto'); // Add this for generating secure random values
+const fs = require('fs'); // Add this for file operations
+
+// JWT Secret Generation
+function generateJwtSecret() {
+    return crypto.randomBytes(64).toString('hex');
+}
+
+function getOrCreateJwtSecret() {
+    // Check if secret exists in environment
+    if (process.env.JWT_SECRET) {
+        return process.env.JWT_SECRET;
+    }
+
+    // Try to load from a secret file
+    const secretFilePath = path.join(__dirname, '.jwt-secret');
+    try {
+        if (fs.existsSync(secretFilePath)) {
+            const secret = fs.readFileSync(secretFilePath, 'utf8').trim();
+            if (secret) {
+                process.env.JWT_SECRET = secret;
+                return secret;
+            }
+        }
+    } catch (err) {
+        console.error('Error reading JWT secret file:', err);
+    }
+
+    // Generate new secret
+    const newSecret = generateJwtSecret();
+    process.env.JWT_SECRET = newSecret;
+
+    // Save to file for persistence
+    try {
+        fs.writeFileSync(secretFilePath, newSecret);
+        fs.chmodSync(secretFilePath, 0o600); // Secure file permissions
+        console.log('New JWT secret generated and saved');
+    } catch (err) {
+        console.error('Error saving JWT secret file:', err);
+    }
+
+    return newSecret;
+}
+
+// Set up JWT secret early
+const jwtSecret = getOrCreateJwtSecret();
+console.log('JWT secret configured successfully');
 
 // Create Express app
 const app = express();

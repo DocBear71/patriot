@@ -7,3 +7,4 @@ client/src/MarketPlace
 /client/src/MarketPlace/
 /oldAPI
 /oldJSFiles
+.jwt-secret
