@@ -26,7 +26,7 @@ let User;
 try {
     User = mongoose.model('User');
 } catch (error) {
-    User = mongoose.model('User', userSchema, 'user');
+    User = mongoose.model('User', userSchema, 'users');
 }
 
 // Main handler function
