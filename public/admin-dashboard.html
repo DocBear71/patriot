@@ -22,7 +22,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
     <script src="./js/bootstrap-4.0.0.js"></script>
-    <script src="./js/form-validator.js" type="module"> </script>
     <script src="./js/dashboard.js"></script>
 </head>
 <body style="padding-top: 70px" id="page_layout">
@@ -164,68 +163,64 @@
             </div>
         </div>
         </div>
+
     <!-- Businesses Panel -->
     <div id="businesses-panel" class="panel">
-        <div class="tabs">
-            <div class="tab active" data-tab="businesses-list">Businesses List</div>
-            <div class="tab" data-tab="add-business">Add Business</div>
-        </div>
-    <!-- Businesses List Tab -->
-    <div id="businesses-list" class="tab-content active">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-            <h3>All Businesses</h3>
-            <div>
-                <a href="admin-business.html" class="btn btn-info mr-2">Full Business Management</a>
-                <button class="btn btn-primary" id="add-business-btn">Add New Business</button>
+        <div class="panel-header">
+            <h2>Business Management</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <p>Overview of your platform businesses</p>
+                <a href="admin-business.html" class="btn btn-primary">Full Business Management</a>
             </div>
         </div>
-        <!-- Business Stats -->
-        <div class="business-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h4>Total Businesses</h4>
-                <p style="font-size: 1.5rem; font-weight: bold;" id="total-businesses-count">Loading...</p>
-            </div>
-            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h4>Active Businesses</h4>
-                <p style="font-size: 1.5rem; font-weight: bold;" id="active-businesses-count">Loading...</p>
-            </div>
-            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h4>New This Month</h4>
-                <p style="font-size: 1.5rem; font-weight: bold;" id="new-businesses-count">Loading...</p>
-            </div>
-        </div>
-        <!-- Recent Businesses Tab -->
-        <div class="recent-businesses">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3>Recent Businesses</h3>
-                <div>
-                    <input type="text" placeholder="Quick search..." id="quick-business-search" style="padding: 5px; border-radius: 3px; border: 1px solid #ddd;">
+
+        <div class="panel-content">
+            <div class="business-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h4>Total Businesses</h4>
+                    <p style="font-size: 1.5rem; font-weight: bold;" id="total-businesses-count">Loading...</p>
+                </div>
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h4>Active Businesses</h4>
+                    <p style="font-size: 1.5rem; font-weight: bold;" id="active-businesses-count">Loading...</p>
+                </div>
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h4>New This Month</h4>
+                    <p style="font-size: 1.5rem; font-weight: bold;" id="new-businesses-count">Loading...</p>
                 </div>
             </div>
 
-            <table class="data-table">
-                <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Location</th>
-                    <th>Category</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-                </thead>
-                <tbody id="dashboard-businesses-table">
-                <tr>
-                    <td colspan="6" class="text-center">Loading business data...</td>
-                </tr>
-                </tbody>
-            </table>
+            <div class="recent-businesses">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3>Recent Businesses</h3>
+                    <div>
+                        <input type="text" placeholder="Quick search..." id="quick-business-search" style="padding: 5px; border-radius: 3px; border: 1px solid #ddd;">
+                    </div>
+                </div>
 
-            <div style="text-align: center; margin-top: 20px;">
-                <a href="admin-business.html" class="btn btn-secondary">See All Businesses</a>
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Location</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="dashboard-businesses-table">
+                    <tr>
+                        <td colspan="6" class="text-center">Loading business data...</td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <a href="admin-business.html" class="btn btn-secondary">See All Businesses</a>
+                </div>
             </div>
         </div>
-    </div>
     </div>
 </div>
 
