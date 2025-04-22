@@ -86,8 +86,20 @@ async function handleProfileGet(req, res) {
         return res.status(400).json({ message: 'User ID is required' });
     }
 
-    // Connect to MongoDB
-    await connect;
+    // Connect to MongoDB - fix the connection call
+    try {
+        // If connect is a function, call it
+        if (typeof connect === 'function') {
+            await connect();
+        } else {
+            // If connect is a promise, await it
+            await connect;
+        }
+        console.log("Database connection established");
+    } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+    }
 
     // Find the user
     let user;
@@ -131,8 +143,20 @@ async function handleUserGet(req, res) {
         return res.status(400).json({ message: 'User ID is required' });
     }
 
-    // Connect to MongoDB
-    await connect;
+    // Connect to MongoDB - fix the connection call
+    try {
+        // If connect is a function, call it
+        if (typeof connect === 'function') {
+            await connect();
+        } else {
+            // If connect is a promise, await it
+            await connect;
+        }
+        console.log("Database connection established");
+    } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+    }
 
     // Find the user
     const user = await User.findOne({ _id: new ObjectId(userId) });
@@ -177,8 +201,20 @@ async function handleUserUpdate(req, res) {
         return res.status(400).json({ message: 'User ID is required' });
     }
 
-    // Connect to MongoDB
-    await connect;
+    // Connect to MongoDB - fix the connection call
+    try {
+        // If connect is a function, call it
+        if (typeof connect === 'function') {
+            await connect();
+        } else {
+            // If connect is a promise, await it
+            await connect;
+        }
+        console.log("Database connection established");
+    } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+    }
 
     // Find the user by ID to verify it exists
     const existingUser = await User.findOne({ _id: new ObjectId(userData._id) });
@@ -240,7 +276,20 @@ async function handlePasswordUpdate(req, res) {
         });
     }
 
-    await connect;
+    // Connect to MongoDB - fix the connection call
+    try {
+        // If connect is a function, call it
+        if (typeof connect === 'function') {
+            await connect();
+        } else {
+            // If connect is a promise, await it
+            await connect;
+        }
+        console.log("Database connection established");
+    } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+    }
 
     // Find the user
     const userExists = await User.findOne({ _id: new ObjectId(userId) });

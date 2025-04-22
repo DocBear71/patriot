@@ -42,8 +42,20 @@ module.exports = async (req, res) => {
         console.log("Contact API route hit:", req.method);
         console.log("Connecting to MongoDB...");
 
-        await connect();
-        console.log("Connected to MongoDB");
+        // Connect to MongoDB - fix the connection call
+        try {
+            // If connect is a function, call it
+            if (typeof connect === 'function') {
+                await connect();
+            } else {
+                // If connect is a promise, await it
+                await connect;
+            }
+            console.log("Database connection established");
+        } catch (dbError) {
+            console.error("Database connection error:", dbError);
+            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        }
 
         // Extract contact data from request body
         const contactData = req.body;

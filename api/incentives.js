@@ -100,9 +100,20 @@ async function handleGetIncentives(req, res) {
 
     console.log("Business ID from query:", businessId);
 
-    // Connect to MongoDB
-    await connect;
-    console.log("Connected to MongoDB using Mongoose");
+    // Connect to MongoDB - fix the connection call
+    try {
+        // If connect is a function, call it
+        if (typeof connect === 'function') {
+            await connect();
+        } else {
+            // If connect is a promise, await it
+            await connect;
+        }
+        console.log("Database connection established");
+    } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+    }
 
     // Find incentives for the business
     console.log("Query being executed:", { business_id: businessId });
@@ -130,9 +141,20 @@ async function handleAddIncentive(req, res) {
         return res.status(400).json({ message: 'Business ID is required' });
     }
 
-    // Connect to MongoDB using Mongoose
-    await connect;
-    console.log("Connected to MongoDB using Mongoose");
+    // Connect to MongoDB - fix the connection call
+    try {
+        // If connect is a function, call it
+        if (typeof connect === 'function') {
+            await connect();
+        } else {
+            // If connect is a promise, await it
+            await connect;
+        }
+        console.log("Database connection established");
+    } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+    }
 
     // Check if the business exists
     const businessExists = await Business.findById(incentiveData.business_id).exec();

@@ -81,8 +81,20 @@ async function handleBusinessRegister(req, res) {
         const businessData = req.body;
         console.log("Business Data:", businessData);
 
-        // Connect to MongoDB
-        await connect();
+        // Connect to MongoDB - fix the connection call
+        try {
+            // If connect is a function, call it
+            if (typeof connect === 'function') {
+                await connect();
+            } else {
+                // If connect is a promise, await it
+                await connect;
+            }
+            console.log("Database connection established");
+        } catch (dbError) {
+            console.error("Database connection error:", dbError);
+            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        }
 
         // Check if business already exists
         const existingBusiness = await Business.findOne({
@@ -126,8 +138,20 @@ async function handleBusinessSearch(req, res) {
     console.log("Query parameters:", req.query);
 
     try {
-        // Connect to MongoDB
-        await connect();
+        // Connect to MongoDB - fix the connection call
+        try {
+            // If connect is a function, call it
+            if (typeof connect === 'function') {
+                await connect();
+            } else {
+                // If connect is a promise, await it
+                await connect;
+            }
+            console.log("Database connection established");
+        } catch (dbError) {
+            console.error("Database connection error:", dbError);
+            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        }
         console.log("Connected to MongoDB using Mongoose");
 
         // Check if business_name or businessName is present

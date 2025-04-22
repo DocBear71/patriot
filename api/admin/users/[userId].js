@@ -70,8 +70,20 @@ module.exports = async (req, res) => {
             return res.status(401).json({ message: 'Invalid or expired token' });
         }
 
-        // Connect to database
-        await connect;
+        // Connect to MongoDB - fix the connection call
+        try {
+            // If connect is a function, call it
+            if (typeof connect === 'function') {
+                await connect();
+            } else {
+                // If connect is a promise, await it
+                await connect;
+            }
+            console.log("Database connection established");
+        } catch (dbError) {
+            console.error("Database connection error:", dbError);
+            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        }
 
         // Check if admin user exists and is admin
         const adminUser = await User.findById(adminUserId);
