@@ -84,11 +84,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? `http://${window.location.host}`
                 : 'https://patriotthanks.vercel.app';
 
-            console.log("Verifying token with URL:", `${baseURL}/api/auth?operation=verify-token\``);
+            console.log("Verifying token with URL:", `${baseURL}/api/auth.js?operation=verify-token\``);
 
             try {
                 // Try the verify-token endpoint
-                const response = await fetch(`${baseURL}/api/auth?operation=verify-token`, {
+                const response = await fetch(`${baseURL}/api/auth.js?operation=verify-token`, {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -208,7 +208,7 @@ document.addEventListener('DOMContentLoaded', function () {
             console.log("Fetching users with query:", queryParams.toString());
 
             // Make API request using the consolidated auth endpoint
-            const response = await fetch(`${baseURL}/api/auth?${queryParams.toString()}`, {
+            const response = await fetch(`${baseURL}/api/auth.js?${queryParams.toString()}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -688,8 +688,8 @@ document.addEventListener('DOMContentLoaded', function () {
             // Determine if creating or updating
             const method = editingUserId ? 'PUT' : 'POST';
             const url = editingUserId
-                ? `${baseURL}/api/admin/users/${editingUserId}`
-                : `${baseURL}/api/admin/users`;
+                ? `${baseURL}/api/admin/users/${editingUserId}.js`
+                : `${baseURL}/api/admin/users/index.js`;
 
             // Don't send an empty password when editing
             if (editingUserId && !userData.password) {
@@ -772,10 +772,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            console.log(`DELETE request to /api/admin/users/${editingUserId}`);
+            console.log(`DELETE request to /api/admin/users/${editingUserId}.js`);
 
             // Make API request
-            const response = await fetch(`${baseURL}/api/admin/users/${editingUserId}`, {
+            const response = await fetch(`${baseURL}/api/admin/users/${editingUserId}.js`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',

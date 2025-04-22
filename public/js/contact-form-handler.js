@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function submitContactForm(formData, submitButton, originalText) {
         console.log("Submitting contact form:", formData);
 
-        const apiUrl = 'https://patriotthanks.vercel.app/api/contact';
+        const apiUrl = 'https://patriotthanks.vercel.app/api/contact.js';
 
         fetch(apiUrl, {
             method: 'POST',

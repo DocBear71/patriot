@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 : `https://patriotthanks.vercel.app`;
 
             // use the API endpoint with the baseURL
-            const apiURL = `${baseURL}/api/business?operation=search&${queryParams}`;
+            const apiURL = `${baseURL}/api/business.js?operation=search&${queryParams}`;
             console.log("submitting search to API at: ", apiURL);
 
             const res = await fetch(apiURL, {

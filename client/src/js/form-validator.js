@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function submitToMongoDB(formData) {
         try {
             // Use the absolute URL to your Vercel deployment with the new endpoint
-            const apiUrl = 'https://patriotthanks.vercel.app/api/auth?operation=register';
+            const apiUrl = 'https://patriotthanks.vercel.app/api/auth.js?operation=register';
             console.log("Submitting to API at:", apiUrl);
 
             const res = await fetch(apiUrl, {

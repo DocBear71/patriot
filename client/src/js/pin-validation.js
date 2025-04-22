@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
         verifyBtn.disabled = true;
 
         // Call the admin verification API
-        fetch(`${baseURL}/api/auth?operation=verify-admin`, {
+        fetch(`${baseURL}/api/auth.js?operation=verify-admin`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json; charset=UTF-8'
