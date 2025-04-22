@@ -52,7 +52,6 @@ module.exports = {
                 {from: './src/images', to: 'images'},
                 {from: './src/css', to: 'css'},
                 {from: './src/js', to: 'js'},
-                {from: '../api', to: '../pages/api'},
                 {from: './src/*.html', to: '[name][ext]', globOptions: {ignore: ['**/index.html']}}
             ]
         })
