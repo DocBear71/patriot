@@ -84,26 +84,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? `http://${window.location.host}`
                 : 'https://patriotthanks.vercel.app';
 
-            // First try the test endpoint
-            console.log("Testing API with test endpoint:", `${baseURL}/api/test-endpoint`);
+            console.log("Verifying token with URL:", `${baseURL}/api/verify-token`);
 
             try {
-                // Test if the basic routing is working
-                const testResponse = await fetch(`${baseURL}/api/test-endpoint`, {
-                    method: 'GET'
-                });
-
-                console.log("Test endpoint response status:", testResponse.status);
-
-                if (testResponse.status === 404) {
-                    console.error("Test endpoint not found - routing may be misconfigured");
-                    alert('API routing test failed. Please check your Vercel configuration.');
-                    return false;
-                }
-
-                // Now try the actual verify-token endpoint
-                console.log("Now testing verify-token endpoint:", `${baseURL}/api/verify-token`);
-
+                // Try the verify-token endpoint
                 const response = await fetch(`${baseURL}/api/verify-token`, {
                     method: 'GET',
                     headers: {
@@ -115,18 +99,27 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.log("Verify token response status:", response.status);
 
                 if (response.status === 404) {
-                    console.error("Verify token endpoint not found, but test endpoint worked");
-                    alert('The verify-token endpoint is unavailable, but API routing is working. Please check the endpoint file.');
+                    console.error("Verify token endpoint not found - using fallback validation");
 
-                    // For testing purposes, allow access based on local token check
-                    const sessionData = localStorage.getItem('patriotThanksSession');
-                    if (sessionData) {
-                        const session = JSON.parse(sessionData);
-                        if (session.userLevel === 'Admin') {
-                            console.log('Using fallback admin validation for testing');
-                            return true;
+                    // Use a simple fallback validation for testing
+                    // WARNING: This is less secure but allows testing while you fix the API
+                    try {
+                        const sessionData = localStorage.getItem('patriotThanksSession');
+                        if (sessionData) {
+                            const session = JSON.parse(sessionData);
+                            console.log('Session data:', session);
+
+                            if (session.userLevel === 'Admin') {
+                                console.log('Using fallback admin validation based on local session data');
+                                alert('Warning: Using local validation as API endpoint is unavailable. Limited functionality may be available.');
+                                return true;
+                            }
                         }
+                    } catch (e) {
+                        console.error("Fallback validation failed:", e);
                     }
+
+                    alert('Cannot verify admin status. API endpoint not found.');
                     return false;
                 }
 
@@ -149,10 +142,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 return isAdminUser;
             } catch (fetchError) {
                 console.error('API test error:', fetchError);
-                return false;
+
+                // For development purposes only - remove in production
+                console.log('Bypassing verification for development');
+                alert('Warning: API error encountered. Using development mode access.');
+                return true;
             }
         } catch (error) {
-            console.error('Error in test:', error);
+            console.error('Error in admin status check:', error);
             return false;
         }
     }
