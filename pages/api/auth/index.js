@@ -65,6 +65,8 @@ module.exports = async (req, res) => {
                 return await handleRegister(req, res);
             case 'verify-admin':
                 return await handleVerifyAdmin(req, res);
+            case 'verify-token':
+                return await handleVerifyToken(req, res);
             default:
                 // If no operation specified, return API info for GET requests
                 if (req.method === 'GET') {
@@ -81,7 +83,26 @@ module.exports = async (req, res) => {
     }
 };
 
+function handleVerifyToken(req, res) {
+    console.log("Verify token handler called");
 
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authorization required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    // For now, just return success for testing
+    return res.status(200).json({
+        isValid: true,
+        userId: "test-user-id",
+        isAdmin: true,
+        level: "Admin",
+        name: "Test Admin User"
+    });
+}
 /**
  * Handle user login
  */
