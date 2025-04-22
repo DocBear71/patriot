@@ -124,7 +124,7 @@ async function handleLogin(req, res) {
 
     try {
         // Connect to MongoDB
-        await connect();
+        await connect;
 
         // Extract login credentials from request body
         const { email, password } = req.body;

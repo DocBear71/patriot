@@ -54,6 +54,12 @@ module.exports = async (req, res) => {
             case 'password':
                 return await handlePasswordUpdate(req, res);
             default:
+                if (req.method === 'GET') {
+                return res.status(200).json({
+                    message: 'User API is available',
+                    operations: ['profile', 'get', 'update', 'password']
+                });
+            }
                 return res.status(400).json({ message: 'Invalid operation' });
         }
     } catch (error) {
