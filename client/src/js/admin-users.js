@@ -669,9 +669,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 state: document.getElementById('state').value,
                 zip: document.getElementById('zip').value.trim(),
                 status: document.getElementById('status').value,
-                level: document.getElementById('level').value,
-                password: document.getElementById('password').value
+                level: document.getElementById('level').value
             };
+
+            // Add password only if provided
+            const password = document.getElementById('password').value;
+            if (password && password.trim() !== '') {
+                userData.password = password;
+            }
+
+            // Determine if creating or updating
+            const isUpdate = !!editingUserId;
+
+            // For updates, add the userId
+            if (isUpdate) {
+                userData.userId = editingUserId;
+            }
 
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -685,22 +698,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            // Determine if creating or updating
-            const method = editingUserId ? 'PUT' : 'POST';
-            const url = editingUserId
-                ? `${baseURL}/api/admin/users/${editingUserId}`
-                : `${baseURL}/api/admin/users`;
+            // Choose the appropriate operation
+            const operation = isUpdate ? 'update-user' : 'register';
+            const url = `${baseURL}/api/auth.js?operation=${operation}`;
 
-            // Don't send an empty password when editing
-            if (editingUserId && !userData.password) {
-                delete userData.password;
-            }
-
-            console.log(`${method} request to ${url}`, userData);
+            console.log(`${isUpdate ? 'UPDATE' : 'CREATE'} request to ${url}`, userData);
 
             // Make API request
             const response = await fetch(url, {
-                method: method,
+                method: 'POST', // Always use POST for the consolidated endpoint
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
@@ -715,8 +721,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || `Error: ${response.status} ${response.statusText}`);
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+                try {
+                    const errorData = JSON.parse(errorText);
+                    throw new Error(errorData.message || `Error: ${response.status} ${response.statusText}`);
+                } catch (e) {
+                    throw new Error(`Error: ${response.status} ${response.statusText}`);
+                }
             }
 
             // Success
@@ -727,7 +739,7 @@ document.addEventListener('DOMContentLoaded', function () {
             $('#userModal').modal('hide');
 
             // Show a success message
-            alert(editingUserId ? 'User updated successfully!' : 'User created successfully!');
+            alert(isUpdate ? 'User updated successfully!' : 'User created successfully!');
 
             // Reload users
             loadUsers();

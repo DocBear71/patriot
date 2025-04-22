@@ -70,12 +70,14 @@ module.exports = async (req, res) => {
                 return await handleVerifyToken(req, res);
             case 'list-users':
                 return await handleListUsers(req, res);
+            case 'update-user':
+                return await handleUpdateUser(req, res);
             default:
                 // If no operation specified, return API info for GET requests
                 if (req.method === 'GET') {
                     return res.status(200).json({
                         message: 'Authentication API is available',
-                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users']
+                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users', 'update-user']
                     });
                 }
                 return res.status(400).json({ message: 'Invalid operation' });
@@ -267,6 +269,91 @@ async function handleRegister(req, res) {
     } catch (error) {
         console.error('User creation failed:', error);
         return res.status(500).json({ message: 'Server error during user creation: ' + error.message });
+    }
+}
+
+/**
+ * Handle user updates (admin functionality)
+ */
+async function handleUpdateUser(req, res) {
+    // Verify the token and check admin status
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authorization required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+
+        // Connect to MongoDB
+        try {
+            await connect;
+            console.log("Database connection established");
+        } catch (dbError) {
+            console.error("Database connection error:", dbError);
+            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        }
+
+        // Find the admin user
+        const adminUser = await User.findById(decoded.userId);
+
+        if (!adminUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (adminUser.level !== 'Admin' && adminUser.isAdmin !== true) {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
+        // Get user data from request body
+        const userData = req.body;
+        const userId = userData.userId;
+
+        if (!userId) {
+            return res.status(400).json({ message: 'User ID is required' });
+        }
+
+        // Remove userId from update data
+        delete userData.userId;
+
+        // Add timestamp
+        userData.updated_at = new Date();
+
+        // Hash password if provided
+        if (userData.password) {
+            userData.password = await bcrypt.hash(userData.password, 10);
+        } else {
+            // Don't update password if not provided
+            delete userData.password;
+        }
+
+        // Update the user
+        const result = await User.findByIdAndUpdate(
+            userId,
+            { $set: userData },
+            { new: true }
+        );
+
+        if (!result) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Return success response
+        return res.status(200).json({
+            message: 'User updated successfully',
+            userId: result._id
+        });
+    } catch (error) {
+        console.error('Error updating user:', error);
+
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Invalid or expired token' });
+        }
+
+        return res.status(500).json({ message: 'Server error', error: error.message });
     }
 }
 
