@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             // Make API request - assuming you'll create an endpoint for businesses
-            const response = await fetch(`${baseURL}/api/business.js?operation=list-businesses&page=1&limit=10`, {
+            const response = await fetch(`${baseURL}/api/business.js?operation=admin-list-businesses&page=1&limit=5`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -340,7 +340,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Render businesses in the table
     function renderBusinesses() {
-        const businessTableBody = document.querySelector('#businesses-list tbody');
+        const businessTableBody = document.getElementById('dashboard-businesses-table');
         if (!businessTableBody) return;
 
         if (businesses.length === 0) {
@@ -350,26 +350,92 @@ document.addEventListener('DOMContentLoaded', function () {
 
         businessTableBody.innerHTML = '';
 
-        // Use placeholder data for now, but with the structure to easily switch to real data
-        businesses.forEach((business, index) => {
+        businesses.forEach(business => {
+            // Format location
+            const location = business.city && business.state ?
+                `${business.city}, ${business.state}` : 'Location not specified';
+
+            // Status badge
+            const statusBadge = business.status === 'active' ?
+                '<span class="badge badge-success">Active</span>' :
+                '<span class="badge badge-secondary">Inactive</span>';
+
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${business.name}</td>
-                <td>${business.city}, ${business.state}</td>
-                <td>${business.category || 'Other'}</td>
-                <td>${business.status === 'active' ? 'Active' : 'Inactive'}</td>
-                <td>
-                    <div class="action-btns">
-                        <button class="btn btn-edit" data-id="${business._id}">Edit</button>
-                        <button class="btn btn-danger" data-id="${business._id}" data-name="${business.name}">Delete</button>
-                    </div>
-                </td>
-            `;
+            <td>${business._id ? business._id.substring(0, 8) + '...' : 'N/A'}</td>
+            <td>${business.bname || 'N/A'}</td>
+            <td>${location}</td>
+            <td>${business.type || 'Other'}</td>
+            <td>${statusBadge}</td>
+            <td>
+                <div class="action-btns">
+                    <a href="admin-business.html?edit=${business._id}" class="btn btn-sm btn-info">Edit</a>
+                </div>
+            </td>
+        `;
 
             businessTableBody.appendChild(row);
         });
+
+        // Update business stats
+        updateBusinessStats();
+
+        // Add quick search functionality
+        setupBusinessQuickSearch();
     }
+
+// Update business stats
+    function updateBusinessStats() {
+        // Total businesses count
+        const totalBusinessesCount = document.getElementById('total-businesses-count');
+        if (totalBusinessesCount) {
+            totalBusinessesCount.textContent = dashboardStats.businessCount || '0';
+        }
+
+        // Active businesses count
+        const activeBusinessesCount = document.getElementById('active-businesses-count');
+        if (activeBusinessesCount) {
+            // Calculate or use API data for active count
+            const activeCount = businesses.filter(b => b.status === 'active').length;
+            activeBusinessesCount.textContent = activeCount;
+        }
+
+        // New businesses count
+        const newBusinessesCount = document.getElementById('new-businesses-count');
+        if (newBusinessesCount) {
+            // Get new businesses count from dashboardStats or estimate
+            newBusinessesCount.textContent = dashboardStats.newBusinessesThisMonth ||
+                Math.floor((dashboardStats.businessCount || 0) * 0.15); // Fallback estimate
+        }
+    }
+
+// Quick search for businesses
+    function setupBusinessQuickSearch() {
+        const quickSearch = document.getElementById('quick-business-search');
+        if (!quickSearch) return;
+
+        quickSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const businessRows = document.querySelectorAll('#dashboard-businesses-table tr');
+
+            businessRows.forEach(row => {
+                let foundMatch = false;
+                const cells = row.querySelectorAll('td');
+
+                cells.forEach(cell => {
+                    if (cell.textContent.toLowerCase().includes(searchTerm)) {
+                        foundMatch = true;
+                    }
+                });
+
+                row.style.display = foundMatch ? '' : 'none';
+            });
+        });
+    }
+
+
+
+
 
     const businessesListContent = document.getElementById('businesses-list');
     if (businessesListContent) {
