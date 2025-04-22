@@ -784,15 +784,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            console.log(`DELETE request to /api/admin/users/${editingUserId}`);
+            const url = `${baseURL}/api/auth.js?operation=delete-user`;
+
+            console.log(`DELETE operation for user ${editingUserId}`);
 
             // Make API request
-            const response = await fetch(`${baseURL}/api/admin/users/${editingUserId}`, {
-                method: 'DELETE',
+            const response = await fetch(url, {
+                method: 'POST', // Always use POST for the consolidated endpoint
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
-                }
+                },
+                body: JSON.stringify({ userId: editingUserId })
             });
 
             // Handle token expiration
@@ -802,8 +805,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || `Error: ${response.status} ${response.statusText}`);
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+                try {
+                    const errorData = JSON.parse(errorText);
+                    throw new Error(errorData.message || `Error: ${response.status} ${response.statusText}`);
+                } catch (e) {
+                    throw new Error(`Error: ${response.status} ${response.statusText}`);
+                }
             }
 
             // Success

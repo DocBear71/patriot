@@ -72,12 +72,14 @@ module.exports = async (req, res) => {
                 return await handleListUsers(req, res);
             case 'update-user':
                 return await handleUpdateUser(req, res);
+            case 'delete-user':
+                return await handleDeleteUser(req, res);
             default:
                 // If no operation specified, return API info for GET requests
                 if (req.method === 'GET') {
                     return res.status(200).json({
                         message: 'Authentication API is available',
-                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users', 'update-user']
+                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users', 'update-user', 'delete-user']
                     });
                 }
                 return res.status(400).json({ message: 'Invalid operation' });
@@ -87,6 +89,72 @@ module.exports = async (req, res) => {
         return res.status(500).json({ message: 'Server error: ' + error.message });
     }
 };
+
+/**
+ * Handle user deletion (admin functionality)
+ */
+async function handleDeleteUser(req, res) {
+    // Verify the token and check admin status
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authorization required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+
+        // Connect to MongoDB
+        try {
+            await connect;
+            console.log("Database connection established");
+        } catch (dbError) {
+            console.error("Database connection error:", dbError);
+            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        }
+
+        // Find the admin user
+        const adminUser = await User.findById(decoded.userId);
+
+        if (!adminUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (adminUser.level !== 'Admin' && adminUser.isAdmin !== true) {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
+        // Get user ID from request body
+        const { userId } = req.body;
+
+        if (!userId) {
+            return res.status(400).json({ message: 'User ID is required' });
+        }
+
+        // Delete the user
+        const result = await User.findByIdAndDelete(userId);
+
+        if (!result) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Return success response
+        return res.status(200).json({
+            message: 'User deleted successfully',
+            userId: userId
+        });
+    } catch (error) {
+        console.error('Error deleting user:', error);
+
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Invalid or expired token' });
+        }
+
+        return res.status(500).json({ message: 'Server error', error: error.message });
+    }
+}
 
 function handleVerifyToken(req, res) {
     console.log("Verify token handler called");
