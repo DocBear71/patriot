@@ -161,8 +161,46 @@ async function getUsers(req, res) {
  */
 async function createUser(req, res) {
     try {
-        // Implementation will go here when needed
-        return res.status(501).json({ message: 'Not implemented yet' });
+        // Validate required fields
+        const { fname, lname, email, status, level, password } = req.body;
+
+        if (!fname || !lname || !email || !status || !level) {
+            return res.status(400).json({ message: 'Missing required fields' });
+        }
+
+        // Check if email is already in use
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email already in use' });
+        }
+
+        // Hash password if provided
+        let hashedPassword = undefined;
+        if (password) {
+            const bcrypt = require('bcryptjs');
+            hashedPassword = await bcrypt.hash(password, 10);
+        } else {
+            return res.status(400).json({ message: 'Password is required for new users' });
+        }
+
+        // Create user
+        const newUser = new User({
+            ...req.body,
+            password: hashedPassword,
+            created_at: new Date(),
+            updated_at: new Date()
+        });
+
+        await newUser.save();
+
+        // Return user without password
+        const userResponse = newUser.toObject();
+        delete userResponse.password;
+
+        return res.status(201).json({
+            message: 'User created successfully',
+            user: userResponse
+        });
     } catch (error) {
         console.error('Error creating user:', error);
         return res.status(500).json({ message: 'Error creating user', error: error.message });
