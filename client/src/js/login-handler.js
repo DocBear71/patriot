@@ -22,12 +22,12 @@ function handleLogin() {
         };
 
         // determine the base URL
-        const baseURL = window.location.hostname === "localhose" || window.location.hostname === '127.0.0.1'
-            ? `https://${window.location.host}`
+        const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
+            ? `http://${window.location.host}`
             : `https://patriotthanks.vercel.app`;
 
         // Make API call to login endpoint
-        fetch(`${baseURL}/api/auth?operation=login`, {
+        fetch(`${baseURL}/api/auth/index?operation=login`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json; charset=UTF-8",

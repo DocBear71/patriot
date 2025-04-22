@@ -135,6 +135,8 @@ async function handleLogin(req, res) {
             process.env.JWT_SECRET || 'patriot-thanks-secret-key',
             { expiresIn: process.env.JWT_EXPIRY || '7d' }
         );
+        console.log('JWT Token generated successfully');
+        console.log('Generated token:', token);
 
         // Return success response with user info (excluding password)
         const userInfo = user.toObject();
@@ -157,7 +159,7 @@ async function handleLogin(req, res) {
             token: token // Add the token to the response
         });
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('Error generating JWT token:', error);
         return res.status(500).json({ message: 'Server error during login: ' + error.message });
     }
 }
