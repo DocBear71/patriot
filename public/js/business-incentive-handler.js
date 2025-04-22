@@ -335,7 +335,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // make the api call to the server
-        const apiURL = 'https://patriotthanks.vercel.app/api/incentives';
+        const apiURL = 'https://patriotthanks.vercel.app/api/incentives.js';
         console.log("Attempting to submit to: ", apiURL);
 
         fetch(apiURL, {
@@ -403,19 +403,4 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.head.appendChild(style);
 
-    function testApiConnection() {
-        console.log("Testing API connection...");
-
-        fetch('https://patriotthanks.vercel.app/api/test')
-            .then(res => {
-                console.log("Test API response status:", res.status);
-                return res.json();
-            })
-            .then(data => {
-                console.log("Test API response:", data);
-            })
-            .catch(error => {
-                console.error("Error testing API:", error);
-            });
-    }
 });

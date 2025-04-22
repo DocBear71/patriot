@@ -192,7 +192,7 @@ function fetchIncentives(business_id, businessName) {
             ? `https://${window.location.host}`
             : `https://patriotthanks.vercel.app`;
 
-        const apiURL = `${baseURL}/api/incentives?business_id=${business_id}`;
+        const apiURL = `${baseURL}/api/incentives.js?business_id=${business_id}`;
         console.log("Fetching from URL: ", apiURL);
 
         // make fetch happen for incentives from the API
