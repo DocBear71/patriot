@@ -88,13 +88,7 @@ async function handleProfileGet(req, res) {
 
     // Connect to MongoDB - fix the connection call
     try {
-        // If connect is a function, call it
-        if (typeof connect === 'function') {
-            await connect();
-        } else {
-            // If connect is a promise, await it
-            await connect;
-        }
+        await connect;  // Since connect is already a Promise, just await it
         console.log("Database connection established");
     } catch (dbError) {
         console.error("Database connection error:", dbError);
@@ -145,13 +139,7 @@ async function handleUserGet(req, res) {
 
     // Connect to MongoDB - fix the connection call
     try {
-        // If connect is a function, call it
-        if (typeof connect === 'function') {
-            await connect();
-        } else {
-            // If connect is a promise, await it
-            await connect;
-        }
+        await connect;  // Since connect is already a Promise, just await it
         console.log("Database connection established");
     } catch (dbError) {
         console.error("Database connection error:", dbError);
@@ -203,13 +191,7 @@ async function handleUserUpdate(req, res) {
 
     // Connect to MongoDB - fix the connection call
     try {
-        // If connect is a function, call it
-        if (typeof connect === 'function') {
-            await connect();
-        } else {
-            // If connect is a promise, await it
-            await connect;
-        }
+        await connect;  // Since connect is already a Promise, just await it
         console.log("Database connection established");
     } catch (dbError) {
         console.error("Database connection error:", dbError);
@@ -278,13 +260,7 @@ async function handlePasswordUpdate(req, res) {
 
     // Connect to MongoDB - fix the connection call
     try {
-        // If connect is a function, call it
-        if (typeof connect === 'function') {
-            await connect();
-        } else {
-            // If connect is a promise, await it
-            await connect;
-        }
+        await connect;  // Since connect is already a Promise, just await it
         console.log("Database connection established");
     } catch (dbError) {
         console.error("Database connection error:", dbError);

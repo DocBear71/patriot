@@ -83,13 +83,7 @@ async function handleBusinessRegister(req, res) {
 
         // Connect to MongoDB - fix the connection call
         try {
-            // If connect is a function, call it
-            if (typeof connect === 'function') {
-                await connect();
-            } else {
-                // If connect is a promise, await it
-                await connect;
-            }
+            await connect;  // Since connect is already a Promise, just await it
             console.log("Database connection established");
         } catch (dbError) {
             console.error("Database connection error:", dbError);
@@ -140,19 +134,12 @@ async function handleBusinessSearch(req, res) {
     try {
         // Connect to MongoDB - fix the connection call
         try {
-            // If connect is a function, call it
-            if (typeof connect === 'function') {
-                await connect();
-            } else {
-                // If connect is a promise, await it
-                await connect;
-            }
+            await connect;  // Since connect is already a Promise, just await it
             console.log("Database connection established");
         } catch (dbError) {
             console.error("Database connection error:", dbError);
             return res.status(500).json({ message: 'Database connection error', error: dbError.message });
         }
-        console.log("Connected to MongoDB using Mongoose");
 
         // Check if business_name or businessName is present
         const businessNameValue = req.query.business_name || req.query.businessName || '';

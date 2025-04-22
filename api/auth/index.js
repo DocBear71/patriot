@@ -125,13 +125,7 @@ async function handleLogin(req, res) {
     try {
         // Connect to MongoDB - fix the connection call
         try {
-            // If connect is a function, call it
-            if (typeof connect === 'function') {
-                await connect();
-            } else {
-                // If connect is a promise, await it
-                await connect;
-            }
+            await connect;  // Since connect is already a Promise, just await it
             console.log("Database connection established");
         } catch (dbError) {
             console.error("Database connection error:", dbError);
@@ -217,19 +211,12 @@ async function handleRegister(req, res) {
     try {
         // Connect to MongoDB - fix the connection call
         try {
-            // If connect is a function, call it
-            if (typeof connect === 'function') {
-                await connect();
-            } else {
-                // If connect is a promise, await it
-                await connect;
-            }
+            await connect;  // Since connect is already a Promise, just await it
             console.log("Database connection established");
         } catch (dbError) {
             console.error("Database connection error:", dbError);
             return res.status(500).json({ message: 'Database connection error', error: dbError.message });
         }
-        console.log("Connected to MongoDB using Mongoose");
 
         const userData = req.body;
 
@@ -300,16 +287,13 @@ async function handleListUsers(req, res) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
 
         // Connect to MongoDB
-       try {
-           if (typeof connect === 'function') {
-               await connect();
-           } else {
-               await connect;
-           }
-       } catch (dbError) {
-           console.error("Database connection error:", dbError);
-           return res.status(500).json({ message: 'Database connection error', error: dbError.message })
-       }
+        try {
+            await connect;  // Since connect is already a Promise, just await it
+            console.log("Database connection established");
+        } catch (dbError) {
+            console.error("Database connection error:", dbError);
+            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        }
 
         // Find the admin user
         const adminUser = await User.findById(decoded.userId);
@@ -405,13 +389,7 @@ async function handleVerifyAdmin(req, res) {
 
         // Connect to MongoDB - fix the connection call
         try {
-            // If connect is a function, call it
-            if (typeof connect === 'function') {
-                await connect();
-            } else {
-                // If connect is a promise, await it
-                await connect;
-            }
+            await connect;  // Since connect is already a Promise, just await it
             console.log("Database connection established");
         } catch (dbError) {
             console.error("Database connection error:", dbError);
