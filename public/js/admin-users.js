@@ -688,8 +688,8 @@ document.addEventListener('DOMContentLoaded', function () {
             // Determine if creating or updating
             const method = editingUserId ? 'PUT' : 'POST';
             const url = editingUserId
-                ? `${baseURL}/api/admin/users/${editingUserId}.js`
-                : `${baseURL}/api/admin/users/index.js`;
+                ? `${baseURL}/api/admin/users/${editingUserId}`
+                : `${baseURL}/api/admin/users`;
 
             // Don't send an empty password when editing
             if (editingUserId && !userData.password) {
@@ -772,10 +772,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            console.log(`DELETE request to /api/admin/users/${editingUserId}.js`);
+            console.log(`DELETE request to /api/admin/users/${editingUserId}`);
 
             // Make API request
-            const response = await fetch(`${baseURL}/api/admin/users/${editingUserId}.js`, {
+            const response = await fetch(`${baseURL}/api/admin/users/${editingUserId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
