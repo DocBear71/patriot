@@ -276,7 +276,16 @@ async function handleListUsers(req, res) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
 
         // Connect to MongoDB
-        await connect();
+       try {
+           if (typeof connect === 'function') {
+               await connect();
+           } else {
+               await connect;
+           }
+       } catch (dbError) {
+           console.error("Database connection error:", dbError);
+           return res.status(500).json({ message: 'Database connection error', error: dbError.message })
+       }
 
         // Find the admin user
         const adminUser = await User.findById(decoded.userId);
