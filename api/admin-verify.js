@@ -1,4 +1,4 @@
-// api/verify-token.js - Simplified for debugging
+// api/admin-verify.js - Simplified for debugging
 module.exports = (req, res) => {
     console.log("Verify-token endpoint called");
 

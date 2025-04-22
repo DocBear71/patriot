@@ -88,7 +88,7 @@ const incentivesApi = require('./api/incentives');
 const usersApi = require('./api/users/index');
 const adminApi = require('./api/admin/users/index');
 const adminUsersApi = require('./api/admin/users/[userId]');
-const verifyTokenApi = require('./api/verify-token');
+const verifyTokenApi = require('./api/admin-verify');
 
 
 // Mount consolidated API routes
@@ -99,7 +99,7 @@ app.all('/api/users/index', createApiHandler(usersApi));
 app.all('/api/auth', createApiHandler(authApi));
 app.all('/api/admin/users/index', createApiHandler(adminApi));
 app.all('/api/admin/users/[userId]', createApiHandler(adminUsersApi));
-app.all('/api/verify-token', createApiHandler(verifyTokenApi));
+app.all('/api/admin-verify', createApiHandler(verifyTokenApi));
 
 // mount legacy API routes to maintain backward compatibility
 app.all('/api/login', createApiHandler(authApi));

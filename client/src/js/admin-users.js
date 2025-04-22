@@ -84,11 +84,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? `http://${window.location.host}`
                 : 'https://patriotthanks.vercel.app';
 
-            console.log("Verifying token with URL:", `${baseURL}/api/verify-token`);
+            console.log("Verifying token with URL:", `${baseURL}/api/admin-verify`);
 
             try {
                 // Try the verify-token endpoint
-                const response = await fetch(`${baseURL}/api/verify-token`, {
+                const response = await fetch(`${baseURL}/api/admin-verify`, {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,
