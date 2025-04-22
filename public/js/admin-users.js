@@ -232,14 +232,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
             console.log("Fetching users with query:", queryParams.toString());
 
-            // Make API request
-            const response = await fetch(`${baseURL}/api/admin/users?${queryParams.toString()}`, {
+
+            // Change in admin-users.js
+            const response = await fetch(`${baseURL}/api/admincheck`, {
                 method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': 'no-cache'
                 }
             });
+            // Make API request
+            // const response = await fetch(`${baseURL}/api/admin/users?${queryParams.toString()}`, {
+            //     method: 'GET',
+            //     headers: {
+            //         'Content-Type': 'application/json',
+            //         'Authorization': `Bearer ${token}`
+            //     }
+            // });
 
             // Handle token expiration
             if (response.status === 401) {

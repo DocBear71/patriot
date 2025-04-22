@@ -31,6 +31,16 @@ try {
 
 module.exports = async (req, res) => {
     console.log("Verify token API called:", req.method);
+    console.log("Request headers:", JSON.stringify(req.headers));
+
+    // Respond with a simple success status for testing
+    return res.status(200).json({
+        message: 'API endpoint is working',
+        isValid: true,
+        isAdmin: true,
+        level: 'Admin',
+        name: 'Test Admin'
+    });
 
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
