@@ -278,15 +278,44 @@ function handleVerifyToken(req, res) {
 
     const token = authHeader.split(' ')[1];
 
-    // For now, just return success for testing
-    return res.status(200).json({
-        isValid: true,
-        userId: "test-user-id",
-        isAdmin: true,
-        level: "Admin",
-        name: "Test Admin User"
-    });
+    try {
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+
+        // Connect to MongoDB
+        connect.then(async () => {
+            console.log("Database connection established");
+
+            // Find the user
+            const user = await User.findById(decoded.userId);
+
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+
+            // Return user information
+            return res.status(200).json({
+                isValid: true,
+                userId: user._id,
+                isAdmin: user.isAdmin || user.level === 'Admin',
+                level: user.level,
+                name: `${user.fname} ${user.lname}`
+            });
+        }).catch(error => {
+            console.error("Database connection error:", error);
+            return res.status(500).json({ message: 'Database connection error', error: error.message });
+        });
+    } catch (error) {
+        console.error('Token verification error:', error);
+
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Invalid or expired token' });
+        }
+
+        return res.status(500).json({ message: 'Server error', error: error.message });
+    }
 }
+
 /**
  * Handle user login
  */

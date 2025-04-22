@@ -34,7 +34,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Check if error is related to authorization
         if (error.status === 401) {
-            window.location.href = '/index.html?login=required&redirect=' + encodeURIComponent(window.location.pathname);
+            console.error("Authentication Error -- Please log in again");
+            //
+
+            // try fallback action if provided
+            if (typeof fallbackAction === 'function') {
+                fallbackAction();
+                return;
+            }
+
+            // only redirect if fallback action is not provided
+            setTimeout(() => {
+                window.location.href = '/index.html?login=required&redirect=' + encodeURIComponent(window.location.pathname);
+            }, 2000);  // redirect delay for time to see the message
             return;
         }
 
@@ -306,10 +318,17 @@ document.addEventListener('DOMContentLoaded', function () {
             // Get auth token
             const token = getAuthToken();
             if (!token) {
+                console.error("No auth token found");
+                // handle missing token gracefully
+                if (businessTableBody) {
+                    businessTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Authentication error. Please log in again.</td></tr>';
+                }
                 return;
             }
 
-            // Make API request - assuming you'll create an endpoint for businesses
+            console.log("Using token for API request: ", token.substring(0, 10) + "...");
+
+            // Make API request
             const response = await fetch(`${baseURL}/api/business.js?operation=admin-list-businesses&page=1&limit=5`, {
                 method: 'GET',
                 headers: {
@@ -319,6 +338,16 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             if (!response.ok) {
+                console.error("API error response: ", response.status, response.statusText);
+
+                // if unauthorized, handle gracefully
+                if (response.status === 401) {
+                    console.error("Unauthorized request -- token may be invalid");
+                    if (businessTableBody) {
+                        businessTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Authentication error. Please log in again.</td></tr>';
+                    }
+                    return;
+                }
                 throw response;
             }
 
@@ -329,7 +358,7 @@ document.addEventListener('DOMContentLoaded', function () {
             renderBusinesses();
         } catch (error) {
             handleApiError(error, () => {
-                // If API fails, show placeholder data
+                // If API fails, show error message instead of redirecting
                 const businessTableBody = document.querySelector('#businesses-list tbody');
                 if (businessTableBody) {
                     businessTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading businesses. Please try again later.</td></tr>';
