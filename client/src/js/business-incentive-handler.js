@@ -1,6 +1,5 @@
 // business-incentive-handler.js - Handles business search and incentive addition
 document.addEventListener('DOMContentLoaded', function() {
-    testApiConnection();
     console.log("Business Incentive Handler Loaded!");
 
     // Initialize business info section display
@@ -123,8 +122,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const incentiveInfoElement = document.getElementById('incentiveInfo');
             const incentiveInfo = incentiveInfoElement ? incentiveInfoElement.value : '';
 
-            if (incentiveAvailable === 'true' && (!incentiveType || !incentiveAmount)) {
-                alert('Please provide incentive type and amount');
+            if (incentiveAvailable === 'true' && (!incentiveType || !incentiveAmount || !incentiveAmount)) {
+                alert('Please provide incentive type, amount, and information');
                 return;
             }
 
@@ -281,12 +280,13 @@ document.addEventListener('DOMContentLoaded', function() {
             // As a last resort try to find a fuzzy match for the state
             for (let i = 0; i < field.options.length; i++) {
                 const optionText = field.options[i].text.toLowerCase();
-                const optionValue = field.options[i].text.toLowerCase();
+                const optionValue = field.options[i].value.toLowerCase();
 
                 if (optionText.includes(valueLower) || valueLower.includes(optionText) ||
                     optionValue.includes(valueLower) || valueLower.includes(optionValue)) {
                     field.selectedIndex = i;
                     console.log(`Fuzzy matched state: ${field.options[i].text} for ${value}`);
+                    return;
                 }
             }
         }
@@ -364,6 +364,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 resetField('incentiveType');
                 resetField('incentiveAmount');
                 resetField('incentiveInfo', 'Please enter information about the discount/incentive.');
+                if (otherTypeContainer) {
+                    otherTypeContainer.style.display = 'none';
+                }
+                resetField('otherTypeDescription');
                 document.querySelectorAll('input[name="incentiveAvailable"]').forEach(radio => {
                     radio.checked = false;
                 });
