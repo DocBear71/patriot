@@ -58,8 +58,10 @@
                 <span>Dashboard</span>
             </div>
             <div class="menu-item" data-section="users">
+                <a href="admin-users.html" style="text-decoration: none; color: inherit;">
                 <span class="menu-icon">👥</span>
                 <span>Users</span>
+                </a>
             </div>
             <div class="menu-item" data-section="businesses">
                 <span class="menu-icon">🏢</span>
@@ -112,10 +114,24 @@
 
         <!-- Users Panel -->
         <div id="users-panel" class="panel">
-            <div class="tabs">
-                <div class="tab active" data-tab="users-list">Users List</div>
-                <div class="tab" data-tab="add-user">Add User</div>
+            <div class="panel-header">
+                <h2>User Management</h2>
+                <p>Manage your platform users in the dedicated interface.</p>
             </div>
+            <div class="panel-content">
+                <p>The user management interface allows you to:</p>
+                <ul>
+                    <li>View all registered users</li>
+                    <li>Add new users to the system</li>
+                    <li>Edit existing user information</li>
+                    <li>Delete users from the system</li>
+                    <li>Filter and search for specific users</li>
+                </ul>
+                <div class="panel-actions">
+                    <a href="admin-users.html" class="btn btn-primary">Go to User Management</a>
+                </div>
+            </div>
+        </div>
 
             <!-- Users List Tab -->
             <div id="users-list" class="tab-content active">
@@ -516,9 +532,100 @@
             </div>
         </div>
     </div>
-</div>
 
 
-<script src="script.js"></script>
+
+<script>
+    // Check for admin status on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Retrieve auth token
+        function getAuthToken() {
+            try {
+                const sessionData = localStorage.getItem('patriotThanksSession');
+                if (!sessionData) {
+                    console.error('No session data found');
+                    return null;
+                }
+
+                const session = JSON.parse(sessionData);
+                if (!session.token) {
+                    console.error('No token found in session data');
+                    return null;
+                }
+
+                return session.token;
+            } catch (error) {
+                console.error('Error retrieving auth token:', error);
+                return null;
+            }
+        }
+
+        // Verify admin status
+        async function checkAdminStatus() {
+            try {
+                // Get auth token
+                const token = getAuthToken();
+                if (!token) {
+                    console.error("No auth token found");
+                    window.location.href = '/index.html?login=required&redirect=' + encodeURIComponent(window.location.pathname);
+                    return false;
+                }
+
+                // Determine the base URL
+                const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                        ? `http://${window.location.host}`
+                        : 'https://patriotthanks.vercel.app';
+
+                try {
+                    // Try the verify-token endpoint
+                    const response = await fetch(`${baseURL}/api/auth.js?operation=verify-token`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Cache-Control': 'no-cache'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = '/index.html?login=required&redirect=' + encodeURIComponent(window.location.pathname);
+                            return false;
+                        }
+                        return false;
+                    }
+
+                    const data = await response.json();
+                    const isAdminUser = data.isAdmin === true || data.level === 'Admin';
+
+                    if (!isAdminUser) {
+                        showAccessDenied();
+                    }
+
+                    return isAdminUser;
+                } catch (error) {
+                    console.error('Error checking admin status:', error);
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error in admin status check:', error);
+                return false;
+            }
+        }
+
+        function showAccessDenied() {
+            document.querySelector('.container').innerHTML = `
+            <div class="alert alert-danger" role="alert">
+                <h4 class="alert-heading">Access Denied</h4>
+                <p>You do not have permission to access this page. Only administrators can access the dashboard.</p>
+                <hr>
+                <p class="mb-0">Please <a href="/index.html">return to the homepage</a> or contact an administrator if you believe this is an error.</p>
+            </div>
+        `;
+        }
+
+        // Call admin check on page load
+        checkAdminStatus();
+    });
+</script>
 </body>
 </html>
