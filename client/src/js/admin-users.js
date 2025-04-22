@@ -94,9 +94,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }, 15000); // 15-second timeout
 
             try {
-                // Add a timestamp to prevent caching
-                const timestamp = new Date().getTime();
-                const response = await fetch(`${baseURL}/api/verify-token?_=${timestamp}`, {
+                // Remove the timestamp query parameter
+                const response = await fetch(`${baseURL}/api/verify-token`, {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -119,7 +118,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     } else if (response.status === 504 || response.status === 503) {
                         console.error("Server timeout or unavailable:", response.status);
                         // Fallback: Let's try to proceed with token validation on client-side
-                        // This is not as secure but allows the user to temporarily access the page
                         try {
                             const sessionData = localStorage.getItem('patriotThanksSession');
                             if (sessionData) {
@@ -135,6 +133,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         }
 
                         alert('The server took too long to respond. Please try again later.');
+                        return false;
+                    } else if (response.status === 404) {
+                        console.error("API endpoint not found:", response.status);
+                        alert('The verification API endpoint was not found. This may be a configuration issue.');
                         return false;
                     }
                     return false;
