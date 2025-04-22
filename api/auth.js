@@ -74,12 +74,14 @@ module.exports = async (req, res) => {
                 return await handleUpdateUser(req, res);
             case 'delete-user':
                 return await handleDeleteUser(req, res);
+            case 'dashboard-stats':
+                return await handleDashboardStats(req, res);
             default:
                 // If no operation specified, return API info for GET requests
                 if (req.method === 'GET') {
                     return res.status(200).json({
                         message: 'Authentication API is available',
-                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users', 'update-user', 'delete-user']
+                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users', 'update-user', 'delete-user', 'dashboard-stats']
                     });
                 }
                 return res.status(400).json({ message: 'Invalid operation' });
@@ -147,6 +149,115 @@ async function handleDeleteUser(req, res) {
         });
     } catch (error) {
         console.error('Error deleting user:', error);
+
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Invalid or expired token' });
+        }
+
+        return res.status(500).json({ message: 'Server error', error: error.message });
+    }
+}
+
+/**
+ * Handle dashboard statistics (admin functionality)
+ */
+async function handleDashboardStats(req, res) {
+    // Verify the token and check admin status
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authorization required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+
+        // Connect to MongoDB
+        try {
+            await connect;
+            console.log("Database connection established");
+        } catch (dbError) {
+            console.error("Database connection error:", dbError);
+            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        }
+
+        // Find the admin user
+        const adminUser = await User.findById(decoded.userId);
+
+        if (!adminUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (adminUser.level !== 'Admin' && adminUser.isAdmin !== true) {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
+        // Get current date and past month date for comparison
+        const currentDate = new Date();
+        const pastMonthDate = new Date();
+        pastMonthDate.setMonth(pastMonthDate.getMonth() - 1);
+
+        // Get user counts
+        const totalUsers = await User.countDocuments();
+        const usersPastMonth = await User.countDocuments({
+            created_at: { $lt: pastMonthDate }
+        });
+        const userChange = usersPastMonth > 0
+            ? Math.round(((totalUsers - usersPastMonth) / usersPastMonth) * 100)
+            : 100;
+
+        // Calculate stats for other collections if they exist
+        let businessCount = 0;
+        let businessChange = 0;
+        let incentiveCount = 0;
+        let incentiveChange = 0;
+
+        try {
+            // Try to get business stats if the collection exists
+            if (mongoose.connection.collections.businesses) {
+                const Business = mongoose.model('Business');
+                businessCount = await Business.countDocuments();
+                const businessesPastMonth = await Business.countDocuments({
+                    created_at: { $lt: pastMonthDate }
+                });
+                businessChange = businessesPastMonth > 0
+                    ? Math.round(((businessCount - businessesPastMonth) / businessesPastMonth) * 100)
+                    : 100;
+            }
+        } catch (error) {
+            console.log('Business stats not available:', error.message);
+        }
+
+        try {
+            // Try to get incentive stats if the collection exists
+            if (mongoose.connection.collections.incentives) {
+                const Incentive = mongoose.model('Incentive');
+                incentiveCount = await Incentive.countDocuments();
+                const incentivesPastMonth = await Incentive.countDocuments({
+                    created_at: { $lt: pastMonthDate }
+                });
+                incentiveChange = incentivesPastMonth > 0
+                    ? Math.round(((incentiveCount - incentivesPastMonth) / incentivesPastMonth) * 100)
+                    : 100;
+            }
+        } catch (error) {
+            console.log('Incentive stats not available:', error.message);
+        }
+
+        // Return dashboard statistics
+        return res.status(200).json({
+            userCount: totalUsers,
+            userChange: userChange,
+            businessCount: businessCount,
+            businessChange: businessChange,
+            incentiveCount: incentiveCount,
+            incentiveChange: incentiveChange,
+            timestamp: new Date()
+        });
+    } catch (error) {
+        console.error('Error generating dashboard stats:', error);
 
         if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
             return res.status(401).json({ message: 'Invalid or expired token' });
