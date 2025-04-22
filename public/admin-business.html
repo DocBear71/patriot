@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Business Management - Patriot Thanks</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2025/4/22">
+    <meta name="description" content="Business Management for Patriot Thanks Admin Dashboard">
+    <meta name="keywords" content="Business Management, Admin Dashboard, Patriot Thanks">
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link href="./css/bootstrap-4.0.0.css" rel="stylesheet">
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/forms.css" rel="stylesheet">
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/form-validation.css" rel="stylesheet">
+    <link href="./css/dashboard.css" rel="stylesheet">
+    <link href="./css/admin/admin-business.css" rel="stylesheet">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="./js/admin-business.js"></script>
+</head>
+<body style="padding-top: 70px" id="page_layout">
+<!--Navigation bar-->
+<div id="nav-placeholder">
+</div>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
+            // Load the login handler after the navbar is loaded
+            $.getScript("./js/login-handler.js")
+            .done(function() {
+                console.log("Login handler script loaded successfully");
+            })
+            .fail(function() {
+                console.error("Failed to load login-handler.js");
+            });
+        });
+    });
+</script>
+
+<header>
+    <div class="left-banner">
+        <a href="./index.html">
+            <img src="./images/docbearlogov4.png" alt="DocBear logo">
+        </a>
+    </div>
+    <div class="right-banner">
+        <h1>Patriot Thanks</h1>
+        <hr>
+        <h4>Admin Dashboard - Business Management</h4>
+    </div>
+    <div style="clear:left;"></div>
+</header>
+
+<main class="admin-container">
+    <div class="admin-header">
+        <h2>Business Management</h2>
+        <button class="btn btn-primary" id="add-business-btn" data-toggle="modal" data-target="#businessModal">Add New Business</button>
+    </div>
+
+    <div class="filter-container">
+        <input type="text" class="search-box" id="business-search" placeholder="Search businesses...">
+
+        <div class="filter-item">
+            <label for="category-filter">Category:</label>
+            <select id="category-filter">
+                <option value="">All</option>
+                <option value="technology">Technology</option>
+                <option value="manufacturing">Manufacturing</option>
+                <option value="transportation">Transportation</option>
+                <option value="retail">Retail</option>
+                <option value="healthcare">Healthcare</option>
+                <option value="education">Education</option>
+                <option value="food">Food & Beverage</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+
+        <div class="filter-item">
+            <label for="status-filter">Status:</label>
+            <select id="status-filter">
+                <option value="">All</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
+        </div>
+
+        <button id="reset-filters" class="btn btn-secondary">Reset Filters</button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Location</th>
+                <th>Category</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody id="business-table-body">
+            <!-- Business data will be populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <ul class="pagination" id="pagination-container">
+        <!-- Pagination will be populated here -->
+    </ul>
+
+    <!-- Business Modal -->
+    <div class="modal fade" id="businessModal" tabindex="-1" role="dialog" aria-labelledby="businessModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="businessModalLabel">Add/Edit Business</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="business-form" class="modal-form">
+                        <input type="hidden" id="business-id" name="business-id">
+
+                        <div class="form-group">
+                            <label for="bname">Business Name</label>
+                            <input type="text" id="bname" name="bname" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="address1">Address 1</label>
+                            <input type="text" id="address1" name="address1" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="address2">Address 2</label>
+                            <input type="text" id="address2" name="address2">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="city">City</label>
+                            <input type="text" id="city" name="city" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="state">State</label>
+                            <select id="state" name="state" required>
+                                <option value="">Select a State</option>
+                                <option value="AL">Alabama</option>
+                                <option value="AK">Alaska</option>
+                                <option value="AZ">Arizona</option>
+                                <option value="AR">Arkansas</option>
+                                <option value="CA">California</option>
+                                <option value="CO">Colorado</option>
+                                <option value="CT">Connecticut</option>
+                                <option value="DE">Delaware</option>
+                                <option value="DC">District Of Columbia</option>
+                                <option value="FL">Florida</option>
+                                <option value="GA">Georgia</option>
+                                <option value="HI">Hawaii</option>
+                                <option value="ID">Idaho</option>
+                                <option value="IL">Illinois</option>
+                                <option value="IN">Indiana</option>
+                                <option value="IA">Iowa</option>
+                                <option value="KS">Kansas</option>
+                                <option value="KY">Kentucky</option>
+                                <option value="LA">Louisiana</option>
+                                <option value="ME">Maine</option>
+                                <option value="MD">Maryland</option>
+                                <option value="MA">Massachusetts</option>
+                                <option value="MI">Michigan</option>
+                                <option value="MN">Minnesota</option>
+                                <option value="MS">Mississippi</option>
+                                <option value="MO">Missouri</option>
+                                <option value="MT">Montana</option>
+                                <option value="NE">Nebraska</option>
+                                <option value="NV">Nevada</option>
+                                <option value="NH">New Hampshire</option>
+                                <option value="NJ">New Jersey</option>
+                                <option value="NM">New Mexico</option>
+                                <option value="NY">New York</option>
+                                <option value="NC">North Carolina</option>
+                                <option value="ND">North Dakota</option>
+                                <option value="OH">Ohio</option>
+                                <option value="OK">Oklahoma</option>
+                                <option value="OR">Oregon</option>
+                                <option value="PA">Pennsylvania</option>
+                                <option value="RI">Rhode Island</option>
+                                <option value="SC">South Carolina</option>
+                                <option value="SD">South Dakota</option>
+                                <option value="TN">Tennessee</option>
+                                <option value="TX">Texas</option>
+                                <option value="UT">Utah</option>
+                                <option value="VT">Vermont</option>
+                                <option value="VA">Virginia</option>
+                                <option value="WA">Washington</option>
+                                <option value="WV">West Virginia</option>
+                                <option value="WI">Wisconsin</option>
+                                <option value="WY">Wyoming</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="zip">Zip Code</label>
+                            <input type="text" id="zip" name="zip" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="phone">Phone</label>
+                            <input type="tel" id="phone" name="phone" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="type">Business Category</label>
+                            <select id="type" name="type" required>
+                                <option value="">Select a Category</option>
+                                <option value="technology">Technology</option>
+                                <option value="manufacturing">Manufacturing</option>
+                                <option value="transportation">Transportation</option>
+                                <option value="retail">Retail</option>
+                                <option value="healthcare">Healthcare</option>
+                                <option value="education">Education</option>
+                                <option value="food">Food & Beverage</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="status">Status</label>
+                            <select id="status" name="status" required>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-business-btn">Save Business</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmationModal" tabindex="-1" role="dialog" aria-labelledby="confirmationModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmationModalLabel">Confirm Action</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body" id="confirmation-message">
+                    Are you sure you want to delete this business?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirm-action-btn">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer class="footer_style"><br>
+    <p>&copy; Copyright 2024 Edward G. McKeown</p>
+    <address>
+        <p>email to <a href='emailto:edward-mckeown@student.kirkwood.edu'>
+            edward-mckeown@student.kirkwood.edu</a></p><br>
+    </address>
+</footer>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check for admin status on page load
+        checkAdminStatus();
+    });
+
+    // Verify admin status
+    async function checkAdminStatus() {
+        try {
+            // Get auth token
+            const token = getAuthToken();
+            if (!token) {
+                console.error("No auth token found");
+                window.location.href = '/index.html?login=required&redirect=' + encodeURIComponent(window.location.pathname);
+                return false;
+            }
+
+            // Determine the base URL
+            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? `http://${window.location.host}`
+                    : 'https://patriotthanks.vercel.app';
+
+            try {
+                // Try the verify-token endpoint
+                const response = await fetch(`${baseURL}/api/auth.js?operation=verify-token`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/index.html?login=required&redirect=' + encodeURIComponent(window.location.pathname);
+                        return false;
+                    }
+                    return false;
+                }
+
+                const data = await response.json();
+                const isAdminUser = data.isAdmin === true || data.level === 'Admin';
+
+                if (!isAdminUser) {
+                    showAccessDenied();
+                }
+
+                return isAdminUser;
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+                return false;
+            }
+        } catch (error) {
+            console.error('Error in admin status check:', error);
+            return false;
+        }
+    }
+
+    // Get auth token
+    function getAuthToken() {
+        try {
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (!sessionData) {
+                console.error('No session data found');
+                return null;
+            }
+
+            const session = JSON.parse(sessionData);
+            if (!session.token) {
+                console.error('No token found in session data');
+                return null;
+            }
+
+            return session.token;
+        } catch (error) {
+            console.error('Error retrieving auth token:', error);
+            return null;
+        }
+    }
+
+    function showAccessDenied() {
+        document.querySelector('.admin-container').innerHTML = `
+            <div class="alert alert-danger" role="alert">
+                <h4 class="alert-heading">Access Denied</h4>
+                <p>You do not have permission to access this page. Only administrators can access the business management.</p>
+                <hr>
+                <p class="mb-0">Please <a href="/index.html">return to the homepage</a> or contact an administrator if you believe this is an error.</p>
+            </div>
+        `;
+    }
+</script>
+</body>
+</html>

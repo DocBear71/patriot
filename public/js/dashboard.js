@@ -371,6 +371,30 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    const businessesListContent = document.getElementById('businesses-list');
+    if (businessesListContent) {
+        // Update the div with a link to the full business management page
+        const headerDiv = businessesListContent.querySelector('div[style*="display: flex"]');
+        if (headerDiv) {
+            const addBusinessBtn = headerDiv.querySelector('#add-business-btn');
+
+            if (addBusinessBtn) {
+                // If the button exists, add the link before it
+                const fullManagementLink = document.createElement('a');
+                fullManagementLink.href = 'admin-business.html';
+                fullManagementLink.className = 'btn btn-info mr-2';
+                fullManagementLink.textContent = 'Full Business Management';
+
+                headerDiv.insertBefore(fullManagementLink, addBusinessBtn);
+            } else {
+                // If the button doesn't exist, add the link to the header
+                headerDiv.innerHTML += `
+                <a href="../admin-business.html" class="btn btn-info">Full Business Management</a>
+            `;
+            }
+        }
+    }
+
     // Sidebar navigation
     const menuItems = document.querySelectorAll('.menu-item');
     const panels = document.querySelectorAll('.panel');
@@ -540,4 +564,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Start initialization
     init();
+
+    // Add link to full business management in businesses panel
+    document.addEventListener('DOMContentLoaded', function() {
+        // Wait a short time to ensure all other DOM manipulations are complete
+        setTimeout(() => {
+            const businessesListContent = document.getElementById('businesses-list');
+            if (businessesListContent) {
+                // Update the div with a link to the full business management page
+                const headerDiv = businessesListContent.querySelector('div[style*="display: flex"]');
+                if (headerDiv) {
+                    const addBusinessBtn = headerDiv.querySelector('#add-business-btn');
+
+                    if (addBusinessBtn) {
+                        // If the button exists, add the link before it
+                        const fullManagementLink = document.createElement('a');
+                        fullManagementLink.href = 'admin-business.html';
+                        fullManagementLink.className = 'btn btn-info mr-2';
+                        fullManagementLink.textContent = 'Full Business Management';
+
+                        headerDiv.insertBefore(fullManagementLink, addBusinessBtn);
+                    } else {
+                        // If the button doesn't exist, add the link to the header
+                        headerDiv.innerHTML += `
+                        <a href="../admin-business.html" class="btn btn-info">Full Business Management</a>
+                    `;
+                    }
+                }
+            }
+        }, 500); // Short delay to ensure DOM is fully processed
+    });
 });
