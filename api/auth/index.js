@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { ObjectId } = mongoose.Types;
 const jwt = require('jsonwebtoken');
+const Users = require("../../models/Users");
 
 // Define schemas
 const userSchema = new mongoose.Schema({
@@ -67,6 +68,8 @@ module.exports = async (req, res) => {
                 return await handleVerifyAdmin(req, res);
             case 'verify-token':
                 return await handleVerifyToken(req, res);
+            case 'list-users':
+                return await handleListUsers(req, res);
             default:
                 // If no operation specified, return API info for GET requests
                 if (req.method === 'GET') {
@@ -253,6 +256,92 @@ async function handleRegister(req, res) {
     } catch (error) {
         console.error('User creation failed:', error);
         return res.status(500).json({ message: 'Server error during user creation: ' + error.message });
+    }
+}
+
+/**
+ * Handle listing users (admin functionality)
+ */
+async function handleListUsers(req, res) {
+    // First, verify the token and check admin status
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authorization required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    // Verify token
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+
+        // Connect to MongoDB
+        await connect();
+
+        // Find the admin user
+        const adminUser = await User.findById(decoded.userId);
+
+        if (!adminUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (adminUser.level !== 'Admin' && adminUser.isAdmin !== true) {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
+        // Parse query parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Build filter object
+        const filter = {};
+
+        // Search filter (search by name or email)
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search, 'i');
+            filter.$or = [
+                { fname: searchRegex },
+                { lname: searchRegex },
+                { email: searchRegex }
+            ];
+        }
+
+        // Status filter
+        if (req.query.status) {
+            filter.status = req.query.status;
+        }
+
+        // Level filter
+        if (req.query.level) {
+            filter.level = req.query.level;
+        }
+
+        // Get total count
+        const total = await User.countDocuments(filter);
+
+        // Get users
+        const users = await User.find(filter)
+            .select('-password') // Exclude password
+            .sort({ created_at: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        return res.status(200).json({
+            users,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        });
+    } catch (error) {
+        console.error('Error in list-users:', error);
+
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Invalid or expired token' });
+        }
+
+        return res.status(500).json({ message: 'Server error', error: error.message });
     }
 }
 
