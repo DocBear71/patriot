@@ -10,7 +10,9 @@ const businessSchema = new mongoose.Schema({
     state: String,
     zip: String,
     phone: String,
-    type: String
+    type: String,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now }
 });
 
 const incentiveSchema = new mongoose.Schema({
@@ -25,13 +27,20 @@ const incentiveSchema = new mongoose.Schema({
 });
 
 const userSchema = new mongoose.Schema({
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    firstname: String,
-    lastname: String,
-    status: { type: String, default: 'US' }, // US = User, AD = Admin
-    isAdmin: { type: Boolean, default: false },
-    created_at: { type: Date, default: Date.now }
+    fname: String,
+    lname: String,
+    address1: String,
+    address2: String,
+    city: String,
+    state: String,
+    zip: String,
+    status: String,
+    level: String,
+    email: String,
+    password: String,
+    isAdmin: Boolean,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now },
 });
 
 // Get or create models

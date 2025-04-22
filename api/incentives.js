@@ -11,7 +11,9 @@ const businessSchema = new mongoose.Schema({
     state: String,
     zip: String,
     phone: String,
-    type: String
+    type: String,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now }
 });
 
 const incentiveSchema = new mongoose.Schema({

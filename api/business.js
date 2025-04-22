@@ -1,6 +1,8 @@
 // api/business.js - Consolidated business API (register and search)
 const connect = require('../config/db');
 const mongoose = require('mongoose');
+let Business = require('../models/index');
+
 
 // Define business schema once
 const businessSchema = new mongoose.Schema({
@@ -17,7 +19,7 @@ const businessSchema = new mongoose.Schema({
 });
 
 // Initialize model once
-let Business;
+
 try {
     Business = mongoose.model('Business');
 } catch (error) {
@@ -38,18 +40,18 @@ module.exports = async (req, res) => {
     const { operation } = req.query;
 
     try {
-        if (operation === 'search' || (req.method === 'GET' && (req.query.business_name || req.query.businessName || req.query.address))) {
-            return await handleBusinessSearch(req, res);
-        } else if (operation === 'register' || req.method === 'POST') {
-            return await handleBusinessRegister(req, res);
-        } else {
-            // If no operation specified, return API info for GET requests
-            if (req.method === 'GET') {
-                return res.status(200).json({
-                    message: 'Business API is available',
-                    operations: ['register', 'search']
-                });
-            }
+        switch (operation) {
+            case 'search':
+                return await handleBusinessSearch(req, res);
+            case 'register':
+                return await handleBusinessRegister(req, res);
+            default:
+                if (req.method === 'GET') {
+                    return res.status(200).json({
+                        message: 'Business API is available',
+                        operations: ['register', 'search']
+                    });
+        }
             return res.status(400).json({ message: 'Invalid operation' });
         }
     } catch (error) {
