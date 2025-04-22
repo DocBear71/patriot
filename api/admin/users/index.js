@@ -87,7 +87,13 @@ module.exports = async (req, res) => {
             case 'POST':
                 return await createUser(req, res);
             default:
-                return res.status(405).json({ message: 'Method not allowed' });
+                if (req.method === 'GET' || 'PUT' || 'DELETE') {
+                    return res.status(200).json({
+                        message: 'Authentication API is available',
+                        operations: ['GET', 'PUT', 'DELETE'],
+                    });
+                }
+                return res.status(400).json({ message: 'Invalid operation' });
         }
     } catch (error) {
         console.error("Admin users API error:", error);

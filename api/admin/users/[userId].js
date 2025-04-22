@@ -99,7 +99,13 @@ module.exports = async (req, res) => {
             case 'DELETE':
                 return await deleteUser(req, res, userId, adminUserId);
             default:
-                return res.status(405).json({ message: 'Method not allowed' });
+                if (req.method === 'GET' || 'PUT' || 'DELETE') {
+                    return res.status(200).json({
+                        message: 'Authentication API is available',
+                        operations: ['GET', 'PUT', 'DELETE'],
+                    });
+                }
+                return res.status(400).json({ message: 'Invalid operation' });
         }
     } catch (error) {
         console.error("Admin user operation API error:", error);
