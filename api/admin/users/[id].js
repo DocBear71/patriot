@@ -42,10 +42,9 @@ module.exports = async (req, res) => {
 
     try {
         // Get userId from request query or param
-        // const userId = req.query.userId || req.url.split('/').pop();
+        let userId = req.query.userId || req.url.split('/').pop();
 
-        const slug = req.query.slug || [];
-        let userId = slug[0];
+
 
         // Remove .js extension if present
         if (userId && userId.endsWith('.js')) {
