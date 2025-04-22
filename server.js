@@ -10,48 +10,53 @@ function generateJwtSecret() {
     return crypto.randomBytes(64).toString('hex');
 }
 
-function getOrCreateJwtSecret() {
-    // Check if secret exists in environment
-    if (process.env.JWT_SECRET) {
-        return process.env.JWT_SECRET;
-    }
+function updateEnvFile() {
+    const envPath = path.join(__dirname, '.env');
 
-    // Try to load from a secret file
-    const secretFilePath = path.join(__dirname, '.jwt-secret');
     try {
-        if (fs.existsSync(secretFilePath)) {
-            const secret = fs.readFileSync(secretFilePath, 'utf8').trim();
-            if (secret) {
-                process.env.JWT_SECRET = secret;
-                return secret;
-            }
+        // Read existing .env file
+        let envContent = '';
+        if (fs.existsSync(envPath)) {
+            envContent = fs.readFileSync(envPath, 'utf8');
         }
+
+        // Check if JWT_SECRET is already defined
+        if (envContent.includes('JWT_SECRET=')) {
+            // Extract the existing secret
+            const match = envContent.match(/JWT_SECRET=([^\n]+)/);
+            if (match && match[1].trim()) {
+                process.env.JWT_SECRET = match[1].trim();
+                console.log('Using existing JWT_SECRET from .env file');
+                return;
+            }
+
+            // Replace the existing line with a new secret
+            const newSecret = generateJwtSecret();
+            envContent = envContent.replace(/JWT_SECRET=([^\n]*)/, `JWT_SECRET=${newSecret}`);
+            process.env.JWT_SECRET = newSecret;
+        } else {
+            // Add JWT_SECRET if it doesn't exist
+            const newSecret = generateJwtSecret();
+            envContent += `\n# JWT Configuration\nJWT_SECRET=${newSecret}\nJWT_EXPIRY=7d\n`;
+            process.env.JWT_SECRET = newSecret;
+        }
+
+        // Write back to .env file
+        fs.writeFileSync(envPath, envContent);
+        console.log('JWT_SECRET configured in .env file');
     } catch (err) {
-        console.error('Error reading JWT secret file:', err);
+        console.error('Error updating .env file:', err);
+        // Fallback to in-memory secret
+        process.env.JWT_SECRET = process.env.JWT_SECRET || generateJwtSecret();
     }
-
-    // Generate new secret
-    const newSecret = generateJwtSecret();
-    process.env.JWT_SECRET = newSecret;
-
-    // Save to file for persistence
-    try {
-        fs.writeFileSync(secretFilePath, newSecret);
-        fs.chmodSync(secretFilePath, 0o600); // Secure file permissions
-        console.log('New JWT secret generated and saved');
-    } catch (err) {
-        console.error('Error saving JWT secret file:', err);
-    }
-
-    return newSecret;
 }
 
-// Set up JWT secret early
-const jwtSecret = getOrCreateJwtSecret();
-console.log('JWT secret configured successfully');
+// Call the function to update the .env file
+updateEnvFile();
 
 // Create Express app
 const app = express();
+
 
 // Enable JSON parsing and CORS
 app.use(express.json());
