@@ -1,7 +1,7 @@
-// api/verify-token.js
 const jwt = require('jsonwebtoken');
-const connect = require('../config/db');
 const mongoose = require('mongoose');
+
+const connect = require('../config/db');
 
 // Using the same User model
 const userSchema = new mongoose.Schema({
@@ -30,6 +30,8 @@ try {
 }
 
 module.exports = async (req, res) => {
+    console.log("Verify token API called:", req.method);
+
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         res.setHeader('Allow', 'GET, OPTIONS');
@@ -49,28 +51,66 @@ module.exports = async (req, res) => {
         }
 
         const token = authHeader.split(' ')[1];
+        console.log("Token received, verifying...");
 
-        // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+        // Verify token with error handling
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+            console.log("Token verified for user ID:", decoded.userId);
+        } catch (jwtError) {
+            console.error("JWT verification error:", jwtError.name, jwtError.message);
 
-        // Get user from database
-        await connect;
-        const user = await User.findById(decoded.userId).select('-password').lean();
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            if (jwtError.name === 'TokenExpiredError') {
+                return res.status(401).json({ message: 'Token expired' });
+            } else {
+                return res.status(401).json({ message: 'Invalid token' });
+            }
         }
 
-        // Return user data with isValid flag
-        return res.status(200).json({
-            isValid: true,
-            userId: user._id,
-            isAdmin: user.level === 'Admin' || user.isAdmin === true,
-            level: user.level,
-            name: `${user.fname} ${user.lname}`
-        });
+        try {
+            // Ensure database connection before query
+            console.log("Connecting to database...");
+            await connect;
+            console.log("Database connection established");
+
+            // Set a timeout promise for database operation
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Database query timed out')), 5000);
+            });
+
+            // Find user with timeout handling
+            console.log("Finding user by ID:", decoded.userId);
+            const userPromise = User.findById(decoded.userId).select('-password').lean();
+
+            // Race the user query against the timeout
+            const user = await Promise.race([userPromise, timeoutPromise]);
+
+            if (!user) {
+                console.log("User not found:", decoded.userId);
+                return res.status(404).json({ message: 'User not found' });
+            }
+
+            // Return user data with isValid flag
+            console.log("User verification successful:", user._id);
+            return res.status(200).json({
+                isValid: true,
+                userId: user._id,
+                isAdmin: user.level === 'Admin' || user.isAdmin === true,
+                level: user.level,
+                name: `${user.fname} ${user.lname}`
+            });
+        } catch (dbError) {
+            console.error("Database error during user lookup:", dbError.name, dbError.message);
+
+            if (dbError.message === 'Database query timed out') {
+                return res.status(503).json({ message: 'Database operation timed out' });
+            }
+
+            throw dbError; // Let the outer catch block handle other errors
+        }
     } catch (error) {
-        console.error('Token verification error:', error);
-        return res.status(401).json({ message: 'Invalid token', error: error.message });
+        console.error('Token verification process error:', error.name, error.message);
+        return res.status(500).json({ message: 'Server error during verification', error: error.message });
     }
 };

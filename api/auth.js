@@ -81,9 +81,7 @@ module.exports = async (req, res) => {
     }
 };
 
-/**
- * Handle user login
- */
+
 /**
  * Handle user login
  */

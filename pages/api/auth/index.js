@@ -1,5 +1,5 @@
 // api/auth/index.js - Consolidated authentication API (login, register, verify-admin)
-const connect = require('../config/db');
+const connect = require('../../config/db');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { ObjectId } = mongoose.Types;
@@ -81,9 +81,7 @@ module.exports = async (req, res) => {
     }
 };
 
-/**
- * Handle user login
- */
+
 /**
  * Handle user login
  */

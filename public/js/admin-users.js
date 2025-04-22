@@ -68,12 +68,13 @@ document.addEventListener('DOMContentLoaded', function () {
         showAccessDenied();
     });
 
-    // Functions
+    // Functionsasync
     async function checkAdminStatus() {
         try {
             // Get auth token
             const token = getAuthToken();
             if (!token) {
+                console.error("No auth token found");
                 redirectToLogin();
                 return false;
             }
@@ -83,28 +84,97 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? `http://${window.location.host}`
                 : 'https://patriotthanks.vercel.app';
 
-            // Verify token with a lightweight API call
-            const response = await fetch(`${baseURL}/api/verify-token`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            console.log("Verifying token with URL:", `${baseURL}/api/verify-token`);
 
-            if (!response.ok) {
-                if (response.status === 401) {
-                    redirectToLogin();
+            // Implement client-side timeout handling
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                console.error("Token verification request timed out");
+            }, 15000); // 15-second timeout
+
+            try {
+                // Add a timestamp to prevent caching
+                const timestamp = new Date().getTime();
+                const response = await fetch(`${baseURL}/api/verify-token?_=${timestamp}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    },
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId); // Clear the timeout
+
+                console.log("Token verification response status:", response.status);
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.error("Authentication failed: 401 Unauthorized");
+                        redirectToLogin();
+                        return false;
+                    } else if (response.status === 504 || response.status === 503) {
+                        console.error("Server timeout or unavailable:", response.status);
+                        // Fallback: Let's try to proceed with token validation on client-side
+                        // This is not as secure but allows the user to temporarily access the page
+                        try {
+                            const sessionData = localStorage.getItem('patriotThanksSession');
+                            if (sessionData) {
+                                const session = JSON.parse(sessionData);
+                                if (session.userLevel === 'Admin') {
+                                    console.log('Using fallback validation - session data indicates admin user');
+                                    alert('Server verification timed out, but proceeding with limited validation. Some features may be unavailable.');
+                                    return true;
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Fallback validation failed:", e);
+                        }
+
+                        alert('The server took too long to respond. Please try again later.');
+                        return false;
+                    }
+                    return false;
                 }
-                return false;
+
+                const data = await response.json();
+                console.log("Verification response data:", data);
+                isAdminUser = data.isAdmin === true || data.level === 'Admin';
+
+                console.log('Admin access verified:', isAdminUser);
+                return isAdminUser;
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+
+                if (fetchError.name === 'AbortError') {
+                    console.error('Request timed out on client side');
+                    // Try fallback approach with client-side token validation
+                    try {
+                        const sessionData = localStorage.getItem('patriotThanksSession');
+                        if (sessionData) {
+                            const session = JSON.parse(sessionData);
+                            if (session.userLevel === 'Admin') {
+                                console.log('Using fallback validation after timeout - session indicates admin');
+                                alert('Server verification timed out, proceeding with limited validation. Some features may be unavailable.');
+                                return true;
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Fallback validation failed:", e);
+                    }
+
+                    alert('Verification request timed out. Please check your network connection or try again later.');
+                    return false;
+                }
+                throw fetchError;
             }
-
-            const data = await response.json();
-            isAdminUser = data.isAdmin === true || data.level === 'Admin';
-
-            console.log('Admin access verified:', isAdminUser);
-            return isAdminUser;
         } catch (error) {
             console.error('Error checking admin status:', error);
+            alert(`Authentication error: ${error.message}. Please try logging in again.`);
+            redirectToLogin();
             return false;
         }
     }

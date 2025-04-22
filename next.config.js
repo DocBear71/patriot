@@ -1,3 +1,6 @@
+// next.config.js file
+//
+
 module.exports = {
     async headers() {
         return [
