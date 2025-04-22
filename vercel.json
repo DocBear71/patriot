@@ -15,6 +15,16 @@
   ],
   "routes": [
     {
+      "src": "/api/verify-token",
+      "dest": "/api/verify-token.js",
+      "methods": ["GET", "OPTIONS"]
+    },
+    {
+      "src": "/api/test-endpoint",
+      "dest": "/api/test-endpoint.js",
+      "methods": ["GET", "OPTIONS"]
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1"
     },
