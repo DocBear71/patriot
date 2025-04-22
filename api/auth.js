@@ -1,8 +1,9 @@
-// api/auth.js - Consolidated authentication API (login, register, verify-admin)
+// api/auth/index.js - Consolidated authentication API (login, register, verify-admin)
 const connect = require('../config/db');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { ObjectId } = mongoose.Types;
+const jwt = require('jsonwebtoken');
 
 // Define schemas
 const userSchema = new mongoose.Schema({
@@ -83,6 +84,9 @@ module.exports = async (req, res) => {
 /**
  * Handle user login
  */
+/**
+ * Handle user login
+ */
 async function handleLogin(req, res) {
     // Handle GET request for testing
     if (req.method === 'GET') {
@@ -122,6 +126,18 @@ async function handleLogin(req, res) {
             return res.status(401).json({ message: 'Invalid email or password' });
         }
 
+        // Generate JWT token
+        const token = jwt.sign(
+            {
+                userId: user._id,
+                isAdmin: user.isAdmin || user.level === 'Admin'
+            },
+            process.env.JWT_SECRET || 'patriot-thanks-secret-key',
+            { expiresIn: process.env.JWT_EXPIRY || '7d' }
+        );
+        console.log('JWT Token generated successfully');
+        console.log('Generated token:', token);
+
         // Return success response with user info (excluding password)
         const userInfo = user.toObject();
         delete userInfo.password;
@@ -139,14 +155,14 @@ async function handleLogin(req, res) {
             zip: user.zip,
             level: user.level,
             status: user.status,
-            isAdmin: user.isAdmin || false
+            isAdmin: user.isAdmin || false,
+            token: token // Add the token to the response
         });
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('Error generating JWT token:', error);
         return res.status(500).json({ message: 'Server error during login: ' + error.message });
     }
 }
-
 /**
  * Handle user registration
  */
