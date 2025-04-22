@@ -75,7 +75,7 @@ module.exports = async (req, res) => {
                 if (req.method === 'GET') {
                     return res.status(200).json({
                         message: 'Authentication API is available',
-                        operations: ['login', 'register', 'verify-admin', 'verify-token']
+                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users']
                     });
                 }
                 return res.status(400).json({ message: 'Invalid operation' });

@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { ObjectId } = mongoose.Types;
 const jwt = require('jsonwebtoken');
-const Users = require("../../models/Users");
+const Users = require("../models/Users");
 
 // Define schemas
 const userSchema = new mongoose.Schema({
@@ -75,7 +75,7 @@ module.exports = async (req, res) => {
                 if (req.method === 'GET') {
                     return res.status(200).json({
                         message: 'Authentication API is available',
-                        operations: ['login', 'register', 'verify-admin', 'verify-token']
+                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users']
                     });
                 }
                 return res.status(400).json({ message: 'Invalid operation' });
