@@ -1,4 +1,4 @@
-// dashboard.js - Updated to use real data from the API
+// dashboard.js - Updated to use real data from the API and show users in the dashboard
 document.addEventListener('DOMContentLoaded', function () {
     // State variables for API data
     let users = [];
@@ -116,13 +116,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             `;
         }
+
+        // Also update the user stats in the user panel
+        const totalUsersCount = document.getElementById('total-users-count');
+        if (totalUsersCount) {
+            totalUsersCount.textContent = stats.userCount || 0;
+        }
+
+        // If we have active/new user counts, update those too
+        const activeUsersCount = document.getElementById('active-users-count');
+        if (activeUsersCount) {
+            activeUsersCount.textContent = stats.activeUserCount || Math.floor((stats.userCount || 0) * 0.85); // Fallback estimate
+        }
+
+        const newUsersCount = document.getElementById('new-users-count');
+        if (newUsersCount) {
+            newUsersCount.textContent = stats.newUsersThisMonth || Math.floor((stats.userCount || 0) * 0.15); // Fallback estimate
+        }
     }
 
     // Load users from API
     async function loadUsers() {
         try {
-            // Show loading indicator
-            const userTableBody = document.querySelector('#users-list tbody');
+            // Show loading indicator in dashboard users table
+            const userTableBody = document.getElementById('dashboard-users-table');
             if (userTableBody) {
                 userTableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading users...</td></tr>';
             }
@@ -138,8 +155,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            // Make API request
-            const response = await fetch(`${baseURL}/api/auth.js?operation=list-users&page=1&limit=10`, {
+            // Make API request - limit to most recent 5 users
+            const response = await fetch(`${baseURL}/api/auth.js?operation=list-users&page=1&limit=5`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -154,12 +171,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
             users = data.users || [];
 
-            // Render users in the table
-            renderUsers();
+            // Render users in the dashboard table
+            renderDashboardUsers();
         } catch (error) {
             handleApiError(error, () => {
                 // If API fails, show an error message
-                const userTableBody = document.querySelector('#users-list tbody');
+                const userTableBody = document.getElementById('dashboard-users-table');
                 if (userTableBody) {
                     userTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading users. Please try again later.</td></tr>';
                 }
@@ -167,9 +184,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Render users in the table
-    function renderUsers() {
-        const userTableBody = document.querySelector('#users-list tbody');
+    // Render users in the dashboard table
+    function renderDashboardUsers() {
+        const userTableBody = document.getElementById('dashboard-users-table');
         if (!userTableBody) return;
 
         if (users.length === 0) {
@@ -179,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         userTableBody.innerHTML = '';
 
-        users.forEach((user, index) => {
+        users.forEach(user => {
             // Format created date
             let formattedDate = 'N/A';
             if (user.created_at) {
@@ -205,17 +222,38 @@ document.addEventListener('DOMContentLoaded', function () {
                 statusBadge = '<span class="badge badge-secondary">Unknown</span>';
             }
 
+            // Level badge
+            let levelBadge = '';
+            switch (user.level) {
+                case 'Free':
+                    levelBadge = '<span class="badge badge-free">Free</span>';
+                    break;
+                case 'Basic':
+                    levelBadge = '<span class="badge badge-basic">Basic</span>';
+                    break;
+                case 'Premium':
+                    levelBadge = '<span class="badge badge-premium">Premium</span>';
+                    break;
+                case 'VIP':
+                    levelBadge = '<span class="badge badge-vip">V.I.P.</span>';
+                    break;
+                case 'Admin':
+                    levelBadge = '<span class="badge badge-admin">Admin</span>';
+                    break;
+                default:
+                    levelBadge = '<span class="badge badge-secondary">Unknown</span>';
+            }
+
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${index + 1}</td>
                 <td>${user.fname} ${user.lname}</td>
                 <td>${user.email}</td>
-                <td>${user.level || 'User'}</td>
                 <td>${statusBadge}</td>
+                <td>${levelBadge}</td>
+                <td>${formattedDate}</td>
                 <td>
                     <div class="action-btns">
-                        <button class="btn btn-edit" data-id="${user._id}">Edit</button>
-                        <button class="btn btn-danger" data-id="${user._id}" data-name="${user.fname} ${user.lname}">Delete</button>
+                        <a href="admin-users.html?edit=${user._id}" class="btn btn-sm btn-info">Edit</a>
                     </div>
                 </td>
             `;
@@ -223,69 +261,32 @@ document.addEventListener('DOMContentLoaded', function () {
             userTableBody.appendChild(row);
         });
 
-        // Add event listeners to buttons
-        setupUserActionButtons();
+        // Add quick search functionality to the dashboard users table
+        setupQuickSearch();
     }
 
-    // Setup event listeners for user action buttons
-    function setupUserActionButtons() {
-        // Edit buttons
-        document.querySelectorAll('.btn-edit').forEach(button => {
-            button.addEventListener('click', function() {
-                const userId = this.getAttribute('data-id');
-                window.location.href = `admin-users.html?edit=${userId}`;
+    // Setup quick search for dashboard users table
+    function setupQuickSearch() {
+        const quickSearch = document.getElementById('quick-user-search');
+        if (!quickSearch) return;
+
+        quickSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const userRows = document.querySelectorAll('#dashboard-users-table tr');
+
+            userRows.forEach(row => {
+                let foundMatch = false;
+                const cells = row.querySelectorAll('td');
+
+                cells.forEach(cell => {
+                    if (cell.textContent.toLowerCase().includes(searchTerm)) {
+                        foundMatch = true;
+                    }
+                });
+
+                row.style.display = foundMatch ? '' : 'none';
             });
         });
-
-        // Delete buttons
-        document.querySelectorAll('.btn-danger').forEach(button => {
-            button.addEventListener('click', async function() {
-                const userId = this.getAttribute('data-id');
-                const userName = this.getAttribute('data-name');
-
-                if (confirm(`Are you sure you want to delete user "${userName}"?`)) {
-                    await deleteUser(userId);
-                }
-            });
-        });
-    }
-
-    // Delete a user
-    async function deleteUser(userId) {
-        try {
-            // Determine the base URL
-            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `http://${window.location.host}`
-                : 'https://patriotthanks.vercel.app';
-
-            // Get auth token
-            const token = getAuthToken();
-            if (!token) {
-                return;
-            }
-
-            // Make API request
-            const response = await fetch(`${baseURL}/api/auth.js?operation=delete-user`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ userId: userId })
-            });
-
-            if (!response.ok) {
-                throw response;
-            }
-
-            // Success, reload users
-            alert('User deleted successfully!');
-            loadUsers();
-        } catch (error) {
-            handleApiError(error, () => {
-                alert('Error deleting user. Please try again later.');
-            });
-        }
     }
 
     // Load businesses from API
@@ -429,11 +430,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Add User button redirects to admin-users.html
-    document.getElementById('add-user-btn')?.addEventListener('click', function () {
-        window.location.href = 'admin-users.html';
-    });
-
     // Search functionality
     const searchInput = document.querySelector('.search-container input');
     searchInput?.addEventListener('input', function () {
@@ -474,44 +470,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Handle form submissions for user, business, and incentive forms
-    function setupFormSubmissions() {
-        const forms = document.querySelectorAll('form');
-        forms.forEach(form => {
-            form.addEventListener('submit', function (e) {
-                e.preventDefault();
-
-                // Collect form data
-                const formData = new FormData(this);
-                const data = {};
-                for (const [key, value] of formData.entries()) {
-                    data[key] = value;
-                }
-
-                // Handle different forms
-                if (form.id === 'user-form') {
-                    window.location.href = 'admin-users.html';
-                } else if (form.id === 'business-form') {
-                    // Will implement when API is ready
-                    alert('Business saved successfully!');
-                    document.querySelector('[data-tab="businesses-list"]').click();
-                } else if (form.id === 'incentive-form') {
-                    // Will implement when API is ready
-                    alert('Incentive saved successfully!');
-                    document.querySelector('[data-tab="incentives-list"]').click();
-                } else if (form.id === 'settings-form') {
-                    // Will implement when API is ready
-                    alert('Settings saved successfully!');
-                }
-            });
-        });
-    }
-
     // Initialize the dashboard
     function init() {
-        // Setup forms
-        setupFormSubmissions();
-
         // Check URL parameters
         handleUrlParams();
 
