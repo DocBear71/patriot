@@ -95,7 +95,7 @@ app.all('/api/business', createApiHandler(businessApi));
 app.all('/api/contact', createApiHandler(contactApi));
 app.all('/api/incentives', createApiHandler(incentivesApi));
 app.all('/api/users/index', createApiHandler(usersApi));
-app.all('/api/auth/index', createApiHandler(authApi));
+app.all('/api/auth', createApiHandler(authApi));
 app.all('/api/admin/users/index', createApiHandler(adminApi));
 app.all('/api/admin/users/[userId]', createApiHandler(adminUsersApi));
 

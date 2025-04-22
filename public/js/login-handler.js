@@ -27,7 +27,7 @@ function handleLogin() {
             : `https://patriotthanks.vercel.app`;
 
         // Make API call to login endpoint
-        fetch(`${baseURL}/api/auth/index?operation=login`, {
+        fetch(`${baseURL}/api/auth?operation=login`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json; charset=UTF-8",
