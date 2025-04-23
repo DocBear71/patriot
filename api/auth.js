@@ -62,7 +62,7 @@ try {
 try {
     Business = mongoose.model('Business');
 } catch (error) {
-    Business = mongoose.model('Business', businessSchema, 'businesses');
+    Business = mongoose.model('Business', businessSchema, 'business');
 }
 
 /**
@@ -182,6 +182,16 @@ async function handleDeleteUser(req, res) {
  * Handle dashboard statistics (admin functionality)
  */
 async function handleDashboardStats(req, res) {
+    console.log("Dashboard stats handler called");
+    console.log("Available Collections: ", Object.keys(mongoose.connection));
+
+    try {
+        console.log("Business model collection name:", Business.collection.name);
+        console.log("Business model exists:", !!Business);
+    } catch (error) {
+        console.error("Error checking Business model:", error);
+    }
+
     // Verify the token and check admin status
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
