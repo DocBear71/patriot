@@ -177,82 +177,140 @@ async function verifyAdminAccess(req) {
  */
 async function handleListIncentives(req, res) {
     console.log("Admin list incentives API hit");
-
     try {
-        // Parse pagination parameters
+        // Connect to MongoDB
+        await connect;
+        console.log("Database connection established");
+
+        // Parse query parameters
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        // Build filter object
-        const filter = {};
+        // Build query based on filters
+        const query = {};
 
-        // Add business filter if provided
-        if (req.query.business_id) {
-            filter.business_id = req.query.business_id;
-        }
-
-        // Add type filter if provided
-        if (req.query.type) {
-            filter.type = req.query.type;
-        }
-
-        // Add availability filter if provided
-        if (req.query.is_available !== undefined) {
-            filter.is_available = req.query.is_available === 'true';
-        }
-
-        // Add search filter if provided
+        // Search filter
         if (req.query.search) {
             const searchRegex = new RegExp(req.query.search, 'i');
-            filter.$or = [
+            query.$or = [
+                { is_available: searchRegex },
+                { type: searchRegex },
+                { amount: searchRegex },
                 { information: searchRegex },
                 { other_description: searchRegex }
             ];
         }
 
-        // Count total incentives matching the filter
-        const total = await Incentive.countDocuments(filter);
+        // Category filter
+        if (req.query.category) {
+            query.type = req.query.category;
+        }
 
-        // Execute the query with pagination
-        const incentives = await Incentive.find(filter)
+        // Status filter
+        if (req.query.status) {
+            query.status = req.query.status;
+        }
+
+        // Count total businesses matching query
+        const total = await Incentive.countDocuments(query);
+
+        // Find businesses with pagination
+        const incentives = await Incentive.find(query)
             .sort({ created_at: -1 })
             .skip(skip)
             .limit(limit)
-            .exec();
+            .lean();
 
-        // Get business information for each incentive
-        const enrichedIncentives = await Promise.all(incentives.map(async (incentive) => {
-            const incentiveObj = incentive.toObject();
+        // Calculate total pages
+        const totalPages = Math.ceil(total / limit);
 
-            // Look up business name if business_id is present
-            if (incentive.business_id) {
-                try {
-                    const business = await Business.findById(incentive.business_id);
-                    if (business) {
-                        incentiveObj.businessName = business.bname;
-                    }
-                } catch (error) {
-                    console.error(`Error fetching business data for incentive ${incentive._id}:`, error);
-                }
-            }
-
-            return incentiveObj;
-        }));
-
-        // Return the results
         return res.status(200).json({
-            message: 'Incentives retrieved successfully',
-            incentives: enrichedIncentives,
+            incentives,
             total,
             page,
             limit,
-            totalPages: Math.ceil(total / limit)
+            totalPages
         });
     } catch (error) {
-        console.error('Error in handleListIncentives:', error);
-        return res.status(500).json({ message: 'Error retrieving incentives', error: error.message });
+        console.error('Error listing incentives:', error);
+        return res.status(500).json({ message: 'Server error during incentive listing: ' + error.message });
     }
+    // try {
+    //     // Parse pagination parameters
+    //     const page = parseInt(req.query.page) || 1;
+    //     const limit = parseInt(req.query.limit) || 10;
+    //     const skip = (page - 1) * limit;
+    //
+    //     // Build filter object
+    //     const filter = {};
+    //
+    //     // Add business filter if provided
+    //     if (req.query.business_id) {
+    //         filter.business_id = req.query.business_id;
+    //     }
+    //
+    //     // Add type filter if provided
+    //     if (req.query.type) {
+    //         filter.type = req.query.type;
+    //     }
+    //
+    //     // Add availability filter if provided
+    //     if (req.query.is_available !== undefined) {
+    //         filter.is_available = req.query.is_available === 'true';
+    //     }
+    //
+    //     // Add search filter if provided
+    //     if (req.query.search) {
+    //         const searchRegex = new RegExp(req.query.search, 'i');
+    //         filter.$or = [
+    //             { information: searchRegex },
+    //             { other_description: searchRegex }
+    //         ];
+    //     }
+    //
+    //     // Count total incentives matching the filter
+    //     const total = await Incentive.countDocuments(filter);
+    //
+    //     // Execute the query with pagination
+    //     const incentives = await Incentive.find(filter)
+    //         .sort({ created_at: -1 })
+    //         .skip(skip)
+    //         .limit(limit)
+    //         .exec();
+    //
+    //     // Get business information for each incentive
+    //     const enrichedIncentives = await Promise.all(incentives.map(async (incentive) => {
+    //         const incentiveObj = incentive.toObject();
+    //
+    //         // Look up business name if business_id is present
+    //         if (incentive.business_id) {
+    //             try {
+    //                 const business = await Business.findById(incentive.business_id);
+    //                 if (business) {
+    //                     incentiveObj.businessName = business.bname;
+    //                 }
+    //             } catch (error) {
+    //                 console.error(`Error fetching business data for incentive ${incentive._id}:`, error);
+    //             }
+    //         }
+    //
+    //         return incentiveObj;
+    //     }));
+    //
+    //     // Return the results
+    //     return res.status(200).json({
+    //         message: 'Incentives retrieved successfully',
+    //         incentives: enrichedIncentives,
+    //         total,
+    //         page,
+    //         limit,
+    //         totalPages: Math.ceil(total / limit)
+    //     });
+    // } catch (error) {
+    //     console.error('Error in handleListIncentives:', error);
+    //     return res.status(500).json({ message: 'Error retrieving incentives', error: error.message });
+    // }
 }
 
 /**
