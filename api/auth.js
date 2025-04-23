@@ -6,6 +6,7 @@ const { ObjectId } = mongoose.Types;
 const jwt = require('jsonwebtoken');
 const Users = require("../models/Users");
 const Businesses = require("../models/index");
+const {Incentive} = require("../models");
 
 // Define schemas
 const userSchema = new mongoose.Schema({
@@ -251,25 +252,18 @@ async function handleDashboardStats(req, res) {
             ? Math.round((newBusinessesThisMonth / businessesPastMonth) * 100)
             : 100;
         console.log('Business change:', businessChange);
-        // Calculate stats for other collections if they exist
-        let incentiveCount = 0;
-        let incentiveChange = 0;
 
-        try {
-            // Try to get incentive stats if the collection exists
-            if (mongoose.connection.collections.incentives) {
-                const Incentive = mongoose.model('Incentive');
-                incentiveCount = await Incentive.countDocuments();
-                const incentivesPastMonth = await Incentive.countDocuments({
-                    created_at: { $lt: pastMonthDate }
-                });
-                incentiveChange = incentivesPastMonth > 0
-                    ? Math.round(((incentiveCount - incentivesPastMonth) / incentivesPastMonth) * 100)
-                    : 100;
-            }
-        } catch (error) {
-            console.log('Incentive stats not available:', error.message);
-        }
+        // get incentive counts
+        const totalIncentives = await Incentive.countDocuments();
+        const incentivesPastMonth = await Incentive.countDocuments({
+            created_at: { $lt: pastMonthDate }
+        });
+
+        const newIncentivesThisMonth = totalIncentives - incentivesPastMonth;
+
+        const incentiveChange = incentivesPastMonth > 0
+            ? Math.round((newIncentivesThisMonth / incentivesPastMonth) * 100)
+            : 100;
 
         // Return dashboard statistics
         return res.status(200).json({
@@ -278,7 +272,7 @@ async function handleDashboardStats(req, res) {
             businessCount: totalBusiness,
             businessChange: businessChange,
             newBusinessesThisMonth: newBusinessesThisMonth,
-            incentiveCount: incentiveCount,
+            incentiveCount: totalIncentives,
             incentiveChange: incentiveChange,
             timestamp: new Date()
         });

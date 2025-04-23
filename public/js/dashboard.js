@@ -526,7 +526,7 @@ document.addEventListener('DOMContentLoaded', function () {
             console.log("Using token for API request: ", token.substring(0, 10) + "...");
 
             // Make API request - use your existing incentives API
-            const response = await fetch(`${baseURL}/api/incentives.js?operation=admin-list-incentives&page=1&limit=5`, {
+            const response = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=5`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -604,47 +604,47 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 // Load incentive statistics
-    async function loadIncentiveStats() {
-        try {
-            // Determine the base URL
-            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `http://${window.location.host}`
-                : 'https://patriotthanks.vercel.app';
-
-            // Get auth token
-            const token = getAuthToken();
-            if (!token) {
-                return;
-            }
-
-            // Make API request - we'll use the existing incentives API for now
-            const response = await fetch(`${baseURL}/api/incentives.js?admin=true&stats=true`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Cache-Control': 'no-cache'
-                }
-            });
-
-            if (!response.ok) {
-                throw response;
-            }
-
-            const data = await response.json();
-
-            // Update stats with the data
-            const totalCount = data.total || 0;
-            const availableCount = data.available || 0;
-            const newCount = data.newThisMonth || 0;
-
-            updateIncentiveStats(totalCount, availableCount, newCount);
-        } catch (error) {
-            console.error('Error loading incentive stats:', error);
-
-            // Fallback to setting reasonable defaults
-            updateIncentiveStats(0, 0, 0);
-        }
-    }
+//     async function loadIncentiveStats() {
+//         try {
+//             // Determine the base URL
+//             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+//                 ? `http://${window.location.host}`
+//                 : 'https://patriotthanks.vercel.app';
+//
+//             // Get auth token
+//             const token = getAuthToken();
+//             if (!token) {
+//                 return;
+//             }
+//
+//             // Make API request - we'll use the existing incentives API for now
+//             const response = await fetch(`${baseURL}/api/auth.js?operation=dashboard-stats`, {
+//                 method: 'GET',
+//                 headers: {
+//                     'Authorization': `Bearer ${token}`,
+//                     'Cache-Control': 'no-cache'
+//                 }
+//             });
+//
+//             if (!response.ok) {
+//                 throw response;
+//             }
+//
+//             const data = await response.json();
+//
+//             // Update stats with the data
+//             const totalCount = data.total || 0;
+//             const availableCount = data.available || 0;
+//             const newCount = data.newThisMonth || 0;
+//
+//             updateIncentiveStats(totalCount, availableCount, newCount);
+//         } catch (error) {
+//             console.error('Error loading incentive stats:', error);
+//
+//             // Fallback to setting reasonable defaults
+//             updateIncentiveStats(0, 0, 0);
+//         }
+//     }
 
 // Render incentives in the dashboard
     function renderDashboardIncentives(incentives) {

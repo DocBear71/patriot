@@ -63,14 +63,8 @@ try {
  * Main API handler for admin incentive operations
  */
 module.exports = async (req, res) => {
-    // Handle CORS
-    res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
-    );
+    // Handle CORS through next.config.js
+
 
     // Handle preflight OPTIONS request
     if (req.method === 'OPTIONS') {
