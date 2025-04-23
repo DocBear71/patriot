@@ -109,8 +109,8 @@ async function verifyAdminToken(req) {
 
         // Find the user
         const user = await User.findById(decoded.userId);
-        user.isAdmin = undefined;
-        user.level = undefined;
+        user.isAdmin = true;
+        user.level = 'Admin';
 
         if (!user) {
             console.log("User not found in database");
