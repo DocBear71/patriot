@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const { ObjectId } = mongoose.Types;
 const jwt = require('jsonwebtoken');
 const Users = require("../models/Users");
+const Businesses = require("../models/index");
 
 // Define schemas
 const userSchema = new mongoose.Schema({
@@ -31,8 +32,21 @@ const adminCodeSchema = new mongoose.Schema({
     created_at: { type: Date, default: Date.now }
 });
 
+const businessSchema = new mongoose.Schema({
+    bname: String,
+    address1: String,
+    address2: String,
+    city: String,
+    state: String,
+    zip: String,
+    phone: String,
+    type: String,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now }
+});
+
 // Initialize models
-let User, AdminCode;
+let User, AdminCode, Business;
 try {
     User = mongoose.model('User');
 } catch (error) {
@@ -43,6 +57,12 @@ try {
     AdminCode = mongoose.model('AdminCode');
 } catch (error) {
     AdminCode = mongoose.model('AdminCode', adminCodeSchema, 'admin_codes');
+}
+
+try {
+    Business = mongoose.model('Business');
+} catch (error) {
+    Business = mongoose.model('Business', businessSchema, 'businesses');
 }
 
 /**
@@ -208,27 +228,18 @@ async function handleDashboardStats(req, res) {
             ? Math.round(((totalUsers - usersPastMonth) / usersPastMonth) * 100)
             : 100;
 
+        // get business counts
+        const totalBusiness = await Business.countDocuments();
+        const businessesPastMonth = await Business.countDocuments({
+            created_at: { $lt: pastMonthDate }
+        });
+        const businessChange = businessesPastMonth > 0
+            ? Math.round(((totalBusiness - businessesPastMonth) / businessesPastMonth) * 100)
+            : 100;
+
         // Calculate stats for other collections if they exist
-        let businessCount = 0;
-        let businessChange = 0;
         let incentiveCount = 0;
         let incentiveChange = 0;
-
-        try {
-            // Try to get business stats if the collection exists
-            if (mongoose.connection.collections.businesses) {
-                const Business = mongoose.model('Business');
-                businessCount = await Business.countDocuments();
-                const businessesPastMonth = await Business.countDocuments({
-                    created_at: { $lt: pastMonthDate }
-                });
-                businessChange = businessesPastMonth > 0
-                    ? Math.round(((businessCount - businessesPastMonth) / businessesPastMonth) * 100)
-                    : 100;
-            }
-        } catch (error) {
-            console.log('Business stats not available:', error.message);
-        }
 
         try {
             // Try to get incentive stats if the collection exists
