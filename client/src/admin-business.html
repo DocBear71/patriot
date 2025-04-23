@@ -340,6 +340,21 @@
                 return false;
             }
 
+            console.log("Token first 20 chars: " + token.substring(0, 20));
+
+            // If token is in JWT format, attempt to decode it (client-side)
+            if (token.split('.').length === 3) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    console.log("Token payload:", payload);
+                    console.log("Admin claim:", payload.isAdmin);
+                    console.log("User ID:", payload.userId);
+                    console.log("Expiration:", new Date(payload.exp * 1000).toLocaleString());
+                } catch (e) {
+                    console.error("Error decoding token:", e);
+                }
+            }
+
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                     ? `http://${window.location.host}`
@@ -403,6 +418,3 @@
 </script>
 </body>
 </html>
-
-a9b8c7d6e5f4g3h2i1j0k9l8m7n6o5p4q3r2s1t0u9v8w7x6y5z4a3b2c1d0
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2ODA0NWUwZDVmYTFmMTE2MWQ5Njc3ZGEiLCJpc0FkbWluIjp0cnVlLCJpYXQiOjE3NDUzNjkwOTYsImV4cCI6MTc0NTk3Mzg5Nn0.hh2lE5pWm2ETqBRAb9JB4Wtd29-lWBgXoLu3-2DfYBE
