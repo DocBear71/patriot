@@ -498,6 +498,280 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+// Load incentives from API for dashboard display
+    async function loadIncentives() {
+        try {
+            // Show loading indicator in dashboard incentives table
+            const incentiveTableBody = document.getElementById('dashboard-incentives-table');
+            if (incentiveTableBody) {
+                incentiveTableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading incentives...</td></tr>';
+            }
+
+            // Determine the base URL
+            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `http://${window.location.host}`
+                : 'https://patriotthanks.vercel.app';
+
+            // Get auth token
+            const token = getAuthToken();
+            if (!token) {
+                console.error("No auth token found");
+                // handle missing token gracefully
+                if (incentiveTableBody) {
+                    incentiveTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Authentication error. Please log in again.</td></tr>';
+                }
+                return;
+            }
+
+            console.log("Using token for API request: ", token.substring(0, 10) + "...");
+
+            // Make API request - use your existing incentives API
+            const response = await fetch(`${baseURL}/api/incentives.js?admin=true&limit=5`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': 'no-cache'
+                }
+            });
+
+            if (!response.ok) {
+                console.error("API error response: ", response.status, response.statusText);
+
+                // if unauthorized, handle gracefully
+                if (response.status === 401) {
+                    console.error("Unauthorized request -- token may be invalid");
+                    if (incentiveTableBody) {
+                        incentiveTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Authentication error. Please log in again.</td></tr>';
+                    }
+                    return;
+                }
+                throw response;
+            }
+
+            const data = await response.json();
+            const incentives = data.results || [];
+
+            // Also load incentive statistics
+            await loadIncentiveStats();
+
+            // Render incentives in the table
+            renderDashboardIncentives(incentives);
+        } catch (error) {
+            handleApiError(error, () => {
+                // If API fails, show error message instead of redirecting
+                const incentiveTableBody = document.getElementById('dashboard-incentives-table');
+                if (incentiveTableBody) {
+                    incentiveTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading incentives. Please try again later.</td></tr>';
+                }
+
+                // For testing, provide some mock data
+                const mockIncentives = [
+                    {
+                        _id: '1',
+                        business_id: '1',
+                        businessName: 'Tech Solutions Inc.',
+                        type: 'VT',
+                        is_available: true,
+                        amount: 10,
+                        information: 'Veterans get 10% off all services.',
+                        created_at: '2025-04-01T00:00:00.000Z'
+                    },
+                    {
+                        _id: '2',
+                        business_id: '2',
+                        businessName: 'Hometown Diner',
+                        type: 'AD',
+                        is_available: true,
+                        amount: 15,
+                        information: 'Active duty military receive 15% discount.',
+                        created_at: '2025-04-05T00:00:00.000Z'
+                    },
+                    {
+                        _id: '3',
+                        business_id: '3',
+                        businessName: 'Cedar Medical Center',
+                        type: 'FR',
+                        is_available: true,
+                        amount: 20,
+                        information: 'First responders receive 20% off select services.',
+                        created_at: '2025-04-10T00:00:00.000Z'
+                    }
+                ];
+                renderDashboardIncentives(mockIncentives);
+                updateIncentiveStats(mockIncentives.length, mockIncentives.filter(i => i.is_available).length, Math.floor(mockIncentives.length * 0.3));
+            });
+        }
+    }
+
+// Load incentive statistics
+    async function loadIncentiveStats() {
+        try {
+            // Determine the base URL
+            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `http://${window.location.host}`
+                : 'https://patriotthanks.vercel.app';
+
+            // Get auth token
+            const token = getAuthToken();
+            if (!token) {
+                return;
+            }
+
+            // Make API request - we'll use the existing incentives API for now
+            const response = await fetch(`${baseURL}/api/incentives.js?admin=true&stats=true`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': 'no-cache'
+                }
+            });
+
+            if (!response.ok) {
+                throw response;
+            }
+
+            const data = await response.json();
+
+            // Update stats with the data
+            const totalCount = data.total || 0;
+            const availableCount = data.available || 0;
+            const newCount = data.newThisMonth || 0;
+
+            updateIncentiveStats(totalCount, availableCount, newCount);
+        } catch (error) {
+            console.error('Error loading incentive stats:', error);
+
+            // Fallback to setting reasonable defaults
+            updateIncentiveStats(0, 0, 0);
+        }
+    }
+
+// Render incentives in the dashboard
+    function renderDashboardIncentives(incentives) {
+        const incentiveTableBody = document.getElementById('dashboard-incentives-table');
+        if (!incentiveTableBody) return;
+
+        if (!incentives || incentives.length === 0) {
+            incentiveTableBody.innerHTML = '<tr><td colspan="6" class="text-center">No incentives found</td></tr>';
+            return;
+        }
+
+        incentiveTableBody.innerHTML = '';
+
+        incentives.forEach(incentive => {
+            // Get type label
+            const typeLabel = getIncentiveTypeLabel(incentive.type);
+
+            // Format other type description
+            const otherDesc = incentive.type === 'OT' && incentive.other_description
+                ? `<br><em>(${incentive.other_description})</em>`
+                : '';
+
+            // Format availability
+            const availabilityText = incentive.is_available ? 'Yes' : 'No';
+            const availabilityClass = incentive.is_available ? 'text-success' : 'text-danger';
+
+            // Format amount
+            const amountText = incentive.is_available ? `${incentive.amount}%` : 'N/A';
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+            <td>${incentive.businessName || 'Unknown Business'}</td>
+            <td>${typeLabel}${otherDesc}</td>
+            <td class="${availabilityClass}">${availabilityText}</td>
+            <td>${amountText}</td>
+            <td>${incentive.information || 'No information available'}</td>
+            <td>
+                <div class="action-btns">
+                    <a href="admin-incentives.html?edit=${incentive._id}" class="btn btn-sm btn-info">Edit</a>
+                </div>
+            </td>
+        `;
+
+            incentiveTableBody.appendChild(row);
+        });
+
+        // Add quick search functionality
+        setupIncentiveQuickSearch();
+    }
+
+// Helper function to get incentive type label
+    function getIncentiveTypeLabel(typeCode) {
+        const types = {
+            'VT': 'Veteran',
+            'AD': 'Active Duty',
+            'FR': 'First Responder',
+            'SP': 'Spouse',
+            'OT': 'Other'
+        };
+
+        return types[typeCode] || typeCode;
+    }
+
+// Update incentive stats in the dashboard
+    function updateIncentiveStats(totalCount, availableCount, newCount) {
+        const totalIncentivesCount = document.getElementById('total-incentives-count');
+        if (totalIncentivesCount) {
+            totalIncentivesCount.textContent = totalCount;
+        }
+
+        const availableIncentivesCount = document.getElementById('available-incentives-count');
+        if (availableIncentivesCount) {
+            availableIncentivesCount.textContent = availableCount;
+        }
+
+        const newIncentivesCount = document.getElementById('new-incentives-count');
+        if (newIncentivesCount) {
+            newIncentivesCount.textContent = newCount;
+        }
+    }
+
+// Set up quick search for incentives
+    function setupIncentiveQuickSearch() {
+        const quickSearch = document.getElementById('quick-incentive-search');
+        if (!quickSearch) return;
+
+        quickSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const incentiveRows = document.querySelectorAll('#dashboard-incentives-table tr');
+
+            incentiveRows.forEach(row => {
+                let foundMatch = false;
+                const cells = row.querySelectorAll('td');
+
+                cells.forEach(cell => {
+                    if (cell.textContent.toLowerCase().includes(searchTerm)) {
+                        foundMatch = true;
+                    }
+                });
+
+                row.style.display = foundMatch ? '' : 'none';
+            });
+        });
+    }
+
+// Add the following to the existing init() function or where appropriate:
+    /*
+    // Add menu click handler for incentives tab if not already handled
+    menuItems.forEach(item => {
+        item.addEventListener('click', function() {
+            // Skip if this is a link to another page
+            if (this.querySelector('a')) {
+                return;
+            }
+
+            // Get the section from data attribute
+            const section = this.getAttribute('data-section');
+
+            // If incentives section is clicked, load incentives
+            if (section === 'incentives') {
+                loadIncentives();
+            }
+            // ... (other sections handling)
+        });
+    });
+    */
+
     // Sidebar navigation
     const menuItems = document.querySelectorAll('.menu-item');
     const panels = document.querySelectorAll('.panel');

@@ -224,7 +224,64 @@
     </div>
 </div>
 </div>
+<!-- Incentives Panel -->
+<div id="incentives-panel" class="panel">
+    <div class="panel-header">
+        <h2>Incentive Management</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <p>Overview of military and first responder discounts</p>
+            <a href="admin-incentives.html" class="btn btn-primary">Full Incentive Management</a>
+        </div>
+    </div>
 
+    <div class="panel-content">
+        <div class="incentive-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h4>Total Incentives</h4>
+                <p style="font-size: 1.5rem; font-weight: bold;" id="total-incentives-count">Loading...</p>
+            </div>
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h4>Available Incentives</h4>
+                <p style="font-size: 1.5rem; font-weight: bold;" id="available-incentives-count">Loading...</p>
+            </div>
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h4>New This Month</h4>
+                <p style="font-size: 1.5rem; font-weight: bold;" id="new-incentives-count">Loading...</p>
+            </div>
+        </div>
+
+        <div class="recent-incentives">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3>Recent Incentives</h3>
+                <div>
+                    <input type="text" placeholder="Quick search..." id="quick-incentive-search" style="padding: 5px; border-radius: 3px; border: 1px solid #ddd;">
+                </div>
+            </div>
+
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th>Business</th>
+                    <th>Type</th>
+                    <th>Available</th>
+                    <th>Amount (%)</th>
+                    <th>Information</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody id="dashboard-incentives-table">
+                <tr>
+                    <td colspan="6" class="text-center">Loading incentive data...</td>
+                </tr>
+                </tbody>
+            </table>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="admin-incentives.html" class="btn btn-secondary">See All Incentives</a>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
     // Check for admin status on page load
