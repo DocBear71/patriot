@@ -526,7 +526,7 @@ document.addEventListener('DOMContentLoaded', function () {
             console.log("Using token for API request: ", token.substring(0, 10) + "...");
 
             // Make API request - use your existing incentives API
-            const response = await fetch(`${baseURL}/api/incentives.js?admin=true&limit=5`, {
+            const response = await fetch(`${baseURL}/api/incentives.js?operation=admin-list-incentives&page=1&limit=5`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
