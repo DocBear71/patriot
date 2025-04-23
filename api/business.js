@@ -93,10 +93,16 @@ async function verifyAdminToken(req) {
     }
 
     const token = authHeader.split(' ')[1];
+    console.log("Verifying admin token in business.js:", token.substring(0, 20) + "...");
 
     try {
+        // Use the same secret as in auth.js
+        const JWT_SECRET = process.env.JWT_SECRET || 'patriot-thanks-secret-key';
+        console.log("Using JWT_SECRET:", JWT_SECRET === 'patriot-thanks-secret-key' ? 'Using fallback secret' : 'Using env variable');
+
         // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+        const decoded = jwt.verify(token, JWT_SECRET);
+        console.log("Token decoded successfully:", decoded.userId, "isAdmin:", decoded.isAdmin);
 
         // Connect to MongoDB
         await connect;
@@ -105,14 +111,17 @@ async function verifyAdminToken(req) {
         const user = await User.findById(decoded.userId);
 
         if (!user) {
+            console.log("User not found in database");
             return { authorized: false, message: 'User not found' };
         }
 
         // Check admin rights
         if (user.level !== 'Admin' && user.isAdmin !== true) {
+            console.log("User is not an admin. Level:", user.level, "isAdmin:", user.isAdmin);
             return { authorized: false, message: 'Admin access required' };
         }
 
+        console.log("User verified as admin:", user.level, user.isAdmin);
         return { authorized: true, user };
     } catch (error) {
         console.error('Token verification error:', error);
