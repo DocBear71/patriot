@@ -230,13 +230,15 @@ async function handleDashboardStats(req, res) {
 
         // get business counts
         const totalBusiness = await Business.countDocuments();
+        console.log('Total business count:', totalBusiness);
         const businessesPastMonth = await Business.countDocuments({
             created_at: { $lt: pastMonthDate }
         });
+        console.log('Businesses past month:', businessesPastMonth);
         const businessChange = businessesPastMonth > 0
             ? Math.round(((totalBusiness - businessesPastMonth) / businessesPastMonth) * 100)
             : 100;
-
+        console.log('Business change:', businessChange);
         // Calculate stats for other collections if they exist
         let incentiveCount = 0;
         let incentiveChange = 0;
