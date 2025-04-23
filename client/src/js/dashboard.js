@@ -801,7 +801,7 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (section === 'businesses') {
                 loadBusinesses();
             } else if (section === 'incentives') {
-                // Load incentives when implemented
+                loadIncentives();
             } else if (section === 'dashboard') {
                 loadDashboardStats();
             }
