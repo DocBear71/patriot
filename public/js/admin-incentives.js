@@ -38,17 +38,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Check admin access then initialize
     async function checkAdminAccess() {
-        try {
-            const isAdmin = await checkAdminStatus();
-            if (isAdmin) {
-                console.log("Admin access confirmed");
-                init();
-            } else {
-                console.error("Admin access denied");
-            }
-        } catch (error) {
-            console.error("Error checking admin access:", error);
-            showAccessDenied();
+        const isAdmin = await checkAdminStatus();
+        if (isAdmin) {
+            console.log("Admin access confirmed");
+            init();
+        } else {
+            console.error("Admin access denied");
         }
     }
 
