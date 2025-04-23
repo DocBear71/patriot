@@ -261,7 +261,7 @@ async function handleDashboardStats(req, res) {
         return res.status(200).json({
             userCount: totalUsers,
             userChange: userChange,
-            businessCount: businessCount,
+            businessCount: totalBusiness,
             businessChange: businessChange,
             incentiveCount: incentiveCount,
             incentiveChange: incentiveChange,
