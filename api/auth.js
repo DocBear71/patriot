@@ -6,7 +6,7 @@ const { ObjectId } = mongoose.Types;
 const jwt = require('jsonwebtoken');
 const Users = require("../models/Users");
 const Businesses = require("../models/index");
-const {Incentive} = require("../models");
+const Incentives = require("../models/index");
 
 // Define schemas
 const userSchema = new mongoose.Schema({
@@ -46,8 +46,19 @@ const businessSchema = new mongoose.Schema({
     updated_at: { type: Date, default: Date.now }
 });
 
+const incentiveSchema = new mongoose.Schema({
+    business_id: String,
+    is_available: Boolean,
+    type: String,
+    amount: Number,
+    information: String,
+    other_description: String,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now }
+});
+
 // Initialize models
-let User, AdminCode, Business;
+let User, AdminCode, Business, Incentive;
 try {
     User = mongoose.model('User');
 } catch (error) {
@@ -64,6 +75,12 @@ try {
     Business = mongoose.model('Business');
 } catch (error) {
     Business = mongoose.model('Business', businessSchema, 'business');
+}
+
+try {
+    Incentive = mongoose.model('Incentive');
+} catch (error) {
+    Business = mongoose.model('Incentive', incentiveSchema, 'incentives');
 }
 
 /**
