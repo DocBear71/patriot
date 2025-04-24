@@ -467,8 +467,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show success message
             showMessage('success', "Incentive updated successfully!");
 
-            // Refresh the incentives list
-            fetchIncentives(selectedBusinessId);
+            // MODIFIED: Instead of refreshing the incentives list, reset the entire form
+            resetFormAfterUpdate();
 
             // Reset button state
             submitButton.value = originalText;
@@ -486,6 +486,105 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
+
+    // Function to reset the form after successful update
+    function resetFormAfterUpdate() {
+        console.log("Resetting form to initial state");
+
+        // Reset business info section
+        const businessInfoSection = document.getElementById('business-info-section');
+        if (businessInfoSection) {
+            businessInfoSection.style.display = 'none';
+        }
+
+        // Reset incentives list section
+        const incentivesListSection = document.getElementById('incentives-list-section');
+        if (incentivesListSection) {
+            incentivesListSection.style.display = 'none';
+
+            // Clear incentives table container
+            const incentivesTableContainer = document.getElementById('incentives-table-container');
+            if (incentivesTableContainer) {
+                incentivesTableContainer.innerHTML = '';
+            }
+        }
+
+        // Reset incentive edit section
+        const incentiveEditSection = document.getElementById('incentive-edit-section');
+        if (incentiveEditSection) {
+            incentiveEditSection.style.display = 'none';
+        }
+
+        // Reset business information displays
+        const nameDisplay = document.getElementById('business-name-display');
+        if (nameDisplay) nameDisplay.textContent = '';
+
+        const addressDisplay = document.getElementById('business-address-display');
+        if (addressDisplay) addressDisplay.textContent = '';
+
+        const cityStateDisplay = document.getElementById('business-city-state-display');
+        if (cityStateDisplay) cityStateDisplay.textContent = '';
+
+        const phoneDisplay = document.getElementById('business-phone-display');
+        if (phoneDisplay) phoneDisplay.textContent = '';
+
+        const typeDisplay = document.getElementById('business-type-display');
+        if (typeDisplay) typeDisplay.textContent = '';
+
+        // Reset hidden fields
+        const selectedBusinessIdField = document.getElementById('selected-business-id');
+        if (selectedBusinessIdField) selectedBusinessIdField.value = '';
+
+        const selectedIncentiveIdField = document.getElementById('selected-incentive-id');
+        if (selectedIncentiveIdField) selectedIncentiveIdField.value = '';
+
+        // Reset form fields
+        const incentiveTypeSelect = document.getElementById('incentiveType');
+        if (incentiveTypeSelect) incentiveTypeSelect.selectedIndex = 0;
+
+        const otherTypeDescription = document.getElementById('otherTypeDescription');
+        if (otherTypeDescription) otherTypeDescription.value = '';
+
+        const incentiveAmount = document.getElementById('incentiveAmount');
+        if (incentiveAmount) incentiveAmount.value = '';
+
+        const incentiveInfo = document.getElementById('incentiveInfo');
+        if (incentiveInfo) incentiveInfo.value = '';
+
+        // Reset otherTypeContainer display
+        const otherTypeContainer = document.getElementById('otherTypeContainer');
+        if (otherTypeContainer) otherTypeContainer.style.display = 'none';
+
+        // Reset radio buttons
+        const incentiveAvailable = document.getElementById('incentiveAvailable');
+        if (incentiveAvailable) incentiveAvailable.checked = false;
+
+        const incentiveNotAvailable = document.getElementById('incentiveNotAvailable');
+        if (incentiveNotAvailable) incentiveNotAvailable.checked = false;
+
+        // Reset the business search form
+        const businessNameField = document.getElementById('business-name');
+        if (businessNameField) businessNameField.value = '';
+
+        const addressField = document.getElementById('address');
+        if (addressField) addressField.value = '';
+
+        // Clear the business search results
+        const resultsContainer = document.getElementById('business-search-results');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '';
+        }
+
+        // Reset the global variables
+        selectedBusinessId = '';
+        selectedIncentiveId = '';
+
+        // Scroll to the top of the page
+        window.scrollTo(0, 0);
+
+        console.log("Form reset completed");
+    }
+
 
     // Helper function to get auth token if available
     function getAuthToken() {

@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
         businessInfoSection.scrollIntoView({ behavior: 'smooth' });
     };
 
+
     // Function to update a business in the database
     async function updateBusiness(formData) {
         try {
@@ -161,6 +162,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show success message
             showMessage('success', "Business updated successfully!");
 
+            // ADDED: Reset the form after successful update
+            resetFormAfterUpdate();
+
             // Reset button state
             submitButton.value = originalText;
             submitButton.disabled = false;
@@ -177,6 +181,57 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
+
+// Function to reset the form after successful update
+    function resetFormAfterUpdate() {
+        console.log("Resetting business update form to initial state");
+
+        // Reset business info section
+        const businessInfoSection = document.getElementById('business-info-section');
+        if (businessInfoSection) {
+            businessInfoSection.style.display = 'none';
+        }
+
+        // Reset form fields
+        const formFields = [
+            'bname', 'address1', 'address2', 'city', 'zip', 'phone'
+        ];
+
+        formFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) field.value = '';
+        });
+
+        // Reset select fields
+        const stateSelect = document.getElementById('state');
+        if (stateSelect) stateSelect.selectedIndex = 0;
+
+        const typeSelect = document.getElementById('type');
+        if (typeSelect) typeSelect.selectedIndex = 0;
+
+        // Reset hidden field
+        const selectedBusinessIdField = document.getElementById('selected-business-id');
+        if (selectedBusinessIdField) selectedBusinessIdField.value = '';
+
+        // Reset the business search form
+        const businessNameField = document.getElementById('business-name');
+        if (businessNameField) businessNameField.value = '';
+
+        const addressField = document.getElementById('address');
+        if (addressField) addressField.value = '';
+
+        // Clear the business search results
+        const resultsContainer = document.getElementById('business-search-results');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '';
+        }
+
+        // Scroll to the top of the page
+        window.scrollTo(0, 0);
+
+        console.log("Business form reset completed");
+    }
+
 
     // Helper function to get auth token if available
     function getAuthToken() {
