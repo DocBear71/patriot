@@ -376,21 +376,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? `${business.city}, ${business.state}`
                 : 'Location not specified';
 
+            // Use the helper function to get the display name for the business type
+            const businessTypeDisplay = getBusinessTypeDisplay(business.type);
+
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${business._id ? business._id.substring(0, 8) + '...' : 'N/A'}</td>
-                <td>${business.bname || 'N/A'}</td>
-                <td>${locationText}</td>
-                <td>${business.type || 'Other'}</td>
-                <td>${business.phone || 'N/A'}</td>
-                <td><span class="badge ${business.status === 'active' ? 'badge-success' : 'badge-secondary'}">${business.status === 'active' ? 'Active' : 'Inactive'}</span></td>
-                <td>
-                    <div class="action-btns">
-                        <button class="btn btn-sm btn-info edit-business-btn" data-id="${business._id}">Edit</button>
-                        <button class="btn btn-sm btn-danger delete-business-btn" data-id="${business._id}" data-name="${business.bname || 'this business'}">Delete</button>
-                    </div>
-                </td>
-            `;
+            <td>${business._id ? business._id.substring(0, 8) + '...' : 'N/A'}</td>
+            <td>${business.bname || 'N/A'}</td>
+            <td>${locationText}</td>
+            <td>${businessTypeDisplay}</td>
+            <td>${business.phone || 'N/A'}</td>
+            <td><span class="badge ${business.status === 'active' ? 'badge-success' : 'badge-secondary'}">${business.status === 'active' ? 'Active' : 'Inactive'}</span></td>
+            <td>
+                <div class="action-btns">
+                    <button class="btn btn-sm btn-info edit-business-btn" data-id="${business._id}">Edit</button>
+                    <button class="btn btn-sm btn-danger delete-business-btn" data-id="${business._id}" data-name="${business.bname || 'this business'}">Delete</button>
+                </div>
+            </td>
+        `;
 
             businessTableBody.appendChild(row);
         });
@@ -799,7 +802,7 @@ document.addEventListener('DOMContentLoaded', function() {
             {id: 'state', label: 'State'},
             {id: 'zip', label: 'Zip Code'},
             {id: 'phone', label: 'Phone'},
-            {id: 'type', label: 'Business Category'},
+            {id: 'type', label: 'Business Type'},
             {id: 'status', label: 'Status'}
         ];
 
@@ -889,5 +892,20 @@ document.addEventListener('DOMContentLoaded', function() {
             clearTimeout(timeout);
             timeout = setTimeout(() => func.apply(context, args), wait);
         };
+    }
+
+    // helper function to map business type codes to display names
+    function getBusinessTypeDisplay(typeCode) {
+        const typeMap = {
+            'AUTO': 'Automotive',
+            'ENT': 'Entertainment',
+            'HARDW': 'Hardware',
+            'RX': 'Pharmacy',
+            'REST': 'Restaurant',
+            'RETAIL': 'Retail',
+            'Tech': 'Technology',
+            'OTHER': 'Other'
+        };
+        return typeMap[typeCode] || typeCode;
     }
 });
