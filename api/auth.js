@@ -1,4 +1,4 @@
-// api/auth/index.js - Consolidated authentication API (login, register, verify-admin)
+// api/auth.js - Consolidated authentication API (login, register, verify-admin)
 const connect = require('../config/db');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -280,6 +280,7 @@ async function handleDashboardStats(req, res) {
         let newBusinessesThisMonth = 0;
         let businessChange = 0;
 
+
         try {
             totalBusiness = await Business.countDocuments();
             businessesPastMonth = await Business.countDocuments({
@@ -287,7 +288,7 @@ async function handleDashboardStats(req, res) {
             });
             newBusinessesThisMonth = totalBusiness - businessesPastMonth;
             businessChange = businessesPastMonth > 0
-                ? Math.round((newBusinessesThisMonth / businessesPastMonth) * 100)
+                ? Math.round(((totalBusiness - businessesPastMonth) / businessesPastMonth) * 100)
                 : 100;
             console.log('Business counts retrieved successfully');
         } catch (error) {
@@ -305,11 +306,6 @@ async function handleDashboardStats(req, res) {
             if (Incentive && typeof Incentive.countDocuments === 'function') {
                 totalIncentives = await Incentive.countDocuments();
 
-                // Count incentives created this month
-                const thisMonth = new Date();
-                thisMonth.setDate(1); // Set to first day of current month
-                thisMonth.setHours(0, 0, 0, 0); // Set to beginning of the day
-
                 newIncentivesThisMonth = await Incentive.countDocuments({
                     created_at: { $gte: thisMonth }
                 });
@@ -320,9 +316,9 @@ async function handleDashboardStats(req, res) {
                 });
 
                 // Calculate percentage change
-                incentiveChange = incentivesPastMonth > 0
+                const incentiveChange = incentivesPastMonth > 0
                     ? Math.round(((totalIncentives - incentivesPastMonth) / incentivesPastMonth) * 100)
-                    : newIncentivesThisMonth > 0 ? newIncentivesThisMonth : 0; // If no past incentives, use actual new count
+                    : 100;
 
                 console.log('Incentive counts retrieved successfully');
             } else {

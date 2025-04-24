@@ -7,6 +7,21 @@ DESCRIPTION:
     Style Sheet for Patriot Thanks Admin Dashboard.
 */
 
+#spinner-container{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: row; /* row is the default */
+    justify-content: center; /* horizontal alignment when flex is set to row */
+    align-items: center; /* Vertical alignment when flex is set to row */
+    background-color: rgba(0,0,0,0.5);
+    color: white;
+    font-size: 4em;
+}
+
 /* Reset and base styles */
 
 * {

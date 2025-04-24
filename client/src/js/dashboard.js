@@ -1,4 +1,27 @@
 // dashboard.js - Updated to use real data from the API and show users in the dashboard
+
+let loadSpinner;
+
+// Function to show the loading spinner
+function showSpinner() {
+    loadSpinner = document.getElementById('spinner-container');
+    if (loadSpinner) {
+        loadSpinner.style.display = 'flex';
+        loadSpinner.style.opacity = 1;
+    }
+}
+
+// Function to hide the loading spinner with a fade effect
+function hideLoadingSpinner() {
+        setTimeout(() => {
+            loadSpinner.style.opacity = 0; // this will hide the spinner
+            loadSpinner.style.transition = 'opacity 0.5s'; // fadeout in half a second
+            setTimeout(() => {
+                loadSpinner.style.display = 'none';
+            }, 500);
+        }, 500);
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     // State variables for API data
     let users = [];
@@ -37,6 +60,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Load dashboard stats
     async function loadDashboardStats() {
+        // Show spinner while loading
+        showSpinner();
         try {
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -67,6 +92,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Update dashboard UI with real stats
             updateDashboardStats();
+            hideLoadingSpinner()
         } catch (error) {
             handleApiError(error, () => {
                 // Use placeholder stats
@@ -79,6 +105,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     incentiveChange: 23
                 };
                 updateDashboardStats();
+                hideLoadingSpinner();
             });
         }
     }
@@ -877,6 +904,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initialize the dashboard
     function init() {
+        // Show spinner while loading
+        showSpinner();
+
         // Check URL parameters
         handleUrlParams();
 
