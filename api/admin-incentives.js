@@ -13,6 +13,7 @@ const businessSchema = new mongoose.Schema({
     zip: String,
     phone: String,
     type: String,
+    status: { type: String, default: 'active' },
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now }
 });
@@ -28,6 +29,23 @@ const incentiveSchema = new mongoose.Schema({
     updated_at: { type: Date, default: Date.now },
 });
 
+const userSchema = new mongoose.Schema({
+    email: String,
+    password: String,
+    fname: String,
+    lname: String,
+    address1: String,
+    address2: String,
+    city: String,
+    state: String,
+    zip: String,
+    status: String,
+    level: String,
+    isAdmin: Boolean,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now }
+});
+
 // Initialize models once
 let Business, Incentive, User;
 try {
@@ -39,37 +57,26 @@ try {
     // Define the models if they do not exist
     Business = mongoose.model('Business', businessSchema, 'business');
     Incentive = mongoose.model('Incentive', incentiveSchema, 'incentives');
-
-    // Define User model if needed for admin validation
-    const userSchema = new mongoose.Schema({
-        email: String,
-        password: String,
-        fname: String,
-        lname: String,
-        address1: String,
-        address2: String,
-        city: String,
-        state: String,
-        zip: String,
-        status: String,
-        level: String,
-        created_at: { type: Date, default: Date.now },
-        updated_at: { type: Date, default: Date.now }
-    });
-    User = mongoose.model('User', userSchema, 'user');
+    User = mongoose.model('User', userSchema, 'users');
 }
 
 /**
  * Main API handler for admin incentive operations
  */
 module.exports = async (req, res) => {
-    // Handle CORS through next.config.js
-
-
     // Handle preflight OPTIONS request
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
+    }
+
+    // Connect to MongoDB
+    try {
+        await connect;
+        console.log("Database connection established");
+    } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return res.status(500).json({ message: 'Database connection error', error: dbError.message });
     }
 
     // Verify admin status for all requests
@@ -81,15 +88,6 @@ module.exports = async (req, res) => {
     } catch (authError) {
         console.error('Admin authentication error:', authError);
         return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    // Connect to MongoDB
-    try {
-        await connect;
-        console.log("Database connection established");
-    } catch (dbError) {
-        console.error("Database connection error:", dbError);
-        return res.status(500).json({ message: 'Database connection error', error: dbError.message });
     }
 
     // Route based on operation parameter and HTTP method
@@ -111,11 +109,8 @@ module.exports = async (req, res) => {
                 return await handleListIncentives(req, res);
             }
         } else if (req.method === 'POST') {
-            // Handle new incentive creation through regular incentives API
-            return res.status(200).json({
-                message: 'Use the regular incentives API endpoint for creating new incentives',
-                endpoint: '/api/incentives.js'
-            });
+            // Handle new incentive creation
+            return await handleCreateIncentive(req, res);
         } else if (req.method === 'PUT' && operation === 'update') {
             // Handle incentive update
             return await handleUpdateIncentive(req, res);
@@ -172,139 +167,122 @@ async function verifyAdminAccess(req) {
 async function handleListIncentives(req, res) {
     console.log("Admin list incentives API hit");
     try {
-        // Connect to MongoDB
-        await connect;
-        console.log("Database connection established");
-
-        // Parse query parameters
+        // Parse pagination parameters
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        // Build query based on filters
-        const query = {};
+        // Build filter object
+        const filter = {};
 
-        // Search filter
+        // Add business filter if provided
+        if (req.query.business_id) {
+            filter.business_id = req.query.business_id;
+        }
+
+        // Add type filter if provided
+        if (req.query.type) {
+            filter.type = req.query.type;
+        }
+
+        // Add availability filter if provided
+        if (req.query.is_available !== undefined) {
+            filter.is_available = req.query.is_available === 'true';
+        }
+
+        // Add search filter if provided
         if (req.query.search) {
             const searchRegex = new RegExp(req.query.search, 'i');
-            query.$or = [
-                { is_available: searchRegex },
-                { type: searchRegex },
-                { amount: searchRegex },
+            filter.$or = [
                 { information: searchRegex },
                 { other_description: searchRegex }
             ];
         }
 
-        // Category filter
-        if (req.query.category) {
-            query.type = req.query.category;
-        }
+        // Count total incentives matching the filter
+        const total = await Incentive.countDocuments(filter);
 
-        // Status filter
-        if (req.query.status) {
-            query.status = req.query.status;
-        }
-
-        // Count total businesses matching query
-        const total = await Incentive.countDocuments(query);
-
-        // Find businesses with pagination
-        const incentives = await Incentive.find(query)
+        // Execute the query with pagination
+        const incentives = await Incentive.find(filter)
             .sort({ created_at: -1 })
             .skip(skip)
             .limit(limit)
             .lean();
 
-        // Calculate total pages
-        const totalPages = Math.ceil(total / limit);
+        // Get business information for each incentive
+        const enrichedIncentives = await Promise.all(incentives.map(async (incentive) => {
+            const incentiveObj = incentive;
 
+            // Look up business name if business_id is present
+            if (incentive.business_id) {
+                try {
+                    const business = await Business.findById(incentive.business_id);
+                    if (business) {
+                        incentiveObj.businessName = business.bname;
+                    }
+                } catch (error) {
+                    console.error(`Error fetching business data for incentive ${incentive._id}:`, error);
+                }
+            }
+
+            return incentiveObj;
+        }));
+
+        // Return the results
         return res.status(200).json({
-            incentives,
+            incentives: enrichedIncentives,
             total,
             page,
             limit,
-            totalPages
+            totalPages: Math.ceil(total / limit)
         });
     } catch (error) {
-        console.error('Error listing incentives:', error);
-        return res.status(500).json({ message: 'Server error during incentive listing: ' + error.message });
+        console.error('Error in handleListIncentives:', error);
+        return res.status(500).json({ message: 'Error retrieving incentives', error: error.message });
     }
-    // try {
-    //     // Parse pagination parameters
-    //     const page = parseInt(req.query.page) || 1;
-    //     const limit = parseInt(req.query.limit) || 10;
-    //     const skip = (page - 1) * limit;
-    //
-    //     // Build filter object
-    //     const filter = {};
-    //
-    //     // Add business filter if provided
-    //     if (req.query.business_id) {
-    //         filter.business_id = req.query.business_id;
-    //     }
-    //
-    //     // Add type filter if provided
-    //     if (req.query.type) {
-    //         filter.type = req.query.type;
-    //     }
-    //
-    //     // Add availability filter if provided
-    //     if (req.query.is_available !== undefined) {
-    //         filter.is_available = req.query.is_available === 'true';
-    //     }
-    //
-    //     // Add search filter if provided
-    //     if (req.query.search) {
-    //         const searchRegex = new RegExp(req.query.search, 'i');
-    //         filter.$or = [
-    //             { information: searchRegex },
-    //             { other_description: searchRegex }
-    //         ];
-    //     }
-    //
-    //     // Count total incentives matching the filter
-    //     const total = await Incentive.countDocuments(filter);
-    //
-    //     // Execute the query with pagination
-    //     const incentives = await Incentive.find(filter)
-    //         .sort({ created_at: -1 })
-    //         .skip(skip)
-    //         .limit(limit)
-    //         .exec();
-    //
-    //     // Get business information for each incentive
-    //     const enrichedIncentives = await Promise.all(incentives.map(async (incentive) => {
-    //         const incentiveObj = incentive.toObject();
-    //
-    //         // Look up business name if business_id is present
-    //         if (incentive.business_id) {
-    //             try {
-    //                 const business = await Business.findById(incentive.business_id);
-    //                 if (business) {
-    //                     incentiveObj.businessName = business.bname;
-    //                 }
-    //             } catch (error) {
-    //                 console.error(`Error fetching business data for incentive ${incentive._id}:`, error);
-    //             }
-    //         }
-    //
-    //         return incentiveObj;
-    //     }));
-    //
-    //     // Return the results
-    //     return res.status(200).json({
-    //         message: 'Incentives retrieved successfully',
-    //         incentives: enrichedIncentives,
-    //         total,
-    //         page,
-    //         limit,
-    //         totalPages: Math.ceil(total / limit)
-    //     });
-    // } catch (error) {
-    //     console.error('Error in handleListIncentives:', error);
-    //     return res.status(500).json({ message: 'Error retrieving incentives', error: error.message });
-    // }
+}
+
+/**
+ * Handle creating a new incentive
+ */
+async function handleCreateIncentive(req, res) {
+    console.log("Admin create incentive API hit");
+
+    try {
+        const { business_id, is_available, type, amount, information, other_description } = req.body;
+
+        // Validate required fields
+        if (!business_id) {
+            return res.status(400).json({ message: 'Business ID is required' });
+        }
+
+        if (!type) {
+            return res.status(400).json({ message: 'Incentive type is required' });
+        }
+
+        // Create the new incentive
+        const newIncentive = new Incentive({
+            business_id,
+            is_available: is_available !== undefined ? is_available : true,
+            type,
+            amount: parseFloat(amount) || 0,
+            information: information || '',
+            other_description: type === 'OT' ? (other_description || '') : '',
+            created_at: new Date(),
+            updated_at: new Date()
+        });
+
+        // Save to database
+        const result = await newIncentive.save();
+
+        return res.status(201).json({
+            message: 'Incentive created successfully',
+            incentiveId: result._id
+        });
+    } catch (error) {
+        console.error('Error in handleCreateIncentive:', error);
+        return res.status(500).json({ message: 'Error creating incentive', error: error.message });
+    }
 }
 
 /**
@@ -321,21 +299,18 @@ async function handleGetIncentive(req, res) {
         }
 
         // Find the incentive
-        const incentive = await Incentive.findById(incentiveId).exec();
+        const incentive = await Incentive.findById(incentiveId).lean();
 
         if (!incentive) {
             return res.status(404).json({ message: 'Incentive not found' });
         }
-
-        // Convert to plain object for modification
-        const incentiveObj = incentive.toObject();
 
         // Look up business name
         if (incentive.business_id) {
             try {
                 const business = await Business.findById(incentive.business_id);
                 if (business) {
-                    incentiveObj.businessName = business.bname;
+                    incentive.businessName = business.bname;
                 }
             } catch (error) {
                 console.error(`Error fetching business data for incentive ${incentiveId}:`, error);
@@ -343,8 +318,7 @@ async function handleGetIncentive(req, res) {
         }
 
         return res.status(200).json({
-            message: 'Incentive retrieved successfully',
-            incentive: incentiveObj
+            incentive
         });
     } catch (error) {
         console.error('Error in handleGetIncentive:', error);
@@ -365,33 +339,36 @@ async function handleUpdateIncentive(req, res) {
             return res.status(400).json({ message: 'Incentive ID is required' });
         }
 
-        // Find the incentive
-        const incentive = await Incentive.findById(incentiveId).exec();
+        // Create update object
+        const updateData = {};
 
-        if (!incentive) {
-            return res.status(404).json({ message: 'Incentive not found' });
-        }
-
-        // Update the incentive fields
-        if (business_id !== undefined) incentive.business_id = business_id;
-        if (is_available !== undefined) incentive.is_available = is_available;
-        if (type !== undefined) incentive.type = type;
-        if (amount !== undefined) incentive.amount = parseFloat(amount) || 0;
-        if (information !== undefined) incentive.information = information;
+        if (business_id !== undefined) updateData.business_id = business_id;
+        if (is_available !== undefined) updateData.is_available = is_available;
+        if (type !== undefined) updateData.type = type;
+        if (amount !== undefined) updateData.amount = parseFloat(amount) || 0;
+        if (information !== undefined) updateData.information = information;
 
         // Handle other_description field
         if (type === 'OT') {
-            incentive.other_description = other_description || '';
-        } else {
+            updateData.other_description = other_description || '';
+        } else if (type !== undefined) {
             // Clear other_description if type is not 'OT'
-            incentive.other_description = '';
+            updateData.other_description = '';
         }
 
         // Update timestamps
-        incentive.updated_at = new Date();
+        updateData.updated_at = new Date();
 
-        // Save the updated incentive
-        await incentive.save();
+        // Update the incentive
+        const result = await Incentive.findByIdAndUpdate(
+            incentiveId,
+            { $set: updateData },
+            { new: true }
+        );
+
+        if (!result) {
+            return res.status(404).json({ message: 'Incentive not found' });
+        }
 
         return res.status(200).json({
             message: 'Incentive updated successfully',
@@ -417,7 +394,7 @@ async function handleDeleteIncentive(req, res) {
         }
 
         // Find and delete the incentive
-        const result = await Incentive.findByIdAndDelete(incentiveId).exec();
+        const result = await Incentive.findByIdAndDelete(incentiveId);
 
         if (!result) {
             return res.status(404).json({ message: 'Incentive not found' });
