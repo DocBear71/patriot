@@ -328,7 +328,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const sessionData = localStorage.getItem('patriotThanksSession');
         if (sessionData) {
             const session = JSON.parse(sessionData);
-            incentiveData.created_by = session.userId || null;
+            if (session && session.user && session.user._id) {
+                incentiveData.created_by = session.user._id;
+            }
         }
 
         // show the loading indicator

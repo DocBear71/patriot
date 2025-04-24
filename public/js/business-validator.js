@@ -60,13 +60,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function submitToMongoDB(formData) {
         try {
-            // Get the user session information
-            // Get user information from session
+            // Get the session data from localStorage
             const sessionData = localStorage.getItem('patriotThanksSession');
+            console.log("Session data from localStorage:", sessionData);
+
             if (sessionData) {
-                const session = JSON.parse(sessionData);
-                formData.created_by = session.userId || null;
+                try {
+                    const session = JSON.parse(sessionData);
+                    console.log("Parsed session data:", session);
+
+                    // Check if user object exists with _id property
+                    if (session && session.user && session.user._id) {
+                        formData.created_by = session.user._id;
+                        console.log("Setting created_by to:", session.user._id);
+                    } else {
+                        console.log("User ID not found in expected location");
+                        formData.created_by = null;
+                    }
+                } catch (parseError) {
+                    console.error("Error parsing session data:", parseError);
+                    formData.created_by = null;
+                }
+            } else {
+                console.log("No session data found in localStorage");
+                formData.created_by = null;
             }
+
 
             // determine the base URL, local or production
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'

@@ -426,7 +426,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const sessionData = localStorage.getItem('patriotThanksSession');
             if (sessionData) {
                 const session = JSON.parse(sessionData);
-                incentiveData.updated_by = session.userId || null;
+                if (session && session.user && session.user._id) {
+                    incentiveData.updated_by = session.user._id;
+                }
             }
 
             // Add user ID to the form data
