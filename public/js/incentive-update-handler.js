@@ -154,28 +154,51 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Define the selectBusinessForIncentives function for business-search.js
+    // FIXED: Added both function names to ensure compatibility
+    // Define the selectBusinessForIncentives function (with 's') for business-search.js
     window.selectBusinessForIncentives = function(businessData) {
         console.log("selectBusinessForIncentives called with: ", businessData);
+        handleBusinessForIncentives(businessData);
+    };
 
+    // Define the selectBusinessForIncentive function (without 's') for business-search.js
+    window.selectBusinessForIncentive = function(businessData) {
+        console.log("selectBusinessForIncentive called with: ", businessData);
+        handleBusinessForIncentives(businessData);
+    };
+
+    // Common handler function to process business selection
+    function handleBusinessForIncentives(businessData) {
         // Store the business ID
         selectedBusinessId = businessData._id || '';
-        document.getElementById('selected-business-id').value = selectedBusinessId;
+        console.log("Setting selected business ID to:", selectedBusinessId);
+
+        const businessIdField = document.getElementById('selected-business-id');
+        if (businessIdField) {
+            businessIdField.value = selectedBusinessId;
+            console.log("Business ID field value set to:", businessIdField.value);
+        }
 
         // Display business information
         displayBusinessInfo(businessData);
 
         // Fetch and display incentives for this business
         fetchIncentives(selectedBusinessId);
-    };
+    }
 
     // Display business information
     function displayBusinessInfo(business) {
-        if (!business) return;
+        if (!business) {
+            console.error("No business data provided to displayBusinessInfo");
+            return;
+        }
+
+        console.log("Displaying business info for:", business.bname);
 
         // Show the business info section
         if (businessInfoSection) {
             businessInfoSection.style.display = 'block';
+            console.log("Business info section display set to:", businessInfoSection.style.display);
         }
 
         // Populate business details
@@ -225,6 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show the incentives list section
             if (incentivesListSection) {
                 incentivesListSection.style.display = 'block';
+                console.log("Incentives list section display set to:", incentivesListSection.style.display);
             }
 
             // Determine the base URL
@@ -319,6 +343,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const incentiveId = this.getAttribute('data-incentive-id');
                 selectedIncentiveId = incentiveId;
                 document.getElementById('selected-incentive-id').value = incentiveId;
+                console.log("Selected incentive ID:", incentiveId);
 
                 // Find the selected incentive
                 const selectedIncentive = incentives.find(inc => inc._id === incentiveId);
@@ -339,6 +364,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show the incentive edit section
         if (incentiveEditSection) {
             incentiveEditSection.style.display = 'block';
+            console.log("Incentive edit section display set to:", incentiveEditSection.style.display);
         }
 
         // Set the availability radio button
@@ -538,23 +564,18 @@ document.addEventListener('DOMContentLoaded', function() {
         return types[typeCode] || typeCode;
     }
 
-    // Update business-search.js to know about the incentive update page
-    try {
-        // This helps business-search.js detect we're on the incentive update page
-        const currentPagePath = window.location.pathname;
-        if (currentPagePath.includes('incentive-update.html')) {
-            console.log("On incentive-update page, setting up handlers");
+    // FIXED: Update the global handler for all related pages
+    // This helps business-search.js detect we're on the incentive update page
+    window.handleBusinessSelection = function(selectedBusiness) {
+        console.log("handleBusinessSelection called with:", selectedBusiness);
 
-            // Add a global function for business-search.js to call
-            window.handleBusinessSelection = function(selectedBusiness) {
-                if (typeof window.selectBusinessForIncentives === 'function') {
-                    window.selectBusinessForIncentives(selectedBusiness);
-                } else {
-                    console.error("selectBusinessForIncentives function not found");
-                }
-            };
+        // When on incentive-update.html, call our handler
+        if (typeof window.selectBusinessForIncentive === 'function') {
+            window.selectBusinessForIncentive(selectedBusiness);
+        } else if (typeof window.selectBusinessForIncentives === 'function') {
+            window.selectBusinessForIncentives(selectedBusiness);
+        } else {
+            console.error("No incentive handler function found");
         }
-    } catch (error) {
-        console.error("Error setting up business selection handler:", error);
-    }
+    };
 });

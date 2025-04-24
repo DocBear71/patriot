@@ -266,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const tbody = document.createElement('tbody');
 
             businesses.forEach(business => {
-                if (!business) return; // again, skill the null or undefined
+                if (!business) return; // again, skip null or undefined
 
                 const row = document.createElement('tr');
 
@@ -306,8 +306,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     const currentPagePath = window.location.pathname;
                     console.log("Current page: ", currentPagePath);
 
-                    // FIXED: Added special handling for business-update.html
-                    if (currentPagePath.includes('business-update.html')) {
+                    // FIXED: Added special handling for incentive-update.html
+                    if (currentPagePath.includes('incentive-update.html')) {
+                        console.log("On incentive-update page");
+                        if (typeof window.selectBusinessForIncentive === 'function') {
+                            window.selectBusinessForIncentive(selectedBusiness);
+                        } else if (typeof window.selectBusinessForIncentives === 'function') {
+                            window.selectBusinessForIncentives(selectedBusiness);
+                        } else {
+                            console.error("selectBusinessForIncentive(s) not found, falling back");
+                            handleBusinessSelection(selectedBusiness);
+                        }
+                    }
+                    // Check if we're on business-update.html
+                    else if (currentPagePath.includes('business-update.html')) {
                         console.log("On business-update page");
                         if (typeof window.selectBusinessForUpdate === 'function') {
                             window.selectBusinessForUpdate(selectedBusiness);
@@ -316,7 +328,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             handleBusinessSelection(selectedBusiness);
                         }
                     }
-                    // Check to see if we are on incentive-add or incentive-view page
+                    // Check to see if we are on incentive-add page
                     else if (currentPagePath.includes('incentive-add.html')) {
                         console.log("On incentive-add page");
                         // for incentive-add, call business-incentive-handler.js
