@@ -81,6 +81,21 @@
                     </div>
                 </div>
             </li>
+            <!-- User Dropdown - will be shown when logged in -->
+            <li class="nav-item dropdown" id="user-dropdown" style="display: none;">
+                <div class="btn-group">
+                    <button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false" id="userDisplayName">
+                        User
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" href="/profile.html">My Profile</a>
+                        <a class="dropdown-item admin-only" style="display: none;" href="/admin-dashboard.html">Admin Dashboard</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="#" id="logout-button">Logout</a>
+                    </div>
+                </div>
+            </li>
         </ul>
     </div>
 </nav>

@@ -76,6 +76,9 @@ function handleLogin() {
                 // Update UI with dropdown changes
                 updateUIAfterLogin(session);
 
+                // update the login UI
+                updateLoginUI();
+
                 // Close the dropdown
                 const dropdown = document.querySelector('.dropdown-menu');
                 if (dropdown) {
@@ -233,6 +236,8 @@ function logoutUser() {
         currentPath.includes('incentive-update.html')) {
         window.location.href = '/index.html';
     }
+    // update the login UI
+    updateLoginUI();
 }
 
 // Function to attach event listeners
@@ -375,6 +380,81 @@ function checkLoginStatus() {
     return false;
 }
 
+// Add this function to your login-handler.js file
+function fixLoginMenuIssue() {
+    const sessionData = localStorage.getItem('patriotThanksSession');
+    if (sessionData) {
+        try {
+            // User is logged in
+            const session = JSON.parse(sessionData);
+
+            // Hide login button
+            const loginBtn = document.getElementById('loginBtn');
+            if (loginBtn) loginBtn.style.display = 'none';
+
+            // Show user dropdown
+            const userDropdown = document.getElementById('userDropdown');
+            if (userDropdown) {
+                userDropdown.style.display = 'block';
+
+                // Update user name display
+                const userDisplayName = document.getElementById('userDisplayName');
+                if (userDisplayName && session.user) {
+                    userDisplayName.textContent = `${session.user.fname || ''} ${session.user.lname || ''}`;
+                }
+            }
+
+            console.log("User session active, displaying user dropdown");
+        } catch (error) {
+            console.error("Error parsing session data:", error);
+        }
+    } else {
+        // User is not logged in
+        console.log("No active session found");
+    }
+}
+
+// Call the fix function after page is fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(fixLoginMenuIssue, 500); // Short delay to ensure other scripts have run
+    setTimeout(updateLoginUI, 500); // to also update the login UI
+});
+
+function updateLoginUI() {
+    const sessionData = localStorage.getItem('patriotThanksSession');
+    const signInDropdown = document.querySelector('.navbar-nav.ml-auto li.dropdown:not(#user-dropdown)');
+    const userDropdown = document.getElementById('user-dropdown');
+
+    if (sessionData) {
+        // User is logged in
+        const session = JSON.parse(sessionData);
+
+        // Hide sign in dropdown
+        if (signInDropdown) signInDropdown.style.display = 'none';
+
+        // Show user dropdown
+        if (userDropdown) {
+            userDropdown.style.display = 'block';
+
+            // Update user name display
+            const userDisplayName = document.getElementById('userDisplayName');
+            if (userDisplayName && session.user) {
+                userDisplayName.textContent = `${session.user.fname || ''} ${session.user.lname || ''}`;
+            }
+        }
+
+        // Toggle admin elements
+        toggleAdminElements(session.user && (session.user.isAdmin || session.user.level === 'Admin'));
+    } else {
+        // User is not logged in
+        if (signInDropdown) signInDropdown.style.display = 'block';
+        if (userDropdown) userDropdown.style.display = 'none';
+
+        // Hide admin elements
+        toggleAdminElements(false);
+    }
+}
+
 // Helper function to get auth token (used by other scripts)
 function getAuthToken() {
     try {
@@ -404,4 +484,6 @@ $(function() {
     attachLoginListeners();
     // Check login status after a short delay to ensure the navbar is loaded
     setTimeout(checkLoginStatus, 500);
+    // also update the login UI
+    setTimeout(updateLoginUI, 500);
 });
