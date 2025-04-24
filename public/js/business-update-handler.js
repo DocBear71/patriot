@@ -88,9 +88,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Populate the hidden field with the business ID
         const businessIdField = document.getElementById('selected-business-id');
+        console.log("Business ID field exists: ", !!businessIdField)
         if (businessIdField) {
             businessIdField.value = businessData._id || '';
         }
+        console.log("Business ID field value: ", businessIdField.value);
 
         // Populate the business information fields
         populateField('bname', businessData.bname);
