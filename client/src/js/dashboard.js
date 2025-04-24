@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <p>${stats.businessChange >= 0 ? '↑' : '↓'} ${Math.abs(stats.businessChange || 0)}% from last month</p>
                 </div>
                 <div style="background-color: #e74c3c; color: white; padding: 20px; border-radius: 5px;">
-                    <h3>Active Incentives</h3>
+                    <h3>Incentives</h3>
                     <p style="font-size: 2rem; margin: 10px 0;">${stats.incentiveCount || 0}</p>
                     <p>${stats.incentiveChange >= 0 ? '↑' : '↓'} ${Math.abs(stats.incentiveChange || 0)}% from last month</p>
                 </div>
