@@ -333,7 +333,7 @@ async function handleUpdateIncentive(req, res) {
     console.log("Admin update incentive API hit");
 
     try {
-        const { incentiveId, business_id, is_available, type, amount, information, other_description } = req.body;
+        const { incentiveId, business_id, is_available, type, amount, information, other_description, updated_by } = req.body;
 
         if (!incentiveId) {
             return res.status(400).json({ message: 'Incentive ID is required' });
@@ -347,6 +347,7 @@ async function handleUpdateIncentive(req, res) {
         if (type !== undefined) updateData.type = type;
         if (amount !== undefined) updateData.amount = parseFloat(amount) || 0;
         if (information !== undefined) updateData.information = information;
+        if (updated_by !== undefined) updateData.updated_by = updated_by;
 
         // Handle other_description field
         if (type === 'OT') {

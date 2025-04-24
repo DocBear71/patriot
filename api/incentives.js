@@ -12,6 +12,9 @@ const businessSchema = new mongoose.Schema({
     zip: String,
     phone: String,
     type: String,
+    status: { type: String, default: 'active' },
+    created_by: String,
+    updated_by: String,
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now }
 });
@@ -23,6 +26,8 @@ const incentiveSchema = new mongoose.Schema({
     amount: Number,
     information: String,
     other_description: String,
+    created_by: String,
+    updated_by: String,
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
 });
@@ -43,14 +48,7 @@ try {
  * Combined API handler for all incentive operations
  */
 module.exports = async (req, res) => {
-    // Handle CORS
-    res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    );
+    // CORS handled by next.config.js
 
     // Handle preflight OPTIONS request
     if (req.method === 'OPTIONS') {
@@ -157,6 +155,7 @@ async function handleAddIncentive(req, res) {
         type: incentiveData.type || '',
         amount: parseFloat(incentiveData.amount) || 0,
         information: incentiveData.information || '',
+        created_by: incentiveData.created_by || null,
         created_at: new Date(),
         updated_at: new Date()
     });

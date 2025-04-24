@@ -324,6 +324,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function addIncentive(incentiveData) {
         console.log("adding Incentive: ", incentiveData);
 
+        // Get user information from session
+        const sessionData = localStorage.getItem('patriotThanksSession');
+        if (sessionData) {
+            const session = JSON.parse(sessionData);
+            incentiveData.created_by = session.userId || null;
+        }
 
         // show the loading indicator
         const submitButton = document.querySelector('#incentive-form input[type="submit"]');

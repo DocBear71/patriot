@@ -379,6 +379,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Use the helper function to get the display name for the business type
             const businessTypeDisplay = getBusinessTypeDisplay(business.type);
 
+            const createdByInfo = business.created_by ?
+                `<span data-user-id="${business.created_by}">User: ${business.created_by}</span>`
+                : 'Unknown';
+
             const row = document.createElement('tr');
             row.innerHTML = `
             <td>${business._id ? business._id.substring(0, 8) + '...' : 'N/A'}</td>
@@ -386,11 +390,20 @@ document.addEventListener('DOMContentLoaded', function() {
             <td>${locationText}</td>
             <td>${businessTypeDisplay}</td>
             <td>${business.phone || 'N/A'}</td>
-            <td><span class="badge ${business.status === 'active' ? 'badge-success' : 'badge-secondary'}">${business.status === 'active' ? 'Active' : 'Inactive'}</span></td>
+            <td><span class="badge ${business.status === 'active' 
+                    ? 'badge-success' 
+                    : 'badge-secondary'}">
+                                    ${business.status === 'active' 
+                    ? 'Active' 
+                    : 'Inactive'}
+            </span>
+            </td>
+            <td>${createdByInfo}</td>
             <td>
                 <div class="action-btns">
                     <button class="btn btn-sm btn-info edit-business-btn" data-id="${business._id}">Edit</button>
-                    <button class="btn btn-sm btn-danger delete-business-btn" data-id="${business._id}" data-name="${business.bname || 'this business'}">Delete</button>
+                    <button class="btn btn-sm btn-danger delete-business-btn" data-id="${business._id}" 
+                            data-name="${business.bname || 'this business'}">Delete</button>
                 </div>
             </td>
         `;

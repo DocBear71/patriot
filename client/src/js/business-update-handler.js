@@ -117,6 +117,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to update a business in the database
     async function updateBusiness(formData) {
         try {
+            // Get user information from session
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (sessionData) {
+                const session = JSON.parse(sessionData);
+                formData.updated_by = session.userId || null;
+            }
+
             // Show loading state
             const submitButton = document.getElementById('update-submit');
             const originalText = submitButton.value;

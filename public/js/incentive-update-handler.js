@@ -422,6 +422,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update an incentive in the database
     async function updateIncentive(incentiveData) {
         try {
+            // Get user information from session
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (sessionData) {
+                const session = JSON.parse(sessionData);
+                incentiveData.updated_by = session.userId || null;
+            }
+
+            // Add user ID to the form data
+            incentiveData.updated_by = userId;
+
             // Show loading state
             const submitButton = document.getElementById('update-submit');
             const originalText = submitButton.value;

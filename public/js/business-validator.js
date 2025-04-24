@@ -60,6 +60,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function submitToMongoDB(formData) {
         try {
+            // Get the user session information
+            // Get user information from session
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (sessionData) {
+                const session = JSON.parse(sessionData);
+                formData.created_by = session.userId || null;
+            }
+
             // determine the base URL, local or production
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? `https://${window.location.host}`
