@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <title>Patriot Thanks: Update an Incentive</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2025/4/24">
+    <meta name="description" content="Update Incentive Information in Patriot Thanks.">
+    <meta name="keywords" content="Veterans, Discounts, Incentive Updates, Patriot Thanks">
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css" >
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/forms.css" rel="stylesheet">
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/form-validation.css" rel="stylesheet">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="./js/business-search.js"></script>
+    <script src="./js/incentive-update-handler.js"></script>
+</head>
+
+<body style="padding-top: 70px" id="page_layout">
+<!--Navigation bar-->
+<div id="nav-placeholder">
+</div>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
+            // Load the login handler after the navbar is loaded
+            $.getScript("./js/login-handler.js")
+            .done(function() {
+                console.log("Login handler script loaded successfully");
+            })
+            .fail(function() {
+                console.error("Failed to load login-handler.js");
+            });
+        });
+    });
+</script>
+<!--end of Navigation bar-->
+<header>
+    <div class="left-banner">
+        <a href="index.html">
+            <img src="./images/docbearlogov4.png" alt="DocBear logo">
+        </a>
+    </div>
+    <div class="right-banner">
+        <h1>Patriot Thanks</h1>
+        <hr>
+        <h4>Update an Incentive</h4>
+    </div>
+    <div style="clear:left;"></div>
+</header>
+<main>
+    <section class="container">
+        <h2>Update an incentive in our database</h2>
+        <p class="paragraph_style">Find a business and update its incentives in the Patriot Thanks database.
+            This allows you to correct or update details about discounts offered for active duty, veterans,
+            first responders, and their spouses.</p>
+    </section>
+
+    <!-- Step 1: Search for a business -->
+    <fieldset>
+        <legend>
+            <h3 class="caveat">Step 1: Search for a Business</h3>
+        </legend>
+        <form id="business-search-form" onsubmit="return false">
+            <label for="business-name">Search by Business Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <input type="text" id="business-name" name="business_name" placeholder="Business Name...">
+            <br>
+            <label for="address">Search by Address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <input type="text" id="address" name="street-address" placeholder="Street Address, city, state, or zip..." >
+            <br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <input type="submit" value="Search Business">
+        </form>
+    </fieldset>
+
+    <!-- Display search results -->
+    <div id="business-search-results"></div>
+
+    <!-- Step 2: Business Information -->
+    <fieldset id="business-info-section">
+        <legend>
+            <h3 class="caveat">Step 2: Confirm Business Information</h3>
+        </legend>
+
+        <!-- Hidden field to store the selected business ID -->
+        <input type="hidden" id="selected-business-id">
+
+        <div class="business-details">
+            <div class="detail-row">
+                <span class="detail-label">Business Name:</span>
+                <span id="business-name-display" class="detail-value"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Address:</span>
+                <span id="business-address-display" class="detail-value"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">City, State Zip:</span>
+                <span id="business-city-state-display" class="detail-value"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Phone:</span>
+                <span id="business-phone-display" class="detail-value"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Type:</span>
+                <span id="business-type-display" class="detail-value"></span>
+            </div>
+        </div>
+    </fieldset>
+
+    <!-- Step 3: View and Select Incentives -->
+    <fieldset id="incentives-list-section">
+        <legend>
+            <h3 class="caveat">Step 3: Select an Incentive to Update</h3>
+        </legend>
+        <div id="incentives-table-container">
+            <!-- Incentives will be displayed here -->
+        </div>
+    </fieldset>
+
+    <!-- Step 4: Update Incentive Form -->
+    <form id="incentive-update-form" onsubmit="return false;">
+        <fieldset id="incentive-edit-section">
+            <legend>
+                <h3 class="caveat">Step 4: Update Incentive Information</h3>
+            </legend>
+
+            <!-- Hidden field to store the selected incentive ID -->
+            <input type="hidden" id="selected-incentive-id">
+
+            <div class="radio-group">
+                <label for="incentiveAvailable" id="radio1">Incentive Available</label>
+                <input type="radio" id="incentiveAvailable" name="incentiveAvailable" value="true">
+            </div>
+
+            <div class="radio-group">
+                <label for="incentiveNotAvailable" id="radio2">Incentive NOT Available</label>
+                <input type="radio" id="incentiveNotAvailable" name="incentiveAvailable" value="false">
+            </div>
+
+            <div class="form-group">
+                <label for="incentiveType">Incentive Type</label>
+                <select name="incentiveType" id="incentiveType">
+                    <option value="" selected="selected">Select an Incentive Type</option>
+                    <option value="VT">Veteran</option>
+                    <option value="AD">Active Duty</option>
+                    <option value="FR">First Responder</option>
+                    <option value="SP">Spouse</option>
+                    <option value="OT">Other (please describe)</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="otherTypeContainer" style="display: none;">
+                <label for="otherTypeDescription">Please Describe</label>
+                <input type="text" id="otherTypeDescription" name="otherTypeDescription" placeholder="Describe the incentive type...">
+            </div>
+
+            <div class="form-group">
+                <label for="incentiveAmount">Incentive Amount as a %</label>
+                <input type="number" id="incentiveAmount" name="percentage" min="0" max="100" step="0.1">
+            </div>
+
+            <div class="form-group">
+                <label for="incentiveInfo">Incentive Information</label>
+                <textarea id="incentiveInfo" name="incentiveInfo" rows="4" cols="50">Please enter information about the discount/incentive.</textarea>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <input type="submit" id="update-submit" value="Update Incentive">
+            </div>
+        </fieldset>
+    </form>
+
+    <!-- Status message container -->
+    <div id="status-message" class="alert" style="display: none;"></div>
+</main>
+<footer class="footer_style"><br>
+    <p>&copy; Copyright 2024 Edward G. McKeown</p>
+    <address>
+        <p>email to <a href='mailto:edward-mckeown@student.kirkwood.edu'>
+            edward-mckeown@student.kirkwood.edu</a></p><br>
+    </address>
+</footer>
+
+<style>
+    /* Additional styles for search results and business details */
+    .results-table {
+        width: 90%;
+        margin: 20px auto;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .results-table th, .results-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+    }
+
+    .results-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .results-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+
+    .results-table tr:hover {
+        background-color: #f1f1f1;
+    }
+
+    .select-business, .select-incentive {
+        background-color: #0000ff;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .select-business:hover, .select-incentive:hover {
+        background-color: #0000cc;
+    }
+
+    /* Business details styling */
+    .business-details {
+        margin: 10px 0 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+    }
+
+    .detail-row {
+        margin-bottom: 8px;
+    }
+
+    .detail-label {
+        font-weight: bold;
+        width: 150px;
+        display: inline-block;
+    }
+
+    .detail-value {
+        display: inline-block;
+    }
+
+    /* Initially hide sections until needed */
+    #business-info-section,
+    #incentives-list-section,
+    #incentive-edit-section {
+        display: none;
+    }
+
+    /* Error message styling */
+    .error {
+        color: red;
+        font-weight: bold;
+        text-align: center;
+        margin: 10px 0;
+    }
+
+    /* Success message styling */
+    .success {
+        color: green;
+        font-weight: bold;
+        text-align: center;
+        margin: 10px 0;
+    }
+
+    /* Disabled field styling */
+    .disabled-field {
+        background-color: #f0f0f0;
+        color: #888;
+        cursor: not-allowed;
+    }
+
+    textarea.disabled-field {
+        resize: none;
+    }
+</style>
+
+</body>
+</html>

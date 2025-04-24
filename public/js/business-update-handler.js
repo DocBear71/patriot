@@ -1,0 +1,324 @@
+// business-update-handler.js - Handles business search and update functionality
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("Business Update Handler Loaded!");
+
+    // Initialize business info section display
+    const businessInfoSection = document.getElementById('business-info-section');
+    if (businessInfoSection) {
+        businessInfoSection.style.display = 'none';
+    }
+
+    // Get form elements for validation
+    const form = {
+        businessName: document.getElementById("bname"),
+        address1: document.getElementById("address1"),
+        city: document.getElementById("city"),
+        state: document.getElementById("state"),
+        zip: document.getElementById("zip"),
+        phone: document.getElementById("phone"),
+        type: document.getElementById("type"),
+        status: document.getElementById("status")
+    };
+
+    // Get the update form element
+    const updateForm = document.getElementById("business-update-form");
+
+    // Add form submission handler
+    if (updateForm) {
+        updateForm.addEventListener('submit', function(event) {
+            // Prevent the form from submitting immediately
+            event.preventDefault();
+
+            // Validate all fields
+            const invalidFields = [];
+
+            if (!isNotEmpty(form.businessName.value)) invalidFields.push("Business Name");
+            if (!isNotEmpty(form.address1.value)) invalidFields.push("Address Line 1");
+            if (!isNotEmpty(form.city.value)) invalidFields.push("City");
+            if (!isNotEmpty(form.state.value)) invalidFields.push("State");
+            if (!isValidZip(form.zip.value)) invalidFields.push("Zip Code (format: 12345 or 12345-6789)");
+            if (!isValidPhone(form.phone.value)) invalidFields.push("Phone Number (format: 123-456-7890)");
+            if (!isNotEmpty(form.type.value)) invalidFields.push("Business Type");
+            if (!isNotEmpty(form.status.value)) invalidFields.push("Status");
+
+            console.log("Invalid fields:", invalidFields);
+
+            // If there are invalid fields, show an alert
+            if (invalidFields.length > 0) {
+                showMessage('error', "Please complete the following required fields: " + invalidFields.join(", "));
+            } else {
+                // Get the business ID
+                const businessId = document.getElementById("selected-business-id").value;
+                if (!businessId) {
+                    showMessage('error', "Business ID is missing. Please select a business first.");
+                    return;
+                }
+
+                const formData = {
+                    businessId: businessId,
+                    bname: form.businessName.value,
+                    address1: form.address1.value,
+                    address2: document.getElementById("address2").value || '',
+                    city: form.city.value,
+                    state: form.state.value,
+                    zip: form.zip.value,
+                    phone: form.phone.value,
+                    type: form.type.value,
+                    status: form.status.value
+                };
+
+                console.log("Form data to submit:", formData);
+
+                // Submit the data to update the business
+                updateBusiness(formData);
+            }
+        });
+    } else {
+        console.warn("Business update form not found in the DOM");
+    }
+
+    // Define the selectBusinessForUpdate function in the global scope for business-search.js
+    window.selectBusinessForUpdate = function(businessData) {
+        console.log("selectBusinessForUpdate called with: ", businessData);
+
+        // Show the business info section
+        if (businessInfoSection) {
+            businessInfoSection.style.display = 'block';
+        }
+
+        // Populate the hidden field with the business ID
+        const businessIdField = document.getElementById('selected-business-id');
+        if (businessIdField) {
+            businessIdField.value = businessData._id || '';
+        }
+
+        // Populate the business information fields
+        populateField('bname', businessData.bname);
+        populateField('address1', businessData.address1);
+        populateField('address2', businessData.address2);
+        populateField('city', businessData.city);
+        populateField('zip', businessData.zip);
+        populateField('phone', businessData.phone);
+
+        // Special handling for select fields
+        populateSelectField('state', businessData.state);
+        populateSelectField('type', businessData.type);
+        populateSelectField('status', businessData.status || 'active');
+
+        // Scroll to the form
+        businessInfoSection.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    // Function to update a business in the database
+    async function updateBusiness(formData) {
+        try {
+            // Show loading state
+            const submitButton = document.getElementById('update-submit');
+            const originalText = submitButton.value;
+            submitButton.value = 'Updating...';
+            submitButton.disabled = true;
+
+            // Determine the base URL, local or production
+            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `http://${window.location.host}`
+                : 'https://patriotthanks.vercel.app';
+
+            // Use the API endpoint with the baseURL
+            const apiURL = `${baseURL}/api/business.js?operation=admin-update-business`;
+            console.log("Submitting to API at:", apiURL);
+
+            const token = getAuthToken();
+            const headers = {
+                "Content-Type": "application/json; charset=utf-8",
+            };
+
+            // Add authorization header if token exists (for admin features)
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(apiURL, {
+                method: "PUT",
+                headers: headers,
+                body: JSON.stringify(formData),
+            });
+
+            console.log("Response status:", response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Error response:", errorText);
+                throw new Error(`Failed to update business: ${response.status} ${errorText}`);
+            }
+
+            const data = await response.json();
+            console.log("Success:", data);
+
+            // Show success message
+            showMessage('success', "Business updated successfully!");
+
+            // Reset button state
+            submitButton.value = originalText;
+            submitButton.disabled = false;
+
+        } catch (error) {
+            console.error("Error:", error);
+            showMessage('error', "Update failed: " + error.message);
+
+            // Reset button state on error too
+            const submitButton = document.getElementById('update-submit');
+            if (submitButton) {
+                submitButton.value = 'Update Business';
+                submitButton.disabled = false;
+            }
+        }
+    }
+
+    // Helper function to get auth token if available
+    function getAuthToken() {
+        try {
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (!sessionData) {
+                return null;
+            }
+
+            const session = JSON.parse(sessionData);
+            return session.token || null;
+        } catch (error) {
+            console.error('Error retrieving auth token:', error);
+            return null;
+        }
+    }
+
+    // Helper function to safely populate form fields
+    function populateField(fieldId, value) {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.value = value || '';
+            console.log(`Populated ${fieldId} with:`, value);
+        } else {
+            console.warn(`Field ${fieldId} not found.`);
+        }
+    }
+
+    // Helper function to safely populate select fields
+    function populateSelectField(fieldId, value) {
+        const field = document.getElementById(fieldId);
+        if (!field) {
+            console.warn(`Field ${fieldId} not found.`);
+            return;
+        }
+
+        // Try for a direct match first
+        for (let i = 0; i < field.options.length; i++) {
+            if (field.options[i].value.toLowerCase() === (value || '').toLowerCase()) {
+                field.selectedIndex = i;
+                console.log(`Selected ${value} in ${fieldId}`);
+                return;
+            }
+        }
+
+        // If no match is found, set to default (first option)
+        console.warn(`Could not find a matching option for ${value} in ${fieldId}`);
+    }
+
+    // Function to show status messages
+    function showMessage(type, message) {
+        const messageContainer = document.getElementById('status-message');
+        if (messageContainer) {
+            messageContainer.innerHTML = message;
+            messageContainer.className = 'alert';
+
+            if (type === 'error') {
+                messageContainer.classList.add('alert-danger');
+            } else if (type === 'success') {
+                messageContainer.classList.add('alert-success');
+            }
+
+            messageContainer.style.display = 'block';
+
+            // Scroll to message
+            messageContainer.scrollIntoView({ behavior: 'smooth' });
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                messageContainer.style.display = 'none';
+            }, 5000);
+        } else {
+            // Fallback to alert if container not found
+            if (type === 'error') {
+                alert(message);
+            } else {
+                alert(message);
+            }
+        }
+    }
+
+    // Validation functions
+    function isNotEmpty(value) {
+        return value.trim() !== '';
+    }
+
+    function isValidZip(value) {
+        const zipPattern = /^\d{5}(-\d{4})?$/;
+        return zipPattern.test(value);
+    }
+
+    function isValidPhone(value) {
+        const phonePattern = /^\d{3}-\d{3}-\d{4}$/;
+        return phonePattern.test(value);
+    }
+
+    // Apply validation styling to a field
+    function validateField(field, validationFn) {
+        if (!field) return;
+
+        console.log(`Validating ${field.id} with value: ${field.value}`);
+
+        if (validationFn(field.value)) {
+            field.classList.remove('invalid-field');
+            field.classList.add('valid-field');
+            field.setAttribute('data-valid', 'true');
+            console.log(`${field.id} is VALID`);
+        } else {
+            field.classList.remove('valid-field');
+            field.classList.add('invalid-field');
+            field.setAttribute('data-valid', 'false');
+            console.log(`${field.id} is INVALID`);
+        }
+    }
+
+    // Add input event listeners for visual feedback
+    if (form.businessName) form.businessName.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    if (form.address1) form.address1.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    if (form.city) form.city.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    if (form.state) form.state.addEventListener('change', function() { validateField(this, isNotEmpty); });
+    if (form.zip) form.zip.addEventListener('input', function() { validateField(this, isValidZip); });
+    if (form.phone) form.phone.addEventListener('input', function() { validateField(this, isValidPhone); });
+    if (form.type) form.type.addEventListener('change', function() { validateField(this, isNotEmpty); });
+    if (form.status) form.status.addEventListener('change', function() { validateField(this, isNotEmpty); });
+
+    // Update business-search.js to know about the update page
+    if (typeof window.viewBusinessIncentives === 'undefined' && typeof window.selectBusinessForIncentive === 'undefined') {
+        // We might be on the business update page
+        // Modify the business-search.js's handleBusinessSelection function to use our function
+        try {
+            // This helps business-search.js detect we're on the update page
+            const currentPagePath = window.location.pathname;
+            if (currentPagePath.includes('business-update.html')) {
+                console.log("On business-update page, setting up handlers");
+
+                // Add a global function for business-search.js to call
+                window.handleBusinessSelection = function(selectedBusiness) {
+                    if (typeof window.selectBusinessForUpdate === 'function') {
+                        window.selectBusinessForUpdate(selectedBusiness);
+                    } else {
+                        console.error("selectBusinessForUpdate function not found");
+                    }
+                };
+            }
+        } catch (error) {
+            console.error("Error setting up business selection handler:", error);
+        }
+    }
+});

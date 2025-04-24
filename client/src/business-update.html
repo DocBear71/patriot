@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <title>Patriot Thanks: Update a Business</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2025/4/24">
+    <meta name="description" content="Update Business Information in Patriot Thanks.">
+    <meta name="keywords" content="Veterans, Discounts, Business Updates, Patriot Thanks">
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css" >
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/forms.css" rel="stylesheet">
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/form-validation.css" rel="stylesheet">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="./js/business-search.js"></script>
+    <script src="./js/business-update-handler.js"></script>
+</head>
+
+<body style="padding-top: 70px" id="page_layout">
+<!--Navigation bar-->
+<div id="nav-placeholder">
+</div>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
+            // Load the login handler after the navbar is loaded
+            $.getScript("./js/login-handler.js")
+            .done(function() {
+                console.log("Login handler script loaded successfully");
+            })
+            .fail(function() {
+                console.error("Failed to load login-handler.js");
+            });
+        });
+    });
+</script>
+<!--end of Navigation bar-->
+<header>
+    <div class="left-banner">
+        <a href="index.html">
+            <img src="./images/docbearlogov4.png" alt="DocBear logo">
+        </a>
+    </div>
+    <div class="right-banner">
+        <h1>Patriot Thanks</h1>
+        <hr>
+        <h4>Update a Business</h4>
+    </div>
+    <div style="clear:left;"></div>
+</header>
+<main>
+    <section class="container">
+        <h2>Update a business in our database</h2>
+        <p class="paragraph_style">Find a business and update its information in the Patriot Thanks database.
+            This allows you to correct or update details for businesses that offer discounts and incentives
+            for active duty, veterans, first responders, and their spouses.</p>
+    </section>
+
+    <!-- Step 1: Search for a business -->
+    <fieldset>
+        <legend>
+            <h3 class="caveat">Step 1: Search for a Business</h3>
+        </legend>
+        <form id="business-search-form" onsubmit="return false">
+            <label for="business-name">Search by Business Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <input type="text" id="business-name" name="business_name" placeholder="Business Name...">
+            <br>
+            <label for="address">Search by Address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <input type="text" id="address" name="street-address" placeholder="Street Address, city, state, or zip..." >
+            <br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <input type="submit" value="Search Business">
+        </form>
+    </fieldset>
+
+    <!-- Display search results -->
+    <div id="business-search-results"></div>
+
+    <!-- Step 2: Update Business Information -->
+    <form id="business-update-form" onsubmit="return false;">
+        <!-- Hidden field to store the selected business ID -->
+        <input type="hidden" id="selected-business-id">
+
+        <!-- Business Information Section -->
+        <fieldset id="business-info-section">
+            <legend>
+                <h3 class="caveat">Step 2: Update Business Information</h3>
+            </legend>
+            <label for="bname">Business Name&nbsp;&nbsp;</label>
+            <input type="text" id="bname" name="business-name" placeholder="Business name...">
+            <br>
+            <label for="address1">Address Line 1&nbsp;&nbsp;</label>
+            <input type="text" id="address1" name="address1" placeholder="Address Line 1...">
+            <br>
+            <label for="address2">Address Line 2&nbsp;&nbsp;</label>
+            <input type="text" id="address2" name="address2" placeholder="Address Line 2...">
+            <br>
+            <label for="city">City&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <input type="text" id="city" name="city" placeholder="Business City is...">
+            <br>
+            <label for="state">U.S. State&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <select name="state" id="state">
+                <option value="" selected="selected">Select a State</option>
+                <option value="AL">Alabama</option>
+                <option value="AK">Alaska</option>
+                <option value="AZ">Arizona</option>
+                <option value="AR">Arkansas</option>
+                <option value="CA">California</option>
+                <option value="CO">Colorado</option>
+                <option value="CT">Connecticut</option>
+                <option value="DE">Delaware</option>
+                <option value="DC">District Of Columbia</option>
+                <option value="FL">Florida</option>
+                <option value="GA">Georgia</option>
+                <option value="HI">Hawaii</option>
+                <option value="ID">Idaho</option>
+                <option value="IL">Illinois</option>
+                <option value="IN">Indiana</option>
+                <option value="IA">Iowa</option>
+                <option value="KS">Kansas</option>
+                <option value="KY">Kentucky</option>
+                <option value="LA">Louisiana</option>
+                <option value="ME">Maine</option>
+                <option value="MD">Maryland</option>
+                <option value="MA">Massachusetts</option>
+                <option value="MI">Michigan</option>
+                <option value="MN">Minnesota</option>
+                <option value="MS">Mississippi</option>
+                <option value="MO">Missouri</option>
+                <option value="MT">Montana</option>
+                <option value="NE">Nebraska</option>
+                <option value="NV">Nevada</option>
+                <option value="NH">New Hampshire</option>
+                <option value="NJ">New Jersey</option>
+                <option value="NM">New Mexico</option>
+                <option value="NY">New York</option>
+                <option value="NC">North Carolina</option>
+                <option value="ND">North Dakota</option>
+                <option value="OH">Ohio</option>
+                <option value="OK">Oklahoma</option>
+                <option value="OR">Oregon</option>
+                <option value="PA">Pennsylvania</option>
+                <option value="RI">Rhode Island</option>
+                <option value="SC">South Carolina</option>
+                <option value="SD">South Dakota</option>
+                <option value="TN">Tennessee</option>
+                <option value="TX">Texas</option>
+                <option value="UT">Utah</option>
+                <option value="VT">Vermont</option>
+                <option value="VA">Virginia</option>
+                <option value="WA">Washington</option>
+                <option value="WV">West Virginia</option>
+                <option value="WI">Wisconsin</option>
+                <option value="WY">Wyoming</option>
+            </select>
+            <br>
+            <label for="zip">Zip Code&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <input type="text" id="zip" name="zip" placeholder="Business Zip Code...">
+            <br>
+            <label for="phone">Phone Number&nbsp;&nbsp;</label>
+            <input type="text" id="phone" name="phone-number" placeholder="Business phone number...">
+            <br>
+            <label for="type">Business Type&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <select name="type" id="type">
+                <option value="" selected="selected">Select a Business Type</option>
+                <option value="AUTO">Automotive</option>
+                <option value="ENT">Entertainment</option>
+                <option value="HARDW">Hardware</option>
+                <option value="RX">Pharmacy</option>
+                <option value="REST">Restaurant</option>
+                <option value="RETAIL">Retail</option>
+                <option value="Tech">Technology</option>
+                <option value="OTHER">Other</option>
+            </select>
+            <br>
+            <label for="status">Status&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <select name="status" id="status">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
+            <br><br>
+            <div style="text-align: center;">
+                <input type="submit" id="update-submit" value="Update Business">
+            </div>
+        </fieldset>
+    </form>
+
+    <!-- Status message container -->
+    <div id="status-message" class="alert" style="display: none;"></div>
+</main>
+<footer class="footer_style"><br>
+    <p>&copy; Copyright 2024 Edward G. McKeown</p>
+    <address>
+        <p>email to <a href='mailto:edward-mckeown@student.kirkwood.edu'>
+            edward-mckeown@student.kirkwood.edu</a></p><br>
+    </address>
+</footer>
+
+<style>
+    /* Additional styles for search results */
+    .results-table {
+        width: 90%;
+        margin: 20px auto;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .results-table th, .results-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+    }
+
+    .results-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .results-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+
+    .results-table tr:hover {
+        background-color: #f1f1f1;
+    }
+
+    .select-business {
+        background-color: #0000ff;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .select-business:hover {
+        background-color: #0000cc;
+    }
+
+    /* Initially hide sections until needed */
+    #business-info-section {
+        display: none;
+    }
+
+    /* Error message styling */
+    .error {
+        color: red;
+        font-weight: bold;
+        text-align: center;
+        margin: 10px 0;
+    }
+
+    /* Success message styling */
+    .success {
+        color: green;
+        font-weight: bold;
+        text-align: center;
+        margin: 10px 0;
+    }
+</style>
+
+</body>
+</html>
