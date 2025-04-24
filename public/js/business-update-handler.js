@@ -54,9 +54,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
+                // FIXED: Changed form.businessName to form.bname to match the form object
                 const formData = {
                     businessId: businessId,
-                    bname: form.businessName.value,
+                    bname: form.bname.value,
                     address1: form.address1.value,
                     address2: document.getElementById("address2").value || '',
                     city: form.city.value,
@@ -88,9 +89,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Populate the hidden field with the business ID
         const businessIdField = document.getElementById('selected-business-id');
-        console.log("Business ID field exists: ", !!businessIdField)
+        console.log("Business ID field exists: ", !!businessIdField);
         if (businessIdField) {
             businessIdField.value = businessData._id || '';
+            console.log("Setting business ID to:", businessData._id);
         }
         console.log("Business ID field value: ", businessIdField.value);
 
@@ -300,27 +302,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (form.type) form.type.addEventListener('change', function() { validateField(this, isNotEmpty); });
     if (form.status) form.status.addEventListener('change', function() { validateField(this, isNotEmpty); });
 
-    // Update business-search.js to know about the update page
-    if (typeof window.viewBusinessIncentives === 'undefined' && typeof window.selectBusinessForIncentive === 'undefined') {
-        // We might be on the business update page
-        // Modify the business-search.js's handleBusinessSelection function to use our function
-        try {
-            // This helps business-search.js detect we're on the update page
-            const currentPagePath = window.location.pathname;
-            if (currentPagePath.includes('business-update.html')) {
-                console.log("On business-update page, setting up handlers");
-
-                // Add a global function for business-search.js to call
-                window.handleBusinessSelection = function(selectedBusiness) {
-                    if (typeof window.selectBusinessForUpdate === 'function') {
-                        window.selectBusinessForUpdate(selectedBusiness);
-                    } else {
-                        console.error("selectBusinessForUpdate function not found");
-                    }
-                };
-            }
-        } catch (error) {
-            console.error("Error setting up business selection handler:", error);
+    // FIXED: Properly set up the business selection handler for the update page
+    // We need to override the handler in business-search.js
+    window.handleBusinessSelection = function(selectedBusiness) {
+        // Call our selectBusinessForUpdate function directly
+        if (typeof window.selectBusinessForUpdate === 'function') {
+            window.selectBusinessForUpdate(selectedBusiness);
+        } else {
+            console.error("selectBusinessForUpdate function not found");
         }
-    }
+    };
 });

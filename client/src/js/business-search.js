@@ -251,15 +251,15 @@ document.addEventListener('DOMContentLoaded', function() {
             // create the header for the table
             const thead = document.createElement('thead');
             thead.innerHTML = `
-                <tr>
-                    <th>Business Name</th>
-                    <th>Address</th>
-                    <th>City</th>
-                    <th>State</th>
-                    <th>Zip</th>
-                    <th>Action</th>
-                </tr>
-            `;
+            <tr>
+                <th>Business Name</th>
+                <th>Address</th>
+                <th>City</th>
+                <th>State</th>
+                <th>Zip</th>
+                <th>Action</th>
+            </tr>
+        `;
             table.appendChild(thead);
 
             // create the table body then add each business to the talbe
@@ -271,13 +271,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 const row = document.createElement('tr');
 
                 row.innerHTML = `
-                    <td>${business.bname}</td>
-                    <td>${business.address1}${business.address2 ? '<br>' + business.address2 : ''}</td>
-                    <td>${business.city}</td>
-                    <td>${business.state}</td>
-                    <td>${business.zip}</td>
-                    <td><button class="select-business" data-business-id="${business._id}">Select</button></td>
-                `;
+                <td>${business.bname}</td>
+                <td>${business.address1}${business.address2 ? '<br>' + business.address2 : ''}</td>
+                <td>${business.city}</td>
+                <td>${business.state}</td>
+                <td>${business.zip}</td>
+                <td><button class="select-business" data-business-id="${business._id}">Select</button></td>
+            `;
                 tbody.appendChild(row);
             });
 
@@ -306,8 +306,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     const currentPagePath = window.location.pathname;
                     console.log("Current page: ", currentPagePath);
 
+                    // FIXED: Added special handling for business-update.html
+                    if (currentPagePath.includes('business-update.html')) {
+                        console.log("On business-update page");
+                        if (typeof window.selectBusinessForUpdate === 'function') {
+                            window.selectBusinessForUpdate(selectedBusiness);
+                        } else {
+                            console.error("selectBusinessForUpdate not found, falling back");
+                            handleBusinessSelection(selectedBusiness);
+                        }
+                    }
                     // Check to see if we are on incentive-add or incentive-view page
-                    if (currentPagePath.includes('incentive-add.html')) {
+                    else if (currentPagePath.includes('incentive-add.html')) {
                         console.log("On incentive-add page");
                         // for incentive-add, call business-incentive-handler.js
                         if (typeof window.selectBusinessForIncentive === 'function') {
