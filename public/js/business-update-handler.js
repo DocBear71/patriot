@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Get form elements for validation
     const form = {
-        businessName: document.getElementById("bname"),
+        bname: document.getElementById("bname"),
         address1: document.getElementById("address1"),
         city: document.getElementById("city"),
         state: document.getElementById("state"),
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Validate all fields
             const invalidFields = [];
 
-            if (!isNotEmpty(form.businessName.value)) invalidFields.push("Business Name");
+            if (!isNotEmpty(form.bname.value)) invalidFields.push("Business Name");
             if (!isNotEmpty(form.address1.value)) invalidFields.push("Address Line 1");
             if (!isNotEmpty(form.city.value)) invalidFields.push("City");
             if (!isNotEmpty(form.state.value)) invalidFields.push("State");
@@ -291,7 +291,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Add input event listeners for visual feedback
-    if (form.businessName) form.businessName.addEventListener('input', function() { validateField(this, isNotEmpty); });
+    if (form.bname) form.bname.addEventListener('input', function() { validateField(this, isNotEmpty); });
     if (form.address1) form.address1.addEventListener('input', function() { validateField(this, isNotEmpty); });
     if (form.city) form.city.addEventListener('input', function() { validateField(this, isNotEmpty); });
     if (form.state) form.state.addEventListener('change', function() { validateField(this, isNotEmpty); });
