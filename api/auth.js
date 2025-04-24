@@ -80,7 +80,7 @@ try {
 try {
     Incentive = mongoose.model('Incentive');
 } catch (error) {
-    Business = mongoose.model('Incentive', incentiveSchema, 'incentives');
+    Incentive = mongoose.model('Incentive', incentiveSchema, 'incentives');
 }
 
 /**
@@ -201,13 +201,22 @@ async function handleDeleteUser(req, res) {
  */
 async function handleDashboardStats(req, res) {
     console.log("Dashboard stats handler called");
-    console.log("Available Collections: ", Object.keys(mongoose.connection));
 
+    // Make sure all collections are properly defined
+    console.log("Available collections check:");
     try {
-        console.log("Business model collection name:", Business.collection.name);
-        console.log("Business model exists:", !!Business);
+        console.log("- Business model collection name:", Business.collection.name);
+        console.log("- User model collection name:", User.collection.name);
+        console.log("- Incentive model available:", !!Incentive);
+
+        // If Incentive is not defined, try to initialize it again
+        if (!Incentive) {
+            console.log("Incentive model not found, initializing...");
+            Incentive = mongoose.model('Incentive', incentiveSchema, 'incentives');
+            console.log("Incentive model initialized:", !!Incentive);
+        }
     } catch (error) {
-        console.error("Error checking Business model:", error);
+        console.error("Error checking models:", error);
     }
 
     // Verify the token and check admin status
@@ -256,31 +265,50 @@ async function handleDashboardStats(req, res) {
             ? Math.round(((totalUsers - usersPastMonth) / usersPastMonth) * 100)
             : 100;
 
-        // get business counts
-        const totalBusiness = await Business.countDocuments();
+        // Get business counts - with error handling
+        let totalBusiness = 0;
+        let businessesPastMonth = 0;
+        let newBusinessesThisMonth = 0;
+        let businessChange = 0;
 
-        const businessesPastMonth = await Business.countDocuments({
-            created_at: { $lt: pastMonthDate }
-        });
+        try {
+            totalBusiness = await Business.countDocuments();
+            businessesPastMonth = await Business.countDocuments({
+                created_at: { $lt: pastMonthDate }
+            });
+            newBusinessesThisMonth = totalBusiness - businessesPastMonth;
+            businessChange = businessesPastMonth > 0
+                ? Math.round((newBusinessesThisMonth / businessesPastMonth) * 100)
+                : 100;
+            console.log('Business counts retrieved successfully');
+        } catch (error) {
+            console.error('Error getting business counts:', error);
+        }
 
-        const newBusinessesThisMonth = totalBusiness - businessesPastMonth;
+        // Get incentive counts - with error handling
+        let totalIncentives = 0;
+        let incentivesPastMonth = 0;
+        let newIncentivesThisMonth = 0;
+        let incentiveChange = 0;
 
-        const businessChange = businessesPastMonth > 0
-            ? Math.round((newBusinessesThisMonth / businessesPastMonth) * 100)
-            : 100;
-        console.log('Business change:', businessChange);
-
-        // get incentive counts
-        const totalIncentives = await Incentive.countDocuments();
-        const incentivesPastMonth = await Incentive.countDocuments({
-            created_at: { $lt: pastMonthDate }
-        });
-
-        const newIncentivesThisMonth = totalIncentives - incentivesPastMonth;
-
-        const incentiveChange = incentivesPastMonth > 0
-            ? Math.round((newIncentivesThisMonth / incentivesPastMonth) * 100)
-            : 100;
+        try {
+            // Check if Incentive model is available
+            if (Incentive && typeof Incentive.countDocuments === 'function') {
+                totalIncentives = await Incentive.countDocuments();
+                incentivesPastMonth = await Incentive.countDocuments({
+                    created_at: { $lt: pastMonthDate }
+                });
+                newIncentivesThisMonth = totalIncentives - incentivesPastMonth;
+                incentiveChange = incentivesPastMonth > 0
+                    ? Math.round((newIncentivesThisMonth / incentivesPastMonth) * 100)
+                    : 100;
+                console.log('Incentive counts retrieved successfully');
+            } else {
+                console.error('Incentive model not available or countDocuments not a function');
+            }
+        } catch (error) {
+            console.error('Error getting incentive counts:', error);
+        }
 
         // Return dashboard statistics
         return res.status(200).json({
