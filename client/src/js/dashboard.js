@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const newUsersCount = document.getElementById('new-users-count');
         if (newUsersCount) {
-            newUsersCount.textContent = stats.newUsersThisMonth || Math.floor((stats.userCount || 0) * 0.15); // Fallback estimate
+            newUsersCount.textContent = stats.newUsersThisMonth || 0; // Use the exact count from API
         }
     }
 
@@ -471,9 +471,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-
-
-
     const businessesListContent = document.getElementById('businesses-list');
     if (businessesListContent) {
         // Update the div with a link to the full business management page
@@ -498,7 +495,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-// Load incentives from API for dashboard display
+    // Load incentives from API for dashboard display
     async function loadIncentives() {
         try {
             // Show loading indicator in dashboard incentives table
@@ -523,9 +520,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            console.log("Using token for API request: ", token.substring(0, 10) + "...");
+            // First, ensure we have the latest dashboard stats
+            await loadDashboardStats();
 
-            // Make API request - use admin-incentives API
+            // Make API request for incentives list
             const response = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=5`, {
                 method: 'GET',
                 headers: {
@@ -537,7 +535,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!response.ok) {
                 console.error("API error response: ", response.status, response.statusText);
 
-                // if unauthorized, handle gracefully
                 if (response.status === 401) {
                     console.error("Unauthorized request -- token may be invalid");
                     if (incentiveTableBody) {
@@ -551,14 +548,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
             const incentives = data.incentives || [];
 
-            // Also get incentive stats from dashboard stats API
-            await loadDashboardStats();
-
             // Render incentives in the table
             renderDashboardIncentives(incentives);
         } catch (error) {
             handleApiError(error, () => {
-                // If API fails, show error message instead of redirecting
+                // Fallback handling
                 const incentiveTableBody = document.getElementById('dashboard-incentives-table');
                 if (incentiveTableBody) {
                     incentiveTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading incentives. Please try again later.</td></tr>';
@@ -598,13 +592,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 ];
                 renderDashboardIncentives(mockIncentives);
-
-                // Update incentive stats from dashboard stats if available
-                const totalCount = dashboardStats.incentiveCount || mockIncentives.length;
-                const availableCount = mockIncentives.filter(i => i.is_available).length;
-                const newCount = Math.floor(mockIncentives.length * 0.3);
-
-                updateIncentiveStats(totalCount, availableCount, newCount);
             });
         }
     }
@@ -724,7 +711,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return types[typeCode] || typeCode;
     }
 
-// Update incentive stats in the dashboard
+    // Update incentive stats in the dashboard
     function updateIncentiveStats(totalCount, availableCount, newCount) {
         const totalIncentivesCount = document.getElementById('total-incentives-count');
         if (totalIncentivesCount) {
@@ -738,7 +725,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const newIncentivesCount = document.getElementById('new-incentives-count');
         if (newIncentivesCount) {
-            newIncentivesCount.textContent = newCount || dashboardStats.incentiveChange || Math.round(totalCount * 0.15); // Fallback estimate
+            // Use the newIncentivesThisMonth value from dashboardStats if available
+            newIncentivesCount.textContent = dashboardStats.newIncentivesThisMonth || newCount || 0;
         }
     }
 

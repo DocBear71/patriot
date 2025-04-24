@@ -251,20 +251,29 @@ async function handleDashboardStats(req, res) {
             return res.status(403).json({ message: 'Admin access required' });
         }
 
-        // Get current date and past month date for comparison
-        const currentDate = new Date();
+        // Get user counts
+        const totalUsers = await User.countDocuments();
+
+        // Count users created this month
+        const thisMonth = new Date();
+        thisMonth.setDate(1); // Set to first day of current month
+        thisMonth.setHours(0, 0, 0, 0); // Set to beginning of the day
+
+        const newUsersThisMonth = await User.countDocuments({
+            created_at: { $gte: thisMonth }
+        });
+
+        // Calculate users from previous month for percentage change
         const pastMonthDate = new Date();
         pastMonthDate.setMonth(pastMonthDate.getMonth() - 1);
 
-        // Get user counts
-        const totalUsers = await User.countDocuments();
         const usersPastMonth = await User.countDocuments({
             created_at: { $lt: pastMonthDate }
         });
+
         const userChange = usersPastMonth > 0
             ? Math.round(((totalUsers - usersPastMonth) / usersPastMonth) * 100)
             : 100;
-
         // Get business counts - with error handling
         let totalBusiness = 0;
         let businessesPastMonth = 0;
@@ -295,13 +304,26 @@ async function handleDashboardStats(req, res) {
             // Check if Incentive model is available
             if (Incentive && typeof Incentive.countDocuments === 'function') {
                 totalIncentives = await Incentive.countDocuments();
+
+                // Count incentives created this month
+                const thisMonth = new Date();
+                thisMonth.setDate(1); // Set to first day of current month
+                thisMonth.setHours(0, 0, 0, 0); // Set to beginning of the day
+
+                newIncentivesThisMonth = await Incentive.countDocuments({
+                    created_at: { $gte: thisMonth }
+                });
+
+                // Calculate incentives from previous month for percentage change
                 incentivesPastMonth = await Incentive.countDocuments({
                     created_at: { $lt: pastMonthDate }
                 });
-                newIncentivesThisMonth = totalIncentives - incentivesPastMonth;
+
+                // Calculate percentage change
                 incentiveChange = incentivesPastMonth > 0
-                    ? Math.round((newIncentivesThisMonth / incentivesPastMonth) * 100)
-                    : 100;
+                    ? Math.round(((totalIncentives - incentivesPastMonth) / incentivesPastMonth) * 100)
+                    : newIncentivesThisMonth > 0 ? newIncentivesThisMonth : 0; // If no past incentives, use actual new count
+
                 console.log('Incentive counts retrieved successfully');
             } else {
                 console.error('Incentive model not available or countDocuments not a function');
@@ -314,11 +336,13 @@ async function handleDashboardStats(req, res) {
         return res.status(200).json({
             userCount: totalUsers,
             userChange: userChange,
+            newUsersThisMonth: newUsersThisMonth,
             businessCount: totalBusiness,
             businessChange: businessChange,
             newBusinessesThisMonth: newBusinessesThisMonth,
             incentiveCount: totalIncentives,
             incentiveChange: incentiveChange,
+            newIncentivesThisMonth: newIncentivesThisMonth, // Add this line
             timestamp: new Date()
         });
     } catch (error) {
