@@ -623,49 +623,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-// Load incentive statistics
-//     async function loadIncentiveStats() {
-//         try {
-//             // Determine the base URL
-//             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-//                 ? `http://${window.location.host}`
-//                 : 'https://patriotthanks.vercel.app';
-//
-//             // Get auth token
-//             const token = getAuthToken();
-//             if (!token) {
-//                 return;
-//             }
-//
-//             // Make API request - we'll use the existing incentives API for now
-//             const response = await fetch(`${baseURL}/api/auth.js?operation=dashboard-stats`, {
-//                 method: 'GET',
-//                 headers: {
-//                     'Authorization': `Bearer ${token}`,
-//                     'Cache-Control': 'no-cache'
-//                 }
-//             });
-//
-//             if (!response.ok) {
-//                 throw response;
-//             }
-//
-//             const data = await response.json();
-//
-//             // Update stats with the data
-//             const totalCount = data.total || 0;
-//             const availableCount = data.available || 0;
-//             const newCount = data.newThisMonth || 0;
-//
-//             updateIncentiveStats(totalCount, availableCount, newCount);
-//         } catch (error) {
-//             console.error('Error loading incentive stats:', error);
-//
-//             // Fallback to setting reasonable defaults
-//             updateIncentiveStats(0, 0, 0);
-//         }
-//     }
-
 // Render incentives in the dashboard
     function renderDashboardIncentives(incentives) {
         const incentiveTableBody = document.getElementById('dashboard-incentives-table');
@@ -717,7 +674,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Update incentive stats based on these incentives
         const totalCount = dashboardStats.incentiveCount || incentives.length;
         const availableCount = incentives.filter(i => i.is_available).length;
-        const newCount = dashboardStats.incentiveChange || Math.round(totalCount * 0.2);
+        const newCount = dashboardStats.newIncentivesThisMonth || Math.round(totalCount * 0.2);
 
         updateIncentiveStats(totalCount, availableCount, newCount);
 
@@ -747,13 +704,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const availableIncentivesCount = document.getElementById('available-incentives-count');
         if (availableIncentivesCount) {
-            availableIncentivesCount.textContent = availableCount || Math.round(totalCount * 0.85); // Fallback estimate
+            availableIncentivesCount.textContent = String(availableCount || Math.round(totalCount * 0.85)); // Fallback estimate
         }
 
         const newIncentivesCount = document.getElementById('new-incentives-count');
         if (newIncentivesCount) {
             // Use the newIncentivesThisMonth value from dashboardStats if available
-            newIncentivesCount.textContent = dashboardStats.newIncentivesThisMonth || newCount || 0;
+            // of fall back to the estimated newCount, or 0 as a last resort.
+            newIncentivesCount.textContent = String(dashboardStats.newIncentivesThisMonth || newCount || 0);
         }
     }
 
