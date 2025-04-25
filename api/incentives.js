@@ -1,48 +1,8 @@
 // api/incentives.js - Combined incentives endpoint handlers
 const connect = require('../config/db');
 const mongoose = require('mongoose');
-
-// Define schemas once
-const businessSchema = new mongoose.Schema({
-    bname: String,
-    address1: String,
-    address2: String,
-    city: String,
-    state: String,
-    zip: String,
-    phone: String,
-    type: String,
-    status: { type: String, default: 'active' },
-    created_by: String,
-    updated_by: String,
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now }
-});
-
-const incentiveSchema = new mongoose.Schema({
-    business_id: String,
-    is_available: Boolean,
-    type: String,
-    amount: Number,
-    information: String,
-    other_description: String,
-    created_by: String,
-    updated_by: String,
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now },
-});
-
-// Initialize models once
-let Business, Incentive;
-try {
-    // Try to fetch the existing models
-    Business = mongoose.model('Business');
-    Incentive = mongoose.model('Incentive');
-} catch (error) {
-    // Define the models if they do not exist
-    Business = mongoose.model('Business', businessSchema, 'business');
-    Incentive = mongoose.model('Incentive', incentiveSchema, 'incentives');
-}
+const Business = require('../models/Business');
+const Incentive = require('../models/Incentive');
 
 /**
  * Combined API handler for all incentive operations

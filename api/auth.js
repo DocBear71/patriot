@@ -4,85 +4,10 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { ObjectId } = mongoose.Types;
 const jwt = require('jsonwebtoken');
-const Users = require("../models/Users");
-const Businesses = require("../models/index");
-const Incentives = require("../models/index");
-
-// Define schemas
-const userSchema = new mongoose.Schema({
-    fname: String,
-    lname: String,
-    address1: String,
-    address2: String,
-    city: String,
-    state: String,
-    zip: String,
-    status: String,
-    level: String,
-    email: String,
-    password: String,
-    isAdmin: Boolean,
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now },
-});
-
-const adminCodeSchema = new mongoose.Schema({
-    code: String,
-    description: String,
-    expiration: Date,
-    created_at: { type: Date, default: Date.now }
-});
-
-const businessSchema = new mongoose.Schema({
-    bname: String,
-    address1: String,
-    address2: String,
-    city: String,
-    state: String,
-    zip: String,
-    phone: String,
-    type: String,
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now }
-});
-
-const incentiveSchema = new mongoose.Schema({
-    business_id: String,
-    is_available: Boolean,
-    type: String,
-    amount: Number,
-    information: String,
-    other_description: String,
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now }
-});
-
-// Initialize models
-let User, AdminCode, Business, Incentive;
-try {
-    User = mongoose.model('User');
-} catch (error) {
-    User = mongoose.model('User', userSchema, 'users');
-}
-
-try {
-    AdminCode = mongoose.model('AdminCode');
-} catch (error) {
-    AdminCode = mongoose.model('AdminCode', adminCodeSchema, 'admin_codes');
-}
-
-try {
-    Business = mongoose.model('Business');
-} catch (error) {
-    Business = mongoose.model('Business', businessSchema, 'business');
-}
-
-try {
-    Incentive = mongoose.model('Incentive');
-} catch (error) {
-    Incentive = mongoose.model('Incentive', incentiveSchema, 'incentives');
-}
-
+const User = require("../models/User");
+const Business = require("../models/Business");
+const Incentive = require("../models/Incentive");
+const AdminCode = require("../models/AdminCode");
 /**
  * Consolidated authentication API handler
  */
@@ -204,20 +129,6 @@ async function handleDashboardStats(req, res) {
 
     // Make sure all collections are properly defined
     console.log("Available collections check:");
-    try {
-        console.log("- Business model collection name:", Business.collection.name);
-        console.log("- User model collection name:", User.collection.name);
-        console.log("- Incentive model available:", !!Incentive);
-
-        // If Incentive is not defined, try to initialize it again
-        if (!Incentive) {
-            console.log("Incentive model not found, initializing...");
-            Incentive = mongoose.model('Incentive', incentiveSchema, 'incentives');
-            console.log("Incentive model initialized:", !!Incentive);
-        }
-    } catch (error) {
-        console.error("Error checking models:", error);
-    }
 
     // Verify the token and check admin status
     const authHeader = req.headers.authorization;

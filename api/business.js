@@ -2,32 +2,8 @@
 const connect = require('../config/db');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
-let Business = require('../models/index');
+let Business = require('../models/Business');
 let User = require('../models/Users');
-
-// Define business schema once
-const businessSchema = new mongoose.Schema({
-    bname: String,
-    address1: String,
-    address2: String,
-    city: String,
-    state: String,
-    zip: String,
-    phone: String,
-    type: String,
-    status: { type: String, default: 'active' },
-    created_by: String,
-    updated_by: String,
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now }
-});
-
-// Initialize model once
-try {
-    Business = mongoose.model('Business');
-} catch (error) {
-    Business = mongoose.model('Business', businessSchema, 'business');
-}
 
 /**
  * Consolidated business API handler

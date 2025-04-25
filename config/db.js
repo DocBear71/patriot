@@ -1,3 +1,4 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 
 // Connection options to optimize performance and prevent timeouts in serverless environment

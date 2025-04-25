@@ -2,63 +2,10 @@
 const connect = require('../config/db');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
+const Business = require('../models/Business');
+const Incentive = require('../models/Incentive');
+const User = require('../models/User');
 
-// Share the same schemas as incentives.js
-const businessSchema = new mongoose.Schema({
-    bname: String,
-    address1: String,
-    address2: String,
-    city: String,
-    state: String,
-    zip: String,
-    phone: String,
-    type: String,
-    status: { type: String, default: 'active' },
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now }
-});
-
-const incentiveSchema = new mongoose.Schema({
-    business_id: String,
-    is_available: Boolean,
-    type: String,
-    amount: Number,
-    information: String,
-    other_description: String,
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now },
-});
-
-const userSchema = new mongoose.Schema({
-    email: String,
-    password: String,
-    fname: String,
-    lname: String,
-    address1: String,
-    address2: String,
-    city: String,
-    state: String,
-    zip: String,
-    status: String,
-    level: String,
-    isAdmin: Boolean,
-    created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now }
-});
-
-// Initialize models once
-let Business, Incentive, User;
-try {
-    // Try to fetch the existing models
-    Business = mongoose.model('Business');
-    Incentive = mongoose.model('Incentive');
-    User = mongoose.model('User');
-} catch (error) {
-    // Define the models if they do not exist
-    Business = mongoose.model('Business', businessSchema, 'business');
-    Incentive = mongoose.model('Incentive', incentiveSchema, 'incentives');
-    User = mongoose.model('User', userSchema, 'users');
-}
 
 /**
  * Main API handler for admin incentive operations
@@ -200,10 +147,10 @@ async function handleListIncentives(req, res) {
         }
 
         // Count total incentives matching the filter
-        const total = await Incentive.countDocuments(filter);
+        const total = await Incentive.countDocuments(filter); // Fixed: Incentive not Incentives
 
         // Execute the query with pagination
-        const incentives = await Incentive.find(filter)
+        const incentives = await Incentive.find(filter) // Fixed: Incentive not Incentives
             .sort({ created_at: -1 })
             .skip(skip)
             .limit(limit)
@@ -214,7 +161,7 @@ async function handleListIncentives(req, res) {
             const incentiveObj = incentive;
 
             // Look up business name if business_id is present
-            if (incentive.business_id) {
+            if (incentive.business_id) { // Fixed: incentive not Incentives
                 try {
                     const business = await Business.findById(incentive.business_id);
                     if (business) {
