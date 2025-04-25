@@ -431,9 +431,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // Add user ID to the form data
-            incentiveData.updated_by = userId;
-
             // Show loading state
             const submitButton = document.getElementById('update-submit');
             const originalText = submitButton.value;
