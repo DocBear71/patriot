@@ -91,7 +91,7 @@ tbody tr:nth-child(even) {
 }
 
 tbody tr:nth-child(odd) {
-    background-color: #d3d3d3;
+    background-color: #fdbcbc;
 }
 
 .incentive-item {
@@ -132,7 +132,7 @@ tbody tr:nth-child(odd) {
     tr th:nth-child(1) {
         font-weight: bold;
         font-size: 110%;
-        background-color: #ffa07a
+        background-color: #fdbcbc;
     }
 
     tr th:nth-child(2) {
@@ -202,13 +202,15 @@ tbody tr:nth-child(odd) {
     }
 
     tr th:nth-child(1) {
-        display: none;
+        font-weight: bold;
+        font-size: 110%;
+        background-color: #fdbcbc;
     }
 
     tr th:nth-child(2) {
         font-weight: bold;
         font-size: 110%;
-        background-color: #ffa07a;
+        background-color: #ffffe0;
     }
 
     tbody th {
