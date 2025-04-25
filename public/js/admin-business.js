@@ -909,13 +909,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // helper function to map business type codes to display names
     function getBusinessTypeDisplay(typeCode) {
         const typeMap = {
-            'AUTO': 'Automotive',
-            'ENT': 'Entertainment',
-            'HARDW': 'Hardware',
-            'RX': 'Pharmacy',
             'REST': 'Restaurant',
-            'RETAIL': 'Retail',
-            'Tech': 'Technology',
+            'GROC': 'Grocery',
+            'DEPT': 'Department Store',
+            'CLTH': 'Clothing',
+            'ELEC': 'Electronics',
+            'HARDW': 'Hardware',
+            'FURN': 'Furniture',
+            'AUTO': 'Automotive',
+            'SERV': 'Service',
+            'ENTR': 'Entertainment',
+            'SPRT': 'Sporting Goods',
+            'TOYS': 'Toys',
+            'HEAL': 'Health',
+            'BEAU': 'Beauty',
+            'JEWL': 'Jewelry',
+            'BOOK': 'Bookstore',
+            'GIFT': 'Gift Shop',
+            'SPEC': 'Specialty',
             'OTHER': 'Other'
         };
         return typeMap[typeCode] || typeCode;

@@ -294,14 +294,25 @@ document.addEventListener('DOMContentLoaded', function() {
         // Handle the business type field
         if (fieldId === 'type' && value) {
             const businessTypes = {
-                'restaurant': 'REST',
-                'automotive': 'AUTO',
-                'entertainment': 'ENT',
-                'hardware': 'HARDW',
-                'pharmacy': 'RX',
-                'retail': 'RETAIL',
-                'technology': 'Tech',
-                'other': 'OTHER'
+                'REST': 'Restaurant',
+                'GROC': 'Grocery',
+                'DEPT': 'Department Store',
+                'CLTH': 'Clothing',
+                'ELEC': 'Electronics',
+                'HARDW': 'Hardware',
+                'FURN': 'Furniture',
+                'AUTO': 'Automotive',
+                'SERV': 'Service',
+                'ENTR': 'Entertainment',
+                'SPRT': 'Sporting Goods',
+                'TOYS': 'Toys',
+                'HEAL': 'Health',
+                'BEAU': 'Beauty',
+                'JEWL': 'Jewelry',
+                'BOOK': 'Bookstore',
+                'GIFT': 'Gift Shop',
+                'SPEC': 'Specialty',
+                'OTHER': 'Other'
             };
 
             // now to try and find the matching type

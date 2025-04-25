@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'DEPT': 'Department Store',
             'CLTH': 'Clothing',
             'ELEC': 'Electronics',
-            'HARD': 'Hardware',
+            'HARDW': 'Hardware',
             'FURN': 'Furniture',
             'AUTO': 'Automotive',
             'SERV': 'Service',
@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'BOOK': 'Bookstore',
             'GIFT': 'Gift Shop',
             'SPEC': 'Specialty',
-            'OTHE': 'Other'
+            'OTHER': 'Other'
             // Add more type codes as needed
         };
 
