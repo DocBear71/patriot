@@ -15,7 +15,7 @@ hr {
 }
 
 .spacer {
-    height: 40px; /* Adjust this value to control the amount of space */
+    height: 20px; /* Adjust this value to control the amount of space */
     width: 100%;
     clear: both;
 }
