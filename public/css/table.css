@@ -90,7 +90,7 @@ tbody tr:nth-child(even) {
 }
 
 tbody tr:nth-child(odd) {
-    background-color: #fdbcbc;
+    background-color: #ffffff;
 }
 
 .incentive-item {
@@ -214,7 +214,7 @@ tbody tr:nth-child(odd) {
     }
 
     tbody tr:nth-child(odd) th {
-        background-color: #fdbcbc;
+        background-color: #ffffff;
     }
 }
 
@@ -283,6 +283,6 @@ tbody tr:nth-child(odd) {
     }
 
     tbody tr:nth-child(odd) th {
-        background-color: #fdbcbc;
+        background-color: #ffffff;
     }
 }
