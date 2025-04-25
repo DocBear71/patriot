@@ -409,7 +409,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!businessTableBody) return;
 
         if (businesses.length === 0) {
-            businessTableBody.innerHTML = '<tr><td colspan="6" class="text-center">No businesses found</td></tr>';
+            businessTableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found</td></tr>';
             return;
         }
 
@@ -427,7 +427,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const row = document.createElement('tr');
             row.innerHTML = `
-            <td>${business._id ? business._id.substring(0, 8) + '...' : 'N/A'}</td>
             <td>${business.bname || 'N/A'}</td>
             <td>${location}</td>
             <td>${business.type || 'Other'}</td>
