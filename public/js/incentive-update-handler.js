@@ -427,7 +427,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (sessionData) {
                 const session = JSON.parse(sessionData);
                 if (session && session.user && session.user._id) {
-                    incentiveData.updated_by = session.user._id; // This is the correct way
+                    incentiveData.updated_by = session.user._id;
                 }
             }
 
