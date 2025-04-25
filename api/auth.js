@@ -4,10 +4,11 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { ObjectId } = mongoose.Types;
 const jwt = require('jsonwebtoken');
-const User = require("../models/User");
-const Business = require("../models/Business");
-const Incentive = require("../models/Incentive");
-const AdminCode = require("../models/AdminCode");
+const User = require('../models/User');
+const Business = require('../models/Business');
+const Incentive = require('../models/Incentive');
+const AdminCode = require('../models/AdminCode');
+const nodemailer = require('nodemailer');
 /**
  * Consolidated authentication API handler
  */
@@ -39,12 +40,17 @@ module.exports = async (req, res) => {
                 return await handleDeleteUser(req, res);
             case 'dashboard-stats':
                 return await handleDashboardStats(req, res);
+            case 'forgot-password':
+                return await handleForgotPassword(req, res);
+            case 'reset-password':
+                return await handleResetPassword(req, res);
             default:
                 // If no operation specified, return API info for GET requests
                 if (req.method === 'GET') {
                     return res.status(200).json({
                         message: 'Authentication API is available',
-                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users', 'update-user', 'delete-user', 'dashboard-stats']
+                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users',
+                            'update-user', 'delete-user', 'dashboard-stats', 'forgot-password', 'reset-password'],
                     });
                 }
                 return res.status(400).json({ message: 'Invalid operation' });
@@ -718,3 +724,234 @@ async function handleVerifyAdmin(req, res) {
         return res.status(500).json({ message: 'Server error during admin verification: ' + error.message });
     }
 }
+
+// Create a transporter for email sending with Bluehost SMTP settings
+const transporter = nodemailer.createTransport({
+    host: 'mail.patriotthanks.com',
+    port: 465,  // Outgoing SMTP port as specified by Bluehost
+    secure: true, // true for port 465 (SSL/TLS)
+    auth: {
+        user: process.env.EMAIL_USER || 'forgotpassword@patriotthanks.com', // Full email address
+        pass: process.env.EMAIL_PASS || '1369Bkcsdp55chtdp81??'
+    },
+    tls: {
+        // Do not fail on invalid certs
+        rejectUnauthorized: false
+    }
+});
+
+// Verify the connection configuration
+transporter.verify(function(error, success) {
+    if (error) {
+        console.error('SMTP connection error:', error);
+    } else {
+        console.log('SMTP server is ready to send emails');
+    }
+});
+
+/**
+ * Handle forgot password request
+ * Generates a reset token and (in production) would send an email
+ */
+async function handleForgotPassword(req, res) {
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    console.log("Forgot password API hit:", req.method);
+
+    try {
+        // Connect to MongoDB
+        try {
+            await connect;
+            console.log("Database connection established");
+        } catch (dbError) {
+            console.error("Database connection error:", dbError);
+            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        }
+
+        // Extract email from request body
+        const { email } = req.body;
+
+        // Basic validation
+        if (!email) {
+            return res.status(400).json({ message: 'Email is required' });
+        }
+
+        // Find user by email
+        const user = await User.findOne({ email });
+
+        // Don't reveal if user exists for security
+        if (!user) {
+            console.log(`No user found with email: ${email}`);
+            return res.status(200).json({
+                message: 'If this email is registered, a reset link has been sent.'
+            });
+        }
+
+        // Generate a secure reset token
+        const resetToken = jwt.sign(
+            { userId: user._id },
+            process.env.JWT_SECRET || 'patriot-thanks-secret-key',
+            { expiresIn: '1h' } // Token expires in 1 hour
+        );
+
+        // Store the reset token and expiration in the user document
+        user.resetToken = resetToken;
+        user.resetTokenExpires = new Date(Date.now() + 3600000); // 1 hour from now
+        await user.save();
+
+        // Get base URL for reset link
+        const baseURL = process.env.BASE_URL || 'https://patriotthanks.vercel.app';
+        const resetLink = `${baseURL}/reset-password.html?token=${resetToken}`;
+
+        // After generating resetLink, add this email sending code:
+
+        try {
+            // Set up email data
+            const mailOptions = {
+                from: {
+                    name: 'Patriot Thanks Support',
+                    address: process.env.EMAIL_USER || 'forgotpassword@patriotthanks.com'
+                },
+                to: email,
+                subject: 'Patriot Thanks - Password Reset Request',
+                html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #f8f9fa; padding: 20px; text-align: center;">
+                <img src="${baseURL}/images/docbearlogov4.png" alt="Patriot Thanks Logo" style="max-width: 100px;">
+                <h1 style="color: #333;">Password Reset Request</h1>
+            </div>
+            <div style="padding: 20px;">
+                <p>Hello,</p>
+                <p>We received a request to reset your password for your Patriot Thanks account. To reset your password, please click the button below:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${resetLink}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Reset Password</a>
+                </div>
+                <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+                <p style="word-break: break-all;">${resetLink}</p>
+                <p>This link will expire in 1 hour for security reasons.</p>
+                <p>If you did not request a password reset, please ignore this email or contact support if you have any concerns.</p>
+                <p>Please do not respond to this email, as this mailbox is not monitored.</p>
+                <p>Thank you,<br>The Patriot Thanks Team</p>
+            </div>
+            <div style="background-color: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+                <p>&copy; ${new Date().getFullYear()} Patriot Thanks. All rights reserved.</p>
+            </div>
+        </div>
+        `,
+                // Also including plain text version for email clients that don't support HTML
+                text: `
+        Password Reset Request
+
+        Hello,
+
+        We received a request to reset your password for your Patriot Thanks account. To reset your password, please visit the link below:
+
+        ${resetLink}
+
+        This link will expire in 1 hour for security reasons.
+
+        If you did not request a password reset, please ignore this email or contact support if you have any concerns.
+        
+        Please do not respond to this email, as this mailbox is not monitored.
+
+        Thank you,
+        The Patriot Thanks Team
+        `
+            };
+
+            // Send the email
+            const info = await transporter.sendMail(mailOptions);
+            console.log("Password reset email sent:", info.messageId);
+
+            // In development, log the test URL (if using Ethereal)
+            if (info.messageUrl) {
+                console.log("Preview URL: %s", info.messageUrl);
+            }
+
+            // Return success response (same message regardless of whether user was found)
+            return res.status(200).json({
+                message: 'If this email is registered, a reset link has been sent.'
+            });
+        } catch (emailError) {
+            // Log the error but don't expose it to the user for security
+            console.error('Error sending password reset email:', emailError);
+
+            // For development, include the reset link in the response
+            const isDev = process.env.NODE_ENV === 'development' ||
+                !process.env.NODE_ENV ||
+                process.env.VERCEL_ENV === 'development' ||
+                process.env.VERCEL_ENV === 'preview';
+
+            return res.status(200).json({
+                message: 'If this email is registered, a reset link has been sent.',
+                ...(isDev && { resetLink, emailError: emailError.message }) // Only in development
+            });
+        }
+    } catch (error) {
+        console.error('Error in forgot password:', error);
+        return res.status(500).json({ message: 'Server error: ' + error.message });
+    }
+}
+
+/**
+ * Handle password reset
+ * Verifies the reset token and updates the password
+ */
+async function handleResetPassword(req, res) {
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    console.log("Reset password API hit:", req.method);
+
+    try {
+        // Connect to MongoDB
+        try {
+            await connect;
+            console.log("Database connection established");
+        } catch (dbError) {
+            console.error("Database connection error:", dbError);
+            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        }
+
+        // Extract token and new password from request body
+        const { token, password } = req.body;
+
+        // Basic validation
+        if (!token || !password) {
+            return res.status(400).json({ message: 'Token and new password are required' });
+        }
+
+        // Find user with this reset token and check if it's still valid
+        const user = await User.findOne({
+            resetToken: token,
+            resetTokenExpires: { $gt: new Date() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid or expired reset token' });
+        }
+
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Update the user's password and clear the reset token
+        user.password = hashedPassword;
+        user.resetToken = undefined;
+        user.resetTokenExpires = undefined;
+        user.updated_at = new Date();
+        await user.save();
+
+        return res.status(200).json({
+            message: 'Password has been reset successfully'
+        });
+    } catch (error) {
+        console.error('Error in reset password:', error);
+        return res.status(500).json({ message: 'Server error: ' + error.message });
+    }
+}
+

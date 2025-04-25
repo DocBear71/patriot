@@ -12,12 +12,16 @@ const userSchema = new mongoose.Schema({
     zip: String,
     status: String,
     level: String,
-    email: String,
-    password: String,
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
     isAdmin: Boolean,
     created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now }
+    updated_at: { type: Date, default: Date.now },
+
+    // New fields for password reset
+    resetToken: String,
+    resetTokenExpires: Date
 });
 
 // Export the model - use the 'users' collection
-module.exports = mongoose.model('User', userSchema, 'users');
+module.exports = mongoose.model('User', userSchema);
