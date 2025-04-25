@@ -368,17 +368,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log("Incentive added successfully: ", data);
                 alert('Incentive added successfully!');
 
-                // Reset the incentive form but keep the selected business
-                resetField('incentiveType');
-                resetField('incentiveAmount');
-                resetField('incentiveInfo', 'Please enter information about the discount/incentive.');
-                if (otherTypeContainer) {
-                    otherTypeContainer.style.display = 'none';
-                }
-                resetField('otherTypeDescription');
-                document.querySelectorAll('input[name="incentiveAvailable"]').forEach(radio => {
-                    radio.checked = false;
-                });
+                // call the resetForm function
+                resetForm();
+
             })
             .catch(error => {
                 console.error("Error adding incentive: ", error);
@@ -399,6 +391,90 @@ document.addEventListener('DOMContentLoaded', function() {
         if (field) {
             field.value = defaultValue;
         }
+    }
+
+    // Add this function to business-incentive-handler.js
+    function resetForm() {
+        // Get the form element
+        const incentiveForm = document.getElementById('incentive-form');
+
+        // Reset the form if it exists
+        if (incentiveForm) {
+            // Reset all form fields
+            incentiveForm.reset();
+
+            // Clear business selection if needed
+            const businessIdField = document.getElementById('selected-business-id');
+            if (businessIdField) {
+                businessIdField.value = '';
+            }
+
+            // Reset radio buttons
+            const availableRadios = document.querySelectorAll('input[name="incentiveAvailable"]');
+            availableRadios.forEach(radio => {
+                radio.checked = false;
+            });
+
+            // Reset incentive type dropdown
+            const typeSelect = document.getElementById('incentiveType');
+            if (typeSelect) {
+                typeSelect.selectedIndex = 0;
+            }
+
+            // Hide the "other" type container
+            const otherTypeContainer = document.getElementById('otherTypeContainer');
+            if (otherTypeContainer) {
+                otherTypeContainer.style.display = 'none';
+            }
+
+            // Reset other description field
+            const otherTypeDescription = document.getElementById('otherTypeDescription');
+            if (otherTypeDescription) {
+                otherTypeDescription.value = '';
+            }
+
+            // Reset amount field
+            const amountField = document.getElementById('incentiveAmount');
+            if (amountField) {
+                amountField.value = '';
+            }
+
+            // Reset information textarea with default text
+            const infoField = document.getElementById('incentiveInfo');
+            if (infoField) {
+                infoField.value = 'Please enter information about the discount/incentive.';
+            }
+
+            // Hide the business info and incentive sections
+            const businessInfoSection = document.getElementById('business-info-section');
+            if (businessInfoSection) {
+                businessInfoSection.style.display = 'none';
+            }
+
+            const incentiveSection = document.getElementById('incentive-section');
+            if (incentiveSection) {
+                incentiveSection.style.display = 'none';
+            }
+
+            // Clear the business search results
+            const searchResults = document.getElementById('business-search-results');
+            if (searchResults) {
+                searchResults.innerHTML = '';
+            }
+
+            // Reset search fields
+            const businessNameField = document.getElementById('business-name');
+            if (businessNameField) {
+                businessNameField.value = '';
+            }
+
+            const addressField = document.getElementById('address');
+            if (addressField) {
+                addressField.value = '';
+            }
+        }
+
+        console.log("Incentive form has been reset");
     }
 
     // Lets add some css for the disabled fields
