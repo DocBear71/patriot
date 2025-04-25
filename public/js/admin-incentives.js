@@ -606,10 +606,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Get business name - if not provided in the incentive, try to find it in the businesses array
             let businessName = incentive.businessName || 'Unknown Business';
-            if (!businessName && incentive.business_id) {
+            let locationText = 'Location not specified';
+
+            // Find the matching business to get location info
+            if (incentive.business_id) {
                 const business = businesses.find(b => b._id === incentive.business_id);
                 if (business) {
-                    businessName = business.bname;
+                    if (!businessName || businessName === 'Unknown Business') {
+                        businessName = business.bname;
+                    }
+
+                    // Set location text if business has address, city, and state
+                    if (business.address1 && business.city && business.state) {
+                        locationText = `${business.address1}, ${business.city}, ${business.state}`;
+                    }
                 }
             }
 
@@ -630,20 +640,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${incentive._id ? incentive._id.substring(0, 8) + '...' : 'N/A'}</td>
-                <td>${businessName}</td>
-                <td>${typeLabel}${otherDesc}</td>
-                <td class="${availabilityClass}">${availabilityText}</td>
-                <td>${amountText}</td>
-                <td>${incentive.information || 'No information available'}</td>
-                <td>${formattedDate}</td>
-                <td>
-                    <div class="action-btns">
-                        <button class="btn btn-sm btn-info edit-incentive-btn" data-id="${incentive._id}">Edit</button>
-                        <button class="btn btn-sm btn-danger delete-incentive-btn" data-id="${incentive._id}" data-business="${businessName}">Delete</button>
-                    </div>
-                </td>
-            `;
+            <td>${businessName}</td>
+            <td>${locationText}</td>
+            <td>${typeLabel}${otherDesc}</td>
+            <td class="${availabilityClass}">${availabilityText}</td>
+            <td>${amountText}</td>
+            <td>${incentive.information || 'No information available'}</td>
+            <td>${formattedDate}</td>
+            <td>
+                <div class="action-btns">
+                    <button class="btn btn-sm btn-info edit-incentive-btn" data-id="${incentive._id}">Edit</button>
+                    <button class="btn btn-sm btn-danger delete-incentive-btn" data-id="${incentive._id}" data-business="${businessName}">Delete</button>
+                </div>
+            </td>
+        `;
 
             incentiveTableBody.appendChild(row);
         });

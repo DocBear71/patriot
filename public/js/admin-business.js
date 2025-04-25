@@ -372,8 +372,8 @@ document.addEventListener('DOMContentLoaded', function() {
         businessTableBody.innerHTML = '';
 
         businesses.forEach(business => {
-            const locationText = business.city && business.state
-                ? `${business.city}, ${business.state}`
+            const locationText = business.address1 && business.city && business.state
+                ? `${business.address1}, ${business.city}, ${business.state}`
                 : 'Location not specified';
 
             // Use the helper function to get the display name for the business type
@@ -385,7 +385,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const row = document.createElement('tr');
             row.innerHTML = `
-            <td>${business._id ? business._id.substring(0, 8) + '...' : 'N/A'}</td>
             <td>${business.bname || 'N/A'}</td>
             <td>${locationText}</td>
             <td>${businessTypeDisplay}</td>
