@@ -94,6 +94,27 @@ tbody tr:nth-child(odd) {
     background-color: #d3d3d3;
 }
 
+.incentive-item {
+    margin-bottom: 8px;
+    padding: 5px;
+    border-left: 3px solid #0066cc;
+    padding-left: 8px;
+}
+
+.incentive-info {
+    font-size: 0.9em;
+    color: #555;
+    margin-left: 5px;
+}
+
+#business_search th {
+    vertical-align: top;
+}
+
+#business_search th.right_table {
+    text-align: left; /* Changed from right to left for better readability of incentives */
+}
+
 /* MEDIA QUERIES ARE BELOW */
 @media only screen and (max-width: 767px) {
     
@@ -109,13 +130,15 @@ tbody tr:nth-child(odd) {
     }
 
     tr th:nth-child(1) {
-        display: none;
+        font-weight: bold;
+        font-size: 110%;
+        background-color: #ffa07a
     }
 
     tr th:nth-child(2) {
         font-weight: bold;
         font-size: 110%;
-        background-color: #ffa07a;
+        background-color: #ffffe0;
     }
 
     tbody th {

@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 retrieveFromMongoDB(formData);
             }
         });
-    }else {
+    } else {
         console.warn("Business search form not found in the DOM");
     }
 
@@ -138,6 +138,121 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Helper function to convert business type codes to readable labels
+    function getBusinessTypeLabel(typeCode) {
+        const types = {
+            'REST': 'Restaurant',
+            'GROC': 'Grocery',
+            'DEPT': 'Department Store',
+            'CLTH': 'Clothing',
+            'ELEC': 'Electronics',
+            'HARD': 'Hardware',
+            'FURN': 'Furniture',
+            'AUTO': 'Automotive',
+            'SERV': 'Service',
+            'ENTR': 'Entertainment',
+            'SPRT': 'Sporting Goods',
+            'TOYS': 'Toys',
+            'HEAL': 'Health',
+            'BEAU': 'Beauty',
+            'JEWL': 'Jewelry',
+            'BOOK': 'Bookstore',
+            'GIFT': 'Gift Shop',
+            'SPEC': 'Specialty',
+            'OTHE': 'Other'
+            // Add more type codes as needed
+        };
+
+        return types[typeCode] || typeCode;
+    }
+
+    // Helper function to convert incentive type codes to readable labels
+    function getIncentiveTypeLabel(typeCode) {
+        const types = {
+            'VT': 'Veteran',
+            'AD': 'Active Duty',
+            'FR': 'First Responder',
+            'SP': 'Spouse',
+            'OT': 'Other'
+        };
+
+        return types[typeCode] || typeCode;
+    }
+
+    // Function to fetch incentives for a specific business
+    function fetchBusinessIncentives(businessId) {
+        if (!businessId) {
+            console.error("No business ID provided for fetching incentives");
+            return;
+        }
+
+        // Determine the base URL of local or production
+        const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? `https://${window.location.host}`
+            : `https://patriotthanks.vercel.app`;
+
+        // Use the API endpoint with the baseURL
+        const apiURL = `${baseURL}/api/incentives.js?business_id=${businessId}`;
+        console.log("Fetching incentives from: ", apiURL);
+
+        fetch(apiURL)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch incentives: ${response.status} ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(`Incentives data for business ${businessId}:`, data);
+
+                // Find the cell where we'll display incentives
+                const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+
+                if (!incentivesCell) {
+                    console.error(`Could not find cell for incentives-for-${businessId}`);
+                    return;
+                }
+
+                // Check if there are any incentives
+                if (!data.results || data.results.length === 0) {
+                    incentivesCell.innerHTML = 'No incentives found';
+                    return;
+                }
+
+                // Build HTML for the incentives
+                let incentivesHTML = '';
+
+                data.results.forEach(incentive => {
+                    if (incentive.is_available) {
+                        const typeLabel = getIncentiveTypeLabel(incentive.type);
+                        const otherDescription = incentive.other_description ?
+                            ` (${incentive.other_description})` : '';
+
+                        incentivesHTML += `
+                            <div class="incentive-item">
+                                <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}%
+                                <div class="incentive-info">${incentive.information || ''}</div>
+                            </div>
+                        `;
+                    }
+                });
+
+                if (incentivesHTML === '') {
+                    incentivesCell.innerHTML = 'No active incentives found';
+                } else {
+                    incentivesCell.innerHTML = incentivesHTML;
+                }
+            })
+            .catch(error => {
+                console.error(`Error fetching incentives for business ${businessId}:`, error);
+                const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+
+                if (incentivesCell) {
+                    incentivesCell.innerHTML = 'Error loading incentives';
+                }
+            });
+    }
+
     function displaySearchResults(businesses) {
         try {
             const businessSearchTable = document.getElementById('business_search');
@@ -185,49 +300,40 @@ document.addEventListener('DOMContentLoaded', function() {
             businesses.forEach(business => {
                 if (!business) return; // skip null or undefined entries
 
-                // Get a placeholder image based on business type
-                // let imageSrc = './images/placeholder.jpg';
-                // if (business.type === 'Restaurant' || business.type === 'REST') {
-                //     imageSrc = './images/red_lobster.jpg';
-                // } else if (business.type === 'RETAIL' || business.type === 'Retail') {
-                //     imageSrc = './images/home_depot.jpg';
-                // } else if (business.type === 'AUTO') {
-                //     imageSrc = './images/milex.jpg';
-                // } else if (business.type === 'HARDW') {
-                //     imageSrc = './images/lowes.jpg';
-                // }
-
                 // Format the address line
                 const addressLine = business.address2
                     ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
                     : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
 
+                // Convert the business type code to a readable label
+                const businessType = getBusinessTypeLabel(business.type);
+
                 // Then create a new row
                 const row = document.createElement('tr');
 
-                // Set the row content
-                row.innerHTML =
-                    // <th><img src="${imageSrc}" alt="${business.bname}" class="business-image"></th>
-                `
+                // First populate with basic business info
+                row.innerHTML = `
                     <th class="left_table">${business.bname}</th>
                     <th class="left_table">${addressLine}</th>
-                    <th class="left_table">Business type: ${business.type}</th>
-                    <th class="right_table">${business.incentive || 'No incentives listed'}</th>
+                    <th class="left_table">${businessType}</th>
+                    <th class="right_table" id="incentives-for-${business._id}">Loading incentives...</th>
                 `;
 
                 tableBody.appendChild(row);
-        });
 
-        // Scroll to the results
-        searchTableContainer.scrollIntoView({ behavior: 'smooth' });
+                // Now fetch incentives for this business
+                fetchBusinessIncentives(business._id);
+            });
 
-    } catch(error) {
-        console.error("Error displaying search results: ", error);
-        alert("There was an error displaying the search results: " + error.message);
+            // Scroll to the results
+            searchTableContainer.scrollIntoView({behavior: 'smooth'});
+
+        } catch (error) {
+            console.error("Error displaying search results: ", error);
+            alert("There was an error displaying the search results: " + error.message);
         }
     }
 
-    // Function to display the business search results in the incentive- pages.
     function displayBusinessSearchResults(businesses, resultsContainer) {
         try {
             // clear any existing content
@@ -287,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // add the event listeners for the "select" buttons
             const selectButtons = document.querySelectorAll('.select-business');
             selectButtons.forEach(button => {
-                button.addEventListener('click', function() {
+                button.addEventListener('click', function () {
                     const businessId = this.getAttribute('data-business-id');
                     if (!businessId) {
                         console.error("No business ID found on button");
@@ -353,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             // have the browser scroll to the results
-            resultsContainer.scrollIntoView({ behavior: 'smooth'});
+            resultsContainer.scrollIntoView({behavior: 'smooth'});
 
         } catch (error) {
             console.error("Error displaying business search results: " + error);
@@ -394,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // now scroll to the business info section
-            businessInfoSection.scrollIntoView({ behavior: 'smooth' });
+            businessInfoSection.scrollIntoView({behavior: 'smooth'});
         } catch (error) {
             console.error("Error in handleBusinessSection: " + error);
             alert("There was an error selecting the business: " + error.message);
@@ -459,11 +565,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add input event listeners for visual feedback
     if (form.businessName) {
-        form.businessName.addEventListener('input', function() { validateField(this, isNotEmpty); });
+        form.businessName.addEventListener('input', function () {
+            validateField(this, isNotEmpty);
+        });
     }
 
     if (form.address) {
-            form.address.addEventListener('input', function() { validateField(this, isNotEmpty); });
+        form.address.addEventListener('input', function () {
+            validateField(this, isNotEmpty);
+        });
     }
 
     // function validation
@@ -491,8 +601,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Validate the entire form (for use with other functions if needed)
     function validateForm() {
         const requiredFields = [
-            { element: form.businessName, validator: isNotEmpty },
-            { element: form.address, validator: isNotEmpty },
+            {element: form.businessName, validator: isNotEmpty},
+            {element: form.address, validator: isNotEmpty},
 
         ];
 
