@@ -1,9 +1,8 @@
-
 /*
 FILE: table.css
 AUTHOR: Edward G. McKeown
 DATE: 2024/11/02
-VERSION: 1.0.1
+VERSION: 1.0.2
 DESCRIPTION:
  
  
@@ -35,7 +34,7 @@ hr {
     margin-right: auto;
     width: 932px;
     height: auto;
-    }
+}
 
 
 #search_table > #business_search, #search_table > #business_search > figcaption {
@@ -103,7 +102,7 @@ tbody tr:nth-child(odd) {
 
 .incentive-info {
     font-size: 0.9em;
-    color: #FFFFE0;
+    color: #555;
     margin-left: 5px;
 }
 
@@ -117,105 +116,50 @@ tbody tr:nth-child(odd) {
 
 /* MEDIA QUERIES ARE BELOW */
 @media only screen and (max-width: 767px) {
-    
-    figure > .middle {
-    margin-left: auto;
-    margin-right: auto;
-    width: auto;
-    height: auto;
-    }
 
-    thead {
-        display: none;
-    }
-
-    tr th:nth-child(1) {
-        font-weight: bold;
-        font-size: 110%;
-        background-color: #fdbcbc;
-    }
-
-    tr th:nth-child(2) {
-        font-weight: bold;
-        font-size: 110%;
-        background-color: #ffffe0;
-    }
-
-    tbody th {
-        border-bottom-style: none;
-    }
-    tfoot {
-        display: none;
-    }
-
-    #search_table > #business_search {
-        border: 1px solid #000000;
-        width: auto;
-        padding: 15px;
-        margin-left: auto;
-        margin-right: auto;
-    }
-    
-    #search_table > #business_search > figcaption {
-        display: block;
-        background-color: #e0ffff;
-        font-size: 200%;
-        font-weight: bold;
-        text-align: center;
-        padding-bottom: .25em;
-    }
-    
-    #search_table > #business_search > table {
-        border-collapse: collapse;
-        border: 1px solid #000000;
-        margin: 10px auto;
-    }
-    
-    th {
-        display: block;
-        border: 1px solid #000000;
-        padding: .2em .7em;
-    }
-    
-    .left_table {
-        text-align: left;
-    }
-    
-    .right_table {
-        text-align: right;
-    }
-
-}
-/* MEDIA QUERIES ARE BELOW */
-@media only screen and (max-width: 467px) {
-    
     figure > .middle {
         margin-left: auto;
         margin-right: auto;
         width: auto;
         height: auto;
-        }
-    
-    
+    }
+
     thead {
         display: none;
     }
 
-    tr th:nth-child(1) {
+    tr th:nth-child(1)::before {
+        content: "Business Name: ";
         font-weight: bold;
-        font-size: 110%;
-        background-color: #fdbcbc;
+        display: block;
+        margin-bottom: 3px;
     }
 
-    tr th:nth-child(2) {
+    tr th:nth-child(2)::before {
+        content: "Location: ";
         font-weight: bold;
-        font-size: 110%;
-        background-color: #ffffe0;
+        display: block;
+        margin-bottom: 3px;
+    }
+
+    tr th:nth-child(3)::before {
+        content: "Description: ";
+        font-weight: bold;
+        display: block;
+        margin-bottom: 3px;
+    }
+
+    tr th:nth-child(4)::before {
+        content: "Offers/Incentives: ";
+        font-weight: bold;
+        display: block;
+        margin-bottom: 3px;
     }
 
     tbody th {
         border-bottom-style: none;
     }
+
     tfoot {
         display: none;
     }
@@ -227,7 +171,7 @@ tbody tr:nth-child(odd) {
         margin-left: auto;
         margin-right: auto;
     }
-    
+
     #search_table > #business_search > figcaption {
         display: block;
         background-color: #e0ffff;
@@ -236,25 +180,109 @@ tbody tr:nth-child(odd) {
         text-align: center;
         padding-bottom: .25em;
     }
-    
+
     #search_table > #business_search > table {
         border-collapse: collapse;
         border: 1px solid #000000;
         margin: 10px auto;
     }
-    
+
     th {
+        display: block;
         border: 1px solid #000000;
         padding: .2em .7em;
     }
-    
+
+    /* Add spacing between rows */
+    tr {
+        margin-bottom: 1em;
+        display: block;
+        border-bottom: 3px solid #000000;
+    }
+
     .left_table {
         text-align: left;
     }
-    
+
     .right_table {
-        text-align: right;
+        text-align: left; /* Changed to left for mobile view */
     }
 
-} 
+    /* Preserve alternating row colors in mobile view */
+    tbody tr:nth-child(even) th {
+        background-color: #ffffe0;
+    }
 
+    tbody tr:nth-child(odd) th {
+        background-color: #fdbcbc;
+    }
+}
+
+/* MEDIA QUERIES ARE BELOW */
+@media only screen and (max-width: 467px) {
+
+    figure > .middle {
+        margin-left: auto;
+        margin-right: auto;
+        width: auto;
+        height: auto;
+    }
+
+    thead {
+        display: none;
+    }
+
+    tbody th {
+        border-bottom-style: none;
+    }
+
+    tfoot {
+        display: none;
+    }
+
+    #search_table > #business_search {
+        border: 1px solid #000000;
+        width: auto;
+        padding: 15px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    #search_table > #business_search > figcaption {
+        display: block;
+        background-color: #e0ffff;
+        font-size: 200%;
+        font-weight: bold;
+        text-align: center;
+        padding-bottom: .25em;
+    }
+
+    #search_table > #business_search > table {
+        border-collapse: collapse;
+        border: 1px solid #000000;
+        margin: 10px auto;
+    }
+
+    th {
+        display: block;
+        border: 1px solid #000000;
+        padding: .2em .7em;
+    }
+
+    .left_table {
+        text-align: left;
+    }
+
+    .right_table {
+        text-align: left; /* Changed to left for mobile view */
+    }
+
+    /* Preserve alternating row colors in mobile view */
+    tbody tr:nth-child(even) th {
+        background-color: #ffffe0;
+    }
+
+    tbody tr:nth-child(odd) th {
+        background-color: #fdbcbc;
+    }
+}
