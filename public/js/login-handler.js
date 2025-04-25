@@ -164,10 +164,10 @@ function toggleAdminElements(isAdmin) {
 
 // Function to enable or disable restricted links based on role
 function enableRestrictedLinks(user) {
-    const businessAddLink = document.querySelector('a[href="/business-add.html"]');
-    const businessUpdateLink = document.querySelector('a[href="/business-update.html"]');
-    const incentiveAddLink = document.querySelector('a[href="/incentive-add.html"]');
-    const incentiveUpdateLink = document.querySelector('a[href="/incentive-update.html"]');
+    const businessAddLink = document.querySelector('a[href="./business-add.html"]');
+    const businessUpdateLink = document.querySelector('a[href="./business-update.html"]');
+    const incentiveAddLink = document.querySelector('a[href="./incentive-add.html"]');
+    const incentiveUpdateLink = document.querySelector('a[href="./incentive-update.html"]');
 
     // Enable links for logged in users
     if (businessAddLink) businessAddLink.classList.remove('disabled');
@@ -178,6 +178,18 @@ function enableRestrictedLinks(user) {
         if (businessUpdateLink) businessUpdateLink.classList.remove('disabled');
         if (incentiveUpdateLink) incentiveUpdateLink.classList.remove('disabled');
     }
+
+    document.querySelectorAll('.dropdown-item.disabled').forEach(item => {
+        // Check if the item should be enabled based on path
+        if ((item.href.includes('business-add.html') ||
+                item.href.includes('incentive-add.html')) ||
+            ((user.isAdmin || user.level === 'Admin') &&
+                (item.href.includes('business-update.html') ||
+                    item.href.includes('incentive-update.html')))) {
+            console.log("Enabling restricted link:", item.href);
+            item.classList.remove('disabled');
+        }
+    });
 }
 
 // Function to handle logout
@@ -219,6 +231,7 @@ function logoutUser() {
             item.href.includes('incentive-add.html') ||
             item.href.includes('incentive-update.html')) {
             item.classList.add('disabled');
+            console.log("Disabling link on logout:", item.href);
         }
     });
 
