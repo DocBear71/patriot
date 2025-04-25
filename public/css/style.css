@@ -170,13 +170,21 @@ main {
 
 .right_pane {
     float: left;
-    width: 40%;
+    width: 50%;
     padding: 0 2%;
 }
 
 .right_pane img {
     width: 100%;
     height: auto;
+}
+
+.military-support-graphic {
+    width: 100%;
+    max-width: 800px;
+    height: auto;
+    margin: 0 auto;
+    display: block;
 }
 
 #home_free {
