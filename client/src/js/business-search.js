@@ -159,8 +159,11 @@ document.addEventListener('DOMContentLoaded', function() {
             'BOOK': 'Bookstore',
             'GIFT': 'Gift Shop',
             'SPEC': 'Specialty',
+            'RX': 'Pharmacy',
+            'RETAIL': 'Retail',
+            'TECH': 'Technology',
             'OTHER': 'Other'
-            // Add more type codes as needed
+
         };
 
         return types[typeCode] || typeCode;
