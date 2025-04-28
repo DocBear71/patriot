@@ -1,3 +1,5 @@
+// /js/business-search.js/
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Form validator loaded!");
 
@@ -135,6 +137,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             errorContainer.innerHTML = `<div class="error">Search failed: ${error.message}</div>`;
             errorContainer.style.display = 'block';
+
+            // Scroll to the error message
+            errorContainer.scrollIntoView({behavior: 'smooth'});
         }
     }
 
@@ -283,20 +288,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 businesses = [];
             }
 
-            if (businesses.length === 0) {
-                // Show no results message
-                searchTableContainer.style.display = 'block';
-                tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
-                return;
-            }
-
             // Show the search results table by making the block visible
             searchTableContainer.style.display = 'block';
 
-            // Hide the "hidden" test in the h5.
+            // Hide the "hidden" text in the h5
             const searchTableH5 = searchTableContainer.querySelector('h5');
             if (searchTableH5) {
                 searchTableH5.style.display = 'none';
+            }
+
+            if (businesses.length === 0) {
+                // Show no results message
+                tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
+
+                // Scroll to the table even when no results are found
+                searchTableContainer.scrollIntoView({behavior: 'smooth'});
+                return;
             }
 
             // Add each business to the table
@@ -349,7 +356,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (businesses.length === 0) {
-                resultsContainer.innerHTML = '<div class="error">No Businesses found matching your search criteria.</div>';
+                resultsContainer.innerHTML = '<div class="error">No businesses found matching your search criteria.</div>';
+
+                // Scroll to the results container even when no businesses are found
+                resultsContainer.scrollIntoView({behavior: 'smooth'});
                 return;
             }
 
@@ -469,6 +479,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const resultsContainer = document.getElementById('business-search-results');
             if (resultsContainer) {
                 resultsContainer.innerHTML = `<div class="error">Error displaying search results: ${error.message}</div>`;
+                // Scroll to the error message
+                resultsContainer.scrollIntoView({behavior: 'smooth'});
             } else {
                 alert("Error displaying search results: " + error.message);
             }

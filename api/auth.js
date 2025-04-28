@@ -1,4 +1,4 @@
-// api/auth.js - Consolidated authentication API (login, register, verify-admin)
+/// auth.js - Modified for case-insensitive email handling
 const connect = require('../config/db');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -352,8 +352,12 @@ async function handleLogin(req, res) {
             return res.status(400).json({ message: 'Email and password are required' });
         }
 
-        // Find user by email
-        const user = await User.findOne({ email });
+        // Convert email to lowercase for case-insensitive comparison
+        const normalizedEmail = email.toLowerCase();
+        console.log("Normalized email for login:", normalizedEmail);
+
+        // Find user by email - use case-insensitive search
+        const user = await User.findOne({ email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') } });
 
         if (!user) {
             return res.status(401).json({ message: 'Invalid email or password' });
@@ -437,8 +441,12 @@ async function handleRegister(req, res) {
             return res.status(400).json({ message: 'Email and password are required' });
         }
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ email: userData.email });
+        // Normalize email to lowercase for case-insensitive matching
+        userData.email = userData.email.toLowerCase();
+        console.log("Normalized email for registration:", userData.email);
+
+        // Check if user already exists - use case-insensitive search
+        const existingUser = await User.findOne({ email: { $regex: new RegExp(`^${userData.email}$`, 'i') } });
         if (existingUser) {
             return res.status(409).json({ message: 'User with this email already exists' });
         }
@@ -481,6 +489,7 @@ async function handleRegister(req, res) {
         return res.status(500).json({ message: 'Server error during user creation: ' + error.message });
     }
 }
+
 
 /**
  * Handle user updates (admin functionality)
@@ -779,12 +788,16 @@ async function handleForgotPassword(req, res) {
             return res.status(400).json({ message: 'Email is required' });
         }
 
-        // Find user by email
-        const user = await User.findOne({ email });
+        // Normalize email to lowercase for case-insensitive comparison
+        const normalizedEmail = email.toLowerCase();
+        console.log("Normalized email for password reset:", normalizedEmail);
+
+        // Find user by email - use case-insensitive search
+        const user = await User.findOne({ email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') } });
 
         // Don't reveal if user exists for security
         if (!user) {
-            console.log(`No user found with email: ${email}`);
+            console.log(`No user found with email: ${normalizedEmail}`);
             return res.status(200).json({
                 message: 'If this email is registered, a reset link has been sent.'
             });
@@ -802,11 +815,12 @@ async function handleForgotPassword(req, res) {
         user.resetTokenExpires = new Date(Date.now() + 3600000); // 1 hour from now
         await user.save();
 
+        // Email sending logic remains the same...
+        // Rest of the function remains unchanged
+
         // Get base URL for reset link
         const baseURL = process.env.BASE_URL || 'https://patriotthanks.vercel.app';
         const resetLink = `${baseURL}/reset-password.html?token=${resetToken}`;
-
-        // After generating resetLink, add this email sending code:
 
         try {
             // Set up email data
@@ -817,6 +831,7 @@ async function handleForgotPassword(req, res) {
                 },
                 to: email,
                 subject: 'Patriot Thanks - Password Reset Request',
+                // Email template remains the same...
                 html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background-color: #f8f9fa; padding: 20px; text-align: center;">
@@ -841,7 +856,6 @@ async function handleForgotPassword(req, res) {
             </div>
         </div>
         `,
-                // Also including plain text version for email clients that don't support HTML
                 text: `
         Password Reset Request
 

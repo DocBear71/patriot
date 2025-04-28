@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         } else if (form.level.value === "Admin") {
             console.log("Admin verification passed, proceeding with registration");
-            }
+        }
 
 
         console.log("Invalid fields:", invalidFields);
@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 zip: form.zip.value,
                 status: form.status.value,
                 level: form.level.value,
-                email: form.email.value,
+                email: form.email.value.toLowerCase(),
                 password: document.getElementById("psw").value,
                 psw_repeat: document.getElementById("psw_repeat").value
             };
@@ -132,10 +132,10 @@ document.addEventListener('DOMContentLoaded', function() {
     form.status.addEventListener('input', function() { validateField(this, isNotEmpty); });
     form.level.addEventListener('input', function() {
         validateField(this, isNotEmpty); });
-        // if changing back from admin level, clear the admin verification flag
-        if (this.value !== "Admin" && typeof window.isAdminVerified === 'function') {
-            window.isAdminVerified = function() { return false; };
-        }
+    // if changing back from admin level, clear the admin verification flag
+    if (this.value !== "Admin" && typeof window.isAdminVerified === 'function') {
+        window.isAdminVerified = function() { return false; };
+    }
 
     // Validation functions
     function isNotEmpty(value) {

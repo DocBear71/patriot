@@ -1,4 +1,4 @@
-// login-handler.js - Enhanced login handler with admin support
+// login-handler.js - Enhanced login handler with admin support and case-insensitive email
 console.log("Login handler script loaded");
 
 // Function to handle login
@@ -6,7 +6,7 @@ function handleLogin() {
     console.log("Handle login function called");
 
     // Get form values
-    const email = document.getElementById('DropdownFormEmail1').value;
+    const email = document.getElementById('DropdownFormEmail1').value.toLowerCase(); // Convert to lowercase here
     const password = document.getElementById('DropdownFormPassword1').value;
     const rememberMe = document.getElementById('dropdownCheck')?.checked || false;
 
