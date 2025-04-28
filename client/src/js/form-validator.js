@@ -1,7 +1,7 @@
 // form-validator.js -- handles the validation of the registration form.
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Form validator loaded!");
+    // console.log("Form validator loaded!");
 
     // Get form elements
     const form = {
@@ -46,15 +46,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // check if admin verification is required but not completed
         // First, check if window.adminVerified exists, then use its value
         if (form.level.value === "Admin" && window.adminVerified !== true) {
-            console.log("Admin verification failed, window.adminVerified = ", window.adminVerified);
+            // console.log("Admin verification failed, window.adminVerified = ", window.adminVerified);
             invalidFields.push("Admin access code verification");
             alert("Admin access must be verified with a valid code before registration");
             return;
         } else if (form.level.value === "Admin") {
-            console.log("Admin verification passed, proceeding with registration");
+            // console.log("Admin verification passed, proceeding with registration");
         }
 
-        console.log("Invalid fields:", invalidFields);
+        // console.log("Invalid fields:", invalidFields);
 
         // If there are invalid fields, show an alert
         if (invalidFields.length > 0) {
@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 psw_repeat: document.getElementById("psw_repeat").value
             };
 
-            console.log("Form data to submit:", formData);
+            // console.log("Form data to submit:", formData);
 
             // Submit the data to MongoDB
             submitToMongoDB(formData);
@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             // Use the absolute URL to your Vercel deployment with the new endpoint
             const apiUrl = 'https://patriotthanks.vercel.app/api/auth.js?operation=register';
-            console.log("Submitting to API at:", apiUrl);
+            // console.log("Submitting to API at:", apiUrl);
 
             const res = await fetch(apiUrl, {
                 method: "POST",
@@ -99,16 +99,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(formData),
             });
 
-            console.log("Response status:", res.status);
+            // console.log("Response status:", res.status);
 
             if (!res.ok) {
                 const errorText = await res.text();
-                console.error("Error response:", errorText);
+                // console.error("Error response:", errorText);
                 throw new Error(`Failed to submit data to MongoDB: ${res.status} ${errorText}`);
             }
 
             const data = await res.json();
-            console.log("Success:", data);
+            // console.log("Success:", data);
 
             // Show success message to user
             alert("Registration successful! You can now log in.");
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = '../index.html';
 
         } catch (error) {
-            console.error("Error:", error);
+            // console.error("Error:", error);
             alert("Registration failed: " + error.message);
         }
     }
@@ -204,4 +204,41 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Run initial validation to set the visual state
     validateForm();
+
+
+    function addAsterisksToRequiredFields() {
+        // Define the IDs of required fields based on your validation logic
+        const requiredFieldIds = [
+            "fname", "lname", "address1", "city", "state",
+            "zip", "email", "status", "membership-level"
+        ];
+
+        // Add asterisks to each required field's label
+        requiredFieldIds.forEach(id => {
+            const field = document.getElementById(id);
+            if (field) {
+                const label = document.querySelector(`label[for="${id}"]`);
+
+                if (label && !label.innerHTML.includes('*')) {
+                    const asterisk = document.createElement('span');
+                    asterisk.className = 'required-indicator';
+                    asterisk.textContent = ' *';
+                    asterisk.style.color = 'red'; // Match your existing color scheme
+                    label.appendChild(asterisk);
+                }
+            }
+        });
+
+        // Add explanation at the top of the form
+        const form = document.getElementById("register-form");
+        if (form) {
+            const explanation = document.createElement('div');
+            explanation.className = 'form-explanation';
+            explanation.innerHTML = '<p>Fields marked with an asterisk (*) are required.</p>';
+            form.insertBefore(explanation, form.firstChild);
+        }
+    }
+
+    // Call the function to add asterisks
+    addAsterisksToRequiredFields();
 });

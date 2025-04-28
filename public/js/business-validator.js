@@ -208,4 +208,41 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Run initial validation to set the visual state
     validateForm();
+
+    // Add asterisks to required fields
+    function addAsterisksToRequiredFields() {
+        // Define the IDs of required fields based on your validation logic
+        const requiredFieldIds = [
+            "bname", "address1", "city", "state",
+            "zip", "phone", "type"
+        ];
+
+        // Add asterisks to each required field's label
+        requiredFieldIds.forEach(id => {
+            const field = document.getElementById(id);
+            if (field) {
+                const label = document.querySelector(`label[for="${id}"]`);
+
+                if (label && !label.innerHTML.includes('*')) {
+                    const asterisk = document.createElement('span');
+                    asterisk.className = 'required-indicator';
+                    asterisk.textContent = ' *';
+                    asterisk.style.color = 'red'; // Match your existing color scheme
+                    label.appendChild(asterisk);
+                }
+            }
+        });
+
+        // Add explanation at the top of the form
+        const form = document.getElementById("business-form");
+        if (form) {
+            const explanation = document.createElement('div');
+            explanation.className = 'form-explanation';
+            explanation.innerHTML = '<p>Fields marked with an asterisk (*) are required.</p>';
+            form.insertBefore(explanation, form.firstChild);
+        }
+    }
+
+// Call the function to add asterisks
+    addAsterisksToRequiredFields();
 });
