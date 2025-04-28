@@ -10,6 +10,9 @@ window.isAdminVerified = function() {
     return isAdminVerified;
 };
 
+// Initialize the global adminVerified flag that form-validator.js is checking
+window.adminVerified = false;
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Pin validation loaded!");
 
@@ -21,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
         checkRestrictedOption(this);
     });
 
-    // Add event listener for the verify button - SIMPLE VERSION WITH HARDCODED PIN
+    // Add event listener for the verify button
     document.getElementById('verifyPinBtn').addEventListener('click', function() {
         const pinInput = document.getElementById('adminPinCode').value;
         const pinError = document.getElementById('pinError');
@@ -31,13 +34,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!pinInput || pinInput.trim() === '') {
             pinError.style.display = 'block';
             pinError.textContent = 'Please enter an admin access code';
+            return; // Exit the function early
         }
 
         console.log("Verifying pin:", pinInput);
 
-        // get user ID from sesstion if avaoiable
+        // get user ID from session if available
         const userId = getUserIdFromSession();
-
 
         // Determine the base URL
         const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -77,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     lastValidSelection = "Admin"; // Update last valid selection
                     isAdminVerified = true;
 
-                    // Set global flag for other scripts
+                    // Set global flag for other scripts - this is what form-validator.js checks
                     window.adminVerified = true;
 
                     // Hide modal
@@ -112,8 +115,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedOption = selectElement.options[selectElement.selectedIndex];
 
         // if any restricted option, such as Admin
-        if (selectedOption.dataset.restricted === true) {
-            console.log('"Restricted option selected: "', selectedOption.value);
+        if (selectedOption.dataset.restricted === 'true') { // Changed from === true to === 'true'
+            console.log('Restricted option selected: ', selectedOption.value);
 
             // show the PIN modal
             $('#adminAccessModal').modal('show');
@@ -131,15 +134,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // temporarily revert back to previous selection until pin is verified
             selectElement.value = lastValidSelection;
         } else {
-            // update the last valid seletion
+            // update the last valid selection
             lastValidSelection = selectElement.value;
 
             // reset admin verification status if not admin option
             if (selectedOption.value !== "Admin") {
                 isAdminVerified = false;
+                window.adminVerified = false; // Make sure to update both variables
             }
         }
     }
+
     // Helper function to get user ID from session
     function getUserIdFromSession() {
         try {

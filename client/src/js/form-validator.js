@@ -44,7 +44,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // check if admin verification is required but not completed
-        if (form.level.value === "Admin" && !window.adminVerified) {
+        // First, check if window.adminVerified exists, then use its value
+        if (form.level.value === "Admin" && window.adminVerified !== true) {
             console.log("Admin verification failed, window.adminVerified = ", window.adminVerified);
             invalidFields.push("Admin access code verification");
             alert("Admin access must be verified with a valid code before registration");
@@ -52,7 +53,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (form.level.value === "Admin") {
             console.log("Admin verification passed, proceeding with registration");
         }
-
 
         console.log("Invalid fields:", invalidFields);
 
@@ -129,13 +129,15 @@ document.addEventListener('DOMContentLoaded', function() {
     form.state.addEventListener('change', function() { validateField(this, isNotEmpty); });
     form.zip.addEventListener('input', function() { validateField(this, isValidZip); });
     form.email.addEventListener('input', function() { validateField(this, isValidEmail); });
-    form.status.addEventListener('input', function() { validateField(this, isNotEmpty); });
-    form.level.addEventListener('input', function() {
-        validateField(this, isNotEmpty); });
-    // if changing back from admin level, clear the admin verification flag
-    if (this.value !== "Admin" && typeof window.isAdminVerified === 'function') {
-        window.isAdminVerified = function() { return false; };
-    }
+    form.status.addEventListener('change', function() { validateField(this, isNotEmpty); });
+    form.level.addEventListener('change', function() {
+        validateField(this, isNotEmpty);
+
+        // If changing back from admin level, clear the admin verification flag
+        if (this.value !== "Admin") {
+            window.adminVerified = false;
+        }
+    });
 
     // Validation functions
     function isNotEmpty(value) {
@@ -154,18 +156,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Apply validation styling to a field
     function validateField(field, validationFn) {
-        console.log(`Validating ${field.id} with value: ${field.value}`);
+        // console.log(`Validating ${field.id} with value: ${field.value}`);
 
         if (validationFn(field.value)) {
             field.classList.remove('invalid-field');
             field.classList.add('valid-field');
             field.setAttribute('data-valid', 'true');
-            console.log(`${field.id} is VALID`);
+            // console.log(`${field.id} is VALID`);
         } else {
             field.classList.remove('valid-field');
             field.classList.add('invalid-field');
             field.setAttribute('data-valid', 'false');
-            console.log(`${field.id} is INVALID`);
+            // console.log(`${field.id} is INVALID`);
         }
     }
 
