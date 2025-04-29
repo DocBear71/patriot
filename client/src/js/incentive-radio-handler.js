@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } else if (incentiveFields[2] && incentiveFields[2].tagName === 'TEXTAREA'
             && incentiveFields[2].value === 'No incentives available at this business.') {
-            incentiveFields[2].value = 'Please enter information about the discount/incentive';
+            incentiveFields[2].value = '';
         }
     }
 

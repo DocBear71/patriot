@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('other-description').value = '';
                     }
                 } else if (incentiveFields[2]) {
-                    incentiveFields[2].value = 'Please enter information about the discount/incentive.';
+                    incentiveFields[2].value = '';
                 }
             }
 
@@ -1110,7 +1110,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Set default information text
         const informationField = document.getElementById('information');
         if (informationField) {
-            informationField.value = 'Please enter information about the discount/incentive.';
+            informationField.value = '';
         }
 
         // Enable all fields initially
@@ -1206,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Validate information
-            if (!information || information === 'Please enter information about the discount/incentive.') {
+            if (!information) {
                 errors.push('Please provide incentive information');
             }
 
