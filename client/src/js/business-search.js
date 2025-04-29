@@ -344,6 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Updated displayBusinessSearchResults function to add data-title attributes
     function displayBusinessSearchResults(businesses, resultsContainer) {
         try {
             // clear any existing content
@@ -367,21 +368,31 @@ document.addEventListener('DOMContentLoaded', function() {
             const table = document.createElement('table');
             table.className = 'results-table';
 
+            // Define column headers (we'll use these for data-title attributes too)
+            const headers = {
+                name: "Business Name",
+                address: "Address",
+                city: "City",
+                state: "State",
+                zip: "Zip",
+                action: "Action"
+            };
+
             // create the header for the table
             const thead = document.createElement('thead');
             thead.innerHTML = `
             <tr>
-                <th>Business Name</th>
-                <th>Address</th>
-                <th>City</th>
-                <th>State</th>
-                <th>Zip</th>
-                <th>Action</th>
+                <th>${headers.name}</th>
+                <th>${headers.address}</th>
+                <th>${headers.city}</th>
+                <th>${headers.state}</th>
+                <th>${headers.zip}</th>
+                <th>${headers.action}</th>
             </tr>
         `;
             table.appendChild(thead);
 
-            // create the table body then add each business to the talbe
+            // create the table body then add each business to the table
             const tbody = document.createElement('tbody');
 
             businesses.forEach(business => {
@@ -390,18 +401,102 @@ document.addEventListener('DOMContentLoaded', function() {
                 const row = document.createElement('tr');
 
                 row.innerHTML = `
-                <td>${business.bname}</td>
-                <td>${business.address1}${business.address2 ? '<br>' + business.address2 : ''}</td>
-                <td>${business.city}</td>
-                <td>${business.state}</td>
-                <td>${business.zip}</td>
-                <td><button class="select-business" data-business-id="${business._id}">Select</button></td>
+                <td data-title="${headers.name}">${business.bname}</td>
+                <td data-title="${headers.address}">${business.address1}${business.address2 ? '<br>' + business.address2 : ''}</td>
+                <td data-title="${headers.city}">${business.city}</td>
+                <td data-title="${headers.state}">${business.state}</td>
+                <td data-title="${headers.zip}">${business.zip}</td>
+                <td data-title="${headers.action}"><button class="select-business" data-business-id="${business._id}">Select</button></td>
             `;
                 tbody.appendChild(row);
             });
 
             table.appendChild(tbody);
             resultsContainer.appendChild(table);
+
+            // Add the responsive table CSS to the page if it doesn't exist yet
+            if (!document.getElementById('responsive-table-css')) {
+                const style = document.createElement('style');
+                style.id = 'responsive-table-css';
+                style.textContent = `
+                /* Base table styles */
+                .results-table {
+                    width: 90%;
+                    margin: 20px auto;
+                    border-collapse: collapse;
+                    text-align: left;
+                }
+                
+                .results-table th, .results-table td {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                }
+                
+                .results-table th {
+                    background-color: #f2f2f2;
+                    font-weight: bold;
+                    text-align: center;
+                }
+                
+                .results-table tr:nth-child(even) {
+                    background-color: #f9f9f9;
+                }
+                
+                .results-table tr:hover {
+                    background-color: #f1f1f1;
+                }
+                
+                /* Responsive table for small screens */
+                @media only screen and (max-width: 767px) {
+                    .results-table {
+                        width: 100%;
+                        margin: 10px 0;
+                    }
+                    
+                    .results-table, .results-table thead, .results-table tbody, .results-table tr {
+                        display: block;
+                    }
+                    
+                    .results-table thead tr {
+                        position: absolute;
+                        top: -9999px;
+                        left: -9999px;
+                    }
+                    
+                    .results-table tr {
+                        border: 1px solid #ccc;
+                        margin-bottom: 15px;
+                    }
+                    
+                    .results-table td {
+                        display: block;
+                        border: none;
+                        border-bottom: 1px solid #eee;
+                        position: relative;
+                        padding-left: 50%;
+                        text-align: left;
+                    }
+                    
+                    .results-table td:before {
+                        position: absolute;
+                        top: 6px;
+                        left: 6px;
+                        width: 45%;
+                        padding-right: 10px;
+                        white-space: nowrap;
+                        content: attr(data-title);
+                        font-weight: bold;
+                    }
+                    
+                    /* Ensure buttons are properly displayed */
+                    .select-business {
+                        margin: 8px 0;
+                        display: inline-block;
+                    }
+                }
+            `;
+                document.head.appendChild(style);
+            }
 
             // add the event listeners for the "select" buttons
             const selectButtons = document.querySelectorAll('.select-business');
