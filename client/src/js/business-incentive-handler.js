@@ -454,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Reset information textarea with default text
             const infoField = document.getElementById('incentiveInfo');
             if (infoField) {
-                infoField.value = 'Please enter information about the discount/incentive.';
+                infoField.value = '';
             }
 
             // Hide the business info and incentive sections
