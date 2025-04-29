@@ -345,6 +345,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Updated displayBusinessSearchResults function to add data-title attributes
+    // Updated displayBusinessSearchResults function to add data-title attributes
     function displayBusinessSearchResults(businesses, resultsContainer) {
         try {
             // clear any existing content
@@ -466,6 +467,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     .results-table tr {
                         border: 1px solid #ccc;
                         margin-bottom: 15px;
+                        padding: 5px;
                     }
                     
                     .results-table td {
@@ -473,19 +475,29 @@ document.addEventListener('DOMContentLoaded', function() {
                         border: none;
                         border-bottom: 1px solid #eee;
                         position: relative;
-                        padding-left: 50%;
+                        padding-top: 30px;
+                        padding-left: 8px;
+                        min-height: 30px;
                         text-align: left;
+                        margin-bottom: 5px;
                     }
                     
                     .results-table td:before {
                         position: absolute;
                         top: 6px;
                         left: 6px;
-                        width: 45%;
-                        padding-right: 10px;
+                        width: 100%;
                         white-space: nowrap;
                         content: attr(data-title);
                         font-weight: bold;
+                        font-size: 0.9em;
+                        color: #555;
+                    }
+                    
+                    /* Space for the content below the label */
+                    .results-table td .td-content {
+                        display: block;
+                        padding-top: 5px;
                     }
                     
                     /* Ensure buttons are properly displayed */
