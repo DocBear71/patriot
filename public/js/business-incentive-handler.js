@@ -737,4 +737,78 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Call the function to add asterisks
     addAsterisksToRequiredFields();
+
+    // Debug the business selection issue
+    console.log("Adding extra debugging for business selection");
+
+// Check if the global function exists
+    console.log("Does selectBusinessForIncentive exist?", typeof window.selectBusinessForIncentive === 'function');
+
+// Add a more direct approach to handle business selection
+    window.debugSelectBusiness = function(businessData) {
+        console.log("Debug Select Business called with:", businessData);
+
+        // Force display the hidden sections
+        const businessInfoSection = document.getElementById('business-info-section');
+        const incentiveSection = document.getElementById('incentive-section');
+
+        if (businessInfoSection) {
+            console.log("Found business-info-section, setting display to block");
+            businessInfoSection.style.display = 'block';
+        } else {
+            console.error("Could not find business-info-section element");
+        }
+
+        if (incentiveSection) {
+            console.log("Found incentive-section, setting display to block");
+            incentiveSection.style.display = 'block';
+        } else {
+            console.error("Could not find incentive-section element");
+        }
+
+        // Populate the business data fields
+        const businessIdField = document.getElementById('selected-business-id');
+        if (businessIdField) {
+            businessIdField.value = businessData._id || '';
+            console.log("Set business ID to:", businessIdField.value);
+        }
+
+        // Populate business fields
+        populateField('bname', businessData.bname);
+        populateField('address1', businessData.address1);
+        populateField('address2', businessData.address2 || '');
+        populateField('city', businessData.city);
+        populateField('state', businessData.state);
+        populateField('zip', businessData.zip);
+        populateField('phone', businessData.phone);
+        populateField('type', businessData.type);
+
+        // Scroll to the business info section
+        businessInfoSection.scrollIntoView({ behavior: 'smooth' });
+    };
+
+// Helper function to populate fields
+    function populateField(fieldId, value) {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.value = value || '';
+            console.log(`Populated ${fieldId} with:`, value);
+        } else {
+            console.warn(`Field ${fieldId} not found.`);
+        }
+    }
+
+// Override the original function if it exists but isn't working
+    const originalSelectBusinessForIncentive = window.selectBusinessForIncentive;
+    window.selectBusinessForIncentive = function(businessData) {
+        console.log("Overridden selectBusinessForIncentive called with:", businessData);
+
+        // Call the original function if it exists
+        if (typeof originalSelectBusinessForIncentive === 'function') {
+            originalSelectBusinessForIncentive(businessData);
+        }
+
+        // Then also call our debug function to ensure the sections are displayed
+        window.debugSelectBusiness(businessData);
+    };
 });
