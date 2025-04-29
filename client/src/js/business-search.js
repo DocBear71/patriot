@@ -344,8 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Updated displayBusinessSearchResults function to add data-title attributes
-    // Updated displayBusinessSearchResults function to add data-title attributes
+// Updated displayBusinessSearchResults function to add data-title attributes
     function displayBusinessSearchResults(businesses, resultsContainer) {
         try {
             // clear any existing content
@@ -458,46 +457,33 @@ document.addEventListener('DOMContentLoaded', function() {
                         display: block;
                     }
                     
-                    .results-table thead tr {
-                        position: absolute;
-                        top: -9999px;
-                        left: -9999px;
+                    .results-table thead {
+                        display: none;
                     }
                     
                     .results-table tr {
                         border: 1px solid #ccc;
                         margin-bottom: 15px;
-                        padding: 5px;
+                        padding: 8px;
+                        background-color: #f9f9f9;
                     }
                     
                     .results-table td {
                         display: block;
                         border: none;
                         border-bottom: 1px solid #eee;
-                        position: relative;
-                        padding-top: 30px;
-                        padding-left: 8px;
-                        min-height: 30px;
+                        padding: 8px;
+                        margin-bottom: 6px;
                         text-align: left;
-                        margin-bottom: 5px;
+                        position: relative;
                     }
                     
-                    .results-table td:before {
-                        position: absolute;
-                        top: 6px;
-                        left: 6px;
-                        width: 100%;
-                        white-space: nowrap;
+                    .results-table td::before {
                         content: attr(data-title);
-                        font-weight: bold;
-                        font-size: 0.9em;
-                        color: #555;
-                    }
-                    
-                    /* Space for the content below the label */
-                    .results-table td .td-content {
                         display: block;
-                        padding-top: 5px;
+                        font-weight: bold;
+                        margin-bottom: 6px;
+                        color: #333;
                     }
                     
                     /* Ensure buttons are properly displayed */
