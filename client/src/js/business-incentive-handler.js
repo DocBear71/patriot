@@ -81,8 +81,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (document.getElementById('otherTypeDescription')) {
                 document.getElementById('otherTypeDescription').value = '';
             }
-        } else if (incentiveFields[2]) {
-            incentiveFields[2].value = 'Please enter information about the discount/incentive.';
         }
     }
 
