@@ -700,4 +700,246 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error("No incentive handler function found");
         }
     };
+
+    // Add validation functions for the incentive update form
+    function isNotEmpty(value) {
+        return value && value.trim() !== '';
+    }
+
+    function isValidNumber(value) {
+        return !isNaN(value) && value > 0;
+    }
+
+    // Function to validate fields and provide visual feedback
+    function validateField(field, validationFn) {
+        console.log(`Validating ${field.id} with value: ${field.value}`);
+
+        if (validationFn(field.value)) {
+            field.classList.remove('invalid-field');
+            field.classList.add('valid-field');
+            field.setAttribute('data-valid', 'true');
+            console.log(`${field.id} is VALID`);
+            return true;
+        } else {
+            field.classList.remove('valid-field');
+            field.classList.add('invalid-field');
+            field.setAttribute('data-valid', 'false');
+            console.log(`${field.id} is INVALID`);
+            return false;
+        }
+    }
+
+    // Function to validate the entire update form
+    function validateUpdateForm() {
+        // Check if a business and incentive are selected
+        const businessIdField = document.getElementById('selected-business-id');
+        const incentiveIdField = document.getElementById('selected-incentive-id');
+
+        if (!businessIdField || !businessIdField.value) {
+            showMessage('error', 'Please select a business first');
+            return false;
+        }
+
+        if (!incentiveIdField || !incentiveIdField.value) {
+            showMessage('error', 'Please select an incentive to update');
+            return false;
+        }
+
+        // Check if availability option is selected
+        const incentiveAvailableOption = document.querySelector('input[name="incentiveAvailable"]:checked');
+        if (!incentiveAvailableOption) {
+            showMessage('error', 'Please specify if the incentive is available');
+            return false;
+        }
+
+        // Get availability value
+        const isAvailable = document.getElementById('incentiveAvailable').checked;
+        let formIsValid = true;
+
+        // If incentives are available, validate the incentive fields
+        if (isAvailable) {
+            const typeField = document.getElementById('incentiveType');
+            const amountField = document.getElementById('incentiveAmount');
+            const infoField = document.getElementById('incentiveInfo');
+
+            if (typeField && !validateField(typeField, isNotEmpty)) {
+                formIsValid = false;
+                showMessage('error', 'Please select an incentive type');
+            }
+
+            if (amountField && !validateField(amountField, isValidNumber)) {
+                formIsValid = false;
+                showMessage('error', 'Please enter a valid amount greater than 0');
+            }
+
+            if (infoField && !validateField(infoField, isNotEmpty)) {
+                formIsValid = false;
+                showMessage('error', 'Please provide information about the incentive');
+            }
+
+            // Check for "Other" type description if needed
+            if (typeField && typeField.value === 'OT') {
+                const otherDescField = document.getElementById('otherTypeDescription');
+                if (otherDescField && !validateField(otherDescField, isNotEmpty)) {
+                    formIsValid = false;
+                    showMessage('error', 'Please provide a description for the "Other" incentive type');
+                }
+            }
+        }
+
+        return formIsValid;
+    }
+
+    // Add event listeners for field validation
+    const incentiveTypeField = document.getElementById('incentiveType');
+    const incentiveAmountField = document.getElementById('incentiveAmount');
+    const incentiveInfoField = document.getElementById('incentiveInfo');
+    const otherTypeDescField = document.getElementById('otherTypeDescription');
+
+    if (incentiveTypeField) {
+        incentiveTypeField.addEventListener('change', function() {
+            validateField(this, isNotEmpty);
+        });
+    }
+
+    if (incentiveAmountField) {
+        incentiveAmountField.addEventListener('input', function() {
+            validateField(this, isValidNumber);
+        });
+    }
+
+    if (incentiveInfoField) {
+        incentiveInfoField.addEventListener('input', function() {
+            validateField(this, isNotEmpty);
+        });
+    }
+
+    if (otherTypeDescField) {
+        otherTypeDescField.addEventListener('input', function() {
+            if (incentiveTypeField && incentiveTypeField.value === 'OT') {
+                validateField(this, isNotEmpty);
+            }
+        });
+    }
+
+    // Update the incentive form submit handler to use the validation function
+
+    if (incentiveUpdateForm) {
+        // Remove previous listeners to avoid duplicates
+        const newUpdateForm = incentiveUpdateForm.cloneNode(true);
+        incentiveUpdateForm.parentNode.replaceChild(newUpdateForm, incentiveUpdateForm);
+
+        // Add a new submit handler with validation
+        newUpdateForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Validate the form before submission
+            if (!validateUpdateForm()) {
+                return;
+            }
+
+            // Get the incentive ID
+            const incentiveId = document.getElementById('selected-incentive-id').value;
+
+            // Get radio button value for incentive availability
+            const isAvailable = document.getElementById('incentiveAvailable').checked;
+
+            // Get incentive form data
+            const incentiveData = {
+                incentiveId: incentiveId,
+                business_id: selectedBusinessId,
+                is_available: isAvailable
+            };
+
+            // Only include type, amount, and info if incentive is available
+            if (isAvailable) {
+                const incentiveType = document.getElementById('incentiveType').value;
+                incentiveData.type = incentiveType;
+                incentiveData.amount = parseFloat(document.getElementById('incentiveAmount').value) || 0;
+                incentiveData.information = document.getElementById('incentiveInfo').value || '';
+
+                // Handle "Other" type description
+                if (incentiveType === 'OT') {
+                    const otherDescription = document.getElementById('otherTypeDescription').value;
+                    incentiveData.other_description = otherDescription;
+                }
+            }
+
+            // Submit update
+            updateIncentive(incentiveData);
+        });
+    }
+
+    // Add asterisks to required fields
+    function addAsterisksToRequiredFields() {
+        // Define the IDs of required fields based on your validation logic
+        const requiredFieldIds = [
+            "incentiveType", "incentiveAmount", "incentiveInfo"
+        ];
+
+        // Add asterisks to each required field's label
+        requiredFieldIds.forEach(id => {
+            const field = document.getElementById(id);
+            if (field) {
+                const label = document.querySelector(`label[for="${id}"]`);
+
+                if (label && !label.innerHTML.includes('*')) {
+                    const asterisk = document.createElement('span');
+                    asterisk.className = 'required-indicator';
+                    asterisk.textContent = ' *';
+                    asterisk.style.color = 'red'; // Match your existing color scheme
+                    label.appendChild(asterisk);
+                }
+            }
+        });
+
+        // Also add an asterisk to the incentive availability option labels
+        const radioLabels = document.querySelectorAll('label[for="incentiveAvailable"], label[for="incentiveNotAvailable"]');
+        radioLabels.forEach(label => {
+            if (!label.innerHTML.includes('*')) {
+                const asterisk = document.createElement('span');
+                asterisk.className = 'required-indicator';
+                asterisk.textContent = ' *';
+                asterisk.style.color = 'red';
+                label.appendChild(asterisk);
+            }
+        });
+
+        // Add explanation at the top of the form
+        const form = document.getElementById("incentive-update-form");
+        if (form) {
+            const explanation = document.createElement('div');
+            explanation.className = 'form-explanation';
+            explanation.innerHTML = '<p>Fields marked with an asterisk (*) are required.</p>';
+            form.insertBefore(explanation, form.firstChild);
+        }
+    }
+
+    // Add CSS styles for form validation
+    const style = document.createElement('style');
+    style.textContent += `
+            .valid-field {
+                border: 1px solid green !important;
+                background-color: #f0fff0 !important;
+            }
+            
+            .invalid-field {
+                border: 1px solid red !important;
+                background-color: #fff0f0 !important;
+            }
+            
+            .required-indicator {
+                color: red;
+                font-weight: bold;
+            }
+            
+            .form-explanation {
+                margin-bottom: 15px;
+                font-style: italic;
+            }
+        `;
+    document.head.appendChild(style);
+
+    // Call the function to add asterisks
+    addAsterisksToRequiredFields();
 });
