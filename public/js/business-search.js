@@ -742,6 +742,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to focus on a specific marker in the map
     window.focusOnMapMarker = function(businessId) {
+        console.log("Attempting to focus on business ID:", businessId);
+        console.log("Current markers:", markers.length);
+
+        // Check if markers array exists and has items
+        if (!markers || markers.length === 0) {
+            console.warn("No markers available yet. The map may still be initializing.");
+            alert("Map markers are not available yet. Please try again in a moment.");
+            return;
+        }
+
         // Find the marker for this business
         const marker = markers.find(m => m.business && m.business._id === businessId);
 
@@ -755,10 +765,106 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Scroll to the map
             document.getElementById('map').scrollIntoView({behavior: 'smooth'});
+
+            console.log("Successfully focused on marker for business:", businessId);
         } else {
-            console.error(`No marker found for business ID: ${businessId}`);
+            console.warn(`No marker found for business ID: ${businessId}`);
+
+            // Log all business IDs in markers for debugging
+            console.log("Available business IDs in markers:",
+                markers.map(m => m.business && m.business._id).filter(id => id));
+
+            // Attempt to create the marker if it doesn't exist
+            attemptToCreateMarker(businessId);
         }
     };
+
+// Helper function to attempt creating a marker for a business
+    function attemptToCreateMarker(businessId) {
+        console.log("Attempting to create marker for business ID:", businessId);
+
+        // Get the business data from the table
+        const businessRow = document.querySelector(`[data-business-id="${businessId}"]`);
+
+        if (!businessRow) {
+            console.error("Cannot find business row in table for ID:", businessId);
+            alert("Could not locate this business on the map. The address may not be complete.");
+            return;
+        }
+
+        // Get business name and address from the table row
+        const businessName = businessRow.textContent;
+        const addressCell = businessRow.nextElementSibling;
+        const addressText = addressCell ? addressCell.innerHTML.replace(/<br>/g, ", ") : "";
+
+        if (!addressText) {
+            console.error("No address found for business:", businessName);
+            alert(`Cannot locate "${businessName}" on the map. No valid address found.`);
+            return;
+        }
+
+        // Let user know we're trying to locate the business
+        alert(`Attempting to locate "${businessName}" on the map. This may take a moment.`);
+
+        // Use geocoder to find the location
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ 'address': addressText }, function(results, status) {
+            if (status === google.maps.GeocoderStatus.OK && results[0]) {
+                const location = results[0].geometry.location;
+
+                // Create a simple business object with the data we have
+                const business = {
+                    _id: businessId,
+                    bname: businessName,
+                    // Add other fields if available
+                };
+
+                // Create marker
+                const marker = new google.maps.Marker({
+                    position: location,
+                    map: map,
+                    title: businessName,
+                    animation: google.maps.Animation.DROP,
+                    icon: {
+                        url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                        scaledSize: new google.maps.Size(32, 32)
+                    }
+                });
+
+                // Store the business data with the marker
+                marker.business = business;
+
+                // Add click event to show info window
+                marker.addListener('click', function() {
+                    const infoContent = `
+                    <div class="info-window">
+                        <h3>${businessName}</h3>
+                        <p><strong>Address:</strong><br>${addressText}</p>
+                    </div>
+                `;
+
+                    infoWindow.setContent(infoContent);
+                    infoWindow.open(map, marker);
+                });
+
+                // Add the marker to our array
+                markers.push(marker);
+
+                // Center the map on this marker
+                map.setCenter(location);
+                map.setZoom(16);
+
+                // Open info window
+                infoWindow.setContent(`<div class="info-window"><h3>${businessName}</h3><p>${addressText}</p></div>`);
+                infoWindow.open(map, marker);
+
+                console.log("Successfully created and focused on marker for:", businessName);
+            } else {
+                console.error("Geocode failed:", status);
+                alert(`Unable to locate "${businessName}" on the map. Error: ${status}`);
+            }
+        });
+    }
 
     // Function validation
     function isNotEmpty(value) {
