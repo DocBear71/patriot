@@ -3,6 +3,15 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const Dotenv = require('dotenv-webpack');
+const webpack = require('webpack');
+
+// Load dotenv to get environment variables from .env file
+require('dotenv').config();
+
+// Get API key from environment variable with fallback
+const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyCHKhYZwQR37M_0QctXUQe6VFRFrlhaYj8';
+
+console.log('Webpack using Google Maps API Key:', googleMapsApiKey.substring(0, 10) + '...');
 
 module.exports = {
     mode: 'development',
@@ -40,38 +49,51 @@ module.exports = {
         ],
     },
     plugins: [
-        new Dotenv(), // Add Dotenv plugin
+        // Make environment variables available in the client-side code
+        new webpack.DefinePlugin({
+            'process.env.GOOGLE_MAPS_API_KEY': JSON.stringify(googleMapsApiKey)
+        }),
+
+        // Load from .env file (for local development)
+        new Dotenv({ systemvars: true }),
+
+        // Configure HTML plugin for index.html
         new HtmlWebpackPlugin({
-            title: 'Webpack App',
+            title: 'Patriot Thanks',
             filename: 'index.html',
             template: './src/index.html',
             templateParameters: {
-                GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || '' // Pass env variable to template
+                GOOGLE_MAPS_API_KEY: googleMapsApiKey
             }
         }),
+
         new MiniCssExtractPlugin(),
+
+        // Copy static assets
         new CopyWebpackPlugin({
             patterns: [
-                {from: './src/images', to: 'images'},
-                {from: './src/css', to: 'css'},
-                {from: './src/js', to: 'js',
+                { from: './src/images', to: 'images' },
+                { from: './src/css', to: 'css' },
+                {
+                    from: './src/js',
+                    to: 'js',
                     transform: (content, path) => {
-                        // Replace API key placeholder in JS files
                         if (path.endsWith('.js')) {
                             return content
                                 .toString()
-                                .replace(/YOUR_API_KEY_HERE/g, process.env.GOOGLE_MAPS_API_KEY || '');
+                                .replace(/YOUR_API_KEY_HERE/g, googleMapsApiKey);
                         }
                         return content;
                     }
                 },
-                {from: './src/*.html', to: '[name][ext]',
-                    globOptions: {ignore: ['**/index.html']},
+                {
+                    from: './src/*.html',
+                    to: '[name][ext]',
+                    globOptions: { ignore: ['**/index.html'] },
                     transform: (content) => {
-                        // Replace API key placeholder in HTML files
                         return content
                             .toString()
-                            .replace(/YOUR_API_KEY_HERE/g, process.env.GOOGLE_MAPS_API_KEY || '');
+                            .replace(/YOUR_API_KEY_HERE/g, googleMapsApiKey);
                     }
                 }
             ]

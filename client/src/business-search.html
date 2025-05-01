@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang='en'>
+<!-- Update the head section of your HTML file -->
 <head>
     <title>Patriot Thanks: Search for a Business</title>
     <meta charset="utf-8">
@@ -24,8 +25,31 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
     <script src="./js/bootstrap-4.0.0.js"></script>
-    <!-- Google Maps API with your API key, libraries and callback function -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=<%= GOOGLE_MAPS_API_KEY %>&libraries=places,geometry&callback=initGoogleMap" async defer></script>
+
+    <!-- Runtime Google Maps API key config -->
+    <script src="./js/runtime-config.js"></script>
+
+    <!-- Dynamic Google Maps script insertion -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get API key from runtime config or fallback to a placeholder
+            // The placeholder will be replaced during build if environment variable is available
+            const apiKey = window.appConfig?.googleMapsApiKey || 'YOUR_API_KEY_HERE';
+
+            // Create and insert the Google Maps script
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry&callback=initGoogleMap`;
+            script.async = true;
+            script.defer = true;
+            script.onerror = function() {
+                console.error('Google Maps API failed to load. Check your API key.');
+                alert('Error loading Google Maps. Please try again later.');
+            };
+            document.head.appendChild(script);
+        });
+    </script>
+
+    <!-- Your business search script -->
     <script src="./js/business-search.js"></script>
 </head>
 
