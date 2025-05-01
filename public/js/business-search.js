@@ -1,5 +1,13 @@
 // Enhanced business-search.js with Google Maps functionality
 
+let map = null;
+let mapInitialized = false;
+let markers = [];
+let infoWindow = null;
+let bounds = null;
+let pendingBusinessesToDisplay = [];
+
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Business search with Google Maps loaded!");
 
@@ -18,38 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get the form element
     const findBusiness = document.getElementById("business-search-form");
 
-    // Initialize Google Map
-    function initMap() {
-        console.log("Initializing Google Map");
-
-        // Create a map centered on the US
-        map = new google.maps.Map(document.getElementById("map"), {
-            center: { lat: 39.8283, lng: -98.5795 }, // Center of US
-            zoom: 4,
-            mapTypeId: google.maps.MapTypeId.ROADMAP
-        });
-
-        infoWindow = new google.maps.InfoWindow();
-        bounds = new google.maps.LatLngBounds();
-
-        // Add a message to the map when it's first loaded
-        const initialMessage = document.createElement('div');
-        initialMessage.id = 'initial-map-message';
-        initialMessage.innerHTML = 'Search for businesses to see them on the map';
-        initialMessage.style.position = 'absolute';
-        initialMessage.style.top = '50%';
-        initialMessage.style.left = '50%';
-        initialMessage.style.transform = 'translate(-50%, -50%)';
-        initialMessage.style.background = 'white';
-        initialMessage.style.padding = '10px';
-        initialMessage.style.borderRadius = '5px';
-        initialMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
-        initialMessage.style.zIndex = '1';
-
-        document.getElementById("map").appendChild(initialMessage);
-    }
-
-    // Add form submission handler
+    // Modify the form submission handler to check map initialization
     if (findBusiness) {
         findBusiness.addEventListener('submit', function (event) {
             // Prevent the form from submitting immediately
@@ -65,6 +42,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
 
                 console.log("Form data to submit:", formData);
+
+                // Check if map is initialized
+                if (!mapInitialized) {
+                    console.warn("Map not initialized yet. Will display businesses after map loads.");
+                }
 
                 // Clear existing map markers
                 clearMarkers();
@@ -82,6 +64,86 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.warn("Business search form not found in the DOM");
     }
+    // Initialize Google Map
+    function initMap() {
+        console.log("Initializing Google Map");
+
+        try {
+            // Check if map container exists
+            const mapContainer = document.getElementById("map");
+            if (!mapContainer) {
+                console.error("Map container not found in the DOM");
+                return;
+            }
+
+            // Create a map centered on the US
+            map = new google.maps.Map(mapContainer, {
+                center: { lat: 39.8283, lng: -98.5795 }, // Center of US
+                zoom: 4,
+                mapTypeId: google.maps.MapTypeId.ROADMAP
+            });
+
+            infoWindow = new google.maps.InfoWindow();
+            bounds = new google.maps.LatLngBounds();
+
+            // Add a message to the map when it's first loaded
+            const initialMessage = document.createElement('div');
+            initialMessage.id = 'initial-map-message';
+            initialMessage.innerHTML = 'Search for businesses to see them on the map';
+            initialMessage.style.position = 'absolute';
+            initialMessage.style.top = '50%';
+            initialMessage.style.left = '50%';
+            initialMessage.style.transform = 'translate(-50%, -50%)';
+            initialMessage.style.background = 'white';
+            initialMessage.style.padding = '10px';
+            initialMessage.style.borderRadius = '5px';
+            initialMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+            initialMessage.style.zIndex = '1';
+
+            mapContainer.appendChild(initialMessage);
+
+            // Add event listener for the reset map button
+            const resetMapButton = document.getElementById('reset-map');
+            if (resetMapButton) {
+                resetMapButton.addEventListener('click', function() {
+                    resetMapView();
+                });
+            }
+
+            // Set flag that map is initialized
+            mapInitialized = true;
+            console.log("Google Map successfully initialized");
+
+            // If there are any pending businesses to display, show them now
+            if (pendingBusinessesToDisplay.length > 0) {
+                console.log("Processing pending businesses to display on map");
+                displayBusinessesOnMap(pendingBusinessesToDisplay);
+                pendingBusinessesToDisplay = [];
+            }
+        } catch (error) {
+            console.error("Error initializing Google Map:", error);
+            mapInitialized = false;
+        }
+    }
+
+    function resetMapView() {
+        if (!mapInitialized || !map) {
+            console.error("Cannot reset map view - map not initialized");
+            return;
+        }
+
+        // Center on US and zoom out
+        map.setCenter({ lat: 39.8283, lng: -98.5795 });
+        map.setZoom(4);
+
+        // Close any open info windows
+        if (infoWindow) {
+            infoWindow.close();
+        }
+    }
+
+
+
 
     async function retrieveFromMongoDB(formData) {
         try {
@@ -194,10 +256,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Display businesses on Google Map
     function displayBusinessesOnMap(businesses) {
-        if (!map) {
-            console.error("Map not initialized");
+        // If map is not ready yet, store businesses for later display
+        if (!mapInitialized || !map) {
+            console.log("Map not initialized yet. Storing businesses for later display.");
+            pendingBusinessesToDisplay = businesses;
             return;
         }
+
+        console.log("Displaying businesses on map:", businesses.length);
 
         if (!Array.isArray(businesses) || businesses.length === 0) {
             console.log("No businesses to display on map");
@@ -518,8 +584,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Clear all markers from the map
     function clearMarkers() {
+        if (!markers) {
+            markers = [];
+            return;
+        }
+
         markers.forEach(marker => {
-            marker.setMap(null);
+            if (marker) {
+                marker.setMap(null);
+            }
         });
         markers = [];
     }
@@ -533,6 +606,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add global accessible initialization function for the Google Maps callback
     window.initGoogleMap = function() {
+        console.log("Google Maps API loaded, initializing map");
         initMap();
     };
 
@@ -743,12 +817,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to focus on a specific marker in the map
     window.focusOnMapMarker = function(businessId) {
         console.log("Attempting to focus on business ID:", businessId);
+
+        // Check if map is initialized
+        if (!mapInitialized || !map) {
+            console.error("Map not initialized yet - cannot focus on marker");
+            alert("Map is still loading. Please try again in a moment.");
+            return;
+        }
+
         console.log("Current markers:", markers.length);
 
         // Check if markers array exists and has items
         if (!markers || markers.length === 0) {
-            console.warn("No markers available yet. The map may still be initializing.");
-            alert("Map markers are not available yet. Please try again in a moment.");
+            console.warn("No markers available yet.");
+            alert("No businesses are currently displayed on the map.");
             return;
         }
 
@@ -770,12 +852,11 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             console.warn(`No marker found for business ID: ${businessId}`);
 
-            // Log all business IDs in markers for debugging
-            console.log("Available business IDs in markers:",
-                markers.map(m => m.business && m.business._id).filter(id => id));
+            // Let the user know
+            alert("This business could not be located on the map. It may not have a complete address.");
 
-            // Attempt to create the marker if it doesn't exist
-            attemptToCreateMarker(businessId);
+            // Scroll to the map anyway
+            document.getElementById('map').scrollIntoView({behavior: 'smooth'});
         }
     };
 
