@@ -1,4 +1,4 @@
-// Enhanced business-search.js with Google Maps functionality
+// Enhanced business-search.js with Google Maps functionality and all original functions
 
 let map = null;
 let mapInitialized = false;
@@ -6,7 +6,6 @@ let markers = [];
 let infoWindow = null;
 let bounds = null;
 let pendingBusinessesToDisplay = [];
-
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Business search with Google Maps loaded!");
@@ -64,6 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.warn("Business search form not found in the DOM");
     }
+
     // Initialize Google Map
     function initMap() {
         console.log("Initializing Google Map");
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Create a map centered on the US
             map = new google.maps.Map(mapContainer, {
-                center: { lat: 39.8283, lng: -98.5795 }, // Center of US
+                center: {lat: 39.8283, lng: -98.5795}, // Center of US
                 zoom: 4,
                 mapTypeId: google.maps.MapTypeId.ROADMAP
             });
@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add event listener for the reset map button
             const resetMapButton = document.getElementById('reset-map');
             if (resetMapButton) {
-                resetMapButton.addEventListener('click', function() {
+                resetMapButton.addEventListener('click', function () {
                     resetMapView();
                 });
             }
@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Center on US and zoom out
-        map.setCenter({ lat: 39.8283, lng: -98.5795 });
+        map.setCenter({lat: 39.8283, lng: -98.5795});
         map.setZoom(4);
 
         // Close any open info windows
@@ -141,9 +141,6 @@ document.addEventListener('DOMContentLoaded', function() {
             infoWindow.close();
         }
     }
-
-
-
 
     async function retrieveFromMongoDB(formData) {
         try {
@@ -299,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Add a small delay to avoid hitting geocoding rate limits
         setTimeout(() => {
-            geocoder.geocode({ 'address': addressString }, function(results, status) {
+            geocoder.geocode({'address': addressString}, function (results, status) {
                 if (status === google.maps.GeocoderStatus.OK) {
                     if (results[0]) {
                         const location = results[0].geometry.location;
@@ -351,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
         marker.business = business;
 
         // Add click event to show info window
-        marker.addListener('click', function() {
+        marker.addListener('click', function () {
             showInfoWindow(this);
         });
 
@@ -542,7 +539,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const addressString = `${business.address1}, ${business.city}, ${business.state} ${business.zip}`;
         const geocoder = new google.maps.Geocoder();
 
-        geocoder.geocode({ 'address': addressString }, function(results, status) {
+        geocoder.geocode({'address': addressString}, function (results, status) {
             if (status === google.maps.GeocoderStatus.OK && results[0]) {
                 const location = results[0].geometry.location;
 
@@ -571,7 +568,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     marker.isNearby = true;
 
                     // Add click event to show info window
-                    marker.addListener('click', function() {
+                    marker.addListener('click', function () {
                         showInfoWindow(this);
                     });
 
@@ -598,14 +595,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // View business details (placeholder function, implement as needed)
-    window.viewBusinessDetails = function(businessId) {
+    window.viewBusinessDetails = function (businessId) {
         console.log("View details for business:", businessId);
         // You can implement this to navigate to a details page or show more info
         alert("This feature is coming soon: View details for " + businessId);
     };
 
     // Add global accessible initialization function for the Google Maps callback
-    window.initGoogleMap = function() {
+    window.initGoogleMap = function () {
         console.log("Google Maps API loaded, initializing map");
         initMap();
     };
@@ -815,7 +812,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Function to focus on a specific marker in the map
-    window.focusOnMapMarker = function(businessId) {
+    window.focusOnMapMarker = function (businessId) {
         console.log("Attempting to focus on business ID:", businessId);
 
         // Check if map is initialized
@@ -860,93 +857,333 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-// Helper function to attempt creating a marker for a business
-    function attemptToCreateMarker(businessId) {
-        console.log("Attempting to create marker for business ID:", businessId);
+    // RESTORED FROM ORIGINAL: displayBusinessSearchResults function to add data-title attributes
+    function displayBusinessSearchResults(businesses, resultsContainer) {
+        try {
+            // clear any existing content
+            resultsContainer.innerHTML = '';
 
-        // Get the business data from the table
-        const businessRow = document.querySelector(`[data-business-id="${businessId}"]`);
+            // Make sure businesses is an array
+            if (!Array.isArray(businesses)) {
+                console.error("businesses is not an array:", businesses);
+                businesses = [];
+            }
 
-        if (!businessRow) {
-            console.error("Cannot find business row in table for ID:", businessId);
-            alert("Could not locate this business on the map. The address may not be complete.");
-            return;
-        }
+            if (businesses.length === 0) {
+                resultsContainer.innerHTML = '<div class="error">No businesses found matching your search criteria.</div>';
 
-        // Get business name and address from the table row
-        const businessName = businessRow.textContent;
-        const addressCell = businessRow.nextElementSibling;
-        const addressText = addressCell ? addressCell.innerHTML.replace(/<br>/g, ", ") : "";
+                // Scroll to the results container even when no businesses are found
+                resultsContainer.scrollIntoView({behavior: 'smooth'});
+                return;
+            }
 
-        if (!addressText) {
-            console.error("No address found for business:", businessName);
-            alert(`Cannot locate "${businessName}" on the map. No valid address found.`);
-            return;
-        }
+            // create table
+            const table = document.createElement('table');
+            table.className = 'results-table';
 
-        // Let user know we're trying to locate the business
-        alert(`Attempting to locate "${businessName}" on the map. This may take a moment.`);
+            // Define column headers (we'll use these for data-title attributes too)
+            const headers = {
+                name: "Business Name",
+                address: "Address",
+                city: "City",
+                state: "State",
+                zip: "Zip",
+                action: "Action"
+            };
 
-        // Use geocoder to find the location
-        const geocoder = new google.maps.Geocoder();
-        geocoder.geocode({ 'address': addressText }, function(results, status) {
-            if (status === google.maps.GeocoderStatus.OK && results[0]) {
-                const location = results[0].geometry.location;
+            // create the header for the table
+            const thead = document.createElement('thead');
+            thead.innerHTML = `
+            <tr>
+                <th>${headers.name}</th>
+                <th>${headers.address}</th>
+                <th>${headers.city}</th>
+                <th>${headers.state}</th>
+                <th>${headers.zip}</th>
+                <th>${headers.action}</th>
+            </tr>
+        `;
+            table.appendChild(thead);
 
-                // Create a simple business object with the data we have
-                const business = {
-                    _id: businessId,
-                    bname: businessName,
-                    // Add other fields if available
-                };
+            // create the table body then add each business to the table
+            const tbody = document.createElement('tbody');
 
-                // Create marker
-                const marker = new google.maps.Marker({
-                    position: location,
-                    map: map,
-                    title: businessName,
-                    animation: google.maps.Animation.DROP,
-                    icon: {
-                        url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                        scaledSize: new google.maps.Size(32, 32)
+            businesses.forEach(business => {
+                if (!business) return; // again, skip null or undefined
+
+                const row = document.createElement('tr');
+
+                row.innerHTML = `
+                <td data-title="${headers.name}">${business.bname}</td>
+                <td data-title="${headers.address}">${business.address1}${business.address2 ? '<br>' + business.address2 : ''}</td>
+                <td data-title="${headers.city}">${business.city}</td>
+                <td data-title="${headers.state}">${business.state}</td>
+                <td data-title="${headers.zip}">${business.zip}</td>
+                <td data-title="${headers.action}"><button class="select-business" data-business-id="${business._id}">Select</button></td>
+            `;
+                tbody.appendChild(row);
+            });
+
+            table.appendChild(tbody);
+            resultsContainer.appendChild(table);
+
+            // Add the responsive table CSS to the page if it doesn't exist yet
+            if (!document.getElementById('responsive-table-css')) {
+                const style = document.createElement('style');
+                style.id = 'responsive-table-css';
+                style.textContent = `
+                /* Base table styles */
+                .results-table {
+                    width: 90%;
+                    margin: 20px auto;
+                    border-collapse: collapse;
+                    text-align: left;
+                }
+                
+                .results-table th, .results-table td {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                }
+                
+                .results-table th {
+                    background-color: #f2f2f2;
+                    font-weight: bold;
+                    text-align: center;
+                }
+                
+                .results-table tr:nth-child(even) {
+                    background-color: #f9f9f9;
+                }
+                
+                .results-table tr:hover {
+                    background-color: #f1f1f1;
+                }
+                
+                /* Responsive table for small screens */
+                @media only screen and (max-width: 767px) {
+                    .results-table {
+                        width: 100%;
+                        margin: 10px 0;
+                    }
+                    
+                    .results-table, .results-table thead, .results-table tbody, .results-table tr {
+                        display: block;
+                    }
+                    
+                    .results-table thead {
+                        display: none;
+                    }
+                    
+                    .results-table tr {
+                        border: 1px solid #ccc;
+                        margin-bottom: 15px;
+                        padding: 8px;
+                        background-color: #f9f9f9;
+                    }
+                    
+                    .results-table td {
+                        display: block;
+                        border: none;
+                        border-bottom: 1px solid #eee;
+                        padding: 8px;
+                        margin-bottom: 6px;
+                        text-align: left;
+                        position: relative;
+                    }
+                    
+                    .results-table td::before {
+                        content: attr(data-title);
+                        display: block;
+                        font-weight: bold;
+                        margin-bottom: 6px;
+                        color: #333;
+                    }
+                    
+                    /* Ensure buttons are properly displayed */
+                    .select-business {
+                        margin: 8px 0;
+                        display: inline-block;
+                    }
+                }
+            `;
+                document.head.appendChild(style);
+            }
+
+            // add the event listeners for the "select" buttons
+            const selectButtons = document.querySelectorAll('.select-business');
+            selectButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    const businessId = this.getAttribute('data-business-id');
+                    if (!businessId) {
+                        console.error("No business ID found on button");
+                        return;
+                    }
+
+                    // Now find the business object based on that ID
+                    const selectedBusiness = businesses.find(bus => bus._id === businessId);
+                    if (!selectedBusiness) {
+                        console.error("Could not find business with ID: " + businessId);
+                        return;
+                    }
+
+                    console.log("Selected business: ", selectedBusiness);
+
+                    const currentPagePath = window.location.pathname;
+                    console.log("Current page: ", currentPagePath);
+
+                    // FIXED: Added special handling for incentive-update.html
+                    if (currentPagePath.includes('incentive-update.html')) {
+                        console.log("On incentive-update page");
+                        if (typeof window.selectBusinessForIncentive === 'function') {
+                            window.selectBusinessForIncentive(selectedBusiness);
+                        } else if (typeof window.selectBusinessForIncentives === 'function') {
+                            window.selectBusinessForIncentives(selectedBusiness);
+                        } else {
+                            console.error("selectBusinessForIncentive(s) not found, falling back");
+                            handleBusinessSelection(selectedBusiness);
+                        }
+                    }
+                    // Check if we're on business-update.html
+                    else if (currentPagePath.includes('business-update.html')) {
+                        console.log("On business-update page");
+                        if (typeof window.selectBusinessForUpdate === 'function') {
+                            window.selectBusinessForUpdate(selectedBusiness);
+                        } else {
+                            console.error("selectBusinessForUpdate not found, falling back");
+                            handleBusinessSelection(selectedBusiness);
+                        }
+                    }
+                    // Check to see if we are on incentive-add page
+                    else if (currentPagePath.includes('incentive-add.html')) {
+                        console.log("On incentive-add page");
+                        // for incentive-add, call business-incentive-handler.js
+                        if (typeof window.selectBusinessForIncentive === 'function') {
+                            window.selectBusinessForIncentive(selectedBusiness);
+                        } else {
+                            handleBusinessSelection(selectedBusiness);
+                        }
+                    } else if (currentPagePath.includes('incentive-view.html') || currentPagePath.endsWith('business-search.html')) {
+                        console.log("On incentive-view page");
+                        // for incentive-view, call business-incentive-viewer.js
+                        if (typeof window.viewBusinessIncentives === 'function') {
+                            window.viewBusinessIncentives(selectedBusiness);
+                        } else {
+                            handleBusinessSelection(selectedBusiness);
+                        }
+                    } else {
+                        console.error("Using fallback business selection handler");
+                        handleBusinessSelection(selectedBusiness);
                     }
                 });
+            });
 
-                // Store the business data with the marker
-                marker.business = business;
+            // have the browser scroll to the results
+            resultsContainer.scrollIntoView({behavior: 'smooth'});
 
-                // Add click event to show info window
-                marker.addListener('click', function() {
-                    const infoContent = `
-                    <div class="info-window">
-                        <h3>${businessName}</h3>
-                        <p><strong>Address:</strong><br>${addressText}</p>
-                    </div>
-                `;
-
-                    infoWindow.setContent(infoContent);
-                    infoWindow.open(map, marker);
-                });
-
-                // Add the marker to our array
-                markers.push(marker);
-
-                // Center the map on this marker
-                map.setCenter(location);
-                map.setZoom(16);
-
-                // Open info window
-                infoWindow.setContent(`<div class="info-window"><h3>${businessName}</h3><p>${addressText}</p></div>`);
-                infoWindow.open(map, marker);
-
-                console.log("Successfully created and focused on marker for:", businessName);
+        } catch (error) {
+            console.error("Error displaying business search results: " + error);
+            const resultsContainer = document.getElementById('business-search-results');
+            if (resultsContainer) {
+                resultsContainer.innerHTML = `<div class="error">Error displaying search results: ${error.message}</div>`;
+                // Scroll to the error message
+                resultsContainer.scrollIntoView({behavior: 'smooth'});
             } else {
-                console.error("Geocode failed:", status);
-                alert(`Unable to locate "${businessName}" on the map. Error: ${status}`);
+                alert("Error displaying search results: " + error.message);
             }
-        });
+        }
     }
 
+    // RESTORED FROM ORIGINAL: helper function to populate business information fields
+    function handleBusinessSelection(business) {
+        console.log("Handling business selection with fallback: ", business);
+
+        try {
+            // only to proceed if the necessary elements are available
+            const businessInfoSection = document.getElementById('business-info-section');
+            if (!businessInfoSection) {
+                console.error("business-info-section not found");
+                return;
+            }
+
+            // set the business ID if the field exists
+            const selectedBusinessIdField = document.getElementById('selected-business-id');
+            if (selectedBusinessIdField) {
+                selectedBusinessId = business._id || '';
+            }
+
+            // now lets populate the business info fields
+            populateBusinessInfo(business);
+
+            // for incentive-add page, show the incentive section if it exists.
+            const incentiveSection = document.getElementById('incentive-section');
+            if (incentiveSection) {
+                incentiveSection.style.display = 'block';
+            }
+
+            // now scroll to the business info section
+            businessInfoSection.scrollIntoView({behavior: 'smooth'});
+        } catch (error) {
+            console.error("Error in handleBusinessSection: " + error);
+            alert("There was an error selecting the business: " + error.message);
+        }
+    }
+
+    // RESTORED FROM ORIGINAL: function to populate business fields
+    function populateBusinessInfo(business) {
+        if (!business) {
+            console.error("No business data provided to populateBusinessInfo");
+            return;
+        }
+
+        try {
+            // set the values for all business fields if they exist
+            const bnameField = document.getElementById('bname');
+            if (bnameField) bnameField.value = business.bname || '';
+
+            const address1Field = document.getElementById('address1');
+            if (address1Field) address1Field.value = business.address1 || '';
+
+            const address2Field = document.getElementById('address2');
+            if (address2Field) address2Field.value = business.address2 || '';
+
+            const cityField = document.getElementById('city');
+            if (cityField) cityField.value = business.city || '';
+
+            const zipField = document.getElementById('zip');
+            if (zipField) zipField.value = business.zip || '';
+
+            const phoneField = document.getElementById('phone');
+            if (phoneField) phoneField.value = business.phone || '';
+
+            // for the select statements of state and business type
+            // they are set differently
+            const stateSelect = document.getElementById('state');
+            if (stateSelect) {
+                const stateValue = business.state || '';
+                for (let i = 0; i < stateSelect.options.length; i++) {
+                    if (stateSelect.options[i].value === stateValue) {
+                        stateSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            const typeSelect = document.getElementById('type');
+            if (typeSelect) {
+                const typeValue = business.type || '';
+                for (let i = 0; i < typeSelect.options.length; i++) {
+                    if (typeSelect.options[i].value === typeValue) {
+                        typeSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            console.log("Business info populated successfully");
+        } catch (error) {
+            console.error("Error in populateBusinessInfo: " + error);
+        }
+    }
     // Function validation
     function isNotEmpty(value) {
         return value.trim() !== '';
