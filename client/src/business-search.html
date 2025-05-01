@@ -19,10 +19,13 @@
     <link href="./css/menu-auth.css" rel="stylesheet">
     <link href="./css/form-validation.css" rel="stylesheet">
     <link href="./css/table.css" rel="stylesheet">
+    <link href="./css/map.css" rel="stylesheet">
     <script src="./js/jquery-3.7.1.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
     <script src="./js/bootstrap-4.0.0.js"></script>
+    <!-- Google Maps API with your API key, libraries and callback function -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE&libraries=places,geometry&callback=initGoogleMap" async defer></script>
     <script src="./js/business-search.js"></script>
 </head>
 
@@ -95,6 +98,30 @@
     </div>
     <div style="clear:both"></div>
     <div class="spacer"></div>
+
+    <!-- Google Maps Container -->
+    <div id="map-container">
+        <div class="map-controls">
+            <div>
+                <h3 class="caveat">Business Map</h3>
+            </div>
+            <div>
+                <button id="reset-map" class="btn btn-sm btn-secondary">Reset Map View</button>
+            </div>
+        </div>
+        <div id="map"></div>
+        <div class="map-legend">
+            <div class="legend-item">
+                <div class="legend-color primary"></div>
+                <span>Search Results</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color nearby"></div>
+                <span>Nearby Similar Businesses</span>
+            </div>
+        </div>
+    </div>
+    <!-- Business Search Results Table -->
     <div id="business-search-results"></div>
 
     <section id="search_table" style="display: none;">
@@ -108,6 +135,7 @@
                     <th>Location</th>
                     <th>Description</th>
                     <th>Offers/Incentives</th>
+                    <th>Map</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -119,6 +147,7 @@
                     <th>Location</th>
                     <th>Description</th>
                     <th>Offers/Incentives</th>
+                    <th>Map</th>
                 </tr>
                 </tfoot>
             </table>
@@ -133,6 +162,5 @@
             edward-mckeown@student.kirkwood.edu</a></p><br>
     </address>
 </footer>
-
 </body>
 </html>
