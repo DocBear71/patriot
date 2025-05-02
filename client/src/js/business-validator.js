@@ -226,7 +226,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (label && !label.innerHTML.includes('*')) {
                     const asterisk = document.createElement('span');
                     asterisk.className = 'required-indicator';
-                    asterisk.textContent = ' *';
+                    asterisk.textContent = '*';
                     asterisk.style.color = 'red'; // Match your existing color scheme
                     label.appendChild(asterisk);
                 }
