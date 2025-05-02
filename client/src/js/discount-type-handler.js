@@ -3,36 +3,41 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Discount Type Handler Loaded!");
 
-    // Step 1: Add the discount type radio buttons to the form
-    const incentiveAmountFieldContainer = document.querySelector('.form-group:has(#incentiveAmount)');
-    if (incentiveAmountFieldContainer) {
-        // Create the discount type radio button container
-        const discountTypeContainer = document.createElement('div');
-        discountTypeContainer.className = 'form-group';
-        discountTypeContainer.id = 'discountTypeContainer';
+    // Step 1: Only add the discount type radio buttons if they don't already exist
+    const existingDiscountTypeContainer = document.getElementById('discountTypeContainer');
 
-        // Add the label and radio buttons
-        discountTypeContainer.innerHTML = `
-            <label>Discount Type <span class="required-indicator">*</span></label>
-            <div class="radio-group">
-                <label for="discountTypePercentage">Percentage (%)</label>
-                <input type="radio" id="discountTypePercentage" name="discountType" value="percentage" checked>
-            </div>
-            <div class="radio-group">
-                <label for="discountTypeAmount">Dollar Amount ($)</label>
-                <input type="radio" id="discountTypeAmount" name="discountType" value="amount">
-            </div>
-        `;
+    if (!existingDiscountTypeContainer) {
+        // Only create new elements if they don't exist
+        const incentiveAmountFieldContainer = document.querySelector('.form-group:has(#incentiveAmount)');
+        if (incentiveAmountFieldContainer) {
+            // Create the discount type radio button container
+            const discountTypeContainer = document.createElement('div');
+            discountTypeContainer.className = 'form-group';
+            discountTypeContainer.id = 'discountTypeContainer';
 
-        // Insert before the incentive amount field
-        incentiveAmountFieldContainer.parentNode.insertBefore(discountTypeContainer, incentiveAmountFieldContainer);
+            // Add the label and radio buttons
+            discountTypeContainer.innerHTML = `
+                <label>Discount Type <span class="required-indicator">*</span></label>
+                <div class="radio-group">
+                    <label for="discountTypePercentage">Percentage (%)</label>
+                    <input type="radio" id="discountTypePercentage" name="discountType" value="percentage" checked>
+                </div>
+                <div class="radio-group">
+                    <label for="discountTypeDollar">Dollar Amount ($)</label>
+                    <input type="radio" id="discountTypeDollar" name="discountType" value="dollar">
+                </div>
+            `;
 
-        // Update the label for the amount field to include an ID
-        const incentiveAmountLabel = document.querySelector('label[for="incentiveAmount"]');
-        if (incentiveAmountLabel) {
-            incentiveAmountLabel.id = 'incentiveAmountLabel';
+            // Insert before the incentive amount field
+            incentiveAmountFieldContainer.parentNode.insertBefore(discountTypeContainer, incentiveAmountFieldContainer);
         }
     }
+    // Update the label for the amount field to include an ID
+    const amountLabelElement = document.querySelector('label[for="incentiveAmount"]');
+    if (amountLabelElement && !amountLabelElement.id) {
+        amountLabelElement.id = 'amountLabel';
+    }
+
 
     // Step 2: Add the event handlers for the radio buttons
     const discountTypePercentage = document.getElementById('discountTypePercentage');
