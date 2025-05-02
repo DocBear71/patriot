@@ -309,8 +309,21 @@
     }
 
     /* Force display for edit section */
-    .force-display {
+    :not(.form-group).force-display {
         display: block !important;
+    }
+
+    /* Use flex for form-group elements */
+    .form-group.force-display {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+
+    /* Special handling for other type container */
+    #otherTypeContainer.force-display,
+    #otherTypeContainer[style*="display: block"] {
+        display: flex !important;
     }
 </style>
 
