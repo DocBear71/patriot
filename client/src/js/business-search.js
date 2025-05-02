@@ -338,7 +338,8 @@ document.addEventListener('DOMContentLoaded', function() {
             title: business.bname,
             animation: google.maps.Animation.DROP,
             icon: {
-                url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png', // Standard businesses
+                // Change http:// to https:// to fix mixed content warnings
+                url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png', // Standard businesses
                 scaledSize: new google.maps.Size(32, 32)
             }
         });
@@ -557,7 +558,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         title: business.bname,
                         animation: google.maps.Animation.DROP,
                         icon: {
-                            url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png', // Nearby businesses
+                            // Change http:// to https:// to fix mixed content warnings
+                            url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png', // Nearby businesses
                             scaledSize: new google.maps.Size(32, 32)
                         }
                     });
@@ -577,6 +579,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
 
     // Clear all markers from the map
     function clearMarkers() {
