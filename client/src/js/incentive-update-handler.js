@@ -714,28 +714,30 @@ document.addEventListener('DOMContentLoaded', function() {
     // Helper function to convert business type codes to display names
     function getBusinessTypeDisplay(typeCode) {
         const types = {
-            'REST': 'Restaurant',
-            'GROC': 'Grocery',
-            'DEPT': 'Department Store',
-            'CLTH': 'Clothing',
-            'ELEC': 'Electronics',
-            'HARDW': 'Hardware',
-            'FURN': 'Furniture',
             'AUTO': 'Automotive',
-            'SERV': 'Service',
-            'ENTR': 'Entertainment',
-            'SPRT': 'Sporting Goods',
-            'TOYS': 'Toys',
-            'HEAL': 'Health',
             'BEAU': 'Beauty',
-            'JEWL': 'Jewelry',
             'BOOK': 'Bookstore',
+            'CLTH': 'Clothing',
+            'CONV': 'Convenience Store/Gas Station',
+            'DEPT': 'Department Store',
+            'ELEC': 'Electronics',
+            'ENTR': 'Entertainment',
+            'FURN': 'Furniture',
+            'FUEL': 'Fuel Station/Truck Stop',
             'GIFT': 'Gift Shop',
-            'SPEC': 'Specialty',
+            'GROC': 'Grocery',
+            'HARDW': 'Hardware',
+            'HEAL': 'Health',
+            'JEWL': 'Jewelry',
+            'OTHER': 'Other',
             'RX': 'Pharmacy',
+            'REST': 'Restaurant',
             'RETAIL': 'Retail',
+            'SERV': 'Service',
+            'SPEC': 'Specialty',
+            'SPRT': 'Sporting Goods',
             'TECH': 'Technology',
-            'OTHER': 'Other'
+            'TOYS': 'Toys'
         };
 
         return types[typeCode] || typeCode;
