@@ -318,9 +318,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                             // Search for nearby businesses if we have at least one result
                             if (total >= 1) {
-                                const lastBusiness = businesses[businesses.length - 1];
-                                const lastLocation = results[0].geometry.location;
-                                searchNearbyBusinesses(lastLocation, lastBusiness.type);
+                                // Use the current business instead of trying to access the businesses array
+                                searchNearbyBusinesses(location, business.type);
                             }
                         }
                     }
