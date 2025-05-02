@@ -35,7 +35,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const incentiveFields = [
         document.getElementById('incentiveType'),
         document.getElementById('incentiveAmount'),
-        document.getElementById('incentiveInfo')
+        document.getElementById('incentiveInfo'),
+        // Also disable discount type fields when incentive is not available
+        document.getElementById('discountTypePercentage'),
+        document.getElementById('discountTypeDollar')
     ];
 
     function toggleIncentiveFields() {
@@ -54,6 +57,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+
+        // Also disable the discount type container
+        const discountTypeContainer = document.getElementById('discountTypeContainer');
+        if (discountTypeContainer) {
+            if (!isIncentiveAvailable) {
+                discountTypeContainer.classList.add('disabled-container');
+            } else {
+                discountTypeContainer.classList.remove('disabled-container');
+            }
+        }
 
         if (otherTypeContainer && document.getElementById('otherTypeDescription')) {
             const otherTypeDescription = document.getElementById('otherTypeDescription');
@@ -134,7 +147,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
+                // Get the discount type (percentage or dollar)
+                const discountTypeRadio = document.querySelector('input[name="discountType"]:checked');
+                const discountType = discountTypeRadio ? discountTypeRadio.value : 'percentage';
+
                 incentiveData.type = incentiveType;
+                incentiveData.discount_type = discountType;
                 incentiveData.amount = parseFloat(document.getElementById('incentiveAmount').value) || 0;
                 incentiveData.information = document.getElementById('incentiveInfo').value || '';
 
@@ -298,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr>
                         <th>Available</th>
                         <th>Type</th>
-                        <th>Amount (%)</th>
+                        <th>Amount</th>
                         <th>Information</th>
                         <th>Action</th>
                     </tr>
@@ -312,13 +330,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const otherDescription = incentive.type === 'OT' && incentive.other_description
                 ? `<br><em>(${incentive.other_description})</em>`
                 : '';
-            const amount = incentive.is_available ? `${incentive.amount}%` : 'N/A';
+
+            // Format the amount based on discount_type
+            let amountDisplay = 'N/A';
+            if (incentive.is_available) {
+                if (incentive.discount_type === 'dollar') {
+                    amountDisplay = `$${incentive.amount.toFixed(2)}`;
+                } else {
+                    // Default to percentage
+                    amountDisplay = `${incentive.amount}%`;
+                }
+            }
 
             html += `
                 <tr>
                     <td>${available}</td>
                     <td>${typeLabel}${otherDescription}</td>
-                    <td>${amount}</td>
+                    <td>${amountDisplay}</td>
                     <td>${incentive.information || ''}</td>
                     <td>
                         <button class="select-incentive" data-incentive-id="${incentive._id}">
@@ -403,6 +431,34 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        // Set discount type radio buttons
+        const discountTypePercentage = document.getElementById('discountTypePercentage');
+        const discountTypeDollar = document.getElementById('discountTypeDollar');
+
+        if (discountTypePercentage && discountTypeDollar) {
+            // Check if the incentive has a discount_type
+            if (incentive.discount_type === 'dollar') {
+                discountTypeDollar.checked = true;
+                discountTypePercentage.checked = false;
+
+                // Update the label to show $ instead of %
+                const amountLabel = document.getElementById('amountLabel');
+                if (amountLabel) {
+                    amountLabel.textContent = 'Incentive Amount in $';
+                }
+            } else {
+                // Default to percentage
+                discountTypePercentage.checked = true;
+                discountTypeDollar.checked = false;
+
+                // Update the label to show %
+                const amountLabel = document.getElementById('amountLabel');
+                if (amountLabel) {
+                    amountLabel.textContent = 'Incentive Amount as a %';
+                }
+            }
+        }
+
         // Set incentive amount
         const incentiveAmountField = document.getElementById('incentiveAmount');
         if (incentiveAmountField) {
@@ -445,6 +501,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Use the API endpoint
             const apiURL = `${baseURL}/api/admin-incentives.js?operation=update`;
             console.log("Submitting to API at:", apiURL);
+            console.log("Incentive data:", incentiveData);
 
             const token = getAuthToken();
             const headers = {
@@ -559,6 +616,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const incentiveInfo = document.getElementById('incentiveInfo');
         if (incentiveInfo) incentiveInfo.value = '';
+
+        // Reset discount type radio buttons
+        const discountTypePercentage = document.getElementById('discountTypePercentage');
+        if (discountTypePercentage) discountTypePercentage.checked = true;
+
+        const discountTypeDollar = document.getElementById('discountTypeDollar');
+        if (discountTypeDollar) discountTypeDollar.checked = false;
+
+        // Reset amount label
+        const amountLabel = document.getElementById('amountLabel');
+        if (amountLabel) amountLabel.textContent = 'Incentive Amount as a %';
 
         // Reset otherTypeContainer display
         const otherTypeContainer = document.getElementById('otherTypeContainer');
@@ -707,7 +775,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function isValidNumber(value) {
-        return !isNaN(value) && value > 0;
+        return !isNaN(value) && value >= 0;
     }
 
     // Function to validate fields and provide visual feedback
@@ -769,7 +837,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (amountField && !validateField(amountField, isValidNumber)) {
                 formIsValid = false;
-                showMessage('error', 'Please enter a valid amount greater than 0');
+                showMessage('error', 'Please enter a valid amount (0 or greater)');
             }
 
             if (infoField && !validateField(infoField, isNotEmpty)) {
@@ -823,7 +891,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Update the incentive form submit handler to use the validation function
-
     if (incentiveUpdateForm) {
         // Remove previous listeners to avoid duplicates
         const newUpdateForm = incentiveUpdateForm.cloneNode(true);
@@ -854,7 +921,13 @@ document.addEventListener('DOMContentLoaded', function() {
             // Only include type, amount, and info if incentive is available
             if (isAvailable) {
                 const incentiveType = document.getElementById('incentiveType').value;
+
+                // Get the discount type (percentage or dollar)
+                const discountTypeRadio = document.querySelector('input[name="discountType"]:checked');
+                const discountType = discountTypeRadio ? discountTypeRadio.value : 'percentage';
+
                 incentiveData.type = incentiveType;
+                incentiveData.discount_type = discountType;
                 incentiveData.amount = parseFloat(document.getElementById('incentiveAmount').value) || 0;
                 incentiveData.information = document.getElementById('incentiveInfo').value || '';
 
@@ -918,26 +991,31 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add CSS styles for form validation
     const style = document.createElement('style');
     style.textContent += `
-            .valid-field {
-                border: 1px solid green !important;
-                background-color: #f0fff0 !important;
-            }
-            
-            .invalid-field {
-                border: 1px solid red !important;
-                background-color: #fff0f0 !important;
-            }
-            
-            .required-indicator {
-                color: red;
-                font-weight: bold;
-            }
-            
-            .form-explanation {
-                margin-bottom: 15px;
-                font-style: italic;
-            }
-        `;
+        .valid-field {
+            border: 1px solid green !important;
+            background-color: #f0fff0 !important;
+        }
+        
+        .invalid-field {
+            border: 1px solid red !important;
+            background-color: #fff0f0 !important;
+        }
+        
+        .required-indicator {
+            color: red;
+            font-weight: bold;
+        }
+        
+        .form-explanation {
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+        
+        .disabled-container {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    `;
     document.head.appendChild(style);
 
     // Call the function to add asterisks

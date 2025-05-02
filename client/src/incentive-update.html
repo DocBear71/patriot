@@ -21,6 +21,7 @@
     <script src="./js/bootstrap-4.0.0.js"></script>
     <script src="./js/business-search.js"></script>
     <script src="./js/incentive-update-handler.js"></script>
+    <script src="./js/discount-type-handler.js"></script>
     <script src="./js/incentive-display-fix.js"></script>
 </head>
 
@@ -167,9 +168,23 @@
                 <input type="text" id="otherTypeDescription" name="otherTypeDescription" placeholder="Describe the incentive type...">
             </div>
 
+            <!-- Discount Type Selection - NEW -->
+            <div class="form-group" id="discountTypeContainer">
+                <label>Discount Type</label>
+                <div class="radio-group">
+                    <label for="discountTypePercentage" id="radio3">Percentage (%)</label>
+                    <input type="radio" id="discountTypePercentage" name="discountType" value="percentage" checked>
+                </div>
+                <div class="radio-group">
+                    <label for="discountTypeDollar" id="radio4">Dollar Amount ($)</label>
+                    <input type="radio" id="discountTypeDollar" name="discountType" value="dollar">
+                </div>
+            </div>
+
+            <!-- Dynamic Amount Label - controlled by JavaScript -->
             <div class="form-group">
-                <label for="incentiveAmount">Incentive Amount as a %</label>
-                <input type="number" id="incentiveAmount" name="percentage" min="0" max="100" step="0.1">
+                <label for="incentiveAmount" id="amountLabel">Incentive Amount as a %</label>
+                <input type="number" id="incentiveAmount" name="amount" min="0" max="100" step="0.1">
             </div>
 
             <div class="form-group">
@@ -290,6 +305,11 @@
 
     textarea.disabled-field {
         resize: none;
+    }
+
+    /* Force display for edit section */
+    .force-display {
+        display: block !important;
     }
 </style>
 
