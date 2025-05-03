@@ -143,6 +143,74 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Call this after map initialization and after markers are added
+    setupMarkerClickPriority();
+
+    function setupMarkerClickPriority() {
+        // Create a listener for map clicks to intercept POI clicks
+        map.addListener('click', function(event) {
+            // Check if the click event has a placeId (indicating it's a POI)
+            if (event.placeId) {
+                // Find if any of our markers are near this click location
+                const clickPoint = event.latLng;
+
+                // Find if any of our markers are within a small radius (15 pixels on screen)
+                const pixelRadius = 15;
+
+                // Convert lat/lng to pixel coordinates
+                const scale = Math.pow(2, map.getZoom());
+                const projection = map.getProjection();
+                const bounds = map.getBounds();
+
+                if (!projection || !bounds) return;
+
+                const ne = bounds.getNorthEast();
+                const sw = bounds.getSouthWest();
+                const worldWidth = projection.fromLatLngToPoint(ne).x - projection.fromLatLngToPoint(sw).x;
+                const pixelsPerLngDegree = worldWidth / (ne.lng() - sw.lng());
+
+                // Check each marker
+                for (const marker of markers) {
+                    if (!marker.position) continue;
+
+                    // Get marker position
+                    const markerLat = typeof marker.position.lat === 'function' ?
+                        marker.position.lat() : marker.position.lat;
+                    const markerLng = typeof marker.position.lng === 'function' ?
+                        marker.position.lng() : marker.position.lng;
+
+                    const clickLat = clickPoint.lat();
+                    const clickLng = clickPoint.lng();
+
+                    // Convert coordinate difference to approximate pixels
+                    const latDiffInPixels = Math.abs(markerLat - clickLat) *
+                        pixelsPerLngDegree * 111000 / (scale * Math.cos(markerLat * Math.PI / 180));
+                    const lngDiffInPixels = Math.abs(markerLng - clickLng) * pixelsPerLngDegree;
+
+                    const pixelDistance = Math.sqrt(
+                        Math.pow(latDiffInPixels, 2) +
+                        Math.pow(lngDiffInPixels, 2)
+                    );
+
+                    // If click is near our marker, stop event propagation
+                    if (pixelDistance < pixelRadius) {
+                        console.log("Preventing POI click near our marker");
+                        event.stop(); // Stop the event from being processed by Google Maps
+
+                        // Trigger our own marker click
+                        setTimeout(() => {
+                            showInfoWindow(marker);
+                        }, 10);
+
+                        return;
+                    }
+                }
+            }
+        });
+    }
+
+
+
     function resetMapView() {
         if (!mapInitialized || !map) {
             console.error("Cannot reset map view - map not initialized");
@@ -347,7 +415,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, index * 200); // Stagger requests with a 200ms delay per business
     }
 
-// New function that only uses AdvancedMarkerElement for markers
+// Enhanced addAdvancedMarker function with image support
     async function addAdvancedMarker(business, location) {
         try {
             // Import the marker library
@@ -360,31 +428,49 @@ document.addEventListener('DOMContentLoaded', function() {
             const isNearby = business.isNearby === true;
             const pinColor = isNearby ? '#4285F4' : '#EA4335'; // Blue for nearby, Red for primary
 
-            // Create a pin element that's clearly clickable
+            // Create a business type icon
+            const businessIcon = getBusinessTypeIcon(business.type);
+
+            // Create a pin element with an icon or image
             const pinElement = document.createElement('div');
             pinElement.className = 'custom-marker';
             pinElement.style.cursor = 'pointer';
-            pinElement.innerHTML = `
-            <div style="width: 32px; height: 32px; display: flex; justify-content: center; position: relative;">
-                <div style="width: 24px; height: 24px; border-radius: 50% 50% 50% 0; 
-                            transform: rotate(-45deg); background-color: ${pinColor}; 
-                            display: flex; justify-content: center; align-items: center; 
-                            position: absolute; top: 0; left: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
-                    <div style="width: 12px; height: 12px; border-radius: 50%; 
-                                background-color: white; transform: rotate(45deg);"></div>
+            pinElement.style.zIndex = '1000'; // Higher z-index to prevent POI clicks
+
+            // Different marker styles based on whether we have an image or not
+            if (business.image_url) {
+                // With business image
+                pinElement.innerHTML = `
+                <div class="marker-container">
+                    <div class="marker-pin" style="background-color: ${pinColor};">
+                        <div class="marker-image-container">
+                            <img src="${business.image_url}" alt="${business.bname}" class="marker-image">
+                        </div>
+                    </div>
+                    <div class="marker-shadow"></div>
                 </div>
-                <!-- Shadow element below the marker -->
-                <div style="width: 16px; height: 4px; background-color: rgba(0,0,0,0.2); 
-                            border-radius: 50%; position: absolute; bottom: 0; left: 8px;"></div>
-            </div>
-        `;
+            `;
+            } else {
+                // With business type icon
+                pinElement.innerHTML = `
+                <div class="marker-container">
+                    <div class="marker-pin" style="background-color: ${pinColor};">
+                        <div class="marker-icon">
+                            ${businessIcon}
+                        </div>
+                    </div>
+                    <div class="marker-shadow"></div>
+                </div>
+            `;
+            }
 
             // Create the advanced marker
             const marker = new AdvancedMarkerElement({
                 position: position,
                 map: map,
                 title: business.bname,
-                content: pinElement
+                content: pinElement,
+                collisionBehavior: isNearby ? 'OPTIONAL_AND_HIDES_LOWER_PRIORITY' : 'REQUIRED'
             });
 
             // Store the business data with the marker
@@ -393,13 +479,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Add multiple event listeners to ensure clicks are captured
             // 1. Add click to the pin element (direct DOM event)
-            pinElement.addEventListener('click', function() {
+            pinElement.addEventListener('click', function(e) {
                 console.log("Marker element clicked:", business.bname);
+                // Stop propagation to prevent Google POI clicks
+                e.stopPropagation();
                 showInfoWindow(marker);
             });
 
             // 2. Add gmp-click to the marker (Google Maps Platform event)
-            marker.addEventListener('gmp-click', function() {
+            marker.addEventListener('gmp-click', function(e) {
                 console.log("Marker gmp-click triggered:", business.bname);
                 showInfoWindow(marker);
             });
@@ -413,6 +501,155 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error("Error creating advanced marker:", error);
             return null;
         }
+    }
+
+    // After markers are created in displayBusinessesOnMap
+    initImageLoading();
+
+// Function to get an icon based on business type
+    function getBusinessTypeIcon(type) {
+        // Map business types to Font Awesome or other icons
+        const iconMap = {
+            'AUTO': '<i class="fa fa-car" aria-hidden="true"></i>',
+            'BEAU': '<i class="fa fa-scissors" aria-hidden="true"></i>',
+            'BOOK': '<i class="fa fa-book" aria-hidden="true"></i>',
+            'CLTH': '<i class="fa fa-shopping-bag" aria-hidden="true"></i>',
+            'CONV': '<i class="fa fa-shopping-basket" aria-hidden="true"></i>',
+            'DEPT': '<i class="fa fa-building" aria-hidden="true"></i>',
+            'ELEC': '<i class="fa fa-laptop" aria-hidden="true"></i>',
+            'ENTR': '<i class="fa fa-film" aria-hidden="true"></i>',
+            'FURN': '<i class="fa fa-bed" aria-hidden="true"></i>',
+            'FUEL': '<i class="fa fa-gas-pump" aria-hidden="true"></i>',
+            'GIFT': '<i class="fa fa-gift" aria-hidden="true"></i>',
+            'GROC': '<i class="fa fa-shopping-cart" aria-hidden="true"></i>',
+            'HARDW': '<i class="fa fa-hammer" aria-hidden="true"></i>',
+            'HEAL': '<i class="fa fa-heartbeat" aria-hidden="true"></i>',
+            'JEWL': '<i class="fa fa-gem" aria-hidden="true"></i>',
+            'OTHER': '<i class="fa fa-store" aria-hidden="true"></i>',
+            'RX': '<i class="fa fa-prescription-bottle" aria-hidden="true"></i>',
+            'REST': '<i class="fa fa-utensils" aria-hidden="true"></i>',
+            'RETAIL': '<i class="fa fa-shopping-bag" aria-hidden="true"></i>',
+            'SERV': '<i class="fa fa-concierge-bell" aria-hidden="true"></i>',
+            'SPEC': '<i class="fa fa-star" aria-hidden="true"></i>',
+            'SPRT': '<i class="fa fa-futbol" aria-hidden="true"></i>',
+            'TECH': '<i class="fa fa-microchip" aria-hidden="true"></i>',
+            'TOYS': '<i class="fa fa-gamepad" aria-hidden="true"></i>'
+        };
+
+        // Return the icon or a default icon if type not found
+        return iconMap[type] || '<i class="fa fa-store" aria-hidden="true"></i>';
+    }
+
+// Add this function to fetch place photos for businesses
+    async function fetchPlacePhotosForBusiness(business) {
+        if (!business || !business.placeId) {
+            console.log("No place ID for business:", business ? business.bname : "unknown");
+            return null;
+        }
+
+        try {
+            // Import the Places library
+            const { Place } = await google.maps.importLibrary("places");
+
+            // Create a Place instance
+            const place = new Place({
+                id: business.placeId
+            });
+
+            // Fetch place details including photos
+            await place.fetchFields({
+                fields: ['photos', 'displayName']
+            });
+
+            // If photos exist, get the first one
+            if (place.photos && place.photos.length > 0) {
+                const photoUrl = place.photos[0].getUrl({
+                    maxWidth: 100,
+                    maxHeight: 100
+                });
+
+                console.log(`Fetched photo for ${business.bname}`);
+                return photoUrl;
+            }
+
+            console.log(`No photos available for ${business.bname}`);
+            return null;
+        } catch (error) {
+            console.error("Error fetching place photos:", error);
+            return null;
+        }
+    }
+
+// Function to enhance markers with images
+    async function enhanceMarkersWithImages() {
+        // Only process if we have markers
+        if (!markers || markers.length === 0) return;
+
+        console.log("Enhancing markers with images...");
+
+        for (const marker of markers) {
+            if (!marker.business) continue;
+
+            // Skip if business already has an image
+            if (marker.business.image_url) continue;
+
+            // Try to get an image for the business
+            const imageUrl = await fetchPlacePhotosForBusiness(marker.business);
+
+            if (imageUrl) {
+                // Update the business object
+                marker.business.image_url = imageUrl;
+
+                // Update the marker with the new image
+                updateMarkerWithImage(marker, imageUrl);
+            }
+        }
+    }
+
+// Update an existing marker with an image
+    function updateMarkerWithImage(marker, imageUrl) {
+        if (!marker || !marker.content) return;
+
+        const business = marker.business;
+        if (!business) return;
+
+        const isNearby = business.isNearby === true;
+        const pinColor = isNearby ? '#4285F4' : '#EA4335';
+
+        // Create new content with the image
+        const pinElement = document.createElement('div');
+        pinElement.className = 'custom-marker';
+        pinElement.style.cursor = 'pointer';
+        pinElement.style.zIndex = '1000';
+
+        pinElement.innerHTML = `
+        <div class="marker-container">
+            <div class="marker-pin" style="background-color: ${pinColor};">
+                <div class="marker-image-container">
+                    <img src="${imageUrl}" alt="${business.bname}" class="marker-image">
+                </div>
+            </div>
+            <div class="marker-shadow"></div>
+        </div>
+    `;
+
+        // Replace the old content
+        marker.content = pinElement;
+
+        // Re-add the click event listener
+        pinElement.addEventListener('click', function(e) {
+            console.log("Updated marker element clicked:", business.bname);
+            e.stopPropagation();
+            showInfoWindow(marker);
+        });
+    }
+
+// Add this to your code after businesses are loaded and markers are created
+    function initImageLoading() {
+        // Call this after markers are created
+        setTimeout(() => {
+            enhanceMarkersWithImages();
+        }, 1000); // Short delay to ensure markers are fully created
     }
 
     async function addMarker(business, location) {

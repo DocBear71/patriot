@@ -3,6 +3,132 @@
    Add this file to your css directory
 */
 
+/* Marker container styling */
+.marker-container {
+    position: relative;
+    width: 36px;
+    height: 50px;
+    transform-origin: bottom center;
+    transition: transform 0.2s ease;
+}
+
+/* Standard pin styling for all markers */
+.marker-pin {
+    position: absolute;
+    top: 0;
+    left: 3px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    background-color: #EA4335; /* Default color, will be overridden */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* Container for business images */
+.marker-image-container {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: white;
+    overflow: hidden;
+    transform: rotate(45deg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Business image styling */
+.marker-image {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    object-position: center;
+    transform: rotate(0deg); /* Counter-rotate to make image upright */
+}
+
+/* Business icon styling */
+.marker-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: white;
+    overflow: hidden;
+    transform: rotate(45deg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    color: #333;
+}
+
+/* Shadow beneath the marker */
+.marker-shadow {
+    position: absolute;
+    bottom: 0;
+    left: 10px;
+    width: 16px;
+    height: 4px;
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 50%;
+}
+
+/* Hover effect for markers */
+.custom-marker:hover .marker-container {
+    transform: scale(1.1);
+}
+
+/* Make sure icon fonts are centered and sized properly */
+.marker-icon i {
+    transform: rotate(-45deg); /* Counter-rotate to make icon upright */
+    font-size: 12px;
+}
+
+/* Nearby marker styling (blue) */
+.marker-pin.nearby {
+    background-color: #4285F4;
+}
+
+/* Primary marker styling (red) */
+.marker-pin.primary {
+    background-color: #EA4335;
+}
+
+/* Additional styling for selected marker */
+.marker-container.selected {
+    z-index: 1001; /* Make sure selected marker is on top */
+}
+
+.marker-container.selected .marker-pin {
+    background-color: #34A853; /* Google green */
+    box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.4);
+}
+
+/* Animation for marker drop */
+@keyframes marker-drop {
+    0% {
+        transform: translateY(-100px);
+        opacity: 0;
+    }
+    60% {
+        transform: translateY(10px);
+        opacity: 1;
+    }
+    80% {
+        transform: translateY(-5px);
+    }
+    100% {
+        transform: translateY(0);
+    }
+}
+
+.marker-container.animate-drop {
+    animation: marker-drop 0.5s forwards;
+}
+
 /* Custom marker styles */
 .custom-marker {
     cursor: pointer;
