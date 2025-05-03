@@ -64,8 +64,8 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn("Business search form not found in the DOM");
     }
 
-    // Initialize Google Map with Map ID and click handler for POIs
-    function initMap() {
+    // Initialize Google Map with Map ID and updated API support
+    async function initMap() {
         console.log("Initializing Google Map");
 
         try {
@@ -80,15 +80,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const mapId = 'ebe8ec43a7bc252d';
             console.log("Using Map ID:", mapId);
 
+            // Import required libraries
+            const { Map } = await google.maps.importLibrary("maps");
+            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
             // Create a map centered on the US
-            map = new google.maps.Map(mapContainer, {
+            map = new Map(mapContainer, {
                 center: {lat: 39.8283, lng: -98.5795}, // Center of US
                 zoom: 4,
-                mapTypeId: google.maps.MapTypeId.ROADMAP,
                 mapId: mapId,  // Map ID for advanced markers
                 clickableIcons: true  // Allow clicking on POIs (businesses, landmarks, etc.)
             });
 
+            // Create info window
             infoWindow = new google.maps.InfoWindow();
             bounds = new google.maps.LatLngBounds();
 
@@ -109,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
             mapContainer.appendChild(initialMessage);
 
             // Set up handler for POI clicks (businesses not in your database)
-            setupMapClickHandler();
+            await setupMapClickHandler();
 
             // Add event listener for the reset map button
             const resetMapButton = document.getElementById('reset-map');
@@ -119,13 +123,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            // Set flag that map is initialized and advanced markers are available
+            // Set flags that map is initialized
             mapInitialized = true;
-            window.useAdvancedMarkers = true;
             console.log("Google Map successfully initialized with Map ID:", mapId);
-            console.log("Advanced Markers enabled, POI click handlers set up");
+            console.log("Advanced Markers and Place API enabled");
 
-            // If there are any pending businesses to display, show them now
+            // Process any pending businesses to display
             if (pendingBusinessesToDisplay.length > 0) {
                 console.log("Processing pending businesses to display on map");
                 displayBusinessesOnMap(pendingBusinessesToDisplay);
@@ -341,8 +344,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }, index * 200); // Stagger requests with a 200ms delay per business
     }
 
-    // Add a marker to the map using AdvancedMarkerElement with properly implemented click event
-    function addMarker(business, location) {
+    // Add a marker to the map using AdvancedMarkerElement
+    async function addMarker(business, location) {
         // Create a position object from the location
         const position = { lat: location.lat(), lng: location.lng() };
 
@@ -351,10 +354,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const pinColor = isNearby ? '#4285F4' : '#EA4335'; // Blue for nearby, Red for primary
 
         try {
-            // Check if advanced markers are available
-            if (!google.maps.marker || !google.maps.marker.AdvancedMarkerElement) {
-                throw new Error("Advanced Markers not available");
-            }
+            // Import the marker library
+            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
             // Create an advanced marker with a custom pin element
             const pinElement = document.createElement('div');
@@ -368,8 +369,8 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
 
-            // Create the advanced marker
-            const marker = new google.maps.marker.AdvancedMarkerElement({
+            // Create the advanced marker using the imported class
+            const marker = new AdvancedMarkerElement({
                 position: position,
                 map: map,
                 title: business.bname,
@@ -380,9 +381,9 @@ document.addEventListener('DOMContentLoaded', function() {
             marker.business = business;
             marker.isNearby = isNearby;
 
-            // Add gmp-click event to show info window
-            marker.addEventListener('gmp-click', function(event) {
-                console.log("Marker clicked:", business.bname);
+            // Add gmp-click event (NOT click) for advanced markers
+            marker.addEventListener('gmp-click', function() {
+                console.log("Advanced marker clicked:", business.bname);
                 showInfoWindow(marker);
             });
 
@@ -417,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Add click event to show info window
             marker.addListener('click', function() {
-                console.log("Marker clicked (legacy):", business.bname);
+                console.log("Standard marker clicked:", business.bname);
                 showInfoWindow(this);
             });
 
@@ -429,7 +430,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Show info window with business details
+    // Updated showInfoWindow function that works with both marker types
     function showInfoWindow(marker) {
         if (!marker || !marker.business) {
             console.error("Invalid marker for info window", marker);
@@ -453,25 +454,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Content for the info window
         const contentString = `
-            <div class="info-window">
-                <h3>${business.bname}</h3>
-                <p><strong>Address:</strong><br>${addressLine}</p>
-                ${phoneDisplay}
-                <p><strong>Type:</strong> ${businessType}</p>
-                <div id="info-window-incentives-${business._id}">
-                    <p><strong>Incentives:</strong> <em>Loading...</em></p>
-                </div>
-                <div class="info-window-actions">
-                    <button class="view-details-btn" 
-                            onclick="window.viewBusinessDetails('${business._id}')">
-                        View Details
-                    </button>
-                </div>
+        <div class="info-window">
+            <h3>${business.bname}</h3>
+            <p><strong>Address:</strong><br>${addressLine}</p>
+            ${phoneDisplay}
+            <p><strong>Type:</strong> ${businessType}</p>
+            <div id="info-window-incentives-${business._id}">
+                <p><strong>Incentives:</strong> <em>Loading...</em></p>
             </div>
-        `;
+            <div class="info-window-actions">
+                <button class="view-details-btn" 
+                        onclick="window.viewBusinessDetails('${business._id}')">
+                    View Details
+                </button>
+            </div>
+        </div>
+    `;
 
-        // Get the position of the marker
-        const position = marker.position;
+        // For advanced markers we need to get the position differently
+        const position = marker.position ? marker.position :
+            (marker.getPosition ? marker.getPosition() : null);
+
+        if (!position) {
+            console.error("Could not determine marker position");
+            return;
+        }
 
         // Set content and open the info window
         infoWindow.setContent(contentString);
@@ -1279,50 +1286,63 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Handle clicks on the map for places that aren't in your database
-    function setupMapClickHandler() {
-        // Initialize Places service
-        const placesService = new google.maps.places.PlacesService(map);
+// Using the newer google.maps.places.Place API
+    async function setupMapClickHandler() {
+        // Make sure the Places library is loaded
+        const { Place } = await google.maps.importLibrary("places");
 
         // Listen for POI clicks (Points of Interest - businesses, landmarks, etc.)
-        map.addListener('click', function(event) {
+        map.addListener('click', async function(event) {
             // Check if clicked on a POI (a place on the map)
             if (event.placeId) {
                 event.stop(); // Prevent the default info window
 
                 console.log("POI clicked, placeId:", event.placeId);
 
-                // Get details about the place
-                placesService.getDetails({
-                    placeId: event.placeId,
-                    fields: ['name', 'formatted_address', 'geometry', 'place_id', 'types', 'business_status', 'formatted_phone_number']
-                }, function(place, status) {
-                    if (status === google.maps.places.PlacesServiceStatus.OK) {
-                        console.log("Place details:", place);
+                try {
+                    // Create a Place instance with the clicked place ID
+                    const place = new Place({
+                        id: event.placeId
+                    });
 
-                        // Show custom info window with "Add to Database" option
-                        showPlaceInfoWindow(place, event.latLng);
-                    } else {
-                        console.error("Error fetching place details:", status);
-                    }
-                });
+                    // Fetch the place details using the new API
+                    await place.fetchFields({
+                        fields: [
+                            'displayName',
+                            'formattedAddress',
+                            'location',
+                            'types',
+                            'businessStatus',
+                            'nationalPhoneNumber'
+                        ]
+                    });
+
+                    console.log("Place details:", place);
+
+                    // Show custom info window with "Add to Database" option
+                    showPlaceInfoWindow(place, event.latLng);
+                } catch (error) {
+                    console.error("Error fetching place details:", error);
+                }
             }
         });
 
-        console.log("Map click handler set up for POIs");
+        console.log("Map click handler set up for POIs using new Place API");
     }
 
 // Show info window for places not in your database
+// Updated to work with the new Place class
     function showPlaceInfoWindow(place, position) {
         // Format the content with an "Add to Database" button
         const contentString = `
         <div class="info-window">
-            <h3>${place.name}</h3>
-            <p><strong>Address:</strong><br>${place.formatted_address || 'Address not available'}</p>
-            ${place.formatted_phone_number ? `<p><strong>Phone:</strong> ${place.formatted_phone_number}</p>` : ''}
+            <h3>${place.displayName || 'Unnamed Place'}</h3>
+            <p><strong>Address:</strong><br>${place.formattedAddress || 'Address not available'}</p>
+            ${place.nationalPhoneNumber ? `<p><strong>Phone:</strong> ${place.nationalPhoneNumber}</p>` : ''}
             <p><strong>Type:</strong> ${getPlaceTypeLabel(place.types)}</p>
             <div class="info-window-actions">
                 <button class="add-business-btn" 
-                        onclick="window.addBusinessToDatabase('${place.place_id}')">
+                        onclick="window.addBusinessToDatabase('${place.id}')">
                     Add to Patriot Thanks
                 </button>
             </div>
@@ -1334,6 +1354,7 @@ document.addEventListener('DOMContentLoaded', function() {
         infoWindow.setPosition(position);
         infoWindow.open(map);
     }
+
 
 // Convert place types to readable format
     function getPlaceTypeLabel(types) {
@@ -1364,52 +1385,87 @@ document.addEventListener('DOMContentLoaded', function() {
         return types[0].replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
-// Function to handle adding a business to your database
-    window.addBusinessToDatabase = function(placeId) {
+    // Function to handle adding a business to your database
+    // Updated to use the new Place API
+    window.addBusinessToDatabase = async function(placeId) {
         console.log("Adding place to database:", placeId);
 
-        // Get place details to fill in the add business form
-        const placesService = new google.maps.places.PlacesService(map);
-        placesService.getDetails({
-            placeId: placeId,
-            fields: ['name', 'formatted_address', 'address_components', 'geometry', 'formatted_phone_number']
-        }, function(place, status) {
-            if (status === google.maps.places.PlacesServiceStatus.OK) {
-                // Redirect to your "Add Business" page with prefilled information
-                const businessData = {
-                    name: place.name,
-                    address1: getAddressComponent(place, 'street_number') + ' ' + getAddressComponent(place, 'route'),
-                    city: getAddressComponent(place, 'locality'),
-                    state: getAddressComponent(place, 'administrative_area_level_1'),
-                    zip: getAddressComponent(place, 'postal_code'),
-                    phone: place.formatted_phone_number || '',
-                    lat: place.geometry.location.lat(),
-                    lng: place.geometry.location.lng(),
-                    placeId: place.place_id
-                };
+        try {
+            // Load the Places library
+            const { Place } = await google.maps.importLibrary("places");
 
-                // Store in sessionStorage for the add business page to use
-                sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
+            // Create a Place instance
+            const place = new Place({
+                id: placeId
+            });
 
-                // Redirect to add business page
-                window.location.href = 'business-add.html?prefill=true';
-            } else {
-                console.error("Error fetching place details for addition:", status);
-                alert("Sorry, we couldn't retrieve the details for this business. Please try again or add it manually.");
-            }
-        });
+            // Fetch comprehensive place details
+            await place.fetchFields({
+                fields: [
+                    'displayName',
+                    'formattedAddress',
+                    'addressComponents',
+                    'location',
+                    'nationalPhoneNumber'
+                ]
+            });
+
+            // Extract address components from the place
+            const businessData = {
+                name: place.displayName || '',
+                address1: getAddressComponentFromPlace(place, 'street_number') + ' ' +
+                    getAddressComponentFromPlace(place, 'route'),
+                city: getAddressComponentFromPlace(place, 'locality'),
+                state: getAddressComponentFromPlace(place, 'administrative_area_level_1'),
+                zip: getAddressComponentFromPlace(place, 'postal_code'),
+                phone: place.nationalPhoneNumber || '',
+                lat: place.location?.lat || 0,
+                lng: place.location?.lng || 0,
+                placeId: place.id
+            };
+
+            // Store in sessionStorage for the add business page to use
+            sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
+
+            // Redirect to add business page
+            window.location.href = 'business-add.html?prefill=true';
+        } catch (error) {
+            console.error("Error fetching place details for addition:", error);
+            alert("Sorry, we couldn't retrieve the details for this business. Please try again or add it manually.");
+        }
     };
 
-// Helper function to extract address components
-    function getAddressComponent(place, type) {
-        if (!place.address_components) return '';
+    // Helper function to extract address components
+    function getAddressComponentFromPlace(place, type) {
+        if (!place.addressComponents) return '';
 
-        const component = place.address_components.find(
+        const component = place.addressComponents.find(
             component => component.types.includes(type)
         );
 
-        return component ? component.short_name : '';
+        return component ? component.shortText : '';
     }
 
+    // Updated Google Maps script loading function
+    function loadGoogleMapsScript() {
+        // Get API key from runtime config or use your actual API key
+        const apiKey = 'AIzaSyCHKhYZwQR37M_0QctXUQe6VFRFrlhaYj8';
+        const mapId = 'ebe8ec43a7bc252d';
 
+        console.log("Loading Google Maps with Map ID:", mapId);
+
+        // Create and insert the Google Maps script with all recommended parameters
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMap&loading=async`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = function() {
+            console.error('Google Maps API failed to load. Check your API key.');
+            alert('Error loading Google Maps. Please try again later.');
+        };
+        document.head.appendChild(script);
+    }
+
+    // Execute the script loading when DOM is ready
+    document.addEventListener('DOMContentLoaded', loadGoogleMapsScript);
 });
