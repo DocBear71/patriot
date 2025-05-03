@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn("Business search form not found in the DOM");
     }
 
-    // Initialize Google Map with Map ID and updated API support
+    // Modify the initMap function to add a test button
     async function initMap() {
         console.log("Initializing Google Map");
 
@@ -121,6 +121,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 resetMapButton.addEventListener('click', function () {
                     resetMapView();
                 });
+            }
+
+            // Add a debug test button
+            const mapContainerParent = document.getElementById("map-container");
+            if (mapContainerParent) {
+                const testButton = document.createElement('button');
+                testButton.textContent = 'Test Markers';
+                testButton.style.position = 'absolute';
+                testButton.style.bottom = '10px';
+                testButton.style.left = '10px';
+                testButton.style.zIndex = '100';
+                testButton.style.padding = '5px 10px';
+                testButton.style.backgroundColor = '#fff';
+                testButton.style.border = '1px solid #ccc';
+                testButton.style.borderRadius = '4px';
+                testButton.onclick = createTestMarker;
+
+                mapContainerParent.appendChild(testButton);
             }
 
             // Set flags that map is initialized
@@ -351,80 +369,83 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Determine marker color based on whether it's a primary result or nearby result
         const isNearby = business.isNearby === true;
-        const pinColor = isNearby ? '#4285F4' : '#EA4335'; // Blue for nearby, Red for primary
 
         try {
-            // Import the marker library
-            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+            // First try to use AdvancedMarkerElement if available
+            if (google.maps.marker && google.maps.marker.AdvancedMarkerElement) {
+                const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
-            // Create an advanced marker with a custom pin element
-            const pinElement = document.createElement('div');
-            pinElement.innerHTML = `
-            <div style="width: 24px; height: 24px; border-radius: 50% 50% 50% 0; 
-                        transform: rotate(-45deg); background-color: ${pinColor}; 
-                        display: flex; justify-content: center; align-items: center; 
-                        position: relative; top: -12px; left: 0px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                        cursor: pointer;">
-                <div style="width: 12px; height: 12px; border-radius: 50%; 
-                            background-color: white; transform: rotate(45deg);"></div>
-            </div>
-        `;
+                // Create a simple DOM element for the marker
+                const markerElement = document.createElement('div');
+                markerElement.className = 'map-marker';
+                markerElement.style.cursor = 'pointer';
+                markerElement.style.width = '32px';
+                markerElement.style.height = '32px';
+                markerElement.style.backgroundImage = isNearby ?
+                    'url(https://maps.google.com/mapfiles/ms/icons/blue-dot.png)' :
+                    'url(https://maps.google.com/mapfiles/ms/icons/red-dot.png)';
+                markerElement.style.backgroundSize = 'contain';
+                markerElement.style.backgroundRepeat = 'no-repeat';
 
-            // Create the advanced marker using the imported class
-            const marker = new AdvancedMarkerElement({
-                position: position,
-                map: map,
-                title: business.bname,
-                content: pinElement
-            });
+                // Create the marker
+                const marker = new AdvancedMarkerElement({
+                    map: map,
+                    position: position,
+                    title: business.bname,
+                    content: markerElement
+                });
 
-            // Store the business data with the marker
-            marker.business = business;
-            marker.isNearby = isNearby;
+                // Store the business data
+                marker.business = business;
+                marker.isNearby = isNearby;
 
-            // Add gmp-click event for advanced markers
-            marker.addEventListener('gmp-click', () => {
-                console.log("Advanced marker clicked:", business.bname);
-                showInfoWindow(marker);
-            });
+                // Add event listener for the advanced marker
+                // We'll add a direct DOM click event instead of using gmp-click
+                markerElement.addEventListener('click', function() {
+                    console.log("Advanced marker DOM element clicked:", business.bname);
+                    showInfoWindow(marker);
+                });
 
-            // Make the marker clickable by adding an explicit pointer cursor
-            marker.content.style.cursor = 'pointer';
+                // Also add the gmp-click event as backup
+                marker.addEventListener('gmp-click', function() {
+                    console.log("Advanced marker gmp-click:", business.bname);
+                    showInfoWindow(marker);
+                });
 
-            // Add the marker to our array
-            markers.push(marker);
-            console.log(`Added advanced marker for ${business.bname}`);
+                // Add the marker to our array
+                markers.push(marker);
+                console.log(`Added advanced marker for ${business.bname}`);
 
-            return marker;
+                return marker;
+            } else {
+                throw new Error("Advanced markers not available, falling back to standard markers");
+            }
         } catch (error) {
-            console.error("Error creating advanced marker, falling back to standard marker:", error);
+            console.log("Using standard marker fallback:", error.message);
 
-            // FALLBACK: Use regular Marker if Advanced Markers not available
-            const iconUrl = isNearby
-                ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-                : 'https://maps.google.com/mapfiles/ms/icons/red-dot.png';
-
-            // Create the marker using the legacy Marker class
+            // Fallback to standard Google Maps Marker
             const marker = new google.maps.Marker({
-                position: location,
+                position: position,
                 map: map,
                 title: business.bname,
                 animation: google.maps.Animation.DROP,
                 icon: {
-                    url: iconUrl,
+                    url: isNearby ?
+                        'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' :
+                        'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
                     scaledSize: new google.maps.Size(32, 32)
                 },
-                clickable: true  // Explicitly make sure it's clickable
+                clickable: true
             });
 
-            // Store the business data with the marker
+            // Store the business data
             marker.business = business;
             marker.isNearby = isNearby;
 
-            // Add click event to show info window
-            marker.addListener('click', function() {
+            // Add click event listener using bind to ensure proper 'this' context
+            google.maps.event.addListener(marker, 'click', function() {
                 console.log("Standard marker clicked:", business.bname);
-                showInfoWindow(this);
+                showInfoWindow(marker);
             });
 
             // Add the marker to our array
@@ -435,14 +456,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-// Also update the showInfoWindow function to better handle both marker types
+// Update the showInfoWindow function to better handle marker positions
     function showInfoWindow(marker) {
+        console.log("showInfoWindow called with marker:", marker);
+
         if (!marker || !marker.business) {
             console.error("Invalid marker for info window", marker);
             return;
         }
 
         const business = marker.business;
+        console.log("Business data for info window:", business);
 
         // Format address
         const addressLine = business.address2
@@ -474,24 +498,33 @@ document.addEventListener('DOMContentLoaded', function() {
             </button>
         </div>
     </div>
-`;
+    `;
 
-        // Get position based on marker type
+        // Determine position based on marker type
         let position;
 
-        // For AdvancedMarkerElement
-        if (marker.position) {
+        // Check if it's an AdvancedMarkerElement (has position property)
+        if (marker.position && typeof marker.position.lat === 'function') {
             position = marker.position;
+            console.log("Using position from advanced marker");
         }
-        // For standard google.maps.Marker
-        else if (typeof marker.getPosition === 'function') {
+        // Check if it's a standard Marker (has getPosition method)
+        else if (marker.getPosition && typeof marker.getPosition === 'function') {
             position = marker.getPosition();
+            console.log("Using position from standard marker's getPosition method");
         }
-        // Fallback if we can't determine position
+        // If advanced marker with position as simple object
+        else if (marker.position && typeof marker.position.lat === 'number') {
+            position = new google.maps.LatLng(marker.position.lat, marker.position.lng);
+            console.log("Creating LatLng from position object");
+        }
+        // Fallback
         else {
-            console.error("Could not determine marker position");
-            return;
+            console.error("Could not determine marker position, using map center");
+            position = map.getCenter();
         }
+
+        console.log("InfoWindow position:", position);
 
         // Set content and open the info window
         infoWindow.setContent(contentString);
@@ -501,6 +534,101 @@ document.addEventListener('DOMContentLoaded', function() {
         // Fetch incentives for this business
         fetchBusinessIncentivesForInfoWindow(business._id);
     }
+
+// Add this debugging function to test marker clicks manually
+    function createTestMarker() {
+        // Create a test marker at the center of the map
+        const center = map.getCenter();
+
+        // Standard marker first
+        const standardMarker = new google.maps.Marker({
+            position: center,
+            map: map,
+            title: 'Test Standard Marker',
+            icon: {
+                url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                scaledSize: new google.maps.Size(32, 32)
+            },
+            clickable: true
+        });
+
+        // Add test data
+        standardMarker.business = {
+            _id: 'test123',
+            bname: 'Test Business',
+            address1: '123 Test St',
+            city: 'Test City',
+            state: 'TS',
+            zip: '12345',
+            type: 'TEST',
+            phone: '555-TEST'
+        };
+
+        // Add click listener
+        google.maps.event.addListener(standardMarker, 'click', function() {
+            console.log("Test standard marker clicked!");
+            alert("Test standard marker clicked!");
+            showInfoWindow(this);
+        });
+
+        console.log("Test standard marker added at", center.lat(), center.lng());
+
+        // Also try to create an advanced marker
+        try {
+            (async () => {
+                const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+                // Create element for the marker
+                const markerElement = document.createElement('div');
+                markerElement.innerHTML = '<div style="background-color: yellow; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid black;"></div>';
+                markerElement.style.cursor = 'pointer';
+
+                // Create an advanced marker slightly offset from the standard one
+                const advancedMarker = new AdvancedMarkerElement({
+                    map: map,
+                    position: {
+                        lat: center.lat() + 0.001,
+                        lng: center.lng() + 0.001
+                    },
+                    title: 'Test Advanced Marker',
+                    content: markerElement
+                });
+
+                // Add test data
+                advancedMarker.business = {
+                    _id: 'test456',
+                    bname: 'Test Advanced Business',
+                    address1: '456 Advanced St',
+                    city: 'Advanced City',
+                    state: 'AD',
+                    zip: '54321',
+                    type: 'TEST',
+                    phone: '555-ADV-TEST'
+                };
+
+                // Add click handler to the element
+                markerElement.addEventListener('click', function() {
+                    console.log("Test advanced marker element clicked!");
+                    alert("Test advanced marker element clicked!");
+                    showInfoWindow(advancedMarker);
+                });
+
+                // Also add gmp-click event
+                advancedMarker.addEventListener('gmp-click', function() {
+                    console.log("Test advanced marker gmp-click!");
+                    alert("Test advanced marker gmp-click!");
+                    showInfoWindow(this);
+                });
+
+                console.log("Test advanced marker added");
+            })();
+        } catch (error) {
+            console.error("Could not create test advanced marker:", error);
+        }
+    }
+
+// Add this function to the window for debugging
+    window.testMarkerClicks = createTestMarker;
 
     // Fetch incentives specifically for the info window
     function fetchBusinessIncentivesForInfoWindow(businessId) {
