@@ -1,5 +1,6 @@
 // Enhanced business-search.js with Google Maps functionality using AdvancedMarkerElement
 
+// Define map variables at the top level for global access
 let map = null;
 let mapInitialized = false;
 let markers = [];
@@ -64,84 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn("Business search form not found in the DOM");
     }
 
-    // Update initMap to add the test button
-    async function initMap() {
-        console.log("Initializing Google Map");
 
-        try {
-            // Check if map container exists
-            const mapContainer = document.getElementById("map");
-            if (!mapContainer) {
-                console.error("Map container not found in the DOM");
-                return;
-            }
-
-            // Get Map ID - hardcoded for reliability
-            const mapId = 'ebe8ec43a7bc252d';
-            console.log("Using Map ID:", mapId);
-
-            // Import required libraries
-            const { Map } = await google.maps.importLibrary("maps");
-            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-
-            // Create a map centered on the US
-            map = new Map(mapContainer, {
-                center: {lat: 39.8283, lng: -98.5795}, // Center of US
-                zoom: 4,
-                mapId: mapId,  // Map ID for advanced markers
-                clickableIcons: true  // Allow clicking on POIs (businesses, landmarks, etc.)
-            });
-
-            // Create info window
-            infoWindow = new google.maps.InfoWindow();
-            bounds = new google.maps.LatLngBounds();
-
-            // Add a message to the map when it's first loaded
-            const initialMessage = document.createElement('div');
-            initialMessage.id = 'initial-map-message';
-            initialMessage.innerHTML = 'Search for businesses to see them on the map';
-            initialMessage.style.position = 'absolute';
-            initialMessage.style.top = '50%';
-            initialMessage.style.left = '50%';
-            initialMessage.style.transform = 'translate(-50%, -50%)';
-            initialMessage.style.background = 'white';
-            initialMessage.style.padding = '10px';
-            initialMessage.style.borderRadius = '5px';
-            initialMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
-            initialMessage.style.zIndex = '1';
-
-            mapContainer.appendChild(initialMessage);
-
-            // Set up handler for POI clicks (businesses not in your database)
-            await setupMapClickHandler();
-
-            // Add event listener for the reset map button
-            const resetMapButton = document.getElementById('reset-map');
-            if (resetMapButton) {
-                resetMapButton.addEventListener('click', function () {
-                    resetMapView();
-                });
-            }
-
-            // Add our test button
-            addTestButton();
-
-            // Set flags that map is initialized
-            mapInitialized = true;
-            console.log("Google Map successfully initialized with Map ID:", mapId);
-            console.log("Advanced Markers and Place API enabled");
-
-            // Process any pending businesses to display
-            if (pendingBusinessesToDisplay.length > 0) {
-                console.log("Processing pending businesses to display on map");
-                displayBusinessesOnMap(pendingBusinessesToDisplay);
-                pendingBusinessesToDisplay = [];
-            }
-        } catch (error) {
-            console.error("Error initializing Google Map:", error);
-            mapInitialized = false;
-        }
-    }
 
     // Call this after map initialization and after markers are added
     setupMarkerClickPriority();
@@ -644,13 +568,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-// Add this to your code after businesses are loaded and markers are created
-    function initImageLoading() {
-        // Call this after markers are created
-        setTimeout(() => {
-            enhanceMarkersWithImages();
-        }, 1000); // Short delay to ensure markers are fully created
-    }
+
 
     async function addMarker(business, location) {
         // Create a position object from the location
@@ -1055,11 +973,133 @@ document.addEventListener('DOMContentLoaded', function() {
         alert("This feature is coming soon: View details for " + businessId);
     };
 
-    // Add global accessible initialization function for the Google Maps callback
-    window.initGoogleMap = function () {
-        console.log("Google Maps API loaded, initializing map");
-        initMap();
+    window.initGoogleMap = async function() {
+        console.log("initGoogleMap called - initializing Google Map");
+
+        try {
+            // Check if map container exists
+            const mapContainer = document.getElementById("map");
+            if (!mapContainer) {
+                console.error("Map container not found in the DOM");
+                return;
+            }
+
+            // Get Map ID - hardcoded for reliability
+            const mapId = 'ebe8ec43a7bc252d';
+            console.log("Using Map ID:", mapId);
+
+            // Import required libraries
+            const { Map } = await google.maps.importLibrary("maps");
+            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+            // Create a map centered on the US with POI clicks disabled
+            map = new Map(mapContainer, {
+                center: {lat: 39.8283, lng: -98.5795}, // Center of US
+                zoom: 4,
+                mapId: mapId,  // Map ID for advanced markers
+                clickableIcons: false  // Disable clickable POIs
+            });
+
+            // Create info window
+            infoWindow = new google.maps.InfoWindow();
+            bounds = new google.maps.LatLngBounds();
+
+            // Add a message to the map when it's first loaded
+            const initialMessage = document.createElement('div');
+            initialMessage.id = 'initial-map-message';
+            initialMessage.innerHTML = 'Search for businesses to see them on the map';
+            initialMessage.style.position = 'absolute';
+            initialMessage.style.top = '50%';
+            initialMessage.style.left = '50%';
+            initialMessage.style.transform = 'translate(-50%, -50%)';
+            initialMessage.style.background = 'white';
+            initialMessage.style.padding = '10px';
+            initialMessage.style.borderRadius = '5px';
+            initialMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+            initialMessage.style.zIndex = '1';
+
+            mapContainer.appendChild(initialMessage);
+
+            // Set up handler for POI clicks (businesses not in your database)
+            await setupMapClickHandler();
+
+            // Add event listener for the reset map button
+            const resetMapButton = document.getElementById('reset-map');
+            if (resetMapButton) {
+                resetMapButton.addEventListener('click', function () {
+                    resetMapView();
+                });
+            }
+
+            // Set flags that map is initialized
+            mapInitialized = true;
+            console.log("Google Map successfully initialized with Map ID:", mapId);
+            console.log("Advanced Markers and Place API enabled");
+
+            // Process any pending businesses to display
+            if (pendingBusinessesToDisplay.length > 0) {
+                console.log("Processing pending businesses to display on map");
+                displayBusinessesOnMap(pendingBusinessesToDisplay);
+                pendingBusinessesToDisplay = [];
+            }
+        } catch (error) {
+            console.error("Error initializing Google Map:", error);
+            mapInitialized = false;
+        }
     };
+
+    // Handle clicks on the map for places that aren't in your database
+// Using the newer google.maps.places.Place API
+    async function setupMapClickHandler() {
+        // Make sure the Places library is loaded
+        const { Place } = await google.maps.importLibrary("places");
+
+        // Listen for POI clicks (Points of Interest - businesses, landmarks, etc.)
+        map.addListener('click', async function(event) {
+            // Check if clicked on a POI (a place on the map)
+            if (event.placeId) {
+                event.stop(); // Prevent the default info window
+
+                console.log("POI clicked, placeId:", event.placeId);
+
+                try {
+                    // Create a Place instance with the clicked place ID
+                    const place = new Place({
+                        id: event.placeId
+                    });
+
+                    // Fetch the place details using the new API
+                    await place.fetchFields({
+                        fields: [
+                            'displayName',
+                            'formattedAddress',
+                            'location',
+                            'types',
+                            'businessStatus',
+                            'nationalPhoneNumber'
+                        ]
+                    });
+
+                    console.log("Place details:", place);
+
+                    // Show custom info window with "Add to Database" option
+                    showPlaceInfoWindow(place, event.latLng);
+                } catch (error) {
+                    console.error("Error fetching place details:", error);
+                }
+            }
+        });
+
+        console.log("Map click handler set up for POIs using new Place API");
+    }
+
+    // Add this to your code after businesses are loaded and markers are created
+    function initImageLoading() {
+        // Call this after markers are created
+        setTimeout(() => {
+            enhanceMarkersWithImages();
+        }, 1000); // Short delay to ensure markers are fully created
+    }
 
     // Helper function to convert business type codes to readable labels
     function getBusinessTypeLabel(typeCode) {
@@ -1679,50 +1719,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Handle clicks on the map for places that aren't in your database
-// Using the newer google.maps.places.Place API
-    async function setupMapClickHandler() {
-        // Make sure the Places library is loaded
-        const { Place } = await google.maps.importLibrary("places");
 
-        // Listen for POI clicks (Points of Interest - businesses, landmarks, etc.)
-        map.addListener('click', async function(event) {
-            // Check if clicked on a POI (a place on the map)
-            if (event.placeId) {
-                event.stop(); // Prevent the default info window
-
-                console.log("POI clicked, placeId:", event.placeId);
-
-                try {
-                    // Create a Place instance with the clicked place ID
-                    const place = new Place({
-                        id: event.placeId
-                    });
-
-                    // Fetch the place details using the new API
-                    await place.fetchFields({
-                        fields: [
-                            'displayName',
-                            'formattedAddress',
-                            'location',
-                            'types',
-                            'businessStatus',
-                            'nationalPhoneNumber'
-                        ]
-                    });
-
-                    console.log("Place details:", place);
-
-                    // Show custom info window with "Add to Database" option
-                    showPlaceInfoWindow(place, event.latLng);
-                } catch (error) {
-                    console.error("Error fetching place details:", error);
-                }
-            }
-        });
-
-        console.log("Map click handler set up for POIs using new Place API");
-    }
 
 // Show info window for places not in your database
 // Updated to work with the new Place class
