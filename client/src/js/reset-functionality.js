@@ -1,6 +1,6 @@
-// reset-functionality.js - Improved version for all Patriot Thanks pages
+// reset-functionality.js - Final version with fixes for specific page issues
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Improved Reset Functionality Loaded!");
+    console.log("Fixed Reset Functionality Loaded!");
 
     // Determine which page we're on based on the HTML structure and URL
     const pagePath = window.location.pathname;
@@ -210,7 +210,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         });
 
                         floatingContainer.appendChild(floatingButton);
-                        document.body.appendChild(floatingContainer);
+
+                        // Insert before the footer instead of at the end of the body
+                        const footer = document.querySelector('footer');
+                        if (footer && footer.parentNode) {
+                            document.body.insertBefore(floatingContainer, footer);
+                        } else {
+                            // Fallback to body append if no footer
+                            document.body.appendChild(floatingContainer);
+                        }
 
                         // Don't need to observe anymore
                         incentivesObserver.disconnect();
@@ -239,7 +247,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
 
                     floatingContainer.appendChild(floatingButton);
-                    document.body.appendChild(floatingContainer);
+
+                    // Insert before the footer instead of at the end of the body
+                    const footer = document.querySelector('footer');
+                    if (footer && footer.parentNode) {
+                        document.body.insertBefore(floatingContainer, footer);
+                    } else {
+                        // Fallback to body append if no footer
+                        document.body.appendChild(floatingContainer);
+                    }
                 }
             }
         }
@@ -315,7 +331,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const incentiveEditSection = document.getElementById('incentive-edit-section');
             if (incentiveEditSection) {
-                incentiveEditSection.style.display = 'none';
+                // Remove any force-display classes that might be preventing proper hiding
+                incentiveEditSection.classList.remove('force-display');
+
+                // Set display to none with !important to override any other styles
+                incentiveEditSection.setAttribute('style', 'display: none !important');
             }
 
             // Reset the table container
@@ -496,6 +516,43 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Add CSS to handle the force-display issue
+    const overrideStyle = document.createElement('style');
+    overrideStyle.textContent = `
+        /* Higher specificity to override force-display */
+        body #incentive-edit-section.hidden-by-reset,
+        body #incentives-list-section.hidden-by-reset,
+        body #business-info-section.hidden-by-reset {
+            display: none !important;
+        }
+    `;
+    document.head.appendChild(overrideStyle);
+
+    // Helper function to apply hidden-by-reset class
+    function applyHiddenClass(element) {
+        if (element) {
+            element.classList.add('hidden-by-reset');
+            setTimeout(() => {
+                element.style.display = 'none';
+                element.setAttribute('style', 'display: none !important');
+            }, 10);
+        }
+    }
+
+    // Modify resetPage to use this approach
+    const originalResetPage = resetPage;
+    resetPage = function() {
+        // Call original function
+        originalResetPage();
+
+        // Apply hidden-by-reset class to all sections
+        if (isUpdatePage) {
+            applyHiddenClass(document.getElementById('incentive-edit-section'));
+            applyHiddenClass(document.getElementById('incentives-list-section'));
+            applyHiddenClass(document.getElementById('business-info-section'));
+        }
+    };
+
     // Add reset buttons to the page - wait for everything to load first
     setTimeout(addResetButtons, 500);
 
@@ -610,5 +667,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    console.log("Enhanced reset functionality setup complete");
+    console.log("Fixed reset functionality setup complete");
 });
