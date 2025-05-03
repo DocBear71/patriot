@@ -1,6 +1,9 @@
 // Enhanced business-search.js with Google Maps functionality using AdvancedMarkerElement
 
-// Define map variables at the top level for global access
+// IMPORTANT: Add this at the VERY TOP of your business-search.js file,
+// BEFORE any other code including the DOMContentLoaded event handler
+
+// Declare these variables in the global scope
 let map = null;
 let mapInitialized = false;
 let markers = [];
@@ -8,14 +11,161 @@ let infoWindow = null;
 let bounds = null;
 let pendingBusinessesToDisplay = [];
 
+// Define initGoogleMap in the global scope so the Maps API can find it
+window.initGoogleMap = async function() {
+    console.log("Global initGoogleMap function called");
+
+    try {
+        // Check if map container exists
+        const mapContainer = document.getElementById("map");
+        if (!mapContainer) {
+            console.error("Map container not found in the DOM");
+            return;
+        }
+
+        // Import required libraries
+        const { Map } = await google.maps.importLibrary("maps");
+        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+        // Create a map centered on the US with POI clicks disabled
+        map = new Map(mapContainer, {
+            center: {lat: 39.8283, lng: -98.5795}, // Center of US
+            zoom: 4,
+            mapId: 'ebe8ec43a7bc252d',  // Your map ID
+            clickableIcons: false  // Disable clickable POIs
+        });
+
+        // Create info window
+        infoWindow = new google.maps.InfoWindow();
+        bounds = new google.maps.LatLngBounds();
+
+        // Add initial message
+        const initialMessage = document.createElement('div');
+        initialMessage.id = 'initial-map-message';
+        initialMessage.innerHTML = 'Search for businesses to see them on the map';
+        initialMessage.style.position = 'absolute';
+        initialMessage.style.top = '50%';
+        initialMessage.style.left = '50%';
+        initialMessage.style.transform = 'translate(-50%, -50%)';
+        initialMessage.style.background = 'white';
+        initialMessage.style.padding = '10px';
+        initialMessage.style.borderRadius = '5px';
+        initialMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+        initialMessage.style.zIndex = '1';
+
+        mapContainer.appendChild(initialMessage);
+
+        // Add event listener for the reset map button
+        const resetMapButton = document.getElementById('reset-map');
+        if (resetMapButton) {
+            resetMapButton.addEventListener('click', resetMapView);
+        }
+
+        // Set flags that map is initialized
+        mapInitialized = true;
+        console.log("Google Map successfully initialized with Map ID:", 'ebe8ec43a7bc252d');
+
+        // Process any pending businesses to display
+        if (pendingBusinessesToDisplay.length > 0) {
+            console.log("Processing pending businesses to display on map");
+            displayBusinessesOnMap(pendingBusinessesToDisplay);
+            pendingBusinessesToDisplay = [];
+        }
+
+        // Setup map click handler AFTER map is initialized
+        setupMapClickHandler();
+
+    } catch (error) {
+        console.error("Error initializing Google Map:", error);
+        mapInitialized = false;
+    }
+};
+
+// Define this function globally so it can be accessed from the HTML
+window.focusOnMapMarker = function(businessId) {
+    console.log("focusOnMapMarker called for business ID:", businessId);
+
+    // Check if map is initialized
+    if (!mapInitialized || !map) {
+        console.error("Map not initialized yet - cannot focus on marker");
+        alert("Map is still loading. Please try again in a moment.");
+        return;
+    }
+
+    // Check if markers exist
+    if (!markers || markers.length === 0) {
+        console.warn("No markers available yet.");
+        alert("No businesses are currently displayed on the map.");
+        return;
+    }
+
+    // Find the marker for this business
+    const marker = markers.find(m => m.business && m.business._id === businessId);
+
+    if (marker) {
+        // Center the map on this marker
+        map.setCenter(marker.position);
+        map.setZoom(16);
+
+        // Open the info window for this marker
+        showInfoWindow(marker);
+
+        // Scroll to the map
+        document.getElementById('map').scrollIntoView({behavior: 'smooth'});
+
+        console.log("Successfully focused on marker for business:", businessId);
+    } else {
+        console.warn(`No marker found for business ID: ${businessId}`);
+        alert("This business could not be located on the map. It may not have a complete address.");
+        document.getElementById('map').scrollIntoView({behavior: 'smooth'});
+    }
+};
+
+// Simple function to reset map view
+function resetMapView() {
+    if (!mapInitialized || !map) {
+        console.error("Cannot reset map view - map not initialized");
+        return;
+    }
+
+    // Center on US and zoom out
+    map.setCenter({lat: 39.8283, lng: -98.5795});
+    map.setZoom(4);
+
+    // Close any open info windows
+    if (infoWindow) {
+        infoWindow.close();
+    }
+}
+
+// Basic placeholder function to prevent errors
+async function setupMapClickHandler() {
+    if (!map) {
+        console.error("Map not initialized in setupMapClickHandler");
+        return;
+    }
+
+    console.log("Setting up map click handler");
+
+    try {
+        // Import the Places library
+        const { Place } = await google.maps.importLibrary("places");
+
+        // Listen for POI clicks
+        map.addListener('click', function(event) {
+            console.log("Map clicked", event);
+            // Further implementation can be added later
+        });
+
+        console.log("Map click handler set up");
+    } catch (error) {
+        console.error("Error setting up map click handler:", error);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Business search with Google Maps loaded!");
 
-    // Map related variables
-    let map;
-    let markers = [];
-    let infoWindow;
-    let bounds;
 
     // Get form elements
     const form = {
