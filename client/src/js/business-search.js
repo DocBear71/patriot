@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, index * 200); // Stagger requests with a 200ms delay per business
     }
 
-    // Add a marker to the map using AdvancedMarkerElement
+
     async function addMarker(business, location) {
         // Create a position object from the location
         const position = { lat: location.lat(), lng: location.lng() };
@@ -363,7 +363,8 @@ document.addEventListener('DOMContentLoaded', function() {
             <div style="width: 24px; height: 24px; border-radius: 50% 50% 50% 0; 
                         transform: rotate(-45deg); background-color: ${pinColor}; 
                         display: flex; justify-content: center; align-items: center; 
-                        position: relative; top: -12px; left: 0px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                        position: relative; top: -12px; left: 0px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        cursor: pointer;">
                 <div style="width: 12px; height: 12px; border-radius: 50%; 
                             background-color: white; transform: rotate(45deg);"></div>
             </div>
@@ -381,11 +382,14 @@ document.addEventListener('DOMContentLoaded', function() {
             marker.business = business;
             marker.isNearby = isNearby;
 
-            // Add gmp-click event (NOT click) for advanced markers
-            marker.addEventListener('gmp-click', function() {
+            // Add gmp-click event for advanced markers
+            marker.addEventListener('gmp-click', () => {
                 console.log("Advanced marker clicked:", business.bname);
                 showInfoWindow(marker);
             });
+
+            // Make the marker clickable by adding an explicit pointer cursor
+            marker.content.style.cursor = 'pointer';
 
             // Add the marker to our array
             markers.push(marker);
@@ -409,7 +413,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 icon: {
                     url: iconUrl,
                     scaledSize: new google.maps.Size(32, 32)
-                }
+                },
+                clickable: true  // Explicitly make sure it's clickable
             });
 
             // Store the business data with the marker
@@ -430,7 +435,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Updated showInfoWindow function that works with both marker types
+// Also update the showInfoWindow function to better handle both marker types
     function showInfoWindow(marker) {
         if (!marker || !marker.business) {
             console.error("Invalid marker for info window", marker);
@@ -454,28 +459,36 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Content for the info window
         const contentString = `
-        <div class="info-window">
-            <h3>${business.bname}</h3>
-            <p><strong>Address:</strong><br>${addressLine}</p>
-            ${phoneDisplay}
-            <p><strong>Type:</strong> ${businessType}</p>
-            <div id="info-window-incentives-${business._id}">
-                <p><strong>Incentives:</strong> <em>Loading...</em></p>
-            </div>
-            <div class="info-window-actions">
-                <button class="view-details-btn" 
-                        onclick="window.viewBusinessDetails('${business._id}')">
-                    View Details
-                </button>
-            </div>
+    <div class="info-window">
+        <h3>${business.bname}</h3>
+        <p><strong>Address:</strong><br>${addressLine}</p>
+        ${phoneDisplay}
+        <p><strong>Type:</strong> ${businessType}</p>
+        <div id="info-window-incentives-${business._id}">
+            <p><strong>Incentives:</strong> <em>Loading...</em></p>
         </div>
-    `;
+        <div class="info-window-actions">
+            <button class="view-details-btn" 
+                    onclick="window.viewBusinessDetails('${business._id}')">
+                View Details
+            </button>
+        </div>
+    </div>
+`;
 
-        // For advanced markers we need to get the position differently
-        const position = marker.position ? marker.position :
-            (marker.getPosition ? marker.getPosition() : null);
+        // Get position based on marker type
+        let position;
 
-        if (!position) {
+        // For AdvancedMarkerElement
+        if (marker.position) {
+            position = marker.position;
+        }
+        // For standard google.maps.Marker
+        else if (typeof marker.getPosition === 'function') {
+            position = marker.getPosition();
+        }
+        // Fallback if we can't determine position
+        else {
             console.error("Could not determine marker position");
             return;
         }
