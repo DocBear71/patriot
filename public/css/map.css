@@ -97,16 +97,6 @@
     background-color: #EA4335;
 }
 
-/* Additional styling for selected marker */
-.marker-container.selected {
-    z-index: 1001; /* Make sure selected marker is on top */
-}
-
-.marker-container.selected .marker-pin {
-    background-color: #34A853; /* Google green */
-    box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.4);
-}
-
 /* Animation for marker drop */
 @keyframes marker-drop {
     0% {
@@ -127,18 +117,6 @@
 
 .marker-container.animate-drop {
     animation: marker-drop 0.5s forwards;
-}
-
-/* Custom marker styles */
-.custom-marker {
-    cursor: pointer;
-    user-select: none;
-    transition: transform 0.2s ease;
-    margin-top: -24px; /* Offset the marker to center on the location */
-}
-
-.custom-marker:hover {
-    transform: scale(1.1);
 }
 
 /* Info window styles */
@@ -190,26 +168,6 @@
 
 .incentives-list li {
     margin-bottom: 6px;
-}
-
-/* Test button styling */
-.map-test-button {
-    background-color: white;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    padding: 5px 10px;
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    z-index: 100;
-    font-family: Arial, sans-serif;
-    font-size: 12px;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.map-test-button:hover {
-    background-color: #f8f8f8;
 }
 
 /* Map legend improvements */
