@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn("Business search form not found in the DOM");
     }
 
-    // Initialize Google Map
+    // Initialize Google Map with Map ID for Advanced Markers
     function initMap() {
         console.log("Initializing Google Map");
 
@@ -76,11 +76,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // Get Map ID from config
+            const mapId = window.appConfig?.googleMapsMapId || '';
+
             // Create a map centered on the US
             map = new google.maps.Map(mapContainer, {
                 center: {lat: 39.8283, lng: -98.5795}, // Center of US
                 zoom: 4,
-                mapTypeId: google.maps.MapTypeId.ROADMAP
+                mapTypeId: google.maps.MapTypeId.ROADMAP,
+                mapId: mapId  // Add the Map ID here
             });
 
             infoWindow = new google.maps.InfoWindow();
@@ -110,9 +114,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            // Set flag that map is initialized
+            // Set flag that map is initialized and advanced markers are available
             mapInitialized = true;
-            console.log("Google Map successfully initialized");
+            window.useAdvancedMarkers = google.maps.marker && google.maps.marker.AdvancedMarkerElement;
+            console.log("Google Map successfully initialized with Map ID:", mapId);
+            console.log("Advanced Markers available:", window.useAdvancedMarkers);
 
             // If there are any pending businesses to display, show them now
             if (pendingBusinessesToDisplay.length > 0) {

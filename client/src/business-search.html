@@ -34,8 +34,8 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Get API key from runtime config or fallback to a placeholder
-            // The placeholder will be replaced during build if environment variable is available
             const apiKey = window.appConfig?.googleMapsApiKey || 'YOUR_API_KEY_HERE';
+            const mapId = window.appConfig?.googleMapsMapId || '';
 
             // Create and insert the Google Maps script with marker library included
             const script = document.createElement('script');
@@ -47,6 +47,9 @@
                 alert('Error loading Google Maps. Please try again later.');
             };
             document.head.appendChild(script);
+
+            console.log("Loading Google Maps API with marker library...");
+            console.log("Map ID configured:", mapId ? "Yes" : "No");
         });
     </script>
 
