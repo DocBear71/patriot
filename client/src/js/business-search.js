@@ -140,6 +140,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Add this right after map initialization
+    map.addListener('click', function(event) {
+        console.log('Map clicked at:', event.latLng.lat(), event.latLng.lng());
+        console.log('Click event:', event);
+    });
+
+    // Add a test marker after map initialization
+    const testMarker = new google.maps.Marker({
+        position: {lat: 39.8283, lng: -98.5795},
+        map: map,
+        title: 'Test Marker',
+        animation: google.maps.Animation.DROP
+    });
+
+    testMarker.addListener('click', function() {
+        console.log('Test marker clicked!');
+        alert('Test marker clicked!');
+    });
+
     function resetMapView() {
         if (!mapInitialized || !map) {
             console.error("Cannot reset map view - map not initialized");
