@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn("Business search form not found in the DOM");
     }
 
-    // Modify the initMap function to add a test button
+    // Update initMap to add the test button
     async function initMap() {
         console.log("Initializing Google Map");
 
@@ -123,23 +123,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            // Add a debug test button
-            const mapContainerParent = document.getElementById("map-container");
-            if (mapContainerParent) {
-                const testButton = document.createElement('button');
-                testButton.textContent = 'Test Markers';
-                testButton.style.position = 'absolute';
-                testButton.style.bottom = '10px';
-                testButton.style.left = '10px';
-                testButton.style.zIndex = '100';
-                testButton.style.padding = '5px 10px';
-                testButton.style.backgroundColor = '#fff';
-                testButton.style.border = '1px solid #ccc';
-                testButton.style.borderRadius = '4px';
-                testButton.onclick = createTestMarker;
-
-                mapContainerParent.appendChild(testButton);
-            }
+            // Add our test button
+            addTestButton();
 
             // Set flags that map is initialized
             mapInitialized = true;
@@ -283,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Display businesses on Google Map
+    // Updated displayBusinessesOnMap function to use only AdvancedMarkerElement
     function displayBusinessesOnMap(businesses) {
         // If map is not ready yet, store businesses for later display
         if (!mapInitialized || !map) {
@@ -313,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Geocode business address to get map coordinates
+    // Updated geocodeBusinessAddress to work with AdvancedMarkerElement
     function geocodeBusinessAddress(business, index, total) {
         if (!business || !business.address1) {
             console.error("Invalid business data for geocoding", business);
@@ -334,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const location = results[0].geometry.location;
 
                         // Create marker
-                        addMarker(business, location);
+                        addAdvancedMarker(business, location);
 
                         // Extend bounds
                         bounds.extend(location);
@@ -362,6 +347,73 @@ document.addEventListener('DOMContentLoaded', function() {
         }, index * 200); // Stagger requests with a 200ms delay per business
     }
 
+// New function that only uses AdvancedMarkerElement for markers
+    async function addAdvancedMarker(business, location) {
+        try {
+            // Import the marker library
+            const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+            // Create a position object from the location
+            const position = { lat: location.lat(), lng: location.lng() };
+
+            // Determine marker color based on whether it's a primary result or nearby result
+            const isNearby = business.isNearby === true;
+            const pinColor = isNearby ? '#4285F4' : '#EA4335'; // Blue for nearby, Red for primary
+
+            // Create a pin element that's clearly clickable
+            const pinElement = document.createElement('div');
+            pinElement.className = 'custom-marker';
+            pinElement.style.cursor = 'pointer';
+            pinElement.innerHTML = `
+            <div style="width: 32px; height: 32px; display: flex; justify-content: center; position: relative;">
+                <div style="width: 24px; height: 24px; border-radius: 50% 50% 50% 0; 
+                            transform: rotate(-45deg); background-color: ${pinColor}; 
+                            display: flex; justify-content: center; align-items: center; 
+                            position: absolute; top: 0; left: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                    <div style="width: 12px; height: 12px; border-radius: 50%; 
+                                background-color: white; transform: rotate(45deg);"></div>
+                </div>
+                <!-- Shadow element below the marker -->
+                <div style="width: 16px; height: 4px; background-color: rgba(0,0,0,0.2); 
+                            border-radius: 50%; position: absolute; bottom: 0; left: 8px;"></div>
+            </div>
+        `;
+
+            // Create the advanced marker
+            const marker = new AdvancedMarkerElement({
+                position: position,
+                map: map,
+                title: business.bname,
+                content: pinElement
+            });
+
+            // Store the business data with the marker
+            marker.business = business;
+            marker.isNearby = isNearby;
+
+            // Add multiple event listeners to ensure clicks are captured
+            // 1. Add click to the pin element (direct DOM event)
+            pinElement.addEventListener('click', function() {
+                console.log("Marker element clicked:", business.bname);
+                showInfoWindow(marker);
+            });
+
+            // 2. Add gmp-click to the marker (Google Maps Platform event)
+            marker.addEventListener('gmp-click', function() {
+                console.log("Marker gmp-click triggered:", business.bname);
+                showInfoWindow(marker);
+            });
+
+            // Add the marker to our array
+            markers.push(marker);
+            console.log(`Added advanced marker for ${business.bname}`);
+
+            return marker;
+        } catch (error) {
+            console.error("Error creating advanced marker:", error);
+            return null;
+        }
+    }
 
     async function addMarker(business, location) {
         // Create a position object from the location
@@ -456,7 +508,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-// Update the showInfoWindow function to better handle marker positions
+// Updated showInfoWindow function optimized for AdvancedMarkerElement
     function showInfoWindow(marker) {
         console.log("showInfoWindow called with marker:", marker);
 
@@ -500,135 +552,95 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
     `;
 
-        // Determine position based on marker type
-        let position;
-
-        // Check if it's an AdvancedMarkerElement (has position property)
-        if (marker.position && typeof marker.position.lat === 'function') {
-            position = marker.position;
-            console.log("Using position from advanced marker");
-        }
-        // Check if it's a standard Marker (has getPosition method)
-        else if (marker.getPosition && typeof marker.getPosition === 'function') {
-            position = marker.getPosition();
-            console.log("Using position from standard marker's getPosition method");
-        }
-        // If advanced marker with position as simple object
-        else if (marker.position && typeof marker.position.lat === 'number') {
-            position = new google.maps.LatLng(marker.position.lat, marker.position.lng);
-            console.log("Creating LatLng from position object");
-        }
-        // Fallback
-        else {
-            console.error("Could not determine marker position, using map center");
-            position = map.getCenter();
+        // Create info window if it doesn't exist
+        if (!infoWindow) {
+            infoWindow = new google.maps.InfoWindow();
         }
 
-        console.log("InfoWindow position:", position);
-
-        // Set content and open the info window
+        // Set content and open with modern approach using an options object
         infoWindow.setContent(contentString);
-        infoWindow.setPosition(position);
-        infoWindow.open(map);
+        infoWindow.open({
+            map: map,
+            anchor: marker,
+            shouldFocus: false
+        });
+
+        console.log("Opened info window for marker using anchor method");
 
         // Fetch incentives for this business
         fetchBusinessIncentivesForInfoWindow(business._id);
     }
 
-// Add this debugging function to test marker clicks manually
-    function createTestMarker() {
-        // Create a test marker at the center of the map
+
+// Test function for creating advanced markers only
+    function createTestAdvancedMarker() {
+        console.log("Creating test advanced marker");
+
+        // Get the map center
         const center = map.getCenter();
 
-        // Standard marker first
-        const standardMarker = new google.maps.Marker({
-            position: center,
-            map: map,
-            title: 'Test Standard Marker',
-            icon: {
-                url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                scaledSize: new google.maps.Size(32, 32)
-            },
-            clickable: true
-        });
-
-        // Add test data
-        standardMarker.business = {
-            _id: 'test123',
-            bname: 'Test Business',
-            address1: '123 Test St',
-            city: 'Test City',
-            state: 'TS',
-            zip: '12345',
-            type: 'TEST',
-            phone: '555-TEST'
-        };
-
-        // Add click listener
-        google.maps.event.addListener(standardMarker, 'click', function() {
-            console.log("Test standard marker clicked!");
-            alert("Test standard marker clicked!");
-            showInfoWindow(this);
-        });
-
-        console.log("Test standard marker added at", center.lat(), center.lng());
-
-        // Also try to create an advanced marker
-        try {
-            (async () => {
+        (async () => {
+            try {
                 const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
-                // Create element for the marker
-                const markerElement = document.createElement('div');
-                markerElement.innerHTML = '<div style="background-color: yellow; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid black;"></div>';
-                markerElement.style.cursor = 'pointer';
-
-                // Create an advanced marker slightly offset from the standard one
-                const advancedMarker = new AdvancedMarkerElement({
-                    map: map,
-                    position: {
-                        lat: center.lat() + 0.001,
-                        lng: center.lng() + 0.001
-                    },
-                    title: 'Test Advanced Marker',
-                    content: markerElement
-                });
-
-                // Add test data
-                advancedMarker.business = {
-                    _id: 'test456',
+                // Create a test business object
+                const testBusiness = {
+                    _id: 'test123',
                     bname: 'Test Advanced Business',
-                    address1: '456 Advanced St',
-                    city: 'Advanced City',
-                    state: 'AD',
-                    zip: '54321',
+                    address1: '123 Test Street',
+                    city: 'Test City',
+                    state: 'TS',
+                    zip: '12345',
                     type: 'TEST',
-                    phone: '555-ADV-TEST'
+                    phone: '555-TEST'
                 };
 
-                // Add click handler to the element
-                markerElement.addEventListener('click', function() {
-                    console.log("Test advanced marker element clicked!");
-                    alert("Test advanced marker element clicked!");
-                    showInfoWindow(advancedMarker);
+                // Add the advanced marker at the center of the map
+                const testMarker = await addAdvancedMarker(testBusiness, {
+                    lat: () => center.lat(),
+                    lng: () => center.lng()
                 });
 
-                // Also add gmp-click event
-                advancedMarker.addEventListener('gmp-click', function() {
-                    console.log("Test advanced marker gmp-click!");
-                    alert("Test advanced marker gmp-click!");
-                    showInfoWindow(this);
-                });
+                console.log("Test marker added at center:", center.lat(), center.lng());
 
-                console.log("Test advanced marker added");
-            })();
-        } catch (error) {
-            console.error("Could not create test advanced marker:", error);
-        }
+                // Optionally, show info window immediately
+                if (testMarker) {
+                    setTimeout(() => {
+                        showInfoWindow(testMarker);
+                    }, 500);
+                }
+            } catch (error) {
+                console.error("Error creating test advanced marker:", error);
+                alert("Error creating test marker: " + error.message);
+            }
+        })();
     }
 
+
+
 // Add this function to the window for debugging
-    window.testMarkerClicks = createTestMarker;
+    window.testAdvancedMarker = createTestAdvancedMarker;
+
+    // Add a test button to the map when initialized
+    function addTestButton() {
+        const mapContainer = document.getElementById("map-container");
+        if (mapContainer) {
+            const testButton = document.createElement('button');
+            testButton.textContent = 'Test Advanced Marker';
+            testButton.className = 'map-test-button';
+            testButton.style.position = 'absolute';
+            testButton.style.bottom = '10px';
+            testButton.style.left = '10px';
+            testButton.style.zIndex = '100';
+            testButton.style.padding = '5px 10px';
+            testButton.style.backgroundColor = '#fff';
+            testButton.style.border = '1px solid #ccc';
+            testButton.style.borderRadius = '4px';
+            testButton.onclick = createTestAdvancedMarker;
+
+            mapContainer.appendChild(testButton);
+        }
+    }
 
     // Fetch incentives specifically for the info window
     function fetchBusinessIncentivesForInfoWindow(businessId) {
@@ -753,7 +765,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    // Geocode nearby business addresses and add to map if within range
+    // Update the searchNearbyBusinesses function for AdvancedMarkerElement
     function geocodeNearbyBusiness(business, centerLocation) {
         if (!business || !business.address1) {
             return;
@@ -778,13 +790,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     business.isNearby = true;
 
                     // Add marker with different color to distinguish from search results
-                    const marker = addMarker(business, location);
+                    addAdvancedMarker(business, location);
                 }
             }
         });
     }
 
-    // Clear all markers from the map
+    // Updated clearMarkers function for AdvancedMarkerElement
     function clearMarkers() {
         if (!markers) {
             markers = [];
@@ -1018,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Function to focus on a specific marker in the map
+    // Make sure the focusOnMapMarker function works with AdvancedMarkerElement
     window.focusOnMapMarker = function (businessId) {
         console.log("Attempting to focus on business ID:", businessId);
 
@@ -1042,8 +1054,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const marker = markers.find(m => m.business && m.business._id === businessId);
 
         if (marker) {
-            // Center the map on this marker
-            map.setCenter(marker.position);
+            // Get the marker position
+            const position = marker.position;
+
+            // Center the map on this marker's position
+            map.setCenter(position);
             map.setZoom(16);
 
             // Open the info window for this marker
@@ -1063,6 +1078,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('map').scrollIntoView({behavior: 'smooth'});
         }
     };
+
 
     // RESTORED FROM ORIGINAL: displayBusinessSearchResults function to add data-title attributes
     function displayBusinessSearchResults(businesses, resultsContainer) {

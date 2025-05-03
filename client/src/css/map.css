@@ -3,6 +3,122 @@
    Add this file to your css directory
 */
 
+/* Custom marker styles */
+.custom-marker {
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.2s ease;
+    margin-top: -24px; /* Offset the marker to center on the location */
+}
+
+.custom-marker:hover {
+    transform: scale(1.1);
+}
+
+/* Info window styles */
+.info-window {
+    font-family: Arial, sans-serif;
+    width: 300px;
+    max-width: 300px;
+    padding: 0;
+}
+
+.info-window h3 {
+    margin: 0 0 10px 0;
+    padding: 8px;
+    background-color: #f8f8f8;
+    border-bottom: 1px solid #eee;
+    font-size: 16px;
+}
+
+.info-window p {
+    margin: 8px 0;
+    font-size: 14px;
+}
+
+.info-window-actions {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+    text-align: right;
+}
+
+.view-details-btn {
+    background-color: #4285F4;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.view-details-btn:hover {
+    background-color: #3367D6;
+}
+
+.incentives-list {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.incentives-list li {
+    margin-bottom: 6px;
+}
+
+/* Test button styling */
+.map-test-button {
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 5px 10px;
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    z-index: 100;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.map-test-button:hover {
+    background-color: #f8f8f8;
+}
+
+/* Map legend improvements */
+.map-legend {
+    background-color: white;
+    border-radius: 4px;
+    padding: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    margin-top: 8px;
+    display: flex;
+    gap: 16px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    margin-right: 8px;
+}
+
+.legend-color.primary {
+    background-color: #EA4335;
+}
+
+.legend-color.nearby {
+    background-color: #4285F4;
+}
+
 /* Map container styles */
 #map-container {
     width: 90%;
