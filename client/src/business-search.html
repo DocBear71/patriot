@@ -37,9 +37,9 @@
             // The placeholder will be replaced during build if environment variable is available
             const apiKey = window.appConfig?.googleMapsApiKey || 'YOUR_API_KEY_HERE';
 
-            // Create and insert the Google Maps script
+            // Create and insert the Google Maps script with marker library included
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry&callback=initGoogleMap`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker&callback=initGoogleMap`;
             script.async = true;
             script.defer = true;
             script.onerror = function() {

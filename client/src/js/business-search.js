@@ -1,4 +1,4 @@
-// Enhanced business-search.js with Google Maps functionality and all original functions
+// Enhanced business-search.js with Google Maps functionality using AdvancedMarkerElement
 
 let map = null;
 let mapInitialized = false;
@@ -330,26 +330,53 @@ document.addEventListener('DOMContentLoaded', function() {
         }, index * 200); // Stagger requests with a 200ms delay per business
     }
 
-    // Add a marker to the map
+    // Add a marker to the map using AdvancedMarkerElement
     function addMarker(business, location) {
-        const marker = new google.maps.Marker({
-            position: location,
+        // First, make sure the required libraries are loaded
+        if (!google.maps.marker || !google.maps.marker.AdvancedMarkerElement) {
+            console.error("AdvancedMarkerElement not available. Make sure to include the marker library.");
+            return null;
+        }
+
+        // Create a position object from the location
+        const position = { lat: location.lat(), lng: location.lng() };
+
+        // Create the marker content - we'll use a pin with a customizable background color
+        let markerContent;
+
+        // Determine marker color based on whether it's a primary result or nearby result
+        const isNearby = business.isNearby === true;
+        const pinColor = isNearby ? '#4285F4' : '#EA4335'; // Blue for nearby, Red for primary
+
+        // Create a pin element with the appropriate color
+        const pinElement = document.createElement('div');
+        pinElement.innerHTML = `
+            <div style="width: 24px; height: 24px; border-radius: 50% 50% 50% 0; 
+                        transform: rotate(-45deg); background-color: ${pinColor}; 
+                        display: flex; justify-content: center; align-items: center; 
+                        position: relative; top: -12px; left: 0px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                <div style="width: 12px; height: 12px; border-radius: 50%; 
+                            background-color: white; transform: rotate(45deg);"></div>
+            </div>
+        `;
+
+        markerContent = pinElement;
+
+        // Create the advanced marker
+        const marker = new google.maps.marker.AdvancedMarkerElement({
+            position: position,
             map: map,
             title: business.bname,
-            animation: google.maps.Animation.DROP,
-            icon: {
-                // Change http:// to https:// to fix mixed content warnings
-                url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png', // Standard businesses
-                scaledSize: new google.maps.Size(32, 32)
-            }
+            content: markerContent
         });
 
         // Store the business data with the marker
         marker.business = business;
+        marker.isNearby = isNearby;
 
         // Add click event to show info window
-        marker.addListener('click', function () {
-            showInfoWindow(this);
+        marker.addEventListener('click', () => {
+            showInfoWindow(marker);
         });
 
         // Add the marker to our array
@@ -399,9 +426,13 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
 
+        // Get the position of the marker
+        const position = marker.position;
+
         // Set content and open the info window
         infoWindow.setContent(contentString);
-        infoWindow.open(map, marker);
+        infoWindow.setPosition(position);
+        infoWindow.open(map);
 
         // Fetch incentives for this business
         fetchBusinessIncentivesForInfoWindow(business._id);
@@ -551,35 +582,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Only add if within 20km (adjust as needed)
                 if (distance <= 20000) {
+                    // Mark this as a nearby business
+                    business.isNearby = true;
+
                     // Add marker with different color to distinguish from search results
-                    const marker = new google.maps.Marker({
-                        position: location,
-                        map: map,
-                        title: business.bname,
-                        animation: google.maps.Animation.DROP,
-                        icon: {
-                            // Change http:// to https:// to fix mixed content warnings
-                            url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png', // Nearby businesses
-                            scaledSize: new google.maps.Size(32, 32)
-                        }
-                    });
-
-                    // Store business data with the marker
-                    marker.business = business;
-                    marker.isNearby = true;
-
-                    // Add click event to show info window
-                    marker.addListener('click', function () {
-                        showInfoWindow(this);
-                    });
-
-                    // Add to markers array
-                    markers.push(marker);
+                    const marker = addMarker(business, location);
                 }
             }
         });
     }
-
 
     // Clear all markers from the map
     function clearMarkers() {
@@ -590,7 +601,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         markers.forEach(marker => {
             if (marker) {
-                marker.setMap(null);
+                marker.map = null;
             }
         });
         markers = [];
@@ -840,7 +851,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (marker) {
             // Center the map on this marker
-            map.setCenter(marker.getPosition());
+            map.setCenter(marker.position);
             map.setZoom(16);
 
             // Open the info window for this marker
