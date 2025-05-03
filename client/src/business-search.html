@@ -31,15 +31,18 @@
     <script src="./js/runtime-config.js"></script>
 
     <!-- Dynamic Google Maps script insertion -->
+    <!-- Optimized Google Maps script insertion with proper async loading and Map ID -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Get API key from runtime config or fallback to a placeholder
-            const apiKey = window.appConfig?.googleMapsApiKey || 'YOUR_API_KEY_HERE';
-            const mapId = window.appConfig?.googleMapsMapId || '';
+            // Get API key from runtime config or use your actual API key
+            const apiKey = 'AIzaSyCHKhYZwQR37M_0QctXUQe6VFRFrlhaYj8';
+            const mapId = 'ebe8ec43a7bc252d';
 
-            // Create and insert the Google Maps script with marker library included
+            console.log("Loading Google Maps with Map ID:", mapId);
+
+            // Create and insert the Google Maps script with all recommended parameters
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker&callback=initGoogleMap`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMap&loading=async`;
             script.async = true;
             script.defer = true;
             script.onerror = function() {
@@ -47,9 +50,6 @@
                 alert('Error loading Google Maps. Please try again later.');
             };
             document.head.appendChild(script);
-
-            console.log("Loading Google Maps API with marker library...");
-            console.log("Map ID configured:", mapId ? "Yes" : "No");
         });
     </script>
 

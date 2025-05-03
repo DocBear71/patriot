@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn("Business search form not found in the DOM");
     }
 
-    // Initialize Google Map with Map ID for Advanced Markers
+    // Initialize Google Map with hardcoded Map ID to ensure it works
     function initMap() {
         console.log("Initializing Google Map");
 
@@ -76,15 +76,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Get Map ID from config
-            const mapId = window.appConfig?.googleMapsMapId || '';
+            // Get the Map ID - hardcoded here to ensure it's available
+            const mapId = 'ebe8ec43a7bc252d';
+            console.log("Using Map ID:", mapId);
 
             // Create a map centered on the US
             map = new google.maps.Map(mapContainer, {
                 center: {lat: 39.8283, lng: -98.5795}, // Center of US
                 zoom: 4,
                 mapTypeId: google.maps.MapTypeId.ROADMAP,
-                mapId: mapId  // Add the Map ID here
+                mapId: mapId  // Directly use the Map ID
             });
 
             infoWindow = new google.maps.InfoWindow();
@@ -116,9 +117,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Set flag that map is initialized and advanced markers are available
             mapInitialized = true;
-            window.useAdvancedMarkers = google.maps.marker && google.maps.marker.AdvancedMarkerElement;
+            window.useAdvancedMarkers = true;  // Force use of advanced markers
             console.log("Google Map successfully initialized with Map ID:", mapId);
-            console.log("Advanced Markers available:", window.useAdvancedMarkers);
+            console.log("Advanced Markers enabled:", window.useAdvancedMarkers);
 
             // If there are any pending businesses to display, show them now
             if (pendingBusinessesToDisplay.length > 0) {
@@ -336,27 +337,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }, index * 200); // Stagger requests with a 200ms delay per business
     }
 
-    // Add a marker to the map using AdvancedMarkerElement
+    // Add a marker to the map using AdvancedMarkerElement with correct event listener
     function addMarker(business, location) {
-        // First, make sure the required libraries are loaded
-        if (!google.maps.marker || !google.maps.marker.AdvancedMarkerElement) {
-            console.error("AdvancedMarkerElement not available. Make sure to include the marker library.");
-            return null;
-        }
-
         // Create a position object from the location
         const position = { lat: location.lat(), lng: location.lng() };
-
-        // Create the marker content - we'll use a pin with a customizable background color
-        let markerContent;
 
         // Determine marker color based on whether it's a primary result or nearby result
         const isNearby = business.isNearby === true;
         const pinColor = isNearby ? '#4285F4' : '#EA4335'; // Blue for nearby, Red for primary
 
-        // Create a pin element with the appropriate color
-        const pinElement = document.createElement('div');
-        pinElement.innerHTML = `
+        try {
+            // Create an advanced marker
+            const pinElement = document.createElement('div');
+            pinElement.innerHTML = `
             <div style="width: 24px; height: 24px; border-radius: 50% 50% 50% 0; 
                         transform: rotate(-45deg); background-color: ${pinColor}; 
                         display: flex; justify-content: center; align-items: center; 
@@ -366,29 +359,63 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
 
-        markerContent = pinElement;
+            // Create the advanced marker
+            const marker = new google.maps.marker.AdvancedMarkerElement({
+                position: position,
+                map: map,
+                title: business.bname,
+                content: pinElement
+            });
 
-        // Create the advanced marker
-        const marker = new google.maps.marker.AdvancedMarkerElement({
-            position: position,
-            map: map,
-            title: business.bname,
-            content: markerContent
-        });
+            // Store the business data with the marker
+            marker.business = business;
+            marker.isNearby = isNearby;
 
-        // Store the business data with the marker
-        marker.business = business;
-        marker.isNearby = isNearby;
+            // Add gmp-click event to show info window (correct event for AdvancedMarkerElement)
+            marker.addEventListener('gmp-click', () => {
+                showInfoWindow(marker);
+            });
 
-        // Add click event to show info window
-        marker.addEventListener('click', () => {
-            showInfoWindow(marker);
-        });
+            // Add the marker to our array
+            markers.push(marker);
+            console.log(`Added advanced marker for ${business.bname}`);
 
-        // Add the marker to our array
-        markers.push(marker);
+            return marker;
+        } catch (error) {
+            console.error("Error creating advanced marker, falling back to standard marker:", error);
 
-        return marker;
+            // FALLBACK: Use regular Marker if Advanced Markers not available
+            const iconUrl = isNearby
+                ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+                : 'https://maps.google.com/mapfiles/ms/icons/red-dot.png';
+
+            // Create the marker using the legacy Marker class
+            const marker = new google.maps.Marker({
+                position: location,
+                map: map,
+                title: business.bname,
+                animation: google.maps.Animation.DROP,
+                icon: {
+                    url: iconUrl,
+                    scaledSize: new google.maps.Size(32, 32)
+                }
+            });
+
+            // Store the business data with the marker
+            marker.business = business;
+            marker.isNearby = isNearby;
+
+            // Add click event to show info window
+            marker.addListener('click', function () {
+                showInfoWindow(this);
+            });
+
+            // Add the marker to our array
+            markers.push(marker);
+            console.log(`Added standard marker for ${business.bname}`);
+
+            return marker;
+        }
     }
 
     // Show info window with business details
