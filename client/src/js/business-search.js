@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn("Business search form not found in the DOM");
     }
 
-    // Initialize Google Map with hardcoded Map ID to ensure it works
+    // Initialize Google Map with Map ID and click handler for POIs
     function initMap() {
         console.log("Initializing Google Map");
 
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Get the Map ID - hardcoded here to ensure it's available
+            // Get Map ID - hardcoded for reliability
             const mapId = 'ebe8ec43a7bc252d';
             console.log("Using Map ID:", mapId);
 
@@ -85,7 +85,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 center: {lat: 39.8283, lng: -98.5795}, // Center of US
                 zoom: 4,
                 mapTypeId: google.maps.MapTypeId.ROADMAP,
-                mapId: mapId  // Directly use the Map ID
+                mapId: mapId,  // Map ID for advanced markers
+                clickableIcons: true  // Allow clicking on POIs (businesses, landmarks, etc.)
             });
 
             infoWindow = new google.maps.InfoWindow();
@@ -107,6 +108,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             mapContainer.appendChild(initialMessage);
 
+            // Set up handler for POI clicks (businesses not in your database)
+            setupMapClickHandler();
+
             // Add event listener for the reset map button
             const resetMapButton = document.getElementById('reset-map');
             if (resetMapButton) {
@@ -117,9 +121,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Set flag that map is initialized and advanced markers are available
             mapInitialized = true;
-            window.useAdvancedMarkers = true;  // Force use of advanced markers
+            window.useAdvancedMarkers = true;
             console.log("Google Map successfully initialized with Map ID:", mapId);
-            console.log("Advanced Markers enabled:", window.useAdvancedMarkers);
+            console.log("Advanced Markers enabled, POI click handlers set up");
 
             // If there are any pending businesses to display, show them now
             if (pendingBusinessesToDisplay.length > 0) {
@@ -337,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, index * 200); // Stagger requests with a 200ms delay per business
     }
 
-    // Add a marker to the map using AdvancedMarkerElement with correct event listener
+    // Add a marker to the map using AdvancedMarkerElement with properly implemented click event
     function addMarker(business, location) {
         // Create a position object from the location
         const position = { lat: location.lat(), lng: location.lng() };
@@ -347,7 +351,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const pinColor = isNearby ? '#4285F4' : '#EA4335'; // Blue for nearby, Red for primary
 
         try {
-            // Create an advanced marker
+            // Check if advanced markers are available
+            if (!google.maps.marker || !google.maps.marker.AdvancedMarkerElement) {
+                throw new Error("Advanced Markers not available");
+            }
+
+            // Create an advanced marker with a custom pin element
             const pinElement = document.createElement('div');
             pinElement.innerHTML = `
             <div style="width: 24px; height: 24px; border-radius: 50% 50% 50% 0; 
@@ -371,8 +380,9 @@ document.addEventListener('DOMContentLoaded', function() {
             marker.business = business;
             marker.isNearby = isNearby;
 
-            // Add gmp-click event to show info window (correct event for AdvancedMarkerElement)
-            marker.addEventListener('gmp-click', () => {
+            // Add gmp-click event to show info window
+            marker.addEventListener('gmp-click', function(event) {
+                console.log("Marker clicked:", business.bname);
                 showInfoWindow(marker);
             });
 
@@ -406,7 +416,8 @@ document.addEventListener('DOMContentLoaded', function() {
             marker.isNearby = isNearby;
 
             // Add click event to show info window
-            marker.addListener('click', function () {
+            marker.addListener('click', function() {
+                console.log("Marker clicked (legacy):", business.bname);
                 showInfoWindow(this);
             });
 
@@ -1266,4 +1277,139 @@ document.addEventListener('DOMContentLoaded', function() {
             validateField(this, isNotEmpty);
         });
     }
+
+    // Handle clicks on the map for places that aren't in your database
+    function setupMapClickHandler() {
+        // Initialize Places service
+        const placesService = new google.maps.places.PlacesService(map);
+
+        // Listen for POI clicks (Points of Interest - businesses, landmarks, etc.)
+        map.addListener('click', function(event) {
+            // Check if clicked on a POI (a place on the map)
+            if (event.placeId) {
+                event.stop(); // Prevent the default info window
+
+                console.log("POI clicked, placeId:", event.placeId);
+
+                // Get details about the place
+                placesService.getDetails({
+                    placeId: event.placeId,
+                    fields: ['name', 'formatted_address', 'geometry', 'place_id', 'types', 'business_status', 'formatted_phone_number']
+                }, function(place, status) {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        console.log("Place details:", place);
+
+                        // Show custom info window with "Add to Database" option
+                        showPlaceInfoWindow(place, event.latLng);
+                    } else {
+                        console.error("Error fetching place details:", status);
+                    }
+                });
+            }
+        });
+
+        console.log("Map click handler set up for POIs");
+    }
+
+// Show info window for places not in your database
+    function showPlaceInfoWindow(place, position) {
+        // Format the content with an "Add to Database" button
+        const contentString = `
+        <div class="info-window">
+            <h3>${place.name}</h3>
+            <p><strong>Address:</strong><br>${place.formatted_address || 'Address not available'}</p>
+            ${place.formatted_phone_number ? `<p><strong>Phone:</strong> ${place.formatted_phone_number}</p>` : ''}
+            <p><strong>Type:</strong> ${getPlaceTypeLabel(place.types)}</p>
+            <div class="info-window-actions">
+                <button class="add-business-btn" 
+                        onclick="window.addBusinessToDatabase('${place.place_id}')">
+                    Add to Patriot Thanks
+                </button>
+            </div>
+        </div>
+    `;
+
+        // Set content and open the info window
+        infoWindow.setContent(contentString);
+        infoWindow.setPosition(position);
+        infoWindow.open(map);
+    }
+
+// Convert place types to readable format
+    function getPlaceTypeLabel(types) {
+        if (!types || !types.length) return 'Unknown';
+
+        // Map Google place types to more readable formats
+        const typeMapping = {
+            'restaurant': 'Restaurant',
+            'food': 'Food',
+            'store': 'Store',
+            'establishment': 'Business',
+            'point_of_interest': 'Point of Interest',
+            'gas_station': 'Gas Station',
+            'lodging': 'Lodging',
+            'cafe': 'Cafe',
+            'bar': 'Bar',
+            // Add more mappings as needed
+        };
+
+        // Try to find a good primary type
+        for (const type of types) {
+            if (typeMapping[type]) {
+                return typeMapping[type];
+            }
+        }
+
+        // Default to first type if we can't find a mapping
+        return types[0].replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+
+// Function to handle adding a business to your database
+    window.addBusinessToDatabase = function(placeId) {
+        console.log("Adding place to database:", placeId);
+
+        // Get place details to fill in the add business form
+        const placesService = new google.maps.places.PlacesService(map);
+        placesService.getDetails({
+            placeId: placeId,
+            fields: ['name', 'formatted_address', 'address_components', 'geometry', 'formatted_phone_number']
+        }, function(place, status) {
+            if (status === google.maps.places.PlacesServiceStatus.OK) {
+                // Redirect to your "Add Business" page with prefilled information
+                const businessData = {
+                    name: place.name,
+                    address1: getAddressComponent(place, 'street_number') + ' ' + getAddressComponent(place, 'route'),
+                    city: getAddressComponent(place, 'locality'),
+                    state: getAddressComponent(place, 'administrative_area_level_1'),
+                    zip: getAddressComponent(place, 'postal_code'),
+                    phone: place.formatted_phone_number || '',
+                    lat: place.geometry.location.lat(),
+                    lng: place.geometry.location.lng(),
+                    placeId: place.place_id
+                };
+
+                // Store in sessionStorage for the add business page to use
+                sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
+
+                // Redirect to add business page
+                window.location.href = 'business-add.html?prefill=true';
+            } else {
+                console.error("Error fetching place details for addition:", status);
+                alert("Sorry, we couldn't retrieve the details for this business. Please try again or add it manually.");
+            }
+        });
+    };
+
+// Helper function to extract address components
+    function getAddressComponent(place, type) {
+        if (!place.address_components) return '';
+
+        const component = place.address_components.find(
+            component => component.types.includes(type)
+        );
+
+        return component ? component.short_name : '';
+    }
+
+
 });

@@ -285,6 +285,131 @@
             edward-mckeown@student.kirkwood.edu</a></p><br>
     </address>
 </footer>
+<script>
+    // Script to prefill business-add form with data from a Google Maps POI
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if we have data to prefill the form
+        const urlParams = new URLSearchParams(window.location.search);
+        const shouldPrefill = urlParams.get('prefill') === 'true';
 
+        if (shouldPrefill) {
+            try {
+                // Get the business data from sessionStorage
+                const businessDataJson = sessionStorage.getItem('newBusinessData');
+                if (!businessDataJson) {
+                    console.warn("No business data found in sessionStorage");
+                    return;
+                }
+
+                const businessData = JSON.parse(businessDataJson);
+                console.log("Prefilling form with business data:", businessData);
+
+                // Prefill the form fields
+                const fields = {
+                    'bname': businessData.name || '',
+                    'address1': businessData.address1 || '',
+                    'city': businessData.city || '',
+                    'state': businessData.state || '',
+                    'zip': businessData.zip || '',
+                    'phone': businessData.phone || ''
+                };
+
+                // Set values for each field
+                Object.keys(fields).forEach(fieldId => {
+                    const field = document.getElementById(fieldId);
+                    if (field) {
+                        field.value = fields[fieldId];
+
+                        // Add visual indication that this field was prefilled
+                        field.classList.add('prefilled');
+
+                        // Add a small animation to highlight the prefilled fields
+                        field.style.transition = 'background-color 1s ease';
+                        field.style.backgroundColor = '#f0f8ff'; // Light blue background
+
+                        // After 1.5 seconds, fade back to normal
+                        setTimeout(() => {
+                            field.style.backgroundColor = '';
+                        }, 1500);
+                    }
+                });
+
+                // Special handling for select elements (like state)
+                const stateSelect = document.getElementById('state');
+                if (stateSelect && businessData.state) {
+                    for (let i = 0; i < stateSelect.options.length; i++) {
+                        if (stateSelect.options[i].value === businessData.state) {
+                            stateSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                // Store Place ID in a hidden field if it exists
+                if (businessData.placeId) {
+                    let placeIdField = document.getElementById('google_place_id');
+
+                    // Create the field if it doesn't exist
+                    if (!placeIdField) {
+                        placeIdField = document.createElement('input');
+                        placeIdField.type = 'hidden';
+                        placeIdField.id = 'google_place_id';
+                        placeIdField.name = 'google_place_id';
+
+                        // Add it to the form
+                        const form = document.querySelector('form');
+                        if (form) {
+                            form.appendChild(placeIdField);
+                        }
+                    }
+
+                    // Set the Place ID
+                    if (placeIdField) {
+                        placeIdField.value = businessData.placeId;
+                    }
+                }
+
+                // Add a success message
+                const formContainer = document.querySelector('fieldset');
+                if (formContainer) {
+                    const message = document.createElement('div');
+                    message.className = 'success-message';
+                    message.innerHTML = `
+                    <p>Information from Google Maps has been pre-filled for your convenience.
+                    Please review and complete any missing information before submitting.</p>
+                `;
+                    message.style.backgroundColor = '#dff0d8';
+                    message.style.color = '#3c763d';
+                    message.style.padding = '10px';
+                    message.style.marginBottom = '15px';
+                    message.style.borderRadius = '4px';
+
+                    // Insert at the top of the form
+                    formContainer.insertBefore(message, formContainer.firstChild);
+
+                    // Remove the message after 8 seconds
+                    setTimeout(() => {
+                        message.style.transition = 'opacity 1s ease';
+                        message.style.opacity = '0';
+
+                        // Remove from DOM after fade out
+                        setTimeout(() => {
+                            if (message.parentNode) {
+                                message.parentNode.removeChild(message);
+                            }
+                        }, 1000);
+                    }, 8000);
+                }
+
+                // Clear the sessionStorage data to prevent reuse
+                sessionStorage.removeItem('newBusinessData');
+
+            } catch (error) {
+                console.error("Error prefilling form:", error);
+            }
+        }
+    });
+
+</script>
 </body>
 </html>
