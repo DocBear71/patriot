@@ -1,166 +1,15 @@
-// reset-functionality.js - Adds auto-reset after submission and start-over buttons
+// reset-functionality.js - Improved version for all Patriot Thanks pages
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Enhanced Reset Functionality Loaded!");
+    console.log("Improved Reset Functionality Loaded!");
 
-    // Determine which page we're on based on the HTML structure
-    const isAddPage = document.getElementById('incentive-section') !== null;
-    const isUpdatePage = document.getElementById('incentive-edit-section') !== null;
-    const isViewPage = document.getElementById('incentives-container') !== null;
+    // Determine which page we're on based on the HTML structure and URL
+    const pagePath = window.location.pathname;
+    const isBusinessUpdatePage = pagePath.includes('business-update.html') || document.getElementById('business-update-form') !== null;
+    const isAddPage = !isBusinessUpdatePage && document.getElementById('incentive-section') !== null;
+    const isUpdatePage = !isBusinessUpdatePage && document.getElementById('incentive-edit-section') !== null;
+    const isViewPage = !isBusinessUpdatePage && (pagePath.includes('incentive-view.html') || document.getElementById('incentives-container') !== null);
 
-    console.log("Page detection - Add:", isAddPage, "Update:", isUpdatePage, "View:", isViewPage);
-
-    // Implement automatic reset after form submission
-    if (isAddPage) {
-        // Override the existing addIncentive function to add auto-reset
-        const originalAddIncentive = window.addIncentive;
-
-        if (typeof originalAddIncentive === 'function') {
-            window.addIncentive = function(incentiveData) {
-                console.log("Enhanced addIncentive called with auto-reset");
-
-                // Call the original function
-                originalAddIncentive(incentiveData).then(function(result) {
-                    // After successful submission, reset the form
-                    console.log("Incentive added successfully, auto-resetting form...");
-                    resetPage();
-                }).catch(function(error) {
-                    // Don't reset on error
-                    console.error("Error in incentive submission:", error);
-                });
-            };
-        } else {
-            // If original function not found, modify the fetch call in the form submission
-            const incentiveForm = document.getElementById('incentive-form');
-            if (incentiveForm) {
-                // Remove existing event listeners
-                const newForm = incentiveForm.cloneNode(true);
-                incentiveForm.parentNode.replaceChild(newForm, incentiveForm);
-
-                // Add new event listener with auto-reset
-                newForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-
-                    // Get form data (abbreviated - your existing code will handle this)
-                    const businessId = document.getElementById('selected-business-id').value;
-
-                    // After form submission succeeds
-                    fetch('https://patriotthanks.vercel.app/api/incentives.js', {
-                        method: 'POST',
-                        // Your existing fetch options
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            console.log("Incentive added successfully, auto-resetting form...");
-                            // Show success message first
-                            alert('Incentive added successfully!');
-                            // Then reset
-                            resetPage();
-                        })
-                        .catch(error => {
-                            console.error("Error adding incentive:", error);
-                            alert(`Error adding incentive: ${error.message}`);
-                            // Don't reset on error
-                        });
-                });
-            }
-        }
-    }
-
-    if (isUpdatePage) {
-        // Override the existing updateIncentive function
-        const originalUpdateIncentive = window.updateIncentive;
-
-        if (typeof originalUpdateIncentive === 'function') {
-            window.updateIncentive = function(incentiveData) {
-                console.log("Enhanced updateIncentive called with auto-reset");
-
-                const apiURL = `${window.location.hostname === 'localhost' ? 'http://' : 'https://'}${window.location.host}/api/admin-incentives.js?operation=update`;
-
-                // Show loading state
-                const submitButton = document.getElementById('update-submit');
-                const originalText = submitButton.value;
-                submitButton.value = 'Updating...';
-                submitButton.disabled = true;
-
-                fetch(apiURL, {
-                    method: "PUT",
-                    headers: {
-                        "Content-Type": "application/json; charset=utf-8",
-                        "Authorization": `Bearer ${getAuthToken() || ''}`
-                    },
-                    body: JSON.stringify(incentiveData)
-                })
-                    .then(response => {
-                        if (!response.ok) {
-                            return response.text().then(text => {
-                                throw new Error(`Failed to update incentive: ${response.status} ${text}`);
-                            });
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log("Success:", data);
-                        // Show success message
-                        showMessage('success', "Incentive updated successfully!");
-                        // Reset button state
-                        submitButton.value = originalText;
-                        submitButton.disabled = false;
-                        // Auto-reset after success
-                        setTimeout(() => {
-                            resetPage();
-                        }, 2000); // Delay to show message
-                    })
-                    .catch(error => {
-                        console.error("Error:", error);
-                        showMessage('error', "Update failed: " + error.message);
-                        // Reset button state on error too
-                        submitButton.value = originalText;
-                        submitButton.disabled = false;
-                        // Don't reset form on error
-                    });
-            };
-        }
-
-        // Helper function to get auth token
-        function getAuthToken() {
-            try {
-                const sessionData = localStorage.getItem('patriotThanksSession');
-                if (!sessionData) {
-                    return null;
-                }
-                const session = JSON.parse(sessionData);
-                return session.token || null;
-            } catch (error) {
-                console.error('Error retrieving auth token:', error);
-                return null;
-            }
-        }
-
-        // Function to show status messages
-        function showMessage(type, message) {
-            const messageContainer = document.getElementById('status-message');
-            if (messageContainer) {
-                messageContainer.innerHTML = message;
-                messageContainer.className = 'alert';
-
-                if (type === 'error') {
-                    messageContainer.classList.add('alert-danger');
-                } else if (type === 'success') {
-                    messageContainer.classList.add('alert-success');
-                }
-
-                messageContainer.style.display = 'block';
-                messageContainer.scrollIntoView({ behavior: 'smooth' });
-
-                // Auto-hide after 5 seconds
-                setTimeout(() => {
-                    messageContainer.style.display = 'none';
-                }, 5000);
-            } else {
-                alert(message);
-            }
-        }
-    }
+    console.log("Page detection - Business Update:", isBusinessUpdatePage, "Add:", isAddPage, "Update:", isUpdatePage, "View:", isViewPage);
 
     // Create the reset button with appropriate styling
     function createResetButton() {
@@ -169,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
         resetButton.type = 'button';
         resetButton.innerText = 'Start Over';
 
-        resetButton.style.backgroundColor = '#0000ff'; // Changed to blue to match your existing buttons
+        resetButton.style.backgroundColor = '#0000ff'; // Match your blue buttons
         resetButton.style.color = 'white';
         resetButton.style.border = 'none';
         resetButton.style.padding = '10px 20px';
@@ -214,65 +63,183 @@ document.addEventListener('DOMContentLoaded', function() {
             searchFieldset.appendChild(searchButtonContainer);
         }
 
-        // Add page-specific reset buttons
-        if (isAddPage) {
+        // Only add the Start Over button to appropriate sections that are VISIBLE
+        // This way we don't show buttons prematurely
+
+        if (isBusinessUpdatePage) {
+            // Business Update page
+            const businessInfoSection = document.getElementById('business-info-section');
+            if (businessInfoSection) {
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.attributeName === 'style' &&
+                            businessInfoSection.style.display !== 'none' &&
+                            !businessInfoSection.querySelector('#reset-button-container')) {
+
+                            const resetButtonContainer = createButtonContainer();
+                            const resetButton = createResetButton();
+                            resetButton.addEventListener('click', function() {
+                                resetPage();
+                            });
+
+                            resetButtonContainer.appendChild(resetButton);
+                            businessInfoSection.appendChild(resetButtonContainer);
+                        }
+                    });
+                });
+
+                observer.observe(businessInfoSection, { attributes: true });
+
+                // Check if it's already visible
+                if (businessInfoSection.style.display !== 'none' &&
+                    !businessInfoSection.querySelector('#reset-button-container')) {
+
+                    const resetButtonContainer = createButtonContainer();
+                    const resetButton = createResetButton();
+                    resetButton.addEventListener('click', function() {
+                        resetPage();
+                    });
+
+                    resetButtonContainer.appendChild(resetButton);
+                    businessInfoSection.appendChild(resetButtonContainer);
+                }
+            }
+        }
+        else if (isAddPage) {
             // Add page for adding incentives
             const incentiveSection = document.getElementById('incentive-section');
             if (incentiveSection) {
-                const resetButtonContainer = createButtonContainer();
-                const resetButton = createResetButton();
-                resetButton.addEventListener('click', function() {
-                    resetPage();
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.attributeName === 'style' &&
+                            incentiveSection.style.display !== 'none' &&
+                            !incentiveSection.querySelector('#reset-button-container')) {
+
+                            const resetButtonContainer = createButtonContainer();
+                            const resetButton = createResetButton();
+                            resetButton.addEventListener('click', function() {
+                                resetPage();
+                            });
+
+                            resetButtonContainer.appendChild(resetButton);
+                            incentiveSection.appendChild(resetButtonContainer);
+                        }
+                    });
                 });
 
-                resetButtonContainer.appendChild(resetButton);
-                incentiveSection.appendChild(resetButtonContainer);
+                observer.observe(incentiveSection, { attributes: true });
+
+                // Check if it's already visible
+                if (incentiveSection.style.display !== 'none' &&
+                    !incentiveSection.querySelector('#reset-button-container')) {
+
+                    const resetButtonContainer = createButtonContainer();
+                    const resetButton = createResetButton();
+                    resetButton.addEventListener('click', function() {
+                        resetPage();
+                    });
+
+                    resetButtonContainer.appendChild(resetButton);
+                    incentiveSection.appendChild(resetButtonContainer);
+                }
             }
         }
         else if (isUpdatePage) {
             // Update page for updating incentives
             const incentiveEditSection = document.getElementById('incentive-edit-section');
             if (incentiveEditSection) {
-                const resetButtonContainer = createButtonContainer();
-                const resetButton = createResetButton();
-                resetButton.addEventListener('click', function() {
-                    resetPage();
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.attributeName === 'style' &&
+                            incentiveEditSection.style.display !== 'none' &&
+                            !incentiveEditSection.querySelector('#reset-button-container')) {
+
+                            const resetButtonContainer = createButtonContainer();
+                            const resetButton = createResetButton();
+                            resetButton.addEventListener('click', function() {
+                                resetPage();
+                            });
+
+                            resetButtonContainer.appendChild(resetButton);
+                            incentiveEditSection.appendChild(resetButtonContainer);
+                        }
+                    });
                 });
 
-                resetButtonContainer.appendChild(resetButton);
-                incentiveEditSection.appendChild(resetButtonContainer);
-            }
-        }
-        else if (isViewPage) {
-            // Create a floating reset button for the view page
-            const main = document.querySelector('main');
-            if (main) {
-                const resetButtonContainer = createButtonContainer();
-                const resetButton = createResetButton();
-                resetButton.addEventListener('click', function() {
-                    resetPage();
-                });
+                observer.observe(incentiveEditSection, { attributes: true });
 
-                // Style for floating button
-                resetButtonContainer.style.position = 'sticky';
-                resetButtonContainer.style.bottom = '20px';
-                resetButtonContainer.style.zIndex = '1000';
+                // Check if it's already visible
+                if (incentiveEditSection.style.display !== 'none' &&
+                    !incentiveEditSection.querySelector('#reset-button-container')) {
 
-                resetButtonContainer.appendChild(resetButton);
-                main.appendChild(resetButtonContainer);
-
-                // Also add to incentives container if it exists
-                const incentivesContainer = document.getElementById('incentives-container');
-                if (incentivesContainer) {
-                    const containerResetButton = createResetButton();
-                    containerResetButton.addEventListener('click', function() {
+                    const resetButtonContainer = createButtonContainer();
+                    const resetButton = createResetButton();
+                    resetButton.addEventListener('click', function() {
                         resetPage();
                     });
 
-                    // Create a new container to avoid interfering with the floating button
-                    const containerButtonHolder = createButtonContainer();
-                    containerButtonHolder.appendChild(containerResetButton);
-                    incentivesContainer.appendChild(containerButtonHolder);
+                    resetButtonContainer.appendChild(resetButton);
+                    incentiveEditSection.appendChild(resetButtonContainer);
+                }
+            }
+        }
+        else if (isViewPage) {
+            // Create a floating reset button for the view page, but only after incentives are loaded
+            const main = document.querySelector('main');
+
+            // For the view page, we need to wait for incentives to load
+            const incentivesContainer = document.getElementById('incentives-container');
+
+            if (incentivesContainer) {
+                const incentivesObserver = new MutationObserver(function(mutations) {
+                    if (incentivesContainer.innerHTML !== '' &&
+                        !document.getElementById('floating-reset-button-container')) {
+
+                        // Create floating button
+                        const floatingContainer = document.createElement('div');
+                        floatingContainer.id = 'floating-reset-button-container';
+                        floatingContainer.style.position = 'fixed';
+                        floatingContainer.style.bottom = '20px';
+                        floatingContainer.style.right = '20px';
+                        floatingContainer.style.zIndex = '1000';
+
+                        const floatingButton = createResetButton();
+                        floatingButton.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+                        floatingButton.addEventListener('click', function() {
+                            resetPage();
+                        });
+
+                        floatingContainer.appendChild(floatingButton);
+                        document.body.appendChild(floatingContainer);
+
+                        // Don't need to observe anymore
+                        incentivesObserver.disconnect();
+                    }
+                });
+
+                incentivesObserver.observe(incentivesContainer, { childList: true, subtree: true });
+
+                // Check if already populated
+                if (incentivesContainer.innerHTML !== '' &&
+                    incentivesContainer.innerHTML !== '<p>Loading incentives...</p>' &&
+                    !document.getElementById('floating-reset-button-container')) {
+
+                    // Create floating button
+                    const floatingContainer = document.createElement('div');
+                    floatingContainer.id = 'floating-reset-button-container';
+                    floatingContainer.style.position = 'fixed';
+                    floatingContainer.style.bottom = '20px';
+                    floatingContainer.style.right = '20px';
+                    floatingContainer.style.zIndex = '1000';
+
+                    const floatingButton = createResetButton();
+                    floatingButton.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+                    floatingButton.addEventListener('click', function() {
+                        resetPage();
+                    });
+
+                    floatingContainer.appendChild(floatingButton);
+                    document.body.appendChild(floatingContainer);
                 }
             }
         }
@@ -309,7 +276,17 @@ document.addEventListener('DOMContentLoaded', function() {
         resetSearchForm();
 
         // Hide sections that should be hidden initially
-        if (isAddPage) {
+        if (isBusinessUpdatePage) {
+            // Reset Business Update page
+            const businessInfoSection = document.getElementById('business-info-section');
+            if (businessInfoSection) {
+                businessInfoSection.style.display = 'none';
+            }
+
+            // Reset form fields
+            resetBusinessUpdateForm();
+        }
+        else if (isAddPage) {
             // Reset Add page
             const businessInfoSection = document.getElementById('business-info-section');
             if (businessInfoSection) {
@@ -362,6 +339,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (incentivesContainer) {
                 incentivesContainer.innerHTML = '';
             }
+
+            // Remove floating button if it exists
+            const floatingButton = document.getElementById('floating-reset-button-container');
+            if (floatingButton) {
+                floatingButton.remove();
+            }
         }
 
         // Reset hidden fields
@@ -375,10 +358,31 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedIncentiveId.value = '';
         }
 
+        // Remove any status messages
+        const statusMessage = document.getElementById('status-message');
+        if (statusMessage) {
+            statusMessage.style.display = 'none';
+            statusMessage.innerHTML = '';
+        }
+
         // Scroll back to the top of the page
         window.scrollTo(0, 0);
 
         console.log("Page has been reset");
+    }
+
+    // Function to reset the Business Update form
+    function resetBusinessUpdateForm() {
+        // Reset all business form fields
+        resetFormField('bname');
+        resetFormField('address1');
+        resetFormField('address2');
+        resetFormField('city');
+        resetFormField('state');
+        resetFormField('zip');
+        resetFormField('phone');
+        resetFormField('type');
+        resetFormField('status');
     }
 
     // Function to reset the Add Incentive form
@@ -488,11 +492,60 @@ document.addEventListener('DOMContentLoaded', function() {
             // Remove validation classes if they exist
             field.classList.remove('valid-field');
             field.classList.remove('invalid-field');
+            field.classList.remove('disabled-field');
         }
     }
 
-    // Add reset buttons to the page
-    addResetButtons();
+    // Add reset buttons to the page - wait for everything to load first
+    setTimeout(addResetButtons, 500);
+
+    // Implement automatic reset after form submission
+    if (isBusinessUpdatePage) {
+        // Handle Business Update form
+        const updateForm = document.getElementById('business-update-form');
+        if (updateForm) {
+            const originalSubmitHandler = updateForm.onsubmit;
+
+            updateForm.addEventListener('submit', function(e) {
+                // Only if it doesn't have our custom handler already
+                if (!e.target.hasAttribute('data-reset-handler')) {
+                    e.target.setAttribute('data-reset-handler', 'true');
+
+                    // Get the submit button
+                    const submitButton = document.getElementById('update-submit');
+                    const originalText = submitButton ? submitButton.value : 'Update Business';
+
+                    // Show processing state
+                    if (submitButton) {
+                        submitButton.value = 'Updating...';
+                        submitButton.disabled = true;
+                    }
+
+                    // Wait for the update to complete, then reset
+                    setTimeout(() => {
+                        // Show success message
+                        const statusMessage = document.getElementById('status-message');
+                        if (statusMessage) {
+                            statusMessage.className = 'alert alert-success';
+                            statusMessage.innerHTML = 'Business updated successfully!';
+                            statusMessage.style.display = 'block';
+                        }
+
+                        // Reset button
+                        if (submitButton) {
+                            submitButton.value = originalText;
+                            submitButton.disabled = false;
+                        }
+
+                        // Auto-reset after delay
+                        setTimeout(() => {
+                            resetPage();
+                        }, 2000);
+                    }, 1000);
+                }
+            });
+        }
+    }
 
     // Add a responsive style for the reset button on mobile
     const mobileStyle = document.createElement('style');
@@ -506,14 +559,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             #reset-button-container {
-                position: sticky;
-                bottom: 10px;
-                z-index: 1000;
                 margin: 10px 0;
             }
             
             #reset-button-container button {
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            }
+            
+            #floating-reset-button-container {
+                width: 80%;
+                left: 10%;
+                right: 10%;
+                bottom: 20px;
+                text-align: center;
+            }
+            
+            #floating-reset-button-container button {
+                width: 100%;
+                padding: 15px;
+                font-size: 16px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             }
         }
     `;
