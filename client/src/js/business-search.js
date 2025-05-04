@@ -1942,9 +1942,6 @@ function geocodeNearbyBusiness(business, centerLocation) {
 
 // Initialize when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Load Google Maps script
-    loadGoogleMapsScript();
-
     // Initialize business search functionality
     initBusinessSearch();
 });
