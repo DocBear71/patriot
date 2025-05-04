@@ -1588,52 +1588,14 @@ async function addAdvancedMarker(business, location) {
 }
 
 /**
- * Get an icon based on business type
- * @param {string} type - Business type code
- * @returns {string} HTML for the icon
- */
-function getBusinessTypeIcon(type) {
-    // Map business types to Font Awesome or other icons
-    const iconMap = {
-        'AUTO': '<i class="fa fa-car" aria-hidden="true"></i>',
-        'BEAU': '<i class="fa fa-scissors" aria-hidden="true"></i>',
-        'BOOK': '<i class="fa fa-book" aria-hidden="true"></i>',
-        'CLTH': '<i class="fa fa-shopping-bag" aria-hidden="true"></i>',
-        'CONV': '<i class="fa fa-shopping-basket" aria-hidden="true"></i>',
-        'DEPT': '<i class="fa fa-building" aria-hidden="true"></i>',
-        'ELEC': '<i class="fa fa-laptop" aria-hidden="true"></i>',
-        'ENTR': '<i class="fa fa-film" aria-hidden="true"></i>',
-        'FURN': '<i class="fa fa-bed" aria-hidden="true"></i>',
-        'FUEL': '<i class="fa fa-gas-pump" aria-hidden="true"></i>',
-        'GIFT': '<i class="fa fa-gift" aria-hidden="true"></i>',
-        'GROC': '<i class="fa fa-shopping-cart" aria-hidden="true"></i>',
-        'HARDW': '<i class="fa fa-hammer" aria-hidden="true"></i>',
-        'HEAL': '<i class="fa fa-heartbeat" aria-hidden="true"></i>',
-        'JEWL': '<i class="fa fa-gem" aria-hidden="true"></i>',
-        'OTHER': '<i class="fa fa-store" aria-hidden="true"></i>',
-        'RX': '<i class="fa fa-prescription-bottle" aria-hidden="true"></i>',
-        'REST': '<i class="fa fa-utensils" aria-hidden="true"></i>',
-        'RETAIL': '<i class="fa fa-shopping-bag" aria-hidden="true"></i>',
-        'SERV': '<i class="fa fa-concierge-bell" aria-hidden="true"></i>',
-        'SPEC': '<i class="fa fa-star" aria-hidden="true"></i>',
-        'SPRT': '<i class="fa fa-futbol" aria-hidden="true"></i>',
-        'TECH': '<i class="fa fa-microchip" aria-hidden="true"></i>',
-        'TOYS': '<i class="fa fa-gamepad" aria-hidden="true"></i>'
-    };
-
-    // Return the icon or a default icon if type not found
-    return iconMap[type] || '<i class="fa fa-store" aria-hidden="true"></i>';
-}
-
-/**
- * Fetch photos for a business from our serverless function
+ * Fetch icon for a business based on its type
  * @param {Object} business - Business object
- * @returns {Promise<string|null>} Photo URL or null if not found
+ * @returns {Promise<string>} Icon URL
  */
 async function fetchPlacePhotosForBusiness(business) {
     if (!business) {
         console.log("No business data provided");
-        return null;
+        return getDefaultBusinessIcon();
     }
 
     try {
@@ -1643,62 +1605,24 @@ async function fetchPlacePhotosForBusiness(business) {
             return placeCache.get(cacheKey);
         }
 
-        // First try to get the placeId if we don't have one
-        let placeId = business.placeId;
-
-        if (!placeId) {
-            // Try to find the place by search
-            placeId = await findPlaceIdBySearch(business);
-            if (placeId) {
-                // Store it for future use
-                business.placeId = placeId;
-                console.log(`Found place ID for ${business.bname}: ${placeId}`);
-            }
-        }
-
-        if (!placeId) {
-            console.log(`No place ID found for ${business.bname}`);
-            return useDefaultIcon(business, cacheKey);
-        }
-
-        // Determine the base URL
-        const baseURL = getBaseURL();
-
-        // Construct the URL to our serverless function
-        const photoUrl = `${baseURL}/api/place-photo?placeId=${placeId}&maxwidth=100&maxheight=100&t=${Date.now()}`;
-
-        console.log(`Using serverless photo URL for ${business.bname}: ${photoUrl}`);
+        // Get an appropriate icon based on business type
+        const iconUrl = getBusinessTypeIcon(business.type);
 
         // Add to cache
-        placeCache.set(cacheKey, photoUrl);
-        return photoUrl;
+        placeCache.set(cacheKey, iconUrl);
+        return iconUrl;
     } catch (error) {
-        console.error(`Error fetching photos for ${business ? business.bname : 'unknown'}:`, error);
-        return useDefaultIcon(business, cacheKey);
+        console.error(`Error getting business icon: ${error.message}`);
+        return getDefaultBusinessIcon();
     }
 }
 
 /**
- * Helper function to use a default icon and cache it
- * @param {Object} business - Business object
- * @param {string} cacheKey - Cache key
- * @returns {string} Default icon URL
- */
-function useDefaultIcon(business, cacheKey) {
-    const defaultIcon = getBusinessIconUrl([], business ? business.type : null);
-    if (business && cacheKey) {
-        placeCache.set(cacheKey, defaultIcon);
-    }
-    return defaultIcon;
-}
-
-/**
- * Get an appropriate business icon URL based on business type
- * @param {Array} placeTypes - Google place types
+ * Get an appropriate icon for a business type
  * @param {string} businessType - Business type code
  * @returns {string} Icon URL
  */
-function getBusinessIconUrl(placeTypes, businessType) {
+function getBusinessTypeIcon(businessType) {
     // Map business types to icon URLs
     const businessTypeIcons = {
         'AUTO': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/car_repair-71.png',
@@ -1727,50 +1651,21 @@ function getBusinessIconUrl(placeTypes, businessType) {
         'TOYS': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/shopping-71.png'
     };
 
-    // If we have a business type and there's an icon for it, use that
-    if (businessType && businessTypeIcons[businessType]) {
+    // If we have an icon for this business type, use it
+    if (businessTypeIcons[businessType]) {
         return businessTypeIcons[businessType];
     }
 
     // Default icon
-    return 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png';
+    return getDefaultBusinessIcon();
 }
 
-
 /**
- * Find a place ID by searching Google Places API using the newer Place.searchByText API
- * @param {Object} business - Business object
- * @returns {Promise<string|null>} Place ID or null if not found
+ * Get default business icon
+ * @returns {string} Default icon URL
  */
-async function findPlaceIdBySearch(business) {
-    if (!business || !business.bname) return null;
-
-    try {
-        // Import the Places library
-        const { Place } = await google.maps.importLibrary("places");
-
-        // Create the search query - business name + address
-        const query = `${business.bname} ${business.address1} ${business.city} ${business.state} ${business.zip}`;
-        console.log(`Searching for place with query: ${query}`);
-
-        // Use the new Place.searchByText API instead of PlacesService
-        const searchResults = await Place.searchByText({
-            textQuery: query,
-            fields: ['id', 'displayName', 'formattedAddress']
-        });
-
-        if (searchResults && searchResults.places && searchResults.places.length > 0) {
-            const placeId = searchResults.places[0].id;
-            console.log(`Found place for ${business.bname}: ${placeId}`);
-            return placeId;
-        } else {
-            console.log(`No place found for query: ${query}`);
-            return null;
-        }
-    } catch (error) {
-        console.error("Error finding place ID:", error);
-        return null;
-    }
+function getDefaultBusinessIcon() {
+    return 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png';
 }
 
 /**
