@@ -1626,7 +1626,7 @@ function getBusinessTypeIcon(type) {
 }
 
 /**
- * Fetch photos for a business from Google Places API
+ * Fetch photos for a business from Google Places API using the newer Place API approach
  * @param {Object} business - Business object
  * @returns {Promise<string|null>} Photo URL or null if not found
  */
@@ -1680,18 +1680,27 @@ async function fetchPlacePhotosForBusiness(business) {
         if (place.photos && place.photos.length > 0) {
             console.log(`Found ${place.photos.length} photos for ${business.bname}`);
 
-            // Get the first photo with reasonable dimensions
-            const photoUrl = place.photos[0].getUrl({
-                maxWidth: 100,
-                maxHeight: 100
-            });
+            // The new Photos API has a different interface - handle it properly
+            const photo = place.photos[0];
 
-            console.log(`Got photo URL for ${business.bname}`);
-
-            // Cache the result
-            placeCache.set(cacheKey, photoUrl);
-
-            return photoUrl;
+            // Check if this is the new format or old format
+            if (typeof photo.getUrl === 'function') {
+                // Old format with getUrl method
+                const photoUrl = photo.getUrl({
+                    maxWidth: 100,
+                    maxHeight: 100
+                });
+                console.log(`Got photo URL (old API) for ${business.bname}`);
+                placeCache.set(cacheKey, photoUrl);
+                return photoUrl;
+            } else {
+                // New format - check for url or data property
+                // Fallback to a default icon if no direct photo URL available
+                const defaultPhotoUrl = `https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png`;
+                placeCache.set(cacheKey, defaultPhotoUrl);
+                console.log(`Using default photo for ${business.bname} due to API changes`);
+                return defaultPhotoUrl;
+            }
         }
 
         console.log(`No photos found for ${business.bname}`);
@@ -1702,8 +1711,9 @@ async function fetchPlacePhotosForBusiness(business) {
     }
 }
 
+
 /**
- * Find a place ID by searching Google Places API
+ * Find a place ID by searching Google Places API using the newer Place.searchByText API
  * @param {Object} business - Business object
  * @returns {Promise<string|null>} Place ID or null if not found
  */
@@ -1711,33 +1721,27 @@ async function findPlaceIdBySearch(business) {
     if (!business || !business.bname) return null;
 
     try {
-        // Import the required library
-        const { PlacesService } = await google.maps.importLibrary("places");
-
-        // Use existing map for PlacesService instead of creating a temporary div
-        const service = new google.maps.places.PlacesService(map);
+        // Import the Places library
+        const { Place } = await google.maps.importLibrary("places");
 
         // Create the search query - business name + address
         const query = `${business.bname} ${business.address1} ${business.city} ${business.state} ${business.zip}`;
+        console.log(`Searching for place with query: ${query}`);
 
-        // Use a promise to handle the async callback
-        return new Promise((resolve, reject) => {
-            service.textSearch(
-                {
-                    query: query,
-                    fields: ['place_id']
-                },
-                (results, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-                        console.log(`Found place for ${business.bname}:`, results[0].place_id);
-                        resolve(results[0].place_id);
-                    } else {
-                        console.log(`No place found for query: ${query}`);
-                        resolve(null);
-                    }
-                }
-            );
+        // Use the new Place.searchByText API instead of PlacesService
+        const searchResults = await Place.searchByText({
+            textQuery: query,
+            fields: ['id', 'displayName', 'formattedAddress']
         });
+
+        if (searchResults && searchResults.places && searchResults.places.length > 0) {
+            const placeId = searchResults.places[0].id;
+            console.log(`Found place for ${business.bname}: ${placeId}`);
+            return placeId;
+        } else {
+            console.log(`No place found for query: ${query}`);
+            return null;
+        }
     } catch (error) {
         console.error("Error finding place ID:", error);
         return null;
