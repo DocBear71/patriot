@@ -55,27 +55,37 @@ window.viewBusinessDetails = function(businessId) {
 };
 
 /**
- * Show info window for places not in your database
+ * Show info window for places not in your database (with scrollable content)
  * @param {Object} place - Google Place object
  * @param {Object} position - Position for the info window
  */
 function showPlaceInfoWindow(place, position) {
     // Create info window if it doesn't exist
     if (!infoWindow) {
-        infoWindow = new google.maps.InfoWindow();
+        infoWindow = new google.maps.InfoWindow({
+            maxWidth: 320,
+            disableAutoPan: false
+        });
     }
 
     // Get type label
     const placeTypeLabel = getPlaceTypeLabel(place.types);
 
-    // Format the content with an "Add to Database" button
+    // Format the content with an "Add to Database" button and scrollable area
     const contentString = `
-    <div class="info-window">
-      <h3>${place.displayName || 'Unnamed Place'}</h3>
-      <p><strong>Address:</strong><br>${place.formattedAddress || 'Address not available'}</p>
-      ${place.nationalPhoneNumber ? `<p><strong>Phone:</strong> ${place.nationalPhoneNumber}</p>` : ''}
-      <p><strong>Type:</strong> ${placeTypeLabel}</p>
-      <div class="info-window-actions">
+    <div class="info-window-wrapper">
+      <div class="info-window-header">
+        <h3>${place.displayName || 'Unnamed Place'}</h3>
+      </div>
+      <div class="info-window-content">
+        <div class="info-window-scrollable">
+          <p><strong>Address:</strong><br>${place.formattedAddress || 'Address not available'}</p>
+          ${place.nationalPhoneNumber ? `<p><strong>Phone:</strong> ${place.nationalPhoneNumber}</p>` : ''}
+          <p><strong>Type:</strong> ${placeTypeLabel}</p>
+          <p>This business is not yet in the Patriot Thanks database.</p>
+        </div>
+      </div>
+      <div class="info-window-footer">
         <button class="view-details-btn" 
                 onclick="window.addBusinessToDatabase('${place.id}')">
           Add to Patriot Thanks
@@ -88,7 +98,11 @@ function showPlaceInfoWindow(place, position) {
     infoWindow.setContent(contentString);
     infoWindow.setPosition(position);
     infoWindow.open(map);
+
+    // Apply scrollable styles
+    applyInfoWindowScrollableStyles();
 }
+
 
 /**
  * Add some CSS to style the markers properly
@@ -1140,6 +1154,7 @@ async function retrieveFromMongoDB(formData) {
 /**
  * Initialize Google Map - globally accessible function called by Google Maps API
  */
+
 window.initGoogleMap = async function() {
     console.log("Global initGoogleMap function called");
 
@@ -1474,44 +1489,70 @@ function addCustomMarkerStyleFixes() {
 }
 
 /**
- * Apply consistent styling to all Google Maps info windows
+ * Customize Google Maps info windows globally
  */
 function customizeInfoWindows() {
-    // Override default styles for Google Maps info windows
-    const infoWindowStyles = document.createElement('style');
-    infoWindowStyles.textContent = `
-        /* Fix padding in Google Maps info windows */
-        .gm-style .gm-style-iw-c {
-            padding: 12px !important;
+    // Apply the scrollable styles
+    applyInfoWindowScrollableStyles();
+
+    // Override close button behavior to make it larger and more visible
+    const closeButtonStyles = document.createElement('style');
+    closeButtonStyles.textContent = `
+        /* Make close button more visible */
+        .gm-ui-hover-effect {
+            opacity: 0.8 !important;
+            width: 24px !important;
+            height: 24px !important;
+            right: 2px !important;
+            top: 2px !important;
         }
         
-        /* Remove the default close button to prevent accidental closing */
-        .gm-style .gm-style-iw-d {
-            overflow: hidden !important;
+        .gm-ui-hover-effect span {
+            width: 16px !important;
+            height: 16px !important;
         }
         
-        /* Make the info window bigger */
-        .gm-style-iw {
-            max-width: 300px !important;
+        .gm-ui-hover-effect:hover {
+            opacity: 1 !important;
         }
     `;
-    document.head.appendChild(infoWindowStyles);
+    document.head.appendChild(closeButtonStyles);
 }
 
-
 /**
- * Function to initialize image loading for markers
+ * Helper function to enhance info window creation with specific styling and behavior
  */
-function initImageLoading() {
-    // Call this after markers are created
-    if (!mapInitialized || markers.length === 0) {
-        console.log("Map not initialized or no markers, delaying image loading");
-        setTimeout(initImageLoading, CONFIG.imageLoadDelay);
-        return;
-    }
+function createEnhancedInfoWindow() {
+    // Create a new info window with custom options
+    const newInfoWindow = new google.maps.InfoWindow({
+        maxWidth: 320,
+        disableAutoPan: false
+    });
 
-    console.log("Starting image loading for markers");
-    enhanceMarkersWithImages();
+    // Add event listener to apply scrollable styles when the window opens
+    google.maps.event.addListener(newInfoWindow, 'domready', function() {
+        console.log("Info window DOM ready, applying styles");
+
+        // Add a slight delay to ensure DOM elements are fully rendered
+        setTimeout(() => {
+            // Find the scrollable element and adjust its height if needed
+            const scrollableElements = document.querySelectorAll('.info-window-scrollable');
+            if (scrollableElements.length > 0) {
+                console.log("Found scrollable elements, adjusting height");
+
+                // Adjust height based on content
+                scrollableElements.forEach(el => {
+                    const content = el.querySelector('.incentives-list');
+                    if (content && content.offsetHeight > 150) {
+                        console.log("Large content detected, ensuring scrollable");
+                        el.style.overflowY = 'auto';
+                    }
+                });
+            }
+        }, 100);
+    });
+
+    return newInfoWindow;
 }
 
 /**
@@ -1885,7 +1926,7 @@ function updateMarkerWithImage(marker, imageUrl) {
 }
 
 /**
- * Show info window for a marker
+ * Show info window for a marker with scrollable content
  * @param {Object} marker - Marker object
  */
 function showInfoWindow(marker) {
@@ -1912,28 +1953,37 @@ function showInfoWindow(marker) {
         ? `<p><strong>Phone:</strong> ${business.phone}</p>`
         : '';
 
-    // Content for the info window
+    // Content for the info window with scrollable container
     const contentString = `
-    <div class="info-window">
-      <h3>${business.bname}</h3>
-      <p><strong>Address:</strong><br>${addressLine}</p>
-      ${phoneDisplay}
-      <p><strong>Type:</strong> ${businessType}</p>
-      <div id="info-window-incentives-${business._id}">
-        <p><strong>Incentives:</strong> <em>Loading...</em></p>
+    <div class="info-window-wrapper">
+      <div class="info-window-header">
+        <h3>${business.bname}</h3>
       </div>
-      <div class="info-window-actions">
+      <div class="info-window-content">
+        <div class="info-window-scrollable">
+          <p><strong>Address:</strong><br>${addressLine}</p>
+          ${phoneDisplay}
+          <p><strong>Type:</strong> ${businessType}</p>
+          <div id="info-window-incentives-${business._id}">
+            <p><strong>Incentives:</strong> <em>Loading...</em></p>
+          </div>
+        </div>
+      </div>
+      <div class="info-window-footer">
         <button class="view-details-btn" 
                 onclick="window.viewBusinessDetails('${business._id}')">
           View Details
         </button>
       </div>
     </div>
-  `;
+    `;
 
     // Create info window if it doesn't exist
     if (!infoWindow) {
-        infoWindow = new google.maps.InfoWindow();
+        infoWindow = new google.maps.InfoWindow({
+            maxWidth: 320, // Set a larger max width
+            disableAutoPan: false // Enable auto-panning
+        });
     }
 
     // Set content and open with modern approach using an options object
@@ -1946,8 +1996,107 @@ function showInfoWindow(marker) {
 
     console.log("Opened info window for marker using anchor method");
 
+    // Apply custom CSS to make scrollable content
+    applyInfoWindowScrollableStyles();
+
     // Fetch incentives for this business
     fetchBusinessIncentivesForInfoWindow(business._id);
+}
+
+/**
+ * Apply custom CSS to make info windows scrollable
+ */
+function applyInfoWindowScrollableStyles() {
+    if (!document.getElementById('info-window-scrollable-styles')) {
+        const style = document.createElement('style');
+        style.id = 'info-window-scrollable-styles';
+        style.textContent = `
+            /* Info window structure */
+            .info-window-wrapper {
+                width: 300px;
+                max-width: 300px;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .info-window-header {
+                padding: 8px 12px;
+                border-bottom: 1px solid #eee;
+                background-color: #f8f8f8;
+            }
+            
+            .info-window-header h3 {
+                margin: 0;
+                font-size: 16px;
+                color: #333;
+                word-break: break-word;
+            }
+            
+            .info-window-content {
+                max-height: 200px;
+                overflow: hidden;
+                position: relative;
+            }
+            
+            .info-window-scrollable {
+                padding: 10px 12px;
+                overflow-y: auto;
+                max-height: 200px;
+                scrollbar-width: thin;
+                scrollbar-color: #ddd #f8f8f8;
+            }
+            
+            .info-window-scrollable::-webkit-scrollbar {
+                width: 8px;
+            }
+            
+            .info-window-scrollable::-webkit-scrollbar-track {
+                background: #f8f8f8;
+            }
+            
+            .info-window-scrollable::-webkit-scrollbar-thumb {
+                background-color: #ddd;
+                border-radius: 4px;
+                border: 2px solid #f8f8f8;
+            }
+            
+            .info-window-footer {
+                padding: 8px 12px;
+                border-top: 1px solid #eee;
+                background-color: #f8f8f8;
+                display: flex;
+                justify-content: flex-end;
+            }
+            
+            /* Incentives list */
+            .incentives-list {
+                margin: 8px 0;
+                padding-left: 20px;
+            }
+            
+            .incentives-list li {
+                margin-bottom: 6px;
+            }
+            
+            /* Override Google's default styles */
+            .gm-style .gm-style-iw-c {
+                padding: 0 !important;
+                border-radius: 8px !important;
+                box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3) !important;
+            }
+            
+            .gm-style .gm-style-iw-d {
+                overflow: hidden !important;
+                padding: 0 !important;
+            }
+            
+            /* Ensure the info window size is consistent */
+            .gm-style-iw.gm-style-iw-c {
+                max-width: 320px !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
 }
 
 /**
@@ -2037,6 +2186,20 @@ function geocodeNearbyBusiness(business, centerLocation) {
         }
     });
 }
+
+// Save the original initGoogleMap function
+const originalInitGoogleMap = window.initGoogleMap;
+
+// Create a new wrapper function that calls the original function
+window.initGoogleMap = async function() {
+    // Call the original function first
+    await originalInitGoogleMap.call(this);
+
+    // Then add our enhancements
+    infoWindow = createEnhancedInfoWindow();
+    customizeInfoWindows();
+    console.log("Enhanced info window initialized");
+};
 
 // Initialize when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
