@@ -1626,7 +1626,7 @@ function getBusinessTypeIcon(type) {
 }
 
 /**
- * Fetch photos for a business from Google Places API using the current API
+ * Fetch photos for a business from our serverless function
  * @param {Object} business - Business object
  * @returns {Promise<string|null>} Photo URL or null if not found
  */
@@ -1658,75 +1658,82 @@ async function fetchPlacePhotosForBusiness(business) {
 
         if (!placeId) {
             console.log(`No place ID found for ${business.bname}`);
-            return null;
+            return useDefaultIcon(business, cacheKey);
         }
 
-        // Import the Places library
-        const { Place } = await google.maps.importLibrary("places");
+        // Determine the base URL
+        const baseURL = getBaseURL();
 
-        console.log(`Fetching photos for ${business.bname} with place ID: ${placeId}`);
+        // Construct the URL to our serverless function
+        const photoUrl = `${baseURL}/api/place-photo?placeId=${placeId}&maxwidth=100&maxheight=100&t=${Date.now()}`;
 
-        // Create a Place instance
-        const place = new Place({
-            id: placeId
-        });
+        console.log(`Using serverless photo URL for ${business.bname}: ${photoUrl}`);
 
-        // Fetch place details including photos
-        await place.fetchFields({
-            fields: ['photos', 'displayName']
-        });
-
-        // If photos exist, get the first one
-        if (place.photos && place.photos.length > 0) {
-            console.log(`Found ${place.photos.length} photos for ${business.bname}`);
-
-            // Get the first photo's reference
-            const photo = place.photos[0];
-
-            console.log("Photo object structure:", JSON.stringify(photo).substring(0, 200) + "...");
-
-            try {
-                // Attempt to use the new Google Maps Static API to get photo URL
-                // This builds the URL to the Google Maps Static API with your API key
-                const apiKey = window.appConfig.googleMapsApiKey;
-
-                // Check if photo has a name property (reference)
-                if (photo.name) {
-                    const photoReference = photo.name;
-                    const photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=100&maxheight=100&photo_reference=${photoReference}&key=${apiKey}`;
-                    console.log(`Generated photo URL for ${business.bname} using reference`);
-                    placeCache.set(cacheKey, photoUrl);
-                    return photoUrl;
-                } else if (photo.reference) {
-                    // Some versions might use reference directly
-                    const photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=100&maxheight=100&photo_reference=${photo.reference}&key=${apiKey}`;
-                    console.log(`Generated photo URL for ${business.bname} using reference`);
-                    placeCache.set(cacheKey, photoUrl);
-                    return photoUrl;
-                }
-                // If we get here, we couldn't find a usable photo reference
-                // Fall back to default icon
-                console.log(`No usable photo reference found for ${business.bname}`);
-            } catch (photoError) {
-                console.error(`Error accessing photo for ${business.bname}:`, photoError);
-            }
-        }
-
-        // Default icon fallback
-        const defaultPhotoUrl = `https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png`;
-        placeCache.set(cacheKey, defaultPhotoUrl);
-        console.log(`Using default photo for ${business.bname}`);
-        return defaultPhotoUrl;
+        // Add to cache
+        placeCache.set(cacheKey, photoUrl);
+        return photoUrl;
     } catch (error) {
         console.error(`Error fetching photos for ${business ? business.bname : 'unknown'}:`, error);
-        // Default icon fallback on error
-        const defaultPhotoUrl = `https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png`;
-        if (business) {
-            const cacheKey = business._id || business.bname + business.address1;
-            placeCache.set(cacheKey, defaultPhotoUrl);
-        }
-        return defaultPhotoUrl;
+        return useDefaultIcon(business, cacheKey);
     }
+}
+
+/**
+ * Helper function to use a default icon and cache it
+ * @param {Object} business - Business object
+ * @param {string} cacheKey - Cache key
+ * @returns {string} Default icon URL
+ */
+function useDefaultIcon(business, cacheKey) {
+    const defaultIcon = getBusinessIconUrl([], business ? business.type : null);
+    if (business && cacheKey) {
+        placeCache.set(cacheKey, defaultIcon);
+    }
+    return defaultIcon;
+}
+
+/**
+ * Get an appropriate business icon URL based on business type
+ * @param {Array} placeTypes - Google place types
+ * @param {string} businessType - Business type code
+ * @returns {string} Icon URL
+ */
+function getBusinessIconUrl(placeTypes, businessType) {
+    // Map business types to icon URLs
+    const businessTypeIcons = {
+        'AUTO': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/car_repair-71.png',
+        'BEAU': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/spa-71.png',
+        'BOOK': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/shopping-71.png',
+        'CLTH': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/shopping-71.png',
+        'CONV': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/convenience-71.png',
+        'DEPT': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/shopping-71.png',
+        'ELEC': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/electronics-71.png',
+        'ENTR': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/movies-71.png',
+        'FURN': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/shopping-71.png',
+        'FUEL': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/gas_station-71.png',
+        'GIFT': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/shopping-71.png',
+        'GROC': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/supermarket-71.png',
+        'HARDW': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/hardware-71.png',
+        'HEAL': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png',
+        'JEWL': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/shopping-71.png',
+        'OTHER': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png',
+        'RX': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/pharmacy-71.png',
+        'REST': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/restaurant-71.png',
+        'RETAIL': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/shopping-71.png',
+        'SERV': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png',
+        'SPEC': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/shopping-71.png',
+        'SPRT': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/sports-71.png',
+        'TECH': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/electronics-71.png',
+        'TOYS': 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/shopping-71.png'
+    };
+
+    // If we have a business type and there's an icon for it, use that
+    if (businessType && businessTypeIcons[businessType]) {
+        return businessTypeIcons[businessType];
+    }
+
+    // Default icon
+    return 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png';
 }
 
 
