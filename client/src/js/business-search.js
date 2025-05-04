@@ -60,15 +60,23 @@ window.viewBusinessDetails = function(businessId) {
  * @param {Object} position - Position for the info window
  */
 function showPlaceInfoWindow(place, position) {
+    // Create info window if it doesn't exist
+    if (!infoWindow) {
+        infoWindow = new google.maps.InfoWindow();
+    }
+
+    // Get type label
+    const placeTypeLabel = getPlaceTypeLabel(place.types);
+
     // Format the content with an "Add to Database" button
     const contentString = `
     <div class="info-window">
       <h3>${place.displayName || 'Unnamed Place'}</h3>
       <p><strong>Address:</strong><br>${place.formattedAddress || 'Address not available'}</p>
       ${place.nationalPhoneNumber ? `<p><strong>Phone:</strong> ${place.nationalPhoneNumber}</p>` : ''}
-      <p><strong>Type:</strong> ${getPlaceTypeLabel(place.types)}</p>
+      <p><strong>Type:</strong> ${placeTypeLabel}</p>
       <div class="info-window-actions">
-        <button class="add-business-btn" 
+        <button class="view-details-btn" 
                 onclick="window.addBusinessToDatabase('${place.id}')">
           Add to Patriot Thanks
         </button>
@@ -80,6 +88,62 @@ function showPlaceInfoWindow(place, position) {
     infoWindow.setContent(contentString);
     infoWindow.setPosition(position);
     infoWindow.open(map);
+}
+
+/**
+ * Add some CSS to style the markers properly
+ */
+function addCustomMarkerStyles() {
+    if (!document.getElementById('custom-marker-css')) {
+        const style = document.createElement('style');
+        style.id = 'custom-marker-css';
+        style.textContent = `
+            .custom-marker {
+                cursor: pointer;
+            }
+            .marker-pin {
+                width: 32px;
+                height: 40px;
+                border-radius: 50% 50% 50% 0;
+                background-color: #EA4335;
+                transform: rotate(-45deg);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }
+            .marker-icon {
+                transform: rotate(45deg);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 24px;
+                height: 24px;
+            }
+            .info-window {
+                padding: 10px;
+                max-width: 300px;
+            }
+            .info-window h3 {
+                margin-top: 0;
+                margin-bottom: 10px;
+                color: #212121;
+            }
+            .add-business-btn {
+                background-color: #EA4335;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 10px;
+            }
+            .add-business-btn:hover {
+                background-color: #D32F2F;
+            }
+        `;
+        document.head.appendChild(style);
+    }
 }
 
 /**
@@ -1096,7 +1160,7 @@ window.initGoogleMap = async function() {
             center: CONFIG.defaultCenter,
             zoom: CONFIG.defaultZoom,
             mapId: CONFIG.mapId,
-            clickableIcons: false  // Disable clickable POIs
+            clickableIcons: true
         });
 
         // Create info window and bounds
@@ -1124,8 +1188,7 @@ window.initGoogleMap = async function() {
         await setupMapClickHandler();
         setupMarkerClickPriority();
 
-        // Schedule image loading for markers after a short delay
-        setTimeout(() => initImageLoading(), 1500);
+        initAdditionalMapFeatures();
 
     } catch (error) {
         console.error("Error initializing Google Map:", error);
@@ -1238,7 +1301,7 @@ function resetMapView() {
 }
 
 /**
- * Setup handler for map clicks
+ * Setup handler for map clicks to handle POI clicks
  */
 async function setupMapClickHandler() {
     if (!map) {
@@ -1258,7 +1321,8 @@ async function setupMapClickHandler() {
 
             // Check if clicked on a POI (a place on the map)
             if (event.placeId) {
-                event.stop(); // Prevent the default info window
+                // Stop the default info window
+                event.stop();
 
                 console.log("POI clicked, placeId:", event.placeId);
 
@@ -1286,6 +1350,7 @@ async function setupMapClickHandler() {
                     showPlaceInfoWindow(place, event.latLng);
                 } catch (error) {
                     console.error("Error fetching place details:", error);
+                    alert("Error loading place details. Please try again.");
                 }
             }
         });
@@ -1296,11 +1361,11 @@ async function setupMapClickHandler() {
     }
 }
 
+
 /**
- * Setup marker click priority over POIs
+ * Add event listeners to prioritize marker clicks over POI clicks
  */
 function setupMarkerClickPriority() {
-    // Skip if map isn't ready
     if (!map) {
         console.error("Map not initialized, cannot set up click priority");
         return;
@@ -1308,57 +1373,46 @@ function setupMarkerClickPriority() {
 
     console.log("Setting up marker click priority");
 
-    // Create a listener for map clicks to intercept POI clicks
-    map.addListener('click', function(event) {
-        // Check if the click event has a placeId (indicating it's a POI)
+    // Create listener that will get called before Google's POI click
+    google.maps.event.addListener(map, 'click', function(event) {
+        // Only process if we have a POI click (place ID present)
         if (event.placeId) {
-            // Find if any of our markers are near this click location
+            // Check if any of our markers are close to this click
             const clickPoint = event.latLng;
 
-            // Find if any of our markers are within a small radius (15 pixels on screen)
-            const pixelRadius = 15;
+            // Search radius in pixels
+            const pixelRadius = 20;
 
-            // Convert lat/lng to pixel coordinates
-            const scale = Math.pow(2, map.getZoom());
+            // Get current projection
             const projection = map.getProjection();
-            const bounds = map.getBounds();
+            if (!projection) return;
 
-            if (!projection || !bounds) return;
-
-            const ne = bounds.getNorthEast();
-            const sw = bounds.getSouthWest();
-            const worldWidth = projection.fromLatLngToPoint(ne).x - projection.fromLatLngToPoint(sw).x;
-            const pixelsPerLngDegree = worldWidth / (ne.lng() - sw.lng());
+            // Convert latLng to pixel coordinates
+            const scale = Math.pow(2, map.getZoom());
+            const worldCoordinate = projection.fromLatLngToPoint(clickPoint);
 
             // Check each marker
             for (const marker of markers) {
                 if (!marker.position) continue;
 
                 // Get marker position
-                const markerLat = typeof marker.position.lat === 'function' ?
-                    marker.position.lat() : marker.position.lat;
-                const markerLng = typeof marker.position.lng === 'function' ?
-                    marker.position.lng() : marker.position.lng;
+                const markerLatLng = marker.position;
 
-                const clickLat = clickPoint.lat();
-                const clickLng = clickPoint.lng();
+                // Convert to pixel coordinates
+                const markerWorldCoord = projection.fromLatLngToPoint(markerLatLng);
 
-                // Convert coordinate difference to approximate pixels
-                const latDiffInPixels = Math.abs(markerLat - clickLat) *
-                    pixelsPerLngDegree * 111000 / (scale * Math.cos(markerLat * Math.PI / 180));
-                const lngDiffInPixels = Math.abs(markerLng - clickLng) * pixelsPerLngDegree;
-
+                // Calculate distance in pixels
                 const pixelDistance = Math.sqrt(
-                    Math.pow(latDiffInPixels, 2) +
-                    Math.pow(lngDiffInPixels, 2)
+                    Math.pow((worldCoordinate.x - markerWorldCoord.x) * scale, 2) +
+                    Math.pow((worldCoordinate.y - markerWorldCoord.y) * scale, 2)
                 );
 
-                // If click is near our marker, stop event propagation
-                if (pixelDistance < pixelRadius) {
-                    console.log("Preventing POI click near our marker");
-                    event.stop(); // Stop the event from being processed by Google Maps
+                // If click is near our marker
+                if (pixelDistance <= pixelRadius) {
+                    console.log("Preventing POI click, using our marker instead");
+                    event.stop(); // Prevent default
 
-                    // Trigger our own marker click
+                    // Trigger our marker click
                     setTimeout(() => {
                         showInfoWindow(marker);
                     }, 10);
@@ -1367,10 +1421,83 @@ function setupMarkerClickPriority() {
                 }
             }
         }
-    });
-
-    console.log("Marker click priority setup complete");
+    }, {passive: false}); // Important for event.stop() to work
 }
+
+/**
+ * Initialize additional setups when Google Maps is loaded
+ */
+function initAdditionalMapFeatures() {
+    console.log("Initializing additional map features");
+
+    // Add custom CSS style to fix any potential styling issues
+    addCustomMarkerStyleFixes();
+
+    // Setup priority for marker clicks
+    setupMarkerClickPriority();
+
+    // Make all info windows have consistent styling
+    customizeInfoWindows();
+}
+
+/**
+ * Add style fixes for any potential CSS issues
+ */
+function addCustomMarkerStyleFixes() {
+    if (!document.getElementById('marker-style-fixes')) {
+        const style = document.createElement('style');
+        style.id = 'marker-style-fixes';
+        style.textContent = `
+            /* Ensure icon is properly displayed inside marker */
+            .marker-icon {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 20px;
+                height: 20px;
+                color: #333;
+            }
+            
+            /* Fix for Font Awesome icons inside markers */
+            .marker-icon i {
+                font-size: 12px !important;
+                color: #333 !important;
+            }
+            
+            /* Info window action button specific styling */
+            .info-window-actions .view-details-btn {
+                margin-top: 8px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+/**
+ * Apply consistent styling to all Google Maps info windows
+ */
+function customizeInfoWindows() {
+    // Override default styles for Google Maps info windows
+    const infoWindowStyles = document.createElement('style');
+    infoWindowStyles.textContent = `
+        /* Fix padding in Google Maps info windows */
+        .gm-style .gm-style-iw-c {
+            padding: 12px !important;
+        }
+        
+        /* Remove the default close button to prevent accidental closing */
+        .gm-style .gm-style-iw-d {
+            overflow: hidden !important;
+        }
+        
+        /* Make the info window bigger */
+        .gm-style-iw {
+            max-width: 300px !important;
+        }
+    `;
+    document.head.appendChild(infoWindowStyles);
+}
+
 
 /**
  * Function to initialize image loading for markers
@@ -1503,7 +1630,7 @@ function geocodeBusinessAddress(business, index, total) {
 }
 
 /**
- * Add an advanced marker to the map
+ * Add an advanced marker to the map (Updated to work with your existing CSS)
  * @param {Object} business - Business object
  * @param {Object} location - Google Maps location object
  */
@@ -1517,43 +1644,28 @@ async function addAdvancedMarker(business, location) {
 
         // Determine marker color based on whether it's a primary result or nearby result
         const isNearby = business.isNearby === true;
-        const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
+        const pinClass = isNearby ? "nearby" : "primary";
 
-        // Create a business type icon
-        const businessIcon = getBusinessTypeIcon(business.type);
-
-        // Create a pin element with an icon or image
+        // Create a pin element
         const pinElement = document.createElement('div');
         pinElement.className = 'custom-marker';
         pinElement.style.cursor = 'pointer';
         pinElement.style.zIndex = '1000'; // Higher z-index to prevent POI clicks
 
-        // Different marker styles based on whether we have an image or not
-        if (business.image_url) {
-            // With business image
-            pinElement.innerHTML = `
-        <div class="marker-container">
-          <div class="marker-pin" style="background-color: ${pinColor};">
-            <div class="marker-image-container">
-              <img src="${business.image_url}" alt="${business.bname}" class="marker-image">
+        // Get business type icon
+        const businessIcon = getBusinessTypeIconHTML(business.type);
+
+        // Set innerHTML with the correct structure to match your CSS
+        pinElement.innerHTML = `
+            <div class="marker-container">
+                <div class="marker-pin ${pinClass}">
+                    <div class="marker-icon">
+                        ${businessIcon}
+                    </div>
+                </div>
+                <div class="marker-shadow"></div>
             </div>
-          </div>
-          <div class="marker-shadow"></div>
-        </div>
-      `;
-        } else {
-            // With business type icon
-            pinElement.innerHTML = `
-        <div class="marker-container">
-          <div class="marker-pin" style="background-color: ${pinColor};">
-            <div class="marker-icon">
-              ${businessIcon}
-            </div>
-          </div>
-          <div class="marker-shadow"></div>
-        </div>
-      `;
-        }
+        `;
 
         // Create the advanced marker
         const marker = new AdvancedMarkerElement({
@@ -1561,17 +1673,17 @@ async function addAdvancedMarker(business, location) {
             map: map,
             title: business.bname,
             content: pinElement,
-            collisionBehavior: isNearby ? 'OPTIONAL_AND_HIDES_LOWER_PRIORITY' : 'REQUIRED'
+            collisionBehavior: isNearby ? 'OPTIONAL_AND_HIDES_LOWER_PRIORITY' : 'REQUIRED_AND_HIDES_OPTIONAL'
         });
 
         // Store the business data with the marker
         marker.business = business;
         marker.isNearby = isNearby;
+        marker.position = position;
 
-        // Add click event listener using a single approach for efficiency
+        // Add click event listener
         pinElement.addEventListener('click', function(e) {
             console.log("Marker element clicked:", business.bname);
-            // Stop propagation to prevent Google POI clicks
             e.stopPropagation();
             showInfoWindow(marker);
         });
@@ -1586,6 +1698,68 @@ async function addAdvancedMarker(business, location) {
         return null;
     }
 }
+
+/**
+ * Get HTML for a business type icon
+ * @param {string} businessType - Business type code
+ * @returns {string} Icon HTML
+ */
+function getBusinessTypeIconHTML(businessType) {
+    // Map business types to icon HTML
+    // Using Font Awesome icons that are already included in your project
+    const iconMap = {
+        'AUTO': '<i class="fas fa-car" style="transform: rotate(-45deg);"></i>',
+        'BEAU': '<i class="fas fa-spa" style="transform: rotate(-45deg);"></i>',
+        'BOOK': '<i class="fas fa-book" style="transform: rotate(-45deg);"></i>',
+        'CLTH': '<i class="fas fa-tshirt" style="transform: rotate(-45deg);"></i>',
+        'CONV': '<i class="fas fa-store" style="transform: rotate(-45deg);"></i>',
+        'DEPT': '<i class="fas fa-shopping-bag" style="transform: rotate(-45deg);"></i>',
+        'ELEC': '<i class="fas fa-bolt" style="transform: rotate(-45deg);"></i>',
+        'ENTR': '<i class="fas fa-film" style="transform: rotate(-45deg);"></i>',
+        'FURN': '<i class="fas fa-couch" style="transform: rotate(-45deg);"></i>',
+        'FUEL': '<i class="fas fa-gas-pump" style="transform: rotate(-45deg);"></i>',
+        'GIFT': '<i class="fas fa-gift" style="transform: rotate(-45deg);"></i>',
+        'GROC': '<i class="fas fa-shopping-cart" style="transform: rotate(-45deg);"></i>',
+        'HARDW': '<i class="fas fa-hammer" style="transform: rotate(-45deg);"></i>',
+        'HEAL': '<i class="fas fa-heartbeat" style="transform: rotate(-45deg);"></i>',
+        'JEWL': '<i class="fas fa-gem" style="transform: rotate(-45deg);"></i>',
+        'OTHER': '<i class="fas fa-store-alt" style="transform: rotate(-45deg);"></i>',
+        'RX': '<i class="fas fa-prescription-bottle-alt" style="transform: rotate(-45deg);"></i>',
+        'REST': '<i class="fas fa-utensils" style="transform: rotate(-45deg);"></i>',
+        'RETAIL': '<i class="fas fa-shopping-basket" style="transform: rotate(-45deg);"></i>',
+        'SERV': '<i class="fas fa-concierge-bell" style="transform: rotate(-45deg);"></i>',
+        'SPEC': '<i class="fas fa-star" style="transform: rotate(-45deg);"></i>',
+        'SPRT': '<i class="fas fa-football-ball" style="transform: rotate(-45deg);"></i>',
+        'TECH': '<i class="fas fa-laptop" style="transform: rotate(-45deg);"></i>',
+        'TOYS': '<i class="fas fa-gamepad" style="transform: rotate(-45deg);"></i>'
+    };
+
+    // Return the icon for this business type, or a default
+    return iconMap[businessType] || '<i class="fas fa-store" style="transform: rotate(-45deg);"></i>';
+}
+
+
+/**
+ * Get an SVG icon for a business type (new function)
+ * @param {string} businessType - Business type code
+ * @returns {string} SVG icon markup
+ */
+function getBusinessTypeSVGIcon(businessType) {
+    // Map business types to SVG icons
+    const businessTypeIcons = {
+        'AUTO': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#EA4335" d="M5,11L6.5,6.5H17.5L19,11M17.5,16A1.5,1.5 0 0,1 16,14.5A1.5,1.5 0 0,1 17.5,13A1.5,1.5 0 0,1 19,14.5A1.5,1.5 0 0,1 17.5,16M6.5,16A1.5,1.5 0 0,1 5,14.5A1.5,1.5 0 0,1 6.5,13A1.5,1.5 0 0,1 8,14.5A1.5,1.5 0 0,1 6.5,16M18.92,6C18.72,5.42 18.16,5 17.5,5H6.5C5.84,5 5.28,5.42 5.08,6L3,12V20A1,1 0 0,0 4,21H5A1,1 0 0,0 6,20V19H18V20A1,1 0 0,0 19,21H20A1,1 0 0,0 21,20V12L18.92,6Z"/></svg>',
+        'BEAU': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M15.5,9.63C15.31,6.84 14.18,4.12 12.06,2C9.92,4.14 8.74,6.86 8.5,9.63C9.79,10.31 10.97,11.19 12,12.26C13.03,11.2 14.21,10.32 15.5,9.63M12,15.45C9.85,12.17 6.18,10 2,10C2,20 11.32,21.89 12,22C12.68,21.88 22,20 22,10C17.82,10 14.15,12.17 12,15.45Z"/></svg>',
+        'REST': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#FBC02D" d="M8.1,13.34L3.91,9.16C2.35,7.59 2.35,5.06 3.91,3.5L10.93,10.5L8.1,13.34M14.88,11.53L13.41,13L20.29,19.88L18.88,21.29L12,14.41L5.12,21.29L3.71,19.88L13.47,10.12C12.76,8.59 13.26,6.44 14.85,4.85C16.76,2.93 19.5,2.57 20.96,4.03C22.43,5.5 22.07,8.24 20.15,10.15C18.56,11.74 16.41,12.24 14.88,11.53Z"/></svg>',
+        'GROC': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#0F9D58" d="M7,18A2,2 0 0,1 5,20A2,2 0 0,1 3,18A2,2 0 0,1 5,16A2,2 0 0,1 7,18M17,18A2,2 0 0,1 15,20A2,2 0 0,1 13,18A2,2 0 0,1 15,16A2,2 0 0,1 17,18M7.17,14.75L7.2,14.63L8.1,13H15.55C16.3,13 16.96,12.59 17.3,11.97L21.16,4.96L19.42,4H19.41L18.31,6L15.55,11H8.53L8.4,10.73L6.16,6L5.21,4L4.27,2H1V4H3L6.6,11.59L5.25,14.04C5.09,14.32 5,14.65 5,15A2,2 0 0,0 7,17H19V15H7.42C7.29,15 7.17,14.89 7.17,14.75Z"/></svg>',
+        'OTHER': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#616161" d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,7V9H16V13C16,14.1 15.1,15 14,15H12V17H8V13H12V11H8V7H12Z"/></svg>'
+        // Add more type-specific icons as needed
+    };
+
+    // Return the icon for this business type, or a default
+    return businessTypeIcons[businessType] ||
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#616161" d="M12,7V3H2V21H22V7H12M10,19H4V17H10V19M10,15H4V13H10V15M10,11H4V9H10V11M10,7H4V5H10V7M20,19H12V5H20V19M18,11H14V13H18V11M18,7H14V9H18V7M18,15H14V17H18V15Z"/></svg>';
+}
+
 
 /**
  * Fetch icon for a business based on its type
@@ -1868,4 +2042,5 @@ function geocodeNearbyBusiness(business, centerLocation) {
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize business search functionality
     initBusinessSearch();
+    addCustomMarkerStyles();
 });
