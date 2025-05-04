@@ -1626,7 +1626,7 @@ function getBusinessTypeIcon(type) {
 }
 
 /**
- * Fetch photos for a business from Google Places API using the newer Place API approach
+ * Fetch photos for a business from Google Places API using the current API
  * @param {Object} business - Business object
  * @returns {Promise<string|null>} Photo URL or null if not found
  */
@@ -1680,34 +1680,52 @@ async function fetchPlacePhotosForBusiness(business) {
         if (place.photos && place.photos.length > 0) {
             console.log(`Found ${place.photos.length} photos for ${business.bname}`);
 
-            // The new Photos API has a different interface - handle it properly
+            // Get the first photo's reference
             const photo = place.photos[0];
 
-            // Check if this is the new format or old format
-            if (typeof photo.getUrl === 'function') {
-                // Old format with getUrl method
-                const photoUrl = photo.getUrl({
-                    maxWidth: 100,
-                    maxHeight: 100
-                });
-                console.log(`Got photo URL (old API) for ${business.bname}`);
-                placeCache.set(cacheKey, photoUrl);
-                return photoUrl;
-            } else {
-                // New format - check for url or data property
-                // Fallback to a default icon if no direct photo URL available
-                const defaultPhotoUrl = `https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png`;
-                placeCache.set(cacheKey, defaultPhotoUrl);
-                console.log(`Using default photo for ${business.bname} due to API changes`);
-                return defaultPhotoUrl;
+            console.log("Photo object structure:", JSON.stringify(photo).substring(0, 200) + "...");
+
+            try {
+                // Attempt to use the new Google Maps Static API to get photo URL
+                // This builds the URL to the Google Maps Static API with your API key
+                const apiKey = window.appConfig.googleMapsApiKey;
+
+                // Check if photo has a name property (reference)
+                if (photo.name) {
+                    const photoReference = photo.name;
+                    const photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=100&maxheight=100&photo_reference=${photoReference}&key=${apiKey}`;
+                    console.log(`Generated photo URL for ${business.bname} using reference`);
+                    placeCache.set(cacheKey, photoUrl);
+                    return photoUrl;
+                } else if (photo.reference) {
+                    // Some versions might use reference directly
+                    const photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=100&maxheight=100&photo_reference=${photo.reference}&key=${apiKey}`;
+                    console.log(`Generated photo URL for ${business.bname} using reference`);
+                    placeCache.set(cacheKey, photoUrl);
+                    return photoUrl;
+                }
+                // If we get here, we couldn't find a usable photo reference
+                // Fall back to default icon
+                console.log(`No usable photo reference found for ${business.bname}`);
+            } catch (photoError) {
+                console.error(`Error accessing photo for ${business.bname}:`, photoError);
             }
         }
 
-        console.log(`No photos found for ${business.bname}`);
-        return null;
+        // Default icon fallback
+        const defaultPhotoUrl = `https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png`;
+        placeCache.set(cacheKey, defaultPhotoUrl);
+        console.log(`Using default photo for ${business.bname}`);
+        return defaultPhotoUrl;
     } catch (error) {
         console.error(`Error fetching photos for ${business ? business.bname : 'unknown'}:`, error);
-        return null;
+        // Default icon fallback on error
+        const defaultPhotoUrl = `https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png`;
+        if (business) {
+            const cacheKey = business._id || business.bname + business.address1;
+            placeCache.set(cacheKey, defaultPhotoUrl);
+        }
+        return defaultPhotoUrl;
     }
 }
 
