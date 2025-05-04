@@ -36,9 +36,9 @@
     <!-- Optimized Google Maps script insertion with proper async loading and Map ID -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Get API key from runtime config or use your actual API key
-            const apiKey = 'AIzaSyCHKhYZwQR37M_0QctXUQe6VFRFrlhaYj8';
-            const mapId = 'ebe8ec43a7bc252d';
+            // Get API key and mapId from runtime config
+            const apiKey = window.appConfig.googleMapsApiKey;
+            const mapId = window.appConfig.googleMapsMapId;
 
             console.log("Loading Google Maps with Map ID:", mapId);
 

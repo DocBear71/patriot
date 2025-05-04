@@ -72,11 +72,20 @@ module.exports = {
         // Copy static assets
         new CopyWebpackPlugin({
             patterns: [
+                {
+                    from: './src/js/runtime-config.js',
+                    to: 'js/runtime-config.js',
+                    force: true,
+                    priority: 10
+                },
                 { from: './src/images', to: 'images' },
                 { from: './src/css', to: 'css' },
                 {
                     from: './src/js',
                     to: 'js',
+                    globOptions: {
+                        ignore: ['**/runtime-config.js'] // Ignore this file in the general copy
+                    },
                     transform: (content, path) => {
                         if (path.endsWith('.js')) {
                             return content

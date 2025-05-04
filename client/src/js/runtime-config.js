@@ -1,6 +1,6 @@
 // File: src/js/runtime-config.js
 // This file will be copied to public/js and will be replaced during build
-// Runtime configuration for Google Maps and other services
+// Added runtime configuration for Google Maps and other services
 window.appConfig = {
     // Your Google Maps API key (from environment variable or fallback)
     googleMapsApiKey: typeof process !== 'undefined' && process.env.GOOGLE_MAPS_API_KEY

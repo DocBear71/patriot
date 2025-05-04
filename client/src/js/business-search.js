@@ -872,27 +872,27 @@ function getBaseURL() {
         : `https://patriotthanks.vercel.app`;
 }
 
-/**
- * Load Google Maps script with API key
- */
-function loadGoogleMapsScript() {
-    // Get API key
-    const apiKey = 'AIzaSyCHKhYZwQR37M_0QctXUQe6VFRFrlhaYj8';
-    const mapId = CONFIG.mapId;
-
-    console.log("Loading Google Maps with Map ID:", mapId);
-
-    // Create and insert the Google Maps script with all recommended parameters
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMap&loading=async`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = function() {
-        console.error('Google Maps API failed to load. Check your API key.');
-        alert('Error loading Google Maps. Please try again later.');
-    };
-    document.head.appendChild(script);
-}
+// /**
+//  * Load Google Maps script with API key
+//  */
+// function loadGoogleMapsScript() {
+//     // Get API key
+//     const apiKey = 'AIzaSyCHKhYZwQR37M_0QctXUQe6VFRFrlhaYj8';
+//     const mapId = CONFIG.mapId;
+//
+//     console.log("Loading Google Maps with Map ID:", mapId);
+//
+//     // Create and insert the Google Maps script with all recommended parameters
+//     const script = document.createElement('script');
+//     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMap&loading=async`;
+//     script.async = true;
+//     script.defer = true;
+//     script.onerror = function() {
+//         console.error('Google Maps API failed to load. Check your API key.');
+//         alert('Error loading Google Maps. Please try again later.');
+//     };
+//     document.head.appendChild(script);
+// }
 
 /**
  * Initialize business search functionality
