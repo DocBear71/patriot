@@ -268,11 +268,18 @@ function attachLoginListeners() {
     });
 
     // Also handle form submission
-    $(document).on('submit', '#login-form', function(e) {
+    $(document).on('submit', '#login-form', '.dropdown-menu form', function(e) {
         console.log("Login form submitted");
         e.preventDefault();
         handleLogin();
         return false;
+    });
+
+    $(document).on('keypress', '#DropdownFormPassword1', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            handleLogin();
+        }
     });
 
     // Handle logout button

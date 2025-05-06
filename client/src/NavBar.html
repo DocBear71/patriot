@@ -58,7 +58,7 @@
                         Sign In
                     </button>
                     <div class="dropdown-menu dropdown-menu-right">
-                        <form class="px-4 py-3" id="login-form" onsubmit="return false;">
+                        <form class="px-4 py-3" id="login-form" onsubmit="handleLogin(); return false;">
                             <div class="form-group">
                                 <label for="DropdownFormEmail1">Email address</label>
                                 <input type="email" class="form-control" id="DropdownFormEmail1" placeholder="email@example.com">
@@ -73,7 +73,7 @@
                                     Remember me
                                 </label>
                             </div>
-                            <button type="button" id="login-button" class="btn btn-primary">Sign in</button>
+                            <button type="submit" id="login-button" class="btn btn-primary">Sign in</button>
                         </form>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="./register.html">New around here? Sign up</a>
