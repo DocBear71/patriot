@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? `http://${window.location.host}`
-                : 'https://patriotthanks.vercel.app';
+                : window.location.origin;
 
             console.log("Verifying token with URL:", `${baseURL}/api/auth.js?operation=verify-token\``);
 
@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? `http://${window.location.host}`
-                : 'https://patriotthanks.vercel.app';
+                : window.location.origin;
 
             // Get auth token
             const token = getAuthToken();
@@ -689,8 +689,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? `http://${window.location.host}`
-                : 'https://patriotthanks.vercel.app';
-
+                :  window.location.origin;
             // Get auth token
             const token = getAuthToken();
             if (!token) {
@@ -775,7 +774,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Determine the base URL
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? `http://${window.location.host}`
-                : 'https://patriotthanks.vercel.app';
+                : window.location.origin;
 
             // Get auth token
             const token = getAuthToken();

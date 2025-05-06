@@ -190,7 +190,7 @@ function fetchIncentives(business_id, businessName) {
         // local versus production
         const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
             ? `https://${window.location.host}`
-            : `https://patriotthanks.vercel.app`;
+            : window.location.origin;
 
         const apiURL = `${baseURL}/api/incentives.js?business_id=${business_id}`;
         console.log("Fetching from URL: ", apiURL);

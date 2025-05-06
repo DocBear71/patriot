@@ -24,7 +24,7 @@ function handleLogin() {
         // determine the base URL
         const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
             ? `http://${window.location.host}`
-            : `https://patriotthanks.vercel.app`;
+            : window.location.origin;
 
         // Make API call to login endpoint
         fetch(`${baseURL}/api/auth.js?operation=login`, {

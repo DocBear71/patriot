@@ -356,8 +356,9 @@ document.addEventListener('DOMContentLoaded', function() {
             submitButton.disabled = true;
         }
 
+        const baseURL = window.location.origin;
         // make the api call to the server
-        const apiURL = 'https://patriotthanks.vercel.app/api/incentives.js';
+        const apiURL = `${baseURL}/api/incentives.js`;
         console.log("Attempting to submit to: ", apiURL);
 
         fetch(apiURL, {

@@ -43,8 +43,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to submit the contact form
     function submitContactForm(formData, submitButton, originalText) {
         console.log("Submitting contact form:", formData);
-
-        const apiUrl = 'https://patriotthanks.vercel.app/api/contact.js';
+        const baseURL = window.location.origin;
+        const apiUrl = `${baseURL}/api/contact.js`;
 
         fetch(apiUrl, {
             method: 'POST',

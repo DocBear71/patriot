@@ -947,7 +947,7 @@ function validateField(field, validationFn) {
 function getBaseURL() {
     return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? `https://${window.location.host}`
-        : `https://patriotthanks.vercel.app`;
+        : window.location.origin;
 }
 
 // /**

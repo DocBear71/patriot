@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Determine the base URL, local or production
             const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
                 ? `http://${window.location.host}`
-                : 'https://patriotthanks.vercel.app';
+                : window.location.origin;
 
             // Use the API endpoint with the baseURL
             const apiURL = `${baseURL}/api/business.js?operation=admin-update-business`;

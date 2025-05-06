@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Determine the base URL (works for both local development and production)
     const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
         ? `http://${window.location.host}`
-        : `https://patriotthanks.vercel.app`;
+        : window.location.origin;
 
     // Handle forgot password form submission
     const forgotPasswordForm = document.getElementById('forgot-password-form');
