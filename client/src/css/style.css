@@ -12,7 +12,7 @@ DESCRIPTION:
 }
  
 body {
-    background-image: url("../images/backgroundNew.png");
+    background-image: url("../images/backgroundNew.webp");
     background-attachment: fixed;
     background-repeat:no-repeat;
     background-size:100% 100%;
@@ -255,13 +255,13 @@ p {
 
 footer {
     clear: both;
-    padding: unset;
-    text-align: center;
-    background-image: url("../images/flag_banner_2.jpg");
+    background: linear-gradient(180deg,rgba(255, 0, 0, 1) 0%, rgba(255, 255, 255, 1) 34%, rgba(255, 255, 255, 1) 66%, rgba(0, 0, 255, 1) 100%);
     background-position: center;
     background-size: contain;
-    background-repeat: repeat-x;
-    border-top: 2px solid #000000;
+    width: 100%;
+    margin: 0 0;
+    border: 1px solid #000000;
+    padding: 0 0;
 }
 
 .footer_style {
@@ -269,7 +269,7 @@ footer {
     text-align: center;
     font-style: oblique;
     font-weight: bold;
-    color:#ffd700;
+    color:#0000ff;
 }
 
 /* Footer link styles are set below */
