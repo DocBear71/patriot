@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', function() {
             message += invalidFields.join("\n");
             alert(message);
         } else {
+            const placeIdField = document.getElementById('google_place_id');
+            const placeId = placeIdField ? placeIdField.value : null;
+
             const formData = {
                 bname: form.businessName.value,
                 address1: form.address1.value,
@@ -49,6 +52,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 phone: form.phone.value,
                 type: form.type.value,
             };
+
+            if (placeId) {
+                formData.location = {
+                    type: 'Point',
+                    coordinates: [-91.5769, 42.0433]
+                }
+            }
             // Add location data if hidden fields exist
             const latField = document.getElementById('hidden_lat');
             const lngField = document.getElementById('hidden_lng');
@@ -65,9 +75,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log("Added location data:", formData.location);
                 }
             }
-
-            console.log("Form data to submit:", formData);
-
             console.log("Form data to submit:", formData);
 
             // Submit the data to MongoDB

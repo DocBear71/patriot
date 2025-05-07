@@ -290,9 +290,11 @@ window.addBusinessToDatabase = async function(placeId) {
             state: getAddressComponentFromPlace(place, 'administrative_area_level_1'),
             zip: getAddressComponentFromPlace(place, 'postal_code'),
             phone: place.nationalPhoneNumber || '',
+            placeId: place.id,
+
+            // Store coordinates for later use
             lat: place.location?.lat || 0,
             lng: place.location?.lng || 0,
-            placeId: place.id,
             // Add this for proper GeoJSON formatting
             location: {
                 type: 'Point',
@@ -302,6 +304,9 @@ window.addBusinessToDatabase = async function(placeId) {
                 ]
             }
         };
+
+        // Log the coordinates to verify they're correct
+        console.log(`Place coordinates: ${businessData.lat}, ${businessData.lng}`);
 
         // Store in sessionStorage for the add business page to use
         sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
