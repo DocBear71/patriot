@@ -49,6 +49,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 phone: form.phone.value,
                 type: form.type.value,
             };
+            // Add location data if hidden fields exist
+            const latField = document.getElementById('hidden_lat');
+            const lngField = document.getElementById('hidden_lng');
+
+            if (latField && lngField) {
+                const lat = parseFloat(latField.value);
+                const lng = parseFloat(lngField.value);
+
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    formData.location = {
+                        type: 'Point',
+                        coordinates: [lng, lat] // GeoJSON format uses [longitude, latitude]
+                    };
+                    console.log("Added location data:", formData.location);
+                }
+            }
+
+            console.log("Form data to submit:", formData);
 
             console.log("Form data to submit:", formData);
 

@@ -365,6 +365,33 @@
                     }
                 }
 
+                // Store lat/lng in hidden fields if they exist
+                if (businessData.lat && businessData.lng) {
+                    console.log(`Storing coordinates: ${businessData.lat}, ${businessData.lng}`);
+
+                    // Create hidden field for lat
+                    let latField = document.getElementById('hidden_lat');
+                    if (!latField) {
+                        latField = document.createElement('input');
+                        latField.type = 'hidden';
+                        latField.id = 'hidden_lat';
+                        latField.name = 'lat';
+                        document.getElementById('business-form').appendChild(latField);
+                    }
+                    latField.value = businessData.lat;
+
+                    // Create hidden field for lng
+                    let lngField = document.getElementById('hidden_lng');
+                    if (!lngField) {
+                        lngField = document.createElement('input');
+                        lngField.type = 'hidden';
+                        lngField.id = 'hidden_lng';
+                        lngField.name = 'lng';
+                        document.getElementById('business-form').appendChild(lngField);
+                    }
+                    lngField.value = businessData.lng;
+                }
+
                 // Add a success message
                 const formContainer = document.querySelector('fieldset');
                 if (formContainer) {
