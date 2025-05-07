@@ -327,7 +327,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 phone: '319-555-1234',
                 type: 'technology',
                 status: 'active',
-                created_at: '2024-04-01T00:00:00.000Z'
+                created_at: '2024-04-01T00:00:00.000Z',
+                created_by: '1',
+                createdByUser: {
+                    name: 'John Doe',
+                    email: 'john.doe@example.com'
+                }
             },
             {
                 _id: '2',
@@ -339,7 +344,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 phone: '319-555-5678',
                 type: 'food',
                 status: 'active',
-                created_at: '2024-04-05T00:00:00.000Z'
+                created_at: '2024-04-05T00:00:00.000Z',
+                created_by: '2',
+                createdByUser: {
+                    name: 'Jane Smith',
+                    email: 'jane.smith@example.com'
+                }
             },
             {
                 _id: '3',
@@ -351,7 +361,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 phone: '319-555-9012',
                 type: 'healthcare',
                 status: 'active',
-                created_at: '2024-04-10T00:00:00.000Z'
+                created_at: '2024-04-10T00:00:00.000Z',
+                created_by: '3',
+                createdByUser: {
+                    name: 'Bob Johnson',
+                    email: 'bob.johnson@example.com'
+                }
             }
         ];
 
@@ -379,9 +394,18 @@ document.addEventListener('DOMContentLoaded', function() {
             // Use the helper function to get the display name for the business type
             const businessTypeDisplay = getBusinessTypeDisplay(business.type);
 
-            const createdByInfo = business.created_by ?
-                `<span data-user-id="${business.created_by}">User: ${business.created_by}</span>`
-                : 'Unknown';
+            // Display user name and email if available
+            let createdByInfo = '';
+            if (business.createdByUser) {
+                createdByInfo = `<div data-user-id="${business.created_by}">
+                    <div>${business.createdByUser.name}</div>
+                    <div class="text-muted small">${business.createdByUser.email}</div>
+                </div>`;
+            } else if (business.created_by) {
+                createdByInfo = `<span data-user-id="${business.created_by}">ID: ${business.created_by}</span>`;
+            } else {
+                createdByInfo = 'Unknown';
+            }
 
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -389,12 +413,12 @@ document.addEventListener('DOMContentLoaded', function() {
             <td>${locationText}</td>
             <td>${businessTypeDisplay}</td>
             <td>${business.phone || 'N/A'}</td>
-            <td><span class="badge ${business.status === 'active' 
-                    ? 'badge-success' 
-                    : 'badge-secondary'}">
-                                    ${business.status === 'active' 
-                    ? 'Active' 
-                    : 'Inactive'}
+            <td><span class="badge ${business.status === 'active'
+                ? 'badge-success'
+                : 'badge-secondary'}">
+                                    ${business.status === 'active'
+                ? 'Active'
+                : 'Inactive'}
             </span>
             </td>
             <td>${createdByInfo}</td>
