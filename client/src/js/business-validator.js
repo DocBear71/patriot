@@ -156,8 +156,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function isValidPhone(value) {
-        const phonePattern = /^\d{3}(-\d{3}(-\d{4}))?$/
-        return phonePattern.test(value);
+        // Remove all non-digit characters
+        const digitsOnly = value.replace(/\D/g, '');
+
+        // Check if we have exactly 10 digits
+        if (digitsOnly.length !== 10) {
+            return false;
+        }
+
+        // Format as XXX-XXX-XXXX
+        // Update the field with the formatted value
+        document.getElementById('phone').value = `${digitsOnly.substring(0, 3)}-${digitsOnly.substring(3, 6)}-${digitsOnly.substring(6, 10)}`;
+
+        return true;
     }
 
     // Apply validation styling to a field

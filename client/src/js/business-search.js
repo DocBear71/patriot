@@ -292,7 +292,15 @@ window.addBusinessToDatabase = async function(placeId) {
             phone: place.nationalPhoneNumber || '',
             lat: place.location?.lat || 0,
             lng: place.location?.lng || 0,
-            placeId: place.id
+            placeId: place.id,
+            // Add this for proper GeoJSON formatting
+            location: {
+                type: 'Point',
+                coordinates: [
+                    place.location?.lng || 0,
+                    place.location?.lat || 0
+                ]
+            }
         };
 
         // Store in sessionStorage for the add business page to use
