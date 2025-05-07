@@ -57,6 +57,36 @@ input[type=submit]:hover {
 background-color: #0000ff;
 }
 
+.location-option {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.location-option input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.location-status {
+    margin-left: 10px;
+    font-size: 0.85em;
+    color: #666;
+    display: none;
+    flex-basis: 100%;
+    margin-top: 5px;
+    padding-left: 24px;
+}
+
+.loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
 /* The message box is shown when the user clicks on the password field */
 #message {
     display:none;

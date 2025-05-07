@@ -1,6 +1,8 @@
+// models/User.js
 const mongoose = require('mongoose');
 
-const schema = new mongoose.Schema({
+// Define user schema
+const userSchema = new mongoose.Schema({
     fname: String,
     lname: String,
     address1: String,
@@ -9,12 +11,17 @@ const schema = new mongoose.Schema({
     state: String,
     zip: String,
     status: String,
-    email: String,
-    password: String,
-    psw_repeat: String,
+    level: String,
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    isAdmin: Boolean,
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now },
+
+    // New fields for password reset
+    resetToken: String,
+    resetTokenExpires: Date
 });
 
-const Users = mongoose.model('Users', schema);
-
-
-module.exports = Users;
+// Export the model - use the 'users' collection
+module.exports = mongoose.model('User', userSchema);

@@ -103,6 +103,67 @@ function showPlaceInfoWindow(place, position) {
     applyInfoWindowScrollableStyles();
 }
 
+/**
+ * Get the user's current location
+ * @returns {Promise<{lat: number, lng: number}>} Location coordinates
+ */
+function getUserLocation() {
+    return new Promise((resolve, reject) => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const userLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    console.log("Got user location:", userLocation);
+                    resolve(userLocation);
+                },
+                error => {
+                    console.warn("Error getting location:", error);
+                    reject(error);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            console.warn("Geolocation not supported by this browser");
+            reject(new Error("Geolocation not supported"));
+        }
+    });
+}
+
+/**
+ * Reverse geocode coordinates to get address
+ * @param {Object} location - Object with lat and lng properties
+ * @returns {Promise<string>} Formatted address
+ */
+async function reverseGeocode(location) {
+    try {
+        const geocoder = new google.maps.Geocoder();
+
+        return new Promise((resolve, reject) => {
+            geocoder.geocode({ 'location': location }, (results, status) => {
+                if (status === google.maps.GeocoderStatus.OK) {
+                    if (results[0]) {
+                        console.log("Reverse geocoded address:", results[0].formatted_address);
+                        resolve(results[0].formatted_address);
+                    } else {
+                        reject(new Error("No results found"));
+                    }
+                } else {
+                    reject(new Error(`Geocoder failed due to: ${status}`));
+                }
+            });
+        });
+    } catch (error) {
+        console.error("Error reverse geocoding:", error);
+        return null;
+    }
+}
 
 /**
  * Add some CSS to style the markers properly
@@ -982,6 +1043,7 @@ function initBusinessSearch() {
     const form = {
         businessName: document.getElementById("business-name"),
         address: document.getElementById("address"),
+        useMyLocation: document.getElementById("use-my-location")
     };
 
     // Get the form element
@@ -1038,6 +1100,35 @@ function initBusinessSearch() {
             validateField(this, isNotEmpty);
         });
     }
+    if (form.useMyLocation) {
+        form.useMyLocation.addEventListener('change', function() {
+            const locationStatus = document.getElementById('location-status');
+
+            if (this.checked) {
+                // Disable the address field if using location
+                if (form.address) {
+                    form.address.disabled = true;
+                    form.address.placeholder = "Using your current location...";
+                }
+
+                if (locationStatus) {
+                    locationStatus.textContent = 'Location will be used when you search';
+                    locationStatus.style.display = 'block';
+                    locationStatus.style.color = '#666';
+                }
+            } else {
+                // Re-enable the address field
+                if (form.address) {
+                    form.address.disabled = false;
+                    form.address.placeholder = "Address, City, State, or Zip";
+                }
+
+                if (locationStatus) {
+                    locationStatus.style.display = 'none';
+                }
+            }
+        });
+    }
 }
 
 /**
@@ -1046,6 +1137,14 @@ function initBusinessSearch() {
  */
 async function retrieveFromMongoDB(formData) {
     try {
+        // Show a loading indicator
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<div class="loading">Searching for businesses...</div>';
+            resultsContainer.style.display = 'block';
+        }
+
         // Only include non-empty parameters in the query
         const params = {};
         if (formData.businessName && formData.businessName.trim() !== '') {
@@ -1053,6 +1152,42 @@ async function retrieveFromMongoDB(formData) {
         }
         if (formData.address && formData.address.trim() !== '') {
             params.address = formData.address;
+        }
+
+        // Check if user wants to use their location
+        const useMyLocation = document.getElementById('use-my-location') &&
+            document.getElementById('use-my-location').checked;
+
+        // If user wants to use location and no address was specified
+        if (useMyLocation && !params.address) {
+            const locationStatus = document.getElementById('location-status');
+            if (locationStatus) {
+                locationStatus.textContent = 'Getting your location...';
+                locationStatus.style.display = 'block';
+            }
+
+            try {
+                const userLocation = await getUserLocation();
+
+                // Add coordinates to the search params
+                params.lat = userLocation.lat;
+                params.lng = userLocation.lng;
+
+                // Add a default radius (miles)
+                params.radius = 25;
+
+                // Try to get a readable address for UI feedback
+                const address = await reverseGeocode(userLocation);
+                if (address && locationStatus) {
+                    locationStatus.textContent = `Using location: ${address}`;
+                }
+            } catch (error) {
+                console.warn("Could not use location:", error);
+                if (locationStatus) {
+                    locationStatus.textContent = 'Could not access your location. Please check permissions.';
+                    locationStatus.style.color = 'red';
+                }
+            }
         }
 
         const queryParams = new URLSearchParams(params).toString();

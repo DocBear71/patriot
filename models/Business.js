@@ -15,8 +15,40 @@ const businessSchema = new mongoose.Schema({
     created_by: String,
     updated_by: String,
     created_at: { type: Date, default: Date.now },
-    updated_at: { type: Date, default: Date.now }
+    updated_at: { type: Date, default: Date.now },
+
+    // Add geospatial location field
+    location: {
+        type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+        },
+        coordinates: {
+            type: [Number],  // [longitude, latitude]
+            default: undefined
+        }
+    },
+
+    // Chain-related fields
+    is_chain: {
+        type: Boolean,
+        default: false
+    },
+    chain_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Business',
+        default: null
+    },
+    chain_name: String,
+    universal_incentives: {
+        type: Boolean,
+        default: false
+    }
 });
+
+// Create a 2dsphere index for geospatial queries
+businessSchema.index({ location: '2dsphere' });
 
 // Export the model - use the 'business' collection
 module.exports = mongoose.model('Business', businessSchema, 'business');

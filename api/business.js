@@ -3,7 +3,7 @@ const connect = require('../config/db');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 let Business = require('../models/Business');
-let User = require('../models/User');
+let User = require('../models/Users');
 
 /**
  * Consolidated business API handler
@@ -139,6 +139,38 @@ async function handleBusinessRegister(req, res) {
             return res.status(500).json({ message: 'Database connection error', error: dbError.message });
         }
 
+        // Add geospatial data if coordinates are provided
+        if (businessData.lat && businessData.lng) {
+            businessData.location = {
+                type: 'Point',
+                coordinates: [
+                    parseFloat(businessData.lng),  // GeoJSON uses [longitude, latitude]
+                    parseFloat(businessData.lat)
+                ]
+            };
+        } else if (businessData.address1 && businessData.city && businessData.state) {
+            // If coordinates weren't provided, geocode the address
+            try {
+                // Import the geocoding function
+                const { geocodeAddress } = require('../utils/geocoding');
+
+                const address = `${businessData.address1}, ${businessData.city}, ${businessData.state} ${businessData.zip}`;
+                const coordinates = await geocodeAddress(address);
+
+                if (coordinates) {
+                    businessData.location = {
+                        type: 'Point',
+                        coordinates: [coordinates.lng, coordinates.lat]
+                    };
+                    console.log("Geocoded coordinates:", coordinates);
+                } else {
+                    console.warn("Could not geocode address:", address);
+                }
+            } catch (geocodeError) {
+                console.error("Error geocoding address:", geocodeError);
+            }
+        }
+
         // Check if business already exists
         const existingBusiness = await Business.findOne({
             address1: businessData.address1,
@@ -214,6 +246,27 @@ async function handleBusinessSearch(req, res) {
                 { state: addressRegex },
                 { zip: addressRegex }
             ];
+        }
+
+        if (req.query.lat && req.query.lng) {
+            const lat = parseFloat(req.query.lat);
+            const lng = parseFloat(req.query.lng);
+            const radius = parseInt(req.query.radius) || 25; // Default 25 miles
+
+            // Convert miles to meters for MongoDB geospatial query
+            const radiusInMeters = radius * 1609.34;
+
+            query.location = {
+                $near: {
+                    $geometry: {
+                        type: "Point",
+                        coordinates: [lng, lat]  // GeoJSON uses [longitude, latitude]
+                    },
+                    $maxDistance: radiusInMeters
+                }
+            };
+
+            console.log(`Performing location-based search at [${lat},${lng}] with radius ${radius} miles`);
         }
 
         console.log("MongoDB Query:", JSON.stringify(query, null, 2));
@@ -401,6 +454,38 @@ async function handleAdminCreateBusiness(req, res) {
         // Connect to MongoDB
         await connect;
 
+        // Add geospatial data if coordinates are provided
+        if (businessData.lat && businessData.lng) {
+            businessData.location = {
+                type: 'Point',
+                coordinates: [
+                    parseFloat(businessData.lng),
+                    parseFloat(businessData.lat)
+                ]
+            };
+        } else if (businessData.address1 && businessData.city && businessData.state) {
+            // If coordinates weren't provided, geocode the address
+            try {
+                // Import the geocoding function
+                const { geocodeAddress } = require('../utils/geocoding');
+
+                const address = `${businessData.address1}, ${businessData.city}, ${businessData.state} ${businessData.zip}`;
+                const coordinates = await geocodeAddress(address);
+
+                if (coordinates) {
+                    businessData.location = {
+                        type: 'Point',
+                        coordinates: [coordinates.lng, coordinates.lat]
+                    };
+                    console.log("Geocoded coordinates:", coordinates);
+                } else {
+                    console.warn("Could not geocode address:", address);
+                }
+            } catch (geocodeError) {
+                console.error("Error geocoding address:", geocodeError);
+            }
+        }
+
         // Check if business already exists
         const existingBusiness = await Business.findOne({
             bname: businessData.bname,
@@ -476,6 +561,38 @@ async function handleAdminUpdateBusiness(req, res) {
 
         // Connect to MongoDB
         await connect;
+
+        // Add geospatial data if coordinates are provided
+        if (businessData.lat && businessData.lng) {
+            businessData.location = {
+                type: 'Point',
+                coordinates: [
+                    parseFloat(businessData.lng),
+                    parseFloat(businessData.lat)
+                ]
+            };
+        } else if (businessData.address1 && businessData.city && businessData.state) {
+            // If coordinates weren't provided, geocode the address
+            try {
+                // Import the geocoding function
+                const { geocodeAddress } = require('../utils/geocoding');
+
+                const address = `${businessData.address1}, ${businessData.city}, ${businessData.state} ${businessData.zip}`;
+                const coordinates = await geocodeAddress(address);
+
+                if (coordinates) {
+                    businessData.location = {
+                        type: 'Point',
+                        coordinates: [coordinates.lng, coordinates.lat]
+                    };
+                    console.log("Geocoded coordinates:", coordinates);
+                } else {
+                    console.warn("Could not geocode address:", address);
+                }
+            } catch (geocodeError) {
+                console.error("Error geocoding address:", geocodeError);
+            }
+        }
 
         // Check if business exists
         const existingBusiness = await Business.findById(businessId);

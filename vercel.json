@@ -9,6 +9,13 @@
       }
     },
     {
+      "src": "utils/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 30
+      }
+    },
+    {
       "src": "public/**/*",
       "use": "@vercel/static"
     }

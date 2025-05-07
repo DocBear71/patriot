@@ -54,7 +54,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                // FIXED: Changed form.businessName to form.bname to match the form object
+                // Get the selected business data
+                const selectedBusiness = window.selectedBusinessData || {};
+
                 const formData = {
                     businessId: businessId,
                     bname: form.bname.value,
@@ -68,6 +70,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     status: form.status.value
                 };
 
+                // Add location data if available
+                if (selectedBusiness.location && selectedBusiness.location.coordinates) {
+                    formData.lng = selectedBusiness.location.coordinates[0];
+                    formData.lat = selectedBusiness.location.coordinates[1];
+                }
+                // Otherwise, let the server geocode the address
+                
                 console.log("Form data to submit:", formData);
 
                 // Submit the data to update the business
@@ -81,6 +90,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Define the selectBusinessForUpdate function in the global scope for business-search.js
     window.selectBusinessForUpdate = function(businessData) {
         console.log("selectBusinessForUpdate called with: ", businessData);
+
+        // Store the selected business data for later use
+        window.selectedBusinessData = businessData;
 
         // Show the business info section
         if (businessInfoSection) {
