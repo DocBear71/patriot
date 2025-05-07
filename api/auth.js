@@ -271,6 +271,10 @@ async function handleDashboardStats(req, res) {
 
 function handleVerifyToken(req, res) {
     console.log("Verify token handler called");
+    res.setHeader('Access-Control-Allow-Origin', 'https://www.patriotthanks.com');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, PATCH, DELETE, POST, PUT');
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
 
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
