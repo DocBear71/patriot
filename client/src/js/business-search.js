@@ -57,8 +57,8 @@ window.viewBusinessDetails = function(businessId) {
 };
 
 /**
- /**
  * Show info window for places not in your database (with scrollable content)
+ * Modified to work with Place API format
  * @param {Object} place - Google Place object
  * @param {Object} position - Position for the info window
  */
@@ -71,10 +71,19 @@ function showPlaceInfoWindow(place, position) {
         });
     }
 
-    // Get type label
+    // Get type label - place.types might be in different formats depending on API version
     const placeTypeLabel = getPlaceTypeLabel(place.types);
 
-    // Calculate distance if search location is available
+    // Extract display name based on which API was used
+    const displayName = place.displayName || place.name || 'Unnamed Place';
+
+    // Get address - different APIs provide different formats
+    const formattedAddress = place.formattedAddress || place.formatted_address || 'Address not available';
+
+    // Get phone number - different APIs provide different formats
+    const phoneNumber = place.nationalPhoneNumber || place.formatted_phone_number || '';
+
+    // Calculate distance if available
     let distanceText = '';
     if (place.distance) {
         distanceText = `<p><strong>Distance:</strong> ${(place.distance / 1609.34).toFixed(1)} miles</p>`;
@@ -83,9 +92,9 @@ function showPlaceInfoWindow(place, position) {
     // Format the content with an "Add to Database" button and scrollable area - using your existing CSS classes
     const contentString = `
     <div class="info-window">
-        <h3>${place.name || place.displayName || 'Unnamed Place'}</h3>
-        <p><strong>Address:</strong><br>${place.formatted_address || place.formattedAddress || 'Address not available'}</p>
-        ${place.formatted_phone_number || place.nationalPhoneNumber ? `<p><strong>Phone:</strong> ${place.formatted_phone_number || place.nationalPhoneNumber}</p>` : ''}
+        <h3>${displayName}</h3>
+        <p><strong>Address:</strong><br>${formattedAddress}</p>
+        ${phoneNumber ? `<p><strong>Phone:</strong> ${phoneNumber}</p>` : ''}
         ${distanceText}
         <p><strong>Type:</strong> ${placeTypeLabel}</p>
         <p><strong>Incentives:</strong> <em>Not in database</em></p>
@@ -110,8 +119,6 @@ function showPlaceInfoWindow(place, position) {
     }
 
     infoWindow.open(map);
-
-    console.log("Opened Place info window");
 }
 
 
@@ -1246,6 +1253,11 @@ async function retrieveFromMongoDB(formData) {
  * Search Google Places when no results found in our database
  * @param {Object} formData - Form data with search criteria
  */
+/**
+ * Search Google Places when no results found in our database
+ * Using the newer Place API to avoid deprecation warnings
+ * @param {Object} formData - Form data with search criteria
+ */
 async function searchGooglePlaces(formData) {
     try {
         console.log("Searching Google Places for:", formData);
@@ -1331,22 +1343,30 @@ async function searchGooglePlaces(formData) {
         bounds.extend(searchLocation);
 
         try {
-            // Import required places library
-            await google.maps.importLibrary("places");
+            // Import the Places library - must be imported before using Place API
+            const { Place } = await google.maps.importLibrary("places");
 
-            // Create a service object
-            const service = new google.maps.places.PlacesService(map);
+            let searchTerms = formData.businessName || searchQuery;
+            if (!searchTerms) {
+                searchTerms = "businesses";  // Default search term if none provided
+            }
 
-            // Create a search request
-            const request = {
-                query: formData.businessName || searchQuery,
-                location: searchLocation,
-                radius: searchRadius
-            };
+            console.log("Searching for places with query:", searchTerms);
 
-            // Perform a Places text search
-            const places = await new Promise((resolve, reject) => {
-                service.textSearch(request, (results, status) => {
+            // Perform a search using FindPlaceFromText with the text query
+            // This is done using a DIV element as a container since we need a service
+            const dummyDiv = document.createElement('div');
+            const service = new google.maps.places.PlacesService(dummyDiv);
+
+            const placesResults = await new Promise((resolve, reject) => {
+                service.findPlaceFromText({
+                    query: searchTerms,
+                    fields: ['place_id', 'name', 'formatted_address', 'geometry', 'types', 'business_status'],
+                    locationBias: {
+                        radius: searchRadius,
+                        center: searchLocation
+                    }
+                }, (results, status) => {
                     if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
                         resolve(results);
                     } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
@@ -1357,13 +1377,11 @@ async function searchGooglePlaces(formData) {
                 });
             });
 
-            console.log("Found places:", places.length);
-
             // Remove loading indicator
             const loadingElement = document.getElementById('map-loading');
             if (loadingElement) loadingElement.remove();
 
-            if (!places || places.length === 0) {
+            if (!placesResults || placesResults.length === 0) {
                 console.log("No places found");
                 // Show no results message
                 const searchTableContainer = document.getElementById('search_table');
@@ -1377,109 +1395,164 @@ async function searchGooglePlaces(formData) {
                 return;
             }
 
-            // Process places
+            console.log("Initial place results:", placesResults.length);
+
+            // For each place result, use the Place API to get full details
             const businessResults = [];
+            const promises = [];
 
-            // Process each place
-            places.forEach(place => {
-                // Extract address components
-                let address1 = '';
-                let city = '';
-                let state = '';
-                let zip = '';
+            for (const placeResult of placesResults) {
+                promises.push((async () => {
+                    try {
+                        // Create a Place instance with the ID
+                        const place = new Place({
+                            id: placeResult.place_id
+                        });
 
-                if (place.formatted_address) {
-                    const addressParts = place.formatted_address.split(',');
-                    if (addressParts.length >= 1) address1 = addressParts[0].trim();
-                    if (addressParts.length >= 2) city = addressParts[1].trim();
-                    if (addressParts.length >= 3) {
-                        const stateZip = addressParts[2].trim().split(' ');
-                        if (stateZip.length >= 1) state = stateZip[0].trim();
-                        if (stateZip.length >= 2) zip = stateZip[1].trim();
-                    }
-                }
+                        // Fetch full details
+                        await place.fetchFields({
+                            fields: [
+                                'displayName',
+                                'formattedAddress',
+                                'addressComponents',
+                                'location',
+                                'types',
+                                'nationalPhoneNumber'
+                            ]
+                        });
 
-                // Map to business type
-                let businessType = 'OTHER';
-                if (place.types) {
-                    if (place.types.includes('restaurant')) businessType = 'REST';
-                    else if (place.types.includes('store')) businessType = 'RETAIL';
-                    else if (place.types.includes('hardware_store')) businessType = 'HARDW';
-                    else if (place.types.includes('gas_station')) businessType = 'FUEL';
-                    // Add more mappings as needed
-                }
+                        console.log("Fetched place details:", place);
 
-                // Calculate distance from search location
-                const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                    searchLocation,
-                    place.geometry.location
-                );
-
-                // Only include places within search radius
-                if (distance > searchRadius) {
-                    return; // Skip this place
-                }
-
-                // Check if this place matches an existing marker by name and location
-                const isDuplicate = markers.some(marker => {
-                    if (!marker.business) return false;
-
-                    // Match by name and proximity
-                    const nameSimilarity = similarity(
-                        marker.business.bname ? marker.business.bname.toLowerCase() : '',
-                        place.name ? place.name.toLowerCase() : ''
-                    );
-
-                    if (nameSimilarity > 0.7) {
-                        // Get positions
-                        const markerPos = marker.position;
-                        const placePos = place.geometry.location;
-
-                        // Calculate distance
-                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            new google.maps.LatLng(markerPos.lat, markerPos.lng),
-                            placePos
-                        );
-
-                        // If within 100 meters, it's a duplicate
-                        if (distance < 100) {
-                            console.log(`Skipping duplicate: ${place.name} (matches ${marker.business.bname})`);
-                            return true;
+                        // Extract address components
+                        const addressComponents = {};
+                        if (place.addressComponents) {
+                            for (const component of place.addressComponents) {
+                                for (const type of component.types) {
+                                    addressComponents[type] = component.shortText;
+                                }
+                            }
                         }
+
+                        // Create address parts
+                        const address1 = `${addressComponents.street_number || ''} ${addressComponents.route || ''}`.trim();
+                        const city = addressComponents.locality || '';
+                        const state = addressComponents.administrative_area_level_1 || '';
+                        const zip = addressComponents.postal_code || '';
+
+                        // Map to business type
+                        let businessType = 'OTHER';
+                        if (place.types) {
+                            if (place.types.includes('restaurant')) businessType = 'REST';
+                            else if (place.types.includes('store')) businessType = 'RETAIL';
+                            else if (place.types.includes('hardware_store')) businessType = 'HARDW';
+                            else if (place.types.includes('gas_station')) businessType = 'FUEL';
+                            // Add more mappings as needed
+                        }
+
+                        // Calculate distance from search location
+                        let distance = 0;
+                        if (place.location && searchLocation) {
+                            distance = google.maps.geometry.spherical.computeDistanceBetween(
+                                searchLocation,
+                                place.location
+                            );
+                        }
+
+                        // Check if this place matches an existing marker by name and location
+                        const isDuplicate = markers.some(marker => {
+                            if (!marker.business) return false;
+
+                            // Match by name and proximity
+                            const nameSimilarity = similarity(
+                                marker.business.bname ? marker.business.bname.toLowerCase() : '',
+                                place.displayName ? place.displayName.toLowerCase() : ''
+                            );
+
+                            if (nameSimilarity > 0.7 && place.location) {
+                                // Get positions
+                                const markerPos = marker.position;
+                                const placePos = place.location;
+
+                                // Calculate distance
+                                const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                                    new google.maps.LatLng(markerPos.lat, markerPos.lng),
+                                    placePos
+                                );
+
+                                // If within 100 meters, it's a duplicate
+                                if (distance < 100) {
+                                    console.log(`Skipping duplicate: ${place.displayName} (matches ${marker.business.bname})`);
+                                    return true;
+                                }
+                            }
+
+                            return false;
+                        });
+
+                        // Skip duplicates
+                        if (isDuplicate) return null;
+
+                        // Skip if out of range
+                        if (distance > searchRadius) {
+                            console.log(`Skipping ${place.displayName} - too far (${distance/1000}km)`);
+                            return null;
+                        }
+
+                        // Create business object
+                        const business = {
+                            _id: 'google_' + place.id,
+                            bname: place.displayName,
+                            address1: address1 || (place.formattedAddress || '').split(',')[0] || '',
+                            city: city,
+                            state: state,
+                            zip: zip,
+                            type: businessType,
+                            phone: place.nationalPhoneNumber || '',
+                            isGooglePlace: true,
+                            placeId: place.id,
+                            lat: place.location?.lat || 0,
+                            lng: place.location?.lng || 0,
+                            distance: distance
+                        };
+
+                        // Add marker if we have coordinates
+                        if (place.location && place.location.lat) {
+                            addAdvancedMarker(business, place.location);
+
+                            // Extend bounds with this place
+                            bounds.extend(place.location);
+                        }
+
+                        return business;
+                    } catch (error) {
+                        console.error(`Error processing place ${placeResult.place_id}:`, error);
+                        return null;
                     }
+                })());
+            }
 
-                    return false;
-                });
+            // Wait for all place details to be fetched
+            const results = await Promise.all(promises);
 
-                // Skip duplicates
-                if (isDuplicate) return;
-
-                // Create business object
-                const business = {
-                    _id: 'google_' + place.place_id,
-                    bname: place.name,
-                    address1: address1,
-                    city: city,
-                    state: state,
-                    zip: zip,
-                    type: businessType,
-                    phone: place.formatted_phone_number || '',
-                    isGooglePlace: true,
-                    placeId: place.place_id,
-                    lat: place.geometry.location.lat(),
-                    lng: place.geometry.location.lng(),
-                    distance: distance
-                };
-
-                // Add marker
-                addAdvancedMarker(business, place.geometry.location);
-
-                // Add to business results
+            // Filter out null results and add valid businesses
+            results.filter(result => result !== null).forEach(business => {
                 businessResults.push(business);
-
-                // Extend bounds with this place
-                bounds.extend(place.geometry.location);
             });
+
+            console.log(`Found ${businessResults.length} valid businesses`);
+
+            if (businessResults.length === 0) {
+                // Show no results message
+                const searchTableContainer = document.getElementById('search_table');
+                if (searchTableContainer) {
+                    const tableBody = searchTableContainer.querySelector('tbody');
+                    if (tableBody) {
+                        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria within 50 miles.</td></tr>';
+                    }
+                    searchTableContainer.style.display = 'block';
+                }
+                return;
+            }
 
             // Sort by distance
             businessResults.sort((a, b) => a.distance - b.distance);
@@ -1512,7 +1585,6 @@ async function searchGooglePlaces(formData) {
                 map.setCenter(searchLocation);
                 map.setZoom(11);
             }
-
         } catch (error) {
             console.error("Error searching places:", error);
 
@@ -2007,69 +2079,79 @@ async function setupMapClickHandler() {
 
     console.log("Setting up map click handler");
 
-    // Add click listener for POIs on the map
-    map.addListener('click', function(event) {
-        console.log("Map clicked", event);
+    try {
+        // Import the Places library
+        const { Place } = await google.maps.importLibrary("places");
 
-        // Check if clicked on a POI (a place on the map)
-        if (event.placeId) {
-            // Stop the default info window
-            event.stop();
+        // Listen for POI clicks (Points of Interest - businesses, landmarks, etc.)
+        map.addListener('click', async function(event) {
+            console.log("Map clicked", event);
 
-            console.log("POI clicked, placeId:", event.placeId);
+            // Check if clicked on a POI (a place on the map)
+            if (event.placeId) {
+                // Stop the default info window
+                event.stop();
 
-            // Check if this is already one of our markers
-            const existingMarker = markers.find(marker =>
-                marker.business &&
-                (marker.business.placeId === event.placeId ||
-                    marker.business._id === 'google_' + event.placeId)
-            );
+                console.log("POI clicked, placeId:", event.placeId);
 
-            if (existingMarker) {
-                // If it's already one of our markers, show our custom info window
-                console.log("Found existing marker for clicked place");
-                showInfoWindow(existingMarker);
-                return;
-            }
+                try {
+                    // Check if this is already one of our markers
+                    const existingMarker = markers.find(marker =>
+                        marker.business &&
+                        (marker.business.placeId === event.placeId ||
+                            marker.business._id === 'google_' + event.placeId)
+                    );
 
-            // Otherwise, fetch place details using the Places Service
-            const service = new google.maps.places.PlacesService(map);
+                    if (existingMarker) {
+                        // If it's already one of our markers, show our custom info window
+                        console.log("Found existing marker for clicked place");
+                        showInfoWindow(existingMarker);
+                        return;
+                    }
 
-            service.getDetails({
-                placeId: event.placeId,
-                fields: [
-                    'name',
-                    'formatted_address',
-                    'geometry',
-                    'types',
-                    'formatted_phone_number'
-                ]
-            }, function(place, status) {
-                if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                    // Otherwise, create a Place instance with the clicked place ID
+                    const place = new Place({
+                        id: event.placeId
+                    });
+
+                    // Fetch the place details using the modern API
+                    await place.fetchFields({
+                        fields: [
+                            'displayName',
+                            'formattedAddress',
+                            'location',
+                            'types',
+                            'businessStatus',
+                            'nationalPhoneNumber'
+                        ]
+                    });
+
                     console.log("Place details:", place);
 
-                    // Add distance if possible
-                    if (place.geometry && place.geometry.location) {
+                    // Calculate distance if possible
+                    if (place.location) {
                         // Try to calculate distance from current center
                         const center = map.getCenter();
                         const distance = google.maps.geometry.spherical.computeDistanceBetween(
                             center,
-                            place.geometry.location
+                            place.location
                         );
                         place.distance = distance;
                     }
 
                     // Show custom info window with "Add to Database" option
                     showPlaceInfoWindow(place, event.latLng);
-                } else {
-                    console.error("Error fetching place details:", status);
+                } catch (error) {
+                    console.error("Error fetching place details:", error);
                     alert("Error loading place details. Please try again.");
                 }
-            });
-        }
-    });
+            }
+        });
 
-    console.log("Map click handler set up");
+        console.log("Map click handler set up");
+    } catch (error) {
+        console.error("Error setting up map click handler:", error);
+    }
 }
 
 
