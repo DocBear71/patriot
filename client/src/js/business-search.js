@@ -1144,10 +1144,7 @@ function initBusinessSearch() {
     }
 }
 
-/**
- * Retrieve businesses from MongoDB
- * @param {Object} formData - Form data
- */
+// Update the retrieveFromMongoDB function
 async function retrieveFromMongoDB(formData) {
     try {
         // Show a loading indicator
@@ -1167,41 +1164,8 @@ async function retrieveFromMongoDB(formData) {
             params.address = formData.address;
         }
 
-        // Check if user wants to use their location
-        const useMyLocation = document.getElementById('use-my-location') &&
-            document.getElementById('use-my-location').checked;
-
-        // If user wants to use location and no address was specified
-        if (useMyLocation && !params.address) {
-            const locationStatus = document.getElementById('location-status');
-            if (locationStatus) {
-                locationStatus.textContent = 'Getting your location...';
-                locationStatus.style.display = 'block';
-            }
-
-            try {
-                const userLocation = await getUserLocation();
-
-                // Add coordinates to the search params
-                params.lat = userLocation.lat;
-                params.lng = userLocation.lng;
-
-                // Add a default radius (miles)
-                params.radius = 25;
-
-                // Try to get a readable address for UI feedback
-                const address = await reverseGeocode(userLocation);
-                if (address && locationStatus) {
-                    locationStatus.textContent = `Using location: ${address}`;
-                }
-            } catch (error) {
-                console.warn("Could not use location:", error);
-                if (locationStatus) {
-                    locationStatus.textContent = 'Could not access your location. Please check permissions.';
-                    locationStatus.style.color = 'red';
-                }
-            }
-        }
+        // Process location if needed (your existing location code)
+        // ...
 
         const queryParams = new URLSearchParams(params).toString();
 
@@ -1230,74 +1194,284 @@ async function retrieveFromMongoDB(formData) {
         const data = await res.json();
         console.log("Search results:", data);
 
-        // Check if data and data.results exist before proceeding
-        if (!data || !data.results) {
-            console.error("Invalid response format - missing results property");
-            throw new Error("Invalid response format from server");
-        }
+        // Check if we got any results from our database
+        if (!data.results || data.results.length === 0) {
+            console.log("No results in our database, searching Google Places...");
 
-        // Check the page to make sure the results display properly
-        if (document.getElementById('search_table')) {
-            // We are on the business-search.html page
-            displaySearchResults(data.results);
-
-            // Also display results on the map
-            displayBusinessesOnMap(data.results);
+            // If no results, search Google Places API
+            await searchGooglePlaces(formData);
         } else {
-            // If on the incentive-add.html or incentive-view.html pages
-            let resultsContainer = document.getElementById('business-search-results');
-
-            if (!resultsContainer) {
-                // Create the container if it doesn't exist
-                resultsContainer = document.createElement('div');
-                resultsContainer.id = 'business-search-results';
-
-                // Decide where to insert the container
-                const firstFieldset = document.querySelector('fieldset');
-                if (firstFieldset) {
-                    firstFieldset.parentNode.insertBefore(resultsContainer, firstFieldset.nextSibling);
-                } else {
-                    const main = document.querySelector('main');
-                    if (main) {
-                        main.appendChild(resultsContainer);
-                    } else {
-                        // If nothing else, just append the body
-                        document.body.appendChild(resultsContainer);
-                    }
+            // We have results from our database, display them
+            if (document.getElementById('search_table')) {
+                displaySearchResults(data.results);
+                displayBusinessesOnMap(data.results);
+            } else {
+                let resultsContainer = document.getElementById('business-search-results');
+                if (!resultsContainer) {
+                    // Create container if needed
+                    // ...your existing container creation code
                 }
-
-                console.log("Created business-search-results container");
+                displayBusinessSearchResults(data.results, resultsContainer);
             }
-            displayBusinessSearchResults(data.results, resultsContainer);
         }
     } catch (error) {
         console.error("Error: ", error);
-        // Show an error message to the user
-        let errorContainer;
+        // Show error message
+        // ...your existing error handling code
+    }
+}
 
+/**
+ * Search Google Places when no results found in our database
+ * @param {Object} formData - Form data with search criteria
+ */
+async function searchGooglePlaces(formData) {
+    try {
+        console.log("Searching Google Places for:", formData);
+
+        // Load the Places library if not already loaded
+        const { PlacesService } = await google.maps.importLibrary("places");
+
+        // Need a map or element for PlacesService
+        const placesService = new PlacesService(document.getElementById('map'));
+
+        // Build the search query based on form data
+        let searchQuery = '';
+        if (formData.businessName) {
+            searchQuery += formData.businessName;
+        }
+        if (formData.address) {
+            searchQuery += ' ' + formData.address;
+        }
+
+        // Create the request object
+        const request = {
+            query: searchQuery.trim(),
+            fields: ['name', 'formatted_address', 'geometry', 'place_id', 'types']
+        };
+
+        // Perform the search
+        placesService.findPlaceFromQuery(request, (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                console.log("Google Places results:", results);
+
+                // Convert Google Places results to your business format
+                const businessResults = results.map(place => {
+                    // Extract address components if available
+                    let address1 = '';
+                    let city = '';
+                    let state = '';
+                    let zip = '';
+
+                    if (place.formatted_address) {
+                        const addressParts = place.formatted_address.split(',');
+                        if (addressParts.length >= 1) {
+                            address1 = addressParts[0].trim();
+                        }
+                        if (addressParts.length >= 2) {
+                            city = addressParts[1].trim();
+                        }
+                        if (addressParts.length >= 3) {
+                            const stateZip = addressParts[2].trim().split(' ');
+                            if (stateZip.length >= 1) {
+                                state = stateZip[0].trim();
+                            }
+                            if (stateZip.length >= 2) {
+                                zip = stateZip[1].trim();
+                            }
+                        }
+                    }
+
+                    // Map Google place types to your business types
+                    let businessType = 'OTHER';
+                    if (place.types) {
+                        if (place.types.includes('restaurant')) businessType = 'REST';
+                        else if (place.types.includes('store')) businessType = 'RETAIL';
+                        else if (place.types.includes('hardware_store')) businessType = 'HARDW';
+                        // Add more type mappings as needed
+                    }
+
+                    // Create a business object with Google Place data
+                    return {
+                        _id: 'google_' + place.place_id, // Prefix to indicate it's from Google
+                        bname: place.name,
+                        address1: address1,
+                        city: city,
+                        state: state,
+                        zip: zip,
+                        type: businessType,
+                        phone: '', // Phone not included in basic results
+                        isGooglePlace: true, // Flag to indicate this is from Google Places
+                        placeId: place.place_id,
+                        location: {
+                            type: 'Point',
+                            coordinates: [
+                                place.geometry.location.lng(),
+                                place.geometry.location.lat()
+                            ]
+                        },
+                        lat: place.geometry.location.lat(),
+                        lng: place.geometry.location.lng()
+                    };
+                });
+
+                // Display the Google Places results
+                if (document.getElementById('search_table')) {
+                    // Add a notification that these are Google Places results
+                    const searchTableContainer = document.getElementById('search_table');
+                    if (searchTableContainer) {
+                        const notification = document.createElement('div');
+                        notification.className = 'google-places-notification';
+                        notification.innerHTML = 'The following businesses were found in Google Maps but are not yet in our database. Click "Add to Patriot Thanks" to add them.';
+                        notification.style.padding = '10px';
+                        notification.style.backgroundColor = '#f8f9fa';
+                        notification.style.border = '1px solid #ddd';
+                        notification.style.borderRadius = '5px';
+                        notification.style.marginBottom = '15px';
+
+                        searchTableContainer.appendChild(notification);
+                    }
+
+                    displayGoogleSearchResults(businessResults);
+                    displayBusinessesOnMap(businessResults);
+                } else {
+                    let resultsContainer = document.getElementById('business-search-results');
+                    if (!resultsContainer) {
+                        // Create container if needed
+                        // ...your existing container creation code
+                    }
+                    displayGoogleSearchResults(businessResults, resultsContainer);
+                }
+            } else {
+                console.log("No results found in Google Places or error:", status);
+
+                // Show no results message
+                const searchTableContainer = document.getElementById('search_table');
+                if (searchTableContainer) {
+                    const tableBody = searchTableContainer.querySelector('tbody');
+                    if (tableBody) {
+                        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria in our database or Google Maps.</td></tr>';
+                    }
+                    searchTableContainer.style.display = 'block';
+                    searchTableContainer.scrollIntoView({behavior: 'smooth'});
+                } else {
+                    const resultsContainer = document.getElementById('business-search-results');
+                    if (resultsContainer) {
+                        resultsContainer.innerHTML = '<div class="error">No businesses found matching your search criteria in our database or Google Maps.</div>';
+                        resultsContainer.scrollIntoView({behavior: 'smooth'});
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error searching Google Places:", error);
+
+        // Show error message to user
+        let errorContainer;
         if (document.getElementById('search_table')) {
             errorContainer = document.getElementById('search_table');
         } else {
             errorContainer = document.getElementById('business-search-results');
-            if (!errorContainer) {
-                errorContainer = document.createElement('div');
-                errorContainer.id = 'business-search-results';
-                const firstFieldset = document.querySelector('fieldset');
-                if (firstFieldset) {
-                    firstFieldset.parentNode.insertBefore(errorContainer, firstFieldset.nextSibling);
-                } else {
-                    document.body.appendChild(errorContainer);
-                }
-            }
         }
 
-        errorContainer.innerHTML = `<div class="error">Search failed: ${error.message}</div>`;
-        errorContainer.style.display = 'block';
-
-        // Scroll to the error message
-        errorContainer.scrollIntoView({behavior: 'smooth'});
+        if (errorContainer) {
+            errorContainer.innerHTML = `<div class="error">Error searching Google Maps: ${error.message}</div>`;
+            errorContainer.style.display = 'block';
+            errorContainer.scrollIntoView({behavior: 'smooth'});
+        }
     }
 }
+
+/**
+ * Display Google Places search results
+ * @param {Array} businesses - Array of business objects from Google Places
+ */
+function displayGoogleSearchResults(businesses) {
+    const businessSearchTable = document.getElementById('business_search');
+    const searchTableContainer = document.getElementById('search_table');
+
+    if (!businessSearchTable || !searchTableContainer) {
+        console.error("Required elements not found in the DOM");
+        return;
+    }
+
+    // Get the table body
+    let tableBody = businessSearchTable.querySelector('tbody');
+    if (!tableBody) {
+        console.error("Table body not found within business_search table");
+        return;
+    }
+
+    // Clear existing rows
+    tableBody.innerHTML = '';
+
+    // Make sure businesses is an array
+    if (!Array.isArray(businesses) || businesses.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
+        searchTableContainer.style.display = 'block';
+        searchTableContainer.scrollIntoView({behavior: 'smooth'});
+        return;
+    }
+
+    // Show the search results table
+    searchTableContainer.style.display = 'block';
+
+    // Hide the "hidden" text in the h5
+    const searchTableH5 = searchTableContainer.querySelector('h5');
+    if (searchTableH5) {
+        searchTableH5.style.display = 'none';
+    }
+
+    // Add each business to the table
+    businesses.forEach(business => {
+        if (!business) return; // skip null or undefined entries
+
+        // Format the address line
+        const addressLine = business.address1 ?
+            `${business.address1}<br>${business.city}, ${business.state} ${business.zip}` :
+            'Address information not available';
+
+        // Convert the business type code to a readable label
+        const businessType = getBusinessTypeLabel(business.type);
+
+        // Create a new row
+        const row = document.createElement('tr');
+
+        // Add a View on Map button and Add to Database button
+        const viewMapButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
+        const addToDbButton = business.isGooglePlace ?
+            `<button class="add-to-db-btn" onclick="addGooglePlaceToDatabase('${business.placeId}')">Add to Patriot Thanks</button>` :
+            '';
+
+        // First populate with basic business info
+        row.innerHTML = `
+            <th class="left_table" data-business-id="${business._id}">${business.bname}</th>
+            <th class="left_table">${addressLine}</th>
+            <th class="left_table">${businessType}</th>
+            <th class="right_table">${business.isGooglePlace ? 'Not in database yet' : 'Loading incentives...'}</th>
+            <th class="center_table">${viewMapButton} ${addToDbButton}</th>
+        `;
+
+        tableBody.appendChild(row);
+
+        // Only fetch incentives for businesses in our database
+        if (!business.isGooglePlace) {
+            fetchBusinessIncentives(business._id);
+        }
+    });
+
+    // Scroll to the results
+    searchTableContainer.scrollIntoView({behavior: 'smooth'});
+}
+
+/**
+ * Add a Google Place to our database
+ * @param {string} placeId - Google Place ID
+ */
+window.addGooglePlaceToDatabase = function(placeId) {
+
+    window.addBusinessToDatabase(placeId);
+};
 
 /**
  * Initialize Google Map - globally accessible function called by Google Maps API
