@@ -1,3 +1,5 @@
+// brand new business-search.js not working properly
+
 /**
  * Enhanced business-search.js with Google Maps functionality
  * Implements AdvancedMarkerElement with proper error handling and performance optimizations
@@ -71,26 +73,20 @@ function showPlaceInfoWindow(place, position) {
     // Get type label
     const placeTypeLabel = getPlaceTypeLabel(place.types);
 
-    // Format the content with an "Add to Database" button and scrollable area
+    // Format the content with an "Add to Database" button and scrollable area - using your existing CSS classes
     const contentString = `
-    <div class="info-window-wrapper">
-      <div class="info-window-header">
+    <div class="info-window">
         <h3>${place.displayName || 'Unnamed Place'}</h3>
-      </div>
-      <div class="info-window-content">
-        <div class="info-window-scrollable">
-          <p><strong>Address:</strong><br>${place.formattedAddress || 'Address not available'}</p>
-          ${place.nationalPhoneNumber ? `<p><strong>Phone:</strong> ${place.nationalPhoneNumber}</p>` : ''}
-          <p><strong>Type:</strong> ${placeTypeLabel}</p>
-          <p>This business is not yet in the Patriot Thanks database.</p>
+        <p><strong>Address:</strong><br>${place.formattedAddress || 'Address not available'}</p>
+        ${place.nationalPhoneNumber ? `<p><strong>Phone:</strong> ${place.nationalPhoneNumber}</p>` : ''}
+        <p><strong>Type:</strong> ${placeTypeLabel}</p>
+        <p>This business is not yet in the Patriot Thanks database.</p>
+        <div class="info-window-actions">
+            <button class="add-business-btn" 
+                    onclick="window.addBusinessToDatabase('${place.id}')">
+                Add to Patriot Thanks
+            </button>
         </div>
-      </div>
-      <div class="info-window-footer">
-        <button class="view-details-btn" 
-                onclick="window.addBusinessToDatabase('${place.id}')">
-          Add to Patriot Thanks
-        </button>
-      </div>
     </div>
   `;
 
@@ -98,9 +94,6 @@ function showPlaceInfoWindow(place, position) {
     infoWindow.setContent(contentString);
     infoWindow.setPosition(position);
     infoWindow.open(map);
-
-    // Apply scrollable styles
-    applyInfoWindowScrollableStyles();
 }
 
 /**
@@ -395,6 +388,15 @@ function getIncentiveTypeLabel(typeCode) {
 function fetchBusinessIncentivesForInfoWindow(businessId) {
     if (!businessId) {
         console.error("No business ID provided for fetching incentives");
+        return;
+    }
+
+    // Skip if this is a Google Place result (not in our database)
+    if (businessId.startsWith('google_')) {
+        const incentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
+        if (incentivesDiv) {
+            incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Not in database</p>';
+        }
         return;
     }
 
@@ -1617,38 +1619,32 @@ function showGooglePlaceInfoWindow(business, position) {
     }
 
     // Format address
-    const addressLine = business.address1 ?
-        `${business.address1}<br>${business.city}, ${business.state} ${business.zip}` :
-        'Address information not available';
+    const addressLine = business.address2
+        ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
+        : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
 
-    // Get business type
+    // Get business type label
     const businessType = getBusinessTypeLabel(business.type);
 
-    // Format distance
-    const distanceText = business.distance ?
-        `<p><strong>Distance:</strong> ${(business.distance / 1609.34).toFixed(1)} miles</p>` : '';
+    // Format distance if available
+    const distanceText = business.distance
+        ? `<p><strong>Distance:</strong> ${(business.distance / 1609.34).toFixed(1)} miles</p>` : '';
 
-    // Create content with "Add to Patriot Thanks" button
+    // Create content with "Add to Patriot Thanks" button - using your existing CSS classes
     const contentString = `
-    <div class="info-window-wrapper">
-      <div class="info-window-header">
+    <div class="info-window">
         <h3>${business.bname}</h3>
-      </div>
-      <div class="info-window-content">
-        <div class="info-window-scrollable">
-          <p><strong>Address:</strong><br>${addressLine}</p>
-          ${business.phone ? `<p><strong>Phone:</strong> ${business.phone}</p>` : ''}
-          ${distanceText}
-          <p><strong>Type:</strong> ${businessType}</p>
-          <p><strong>Status:</strong> This business is not yet in the Patriot Thanks database.</p>
+        <p><strong>Address:</strong><br>${addressLine}</p>
+        ${business.phone ? `<p><strong>Phone:</strong> ${business.phone}</p>` : ''}
+        ${distanceText}
+        <p><strong>Type:</strong> ${businessType}</p>
+        <p><strong>Status:</strong> This business is not yet in the Patriot Thanks database.</p>
+        <div class="info-window-actions">
+            <button class="add-business-btn" 
+                    onclick="window.addBusinessToDatabase('${business.placeId}')">
+                Add to Patriot Thanks
+            </button>
         </div>
-      </div>
-      <div class="info-window-footer">
-        <button class="add-to-db-btn" 
-                onclick="window.addBusinessToDatabase('${business.placeId}')">
-          Add to Patriot Thanks
-        </button>
-      </div>
     </div>
     `;
 
@@ -1663,9 +1659,6 @@ function showGooglePlaceInfoWindow(business, position) {
     }
 
     infoWindow.open(map);
-
-    // Apply styles
-    applyInfoWindowScrollableStyles();
 
     console.log("Opened Google Place info window");
 }
@@ -2370,7 +2363,7 @@ async function addAdvancedMarker(business, location) {
         // Import the marker library
         const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
-        // Create position object
+        // Create a position object from the location
         let position;
         if (location.lat && typeof location.lat === 'function') {
             position = { lat: location.lat(), lng: location.lng() };
@@ -2383,23 +2376,24 @@ async function addAdvancedMarker(business, location) {
             return null;
         }
 
-        // Determine marker color
+        // Determine marker color based on whether it's a primary result or nearby result
         const isNearby = business.isNearby === true;
+        const pinClass = isNearby ? "nearby" : "primary";
         const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
 
-        // Create pin element with business type icon
+        // Create a pin element
         const pinElement = document.createElement('div');
         pinElement.className = 'custom-marker';
         pinElement.style.cursor = 'pointer';
-        pinElement.style.zIndex = '1000';
+        pinElement.style.zIndex = '1000'; // Higher z-index to prevent POI clicks
 
         // Get business type icon
         const businessIcon = getBusinessTypeIconHTML(business.type);
 
-        // Set HTML for marker
+        // Set innerHTML with the correct structure to match your CSS
         pinElement.innerHTML = `
             <div class="marker-container">
-                <div class="marker-pin" style="background-color: ${pinColor};">
+                <div class="marker-pin ${pinClass}" style="background-color: ${pinColor};">
                     <div class="marker-icon">
                         ${businessIcon}
                     </div>
@@ -2408,50 +2402,40 @@ async function addAdvancedMarker(business, location) {
             </div>
         `;
 
-        // Create advanced marker
+        // Create the advanced marker
         const marker = new AdvancedMarkerElement({
             position: position,
             map: map,
             title: business.bname,
-            content: pinElement
+            content: pinElement,
+            collisionBehavior: isNearby ? 'OPTIONAL_AND_HIDES_LOWER_PRIORITY' : 'REQUIRED_AND_HIDES_OPTIONAL'
         });
 
-        // Store data with marker
+        // Store the business data with the marker
         marker.business = business;
+        marker.isNearby = isNearby;
         marker.position = position;
 
-        // Add click handler using gmp-click event
+        // Add click event listener - using eventListener rather than 'click' for better compatibility
         pinElement.addEventListener('click', function(e) {
             console.log("Marker element clicked:", business.bname);
             e.stopPropagation();
-
-            // Use different info windows based on business type
-            if (business.isGooglePlace) {
-                // For Google Places businesses
-                showGooglePlaceInfoWindow(business, position);
-            } else {
-                // For database businesses
-                showInfoWindow(marker);
-            }
+            showInfoWindow(marker);
         });
 
-        // Add to markers array
+        // Add the marker to our array
         markers.push(marker);
-        console.log(`Added marker for ${business.bname}`);
+        console.log(`Added advanced marker for ${business.bname}`);
 
         return marker;
     } catch (error) {
-        console.error("Error creating marker:", error);
+        console.error("Error creating advanced marker:", error);
 
-        // Fall back to standard marker
-        try {
-            return createFallbackMarker(business, location);
-        } catch (fallbackError) {
-            console.error("Fallback marker also failed:", fallbackError);
-            return null;
-        }
+        // Fall back to standard marker if advanced marker fails
+        return createFallbackMarker(business, location);
     }
 }
+
 
 
 /**
@@ -2484,7 +2468,7 @@ function createFallbackMarker(business, location) {
 
         // Create a standard marker
         const marker = new google.maps.Marker({
-            position: position,
+            position: new google.maps.LatLng(position.lat, position.lng),
             map: map,
             title: business.bname,
             icon: {
@@ -2505,12 +2489,7 @@ function createFallbackMarker(business, location) {
 
         // Add click event listener
         marker.addListener('click', function() {
-            // Check if this is a Google Places result or a database result
-            if (business.isGooglePlace) {
-                showGooglePlaceInfoWindow(business, position);
-            } else {
-                showInfoWindow(marker);
-            }
+            showInfoWindow(marker);
         });
 
         // Add the marker to our array
@@ -2863,29 +2842,40 @@ function showInfoWindow(marker) {
         ? `<p><strong>Distance:</strong> ${(business.distance / 1609.34).toFixed(1)} miles</p>`
         : '';
 
-    // Content for the info window with scrollable container
-    const contentString = `
-    <div class="info-window-wrapper">
-      <div class="info-window-header">
-        <h3>${business.bname}</h3>
-      </div>
-      <div class="info-window-content">
-        <div class="info-window-scrollable">
-          <p><strong>Address:</strong><br>${addressLine}</p>
-          ${phoneDisplay}
-          ${distanceDisplay}
-          <p><strong>Type:</strong> ${businessType}</p>
-          <div id="info-window-incentives-${business._id}">
-            <p><strong>Incentives:</strong> <em>Loading...</em></p>
-          </div>
-        </div>
-      </div>
-      <div class="info-window-footer">
+    // Check if this is a Google Places result not in our database
+    const isGooglePlace = business.isGooglePlace === true;
+
+    // Customize the footer button based on whether it's in our database
+    let actionButtons;
+    if (isGooglePlace) {
+        actionButtons = `
+        <button class="add-business-btn" 
+                onclick="window.addBusinessToDatabase('${business.placeId}')">
+            Add to Patriot Thanks
+        </button>`;
+    } else {
+        actionButtons = `
         <button class="view-details-btn" 
                 onclick="window.viewBusinessDetails('${business._id}')">
-          View Details
-        </button>
-      </div>
+            View Details
+        </button>`;
+    }
+
+    // Content for the info window with your existing CSS classes
+    const contentString = `
+    <div class="info-window">
+        <h3>${business.bname}</h3>
+        <p><strong>Address:</strong><br>${addressLine}</p>
+        ${phoneDisplay}
+        ${distanceDisplay}
+        <p><strong>Type:</strong> ${businessType}</p>
+        <div id="info-window-incentives-${business._id}">
+            <p><strong>Incentives:</strong> <em>${isGooglePlace ? 'Not in database' : 'Loading...'}</em></p>
+        </div>
+        ${isGooglePlace ? '<p>This business is not yet in the Patriot Thanks database.</p>' : ''}
+        <div class="info-window-actions">
+            ${actionButtons}
+        </div>
     </div>
     `;
 
@@ -2897,25 +2887,47 @@ function showInfoWindow(marker) {
         });
     }
 
-    // Handle different marker types
+    // Set content for the info window
     infoWindow.setContent(contentString);
 
-    if (marker instanceof google.maps.marker.AdvancedMarkerElement) {
-        // For AdvancedMarkerElement
-        infoWindow.setPosition(marker.position);
-        infoWindow.open(map);
-    } else {
-        // For standard Marker
-        infoWindow.open(map, marker);
+    // Open the info window based on marker type
+    try {
+        if (typeof marker.position === 'object' && marker.position !== null) {
+            // For both AdvancedMarkerElement and position objects
+            if (marker.position.lat && typeof marker.position.lat === 'function') {
+                // It's a LatLng object
+                infoWindow.setPosition(marker.position);
+                infoWindow.open(map);
+            } else if (marker.position.lat && typeof marker.position.lat === 'number') {
+                // It's a position object with lat/lng properties
+                infoWindow.setPosition(new google.maps.LatLng(
+                    marker.position.lat,
+                    marker.position.lng
+                ));
+                infoWindow.open(map);
+            } else {
+                // Try to open it against the marker
+                infoWindow.open(map, marker);
+            }
+        } else {
+            // Fallback for any other marker type
+            infoWindow.open(map, marker);
+        }
+    } catch (error) {
+        console.error("Error opening info window:", error);
+        // Final fallback - try to get position from business
+        if (business.lat && business.lng) {
+            infoWindow.setPosition(new google.maps.LatLng(business.lat, business.lng));
+            infoWindow.open(map);
+        }
     }
 
     console.log("Opened info window for marker");
 
-    // Apply custom CSS for scrollable content
-    applyInfoWindowScrollableStyles();
-
-    // Fetch incentives for this business
-    fetchBusinessIncentivesForInfoWindow(business._id);
+    // Only fetch incentives if it's in our database
+    if (!isGooglePlace) {
+        fetchBusinessIncentivesForInfoWindow(business._id);
+    }
 }
 
 
