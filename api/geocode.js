@@ -1,10 +1,49 @@
 // api/geocode.js
-const { geocodeAddress } = require('../utils/geocoding');
+// Server-side API endpoint for geocoding addresses
+const axios = require('axios');
 
 /**
- * @route   GET /api/geocode
- * @desc    Geocode an address and return coordinates
- * @access  Public
+ * Geocode an address to get coordinates
+ * @param {string} address - Full address to geocode
+ * @returns {Promise<{lat: number, lng: number} | null>} Location coordinates or null
+ */
+async function geocodeAddress(address) {
+    try {
+        // Use Google Maps Geocoding API
+        const apiKey = process.env.GOOGLE_MAPS_API_KEY; // Get key from environment variable
+
+        if (!apiKey) {
+            console.error('Google Maps API key is not configured');
+            throw new Error('Server configuration error: Google Maps API key is missing');
+        }
+
+        const encodedAddress = encodeURIComponent(address);
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
+
+        const response = await axios.get(url);
+
+        if (response.data.status === 'OK' && response.data.results.length > 0) {
+            const location = response.data.results[0].geometry.location;
+            return {
+                lat: location.lat,
+                lng: location.lng
+            };
+        } else {
+            console.warn(`Geocoding failed with status: ${response.data.status}`);
+            console.warn(`Address: ${address}`);
+            console.warn(`Error message: ${response.data.error_message || 'No error message'}`);
+            return null;
+        }
+    } catch (error) {
+        console.error('Geocoding error:', error);
+        throw error;
+    }
+}
+
+/**
+ * Geocode API endpoint handler
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
  */
 module.exports = async (req, res) => {
     try {
@@ -17,6 +56,7 @@ module.exports = async (req, res) => {
             });
         }
 
+        console.log(`Geocoding address: ${address}`);
         const location = await geocodeAddress(address);
 
         if (!location) {

@@ -31,7 +31,24 @@
 
     <!-- Runtime Google Maps API key config -->
     <script src="./js/runtime-config.js"></script>
+    <script>
+        // Enhanced runtime configuration
+        window.appConfig = {
+            // Your Google Maps API key - Make sure to replace with your actual key
+            googleMapsApiKey: 'AIzaSyCHKhYZwQR37M_0QctXUQe6VFRFrlhaYj8',
 
+            // Map ID for Advanced Markers
+            googleMapsMapId: 'ebe8ec43a7bc252d',
+
+            // Other configuration settings
+            environment: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? 'development'
+                    : 'production',
+
+            // Debug mode - set to true to see more console logging
+            debug: true
+        };
+    </script>
     <!-- Dynamic Google Maps script insertion -->
     <!-- Optimized Google Maps script insertion with proper async loading and Map ID -->
     <script>
@@ -44,12 +61,22 @@
 
             // Create and insert the Google Maps script with all recommended parameters
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMap&loading=async`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMap&loading=async&v=weekly`;
             script.async = true;
             script.defer = true;
             script.onerror = function() {
                 console.error('Google Maps API failed to load. Check your API key.');
-                alert('Error loading Google Maps. Please try again later.');
+                const mapContainer = document.getElementById('map');
+                if (mapContainer) {
+                    mapContainer.innerHTML = `
+                <div style="text-align: center; padding: 20px; background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; border-radius: 4px;">
+                    <p><strong>Error loading Google Maps</strong></p>
+                    <p>Please check your internet connection and try again.</p>
+                </div>
+            `;
+                } else {
+                    alert('Error loading Google Maps. Please try again later.');
+                }
             };
             document.head.appendChild(script);
         });
@@ -100,6 +127,9 @@
         <p class="paragraph_style">In Patriot Thanks, you can search for a business within your local
             area that offers discounts and/or incentives for "active duty, veterans, first responders, and their
             spouses." If you know of a business that offers discounts and/or incentives, Please add them in the add a business section. </p>
+        <div id="debug-controls" style="margin: 10px 0; text-align: right; display: none;">
+            <button id="debug-map-btn" class="btn btn-sm btn-secondary">Debug Map</button>
+        </div>
     </section>
     <div class="left_pane">
         <fieldset>
@@ -193,5 +223,96 @@
 <footer class = "footer_style"><br>
     <p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p>
 </footer>
+
+<style>
+    .error-message {
+        color: #721c24;
+        padding: 10px;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        margin: 10px 0;
+        text-align: center;
+    }
+
+    .loading-indicator {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+
+    .loading-indicator::after {
+        content: '';
+        width: 30px;
+        height: 30px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-left: 10px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Improved marker styles */
+    .custom-marker {
+        cursor: pointer;
+    }
+
+    .marker-pin {
+        width: 32px;
+        height: 40px;
+        border-radius: 50% 50% 50% 0;
+        background-color: #EA4335;
+        transform: rotate(-45deg);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .marker-icon {
+        transform: rotate(45deg);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 24px;
+        height: 24px;
+        color: white !important;
+    }
+
+    /* Make icon color white for better visibility */
+    .marker-icon i {
+        color: white !important;
+    }
+
+</style>
+<script>
+    // Show debug controls only in development environment
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.appConfig && window.appConfig.environment === 'development') {
+            const debugControls = document.getElementById('debug-controls');
+            if (debugControls) {
+                debugControls.style.display = 'block';
+
+                // Add event listener for the debug button
+                const debugBtn = document.getElementById('debug-map-btn');
+                if (debugBtn) {
+                    debugBtn.addEventListener('click', function() {
+                        if (typeof debugMapState === 'function') {
+                            debugMapState();
+                        } else {
+                            console.log("debugMapState function not available");
+                        }
+                    });
+                }
+            }
+        }
+    });
+</script>
 </body>
 </html>

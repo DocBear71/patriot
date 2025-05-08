@@ -1246,11 +1246,393 @@ async function retrieveFromMongoDB(formData) {
     }
 }
 
+// /**
+//  * Search Google Places when no results found in our database
+//  * Using the completely new Places API (v1) to avoid deprecation warnings
+//  * @param {Object} formData - Form data with search criteria
+//  */
+// async function searchGooglePlaces(formData) {
+//     try {
+//         console.log("Searching Google Places for:", formData);
+//
+//         // Make map visible
+//         const mapContainer = document.getElementById('map');
+//         if (mapContainer) {
+//             mapContainer.style.display = 'block';
+//             mapContainer.style.height = '400px';
+//         }
+//
+//         // Clear existing markers
+//         clearMarkers();
+//
+//         // Build search query
+//         let searchQuery = '';
+//         if (formData.businessName) searchQuery += formData.businessName;
+//         if (formData.address) searchQuery += ' ' + formData.address;
+//         searchQuery = searchQuery.trim();
+//
+//         // Show loading indicator
+//         const loadingDiv = document.createElement('div');
+//         loadingDiv.id = 'map-loading';
+//         loadingDiv.innerHTML = 'Searching for businesses...';
+//         loadingDiv.style.position = 'absolute';
+//         loadingDiv.style.top = '50%';
+//         loadingDiv.style.left = '50%';
+//         loadingDiv.style.transform = 'translate(-50%, -50%)';
+//         loadingDiv.style.backgroundColor = 'white';
+//         loadingDiv.style.padding = '10px';
+//         loadingDiv.style.borderRadius = '5px';
+//         loadingDiv.style.zIndex = '1000';
+//         mapContainer.appendChild(loadingDiv);
+//
+//         // Geocode the address or use the current location
+//         let searchLocation;
+//
+//         // Check if user wants to use their location
+//         const useMyLocation = document.getElementById('use-my-location') &&
+//             document.getElementById('use-my-location').checked;
+//
+//         if (useMyLocation) {
+//             try {
+//                 const userLocation = await getUserLocation();
+//                 searchLocation = {
+//                     latitude: userLocation.lat,
+//                     longitude: userLocation.lng
+//                 };
+//                 console.log("Using user's current location for search:", searchLocation);
+//             } catch (error) {
+//                 console.error("Error getting user location:", error);
+//                 // Fall back to geocoding the address
+//                 let useLocationFailed = true;
+//             }
+//         }
+//
+//         if (!useMyLocation || typeof useLocationFailed !== 'undefined') {
+//             try {
+//                 // Geocode address using Geocoding API directly
+//                 const geocodeApiUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(formData.address || searchQuery)}&key=${getGoogleMapsApiKey()}`;
+//
+//                 const response = await fetch(geocodeApiUrl);
+//                 const geocodeData = await response.json();
+//
+//                 if (geocodeData.status === 'OK' && geocodeData.results && geocodeData.results.length > 0) {
+//                     const location = geocodeData.results[0].geometry.location;
+//                     searchLocation = {
+//                         latitude: location.lat,
+//                         longitude: location.lng
+//                     };
+//
+//                     // Create a Google Maps LatLng object for map operations
+//                     const googleMapsLocation = new google.maps.LatLng(location.lat, location.lng);
+//
+//                     // Create new bounds
+//                     bounds = new google.maps.LatLngBounds();
+//                     bounds.extend(googleMapsLocation);
+//
+//                     console.log("Geocoded search center:", searchLocation);
+//                 } else {
+//                     throw new Error(`Geocoding failed: ${geocodeData.status}`);
+//                 }
+//             } catch (error) {
+//                 console.error("Error geocoding address:", error);
+//
+//                 // Fall back to default US center
+//                 searchLocation = {
+//                     latitude: CONFIG.defaultCenter.lat,
+//                     longitude: CONFIG.defaultCenter.lng
+//                 };
+//
+//                 // Create a Google Maps LatLng object for map operations
+//                 const googleMapsLocation = new google.maps.LatLng(
+//                     CONFIG.defaultCenter.lat,
+//                     CONFIG.defaultCenter.lng
+//                 );
+//
+//                 // Create new bounds
+//                 bounds = new google.maps.LatLngBounds();
+//                 bounds.extend(googleMapsLocation);
+//
+//                 console.log("Using default US center for search");
+//             }
+//         }
+//
+//         try {
+//             // Search radius - 80km is about 50 miles
+//             const searchRadius = 50000;
+//
+//             // Use the modern Places API - Text Search
+//             const placeResults = await searchPlacesWithTextSearch(searchQuery, searchLocation, searchRadius);
+//
+//             // Remove loading indicator
+//             const loadingElement = document.getElementById('map-loading');
+//             if (loadingElement) loadingElement.remove();
+//
+//             if (!placeResults || placeResults.length === 0) {
+//                 console.log("No places found");
+//                 // Show no results message
+//                 const searchTableContainer = document.getElementById('search_table');
+//                 if (searchTableContainer) {
+//                     const tableBody = searchTableContainer.querySelector('tbody');
+//                     if (tableBody) {
+//                         tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria within 50 miles.</td></tr>';
+//                     }
+//                     searchTableContainer.style.display = 'block';
+//                 }
+//                 return;
+//             }
+//
+//             console.log("Found places:", placeResults.length);
+//
+//             // Process places into business objects and add markers
+//             const businessResults = processPlaceResults(placeResults, searchLocation);
+//
+//             if (businessResults.length === 0) {
+//                 // Show no results message
+//                 const searchTableContainer = document.getElementById('search_table');
+//                 if (searchTableContainer) {
+//                     const tableBody = searchTableContainer.querySelector('tbody');
+//                     if (tableBody) {
+//                         tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria within 50 miles.</td></tr>';
+//                     }
+//                     searchTableContainer.style.display = 'block';
+//                 }
+//                 return;
+//             }
+//
+//             // Sort by distance
+//             businessResults.sort((a, b) => a.distance - b.distance);
+//
+//             // Display results
+//             displaySearchResults(businessResults);
+//
+//             // Fit map to bounds
+//             if (bounds && !bounds.isEmpty()) {
+//                 map.fitBounds(bounds);
+//
+//                 // Adjust zoom level
+//                 setTimeout(() => {
+//                     if (businessResults.length <= 2) {
+//                         const currentZoom = map.getZoom();
+//                         if (currentZoom > 14) {
+//                             map.setZoom(14);
+//                         }
+//                     } else if (businessResults.length > 10) {
+//                         const currentZoom = map.getZoom();
+//                         if (currentZoom < 10) {
+//                             map.setZoom(10);
+//                         }
+//                     }
+//                 }, 100);
+//             } else {
+//                 // If bounds are empty, center on search location
+//                 map.setCenter(new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude));
+//                 map.setZoom(11);
+//             }
+//
+//         } catch (error) {
+//             console.error("Error searching places:", error);
+//
+//             // Remove loading indicator
+//             const loadingElement = document.getElementById('map-loading');
+//             if (loadingElement) loadingElement.remove();
+//
+//             // Show error in search results
+//             const searchTableContainer = document.getElementById('search_table');
+//             if (searchTableContainer) {
+//                 const tableBody = searchTableContainer.querySelector('tbody');
+//                 if (tableBody) {
+//                     tableBody.innerHTML = `<tr><td colspan="5" class="text-center">Error searching for businesses: ${error.message}</td></tr>`;
+//                 }
+//                 searchTableContainer.style.display = 'block';
+//             }
+//
+//             // Center map on search location if possible
+//             if (searchLocation) {
+//                 map.setCenter(new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude));
+//                 map.setZoom(11);
+//             }
+//         }
+//     } catch (error) {
+//         console.error("Error in searchGooglePlaces:", error);
+//
+//         // Remove loading indicator if it exists
+//         const loadingElement = document.getElementById('map-loading');
+//         if (loadingElement) loadingElement.remove();
+//
+//         // Show error message
+//         const searchTableContainer = document.getElementById('search_table');
+//         if (searchTableContainer) {
+//             searchTableContainer.style.display = 'block';
+//             const tableBody = searchTableContainer.querySelector('tbody');
+//             if (tableBody) {
+//                 tableBody.innerHTML = `<tr><td colspan="5" class="text-center">Error searching for businesses: ${error.message}</td></tr>`;
+//             }
+//         }
+//     }
+// }
+
+// Add these functions to your business-search.js file to use the server-side endpoints
+
 /**
- * Search Google Places when no results found in our database
- * Using the completely new Places API (v1) to avoid deprecation warnings
- * @param {Object} formData - Form data with search criteria
+ * Geocode an address using the server-side endpoint
+ * @param {string} address - Address to geocode
+ * @returns {Promise<{lat: number, lng: number} | null>} Location coordinates or null
  */
+async function geocodeAddressServerSide(address) {
+    try {
+        console.log(`Geocoding address via server: ${address}`);
+
+        // Get the base URL
+        const baseURL = getBaseURL();
+        const url = `${baseURL}/api/geocode?address=${encodeURIComponent(address)}`;
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Geocoding failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.success || !data.location) {
+            throw new Error('Geocoding returned no results');
+        }
+
+        console.log(`Geocoding result:`, data.location);
+        return data.location;
+    } catch (error) {
+        console.error("Error geocoding address:", error);
+        return null;
+    }
+}
+
+/**
+ * Search for places via the server-side endpoint
+ * @param {string} query - Search query
+ * @param {Object} location - Location with latitude and longitude
+ * @param {number} radius - Search radius in meters
+ * @returns {Promise<Array>} Places search results
+ */
+async function searchPlacesServerSide(query, location, radius = 50000) {
+    try {
+        console.log(`Searching places via server: ${query}`);
+
+        // Get the base URL
+        const baseURL = getBaseURL();
+
+        // Build the URL with query parameters
+        let url = `${baseURL}/api/places/search?query=${encodeURIComponent(query)}`;
+
+        // Add location params if available
+        if (location && location.latitude && location.longitude) {
+            url += `&latitude=${location.latitude}&longitude=${location.longitude}&radius=${radius}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Places search failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.success) {
+            throw new Error('Places search returned an error');
+        }
+
+        console.log(`Found ${data.results.length} places`);
+        return data.results;
+    } catch (error) {
+        console.error("Error searching places:", error);
+        return [];
+    }
+}
+
+/**
+ * Get details for a specific place via the server-side endpoint
+ * @param {string} placeId - Google Place ID
+ * @returns {Promise<Object|null>} Place details or null
+ */
+async function getPlaceDetailsServerSide(placeId) {
+    try {
+        console.log(`Getting place details via server: ${placeId}`);
+
+        // Get the base URL
+        const baseURL = getBaseURL();
+        const url = `${baseURL}/api/places/details/${placeId}`;
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Place details failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.success || !data.place) {
+            throw new Error('Place details returned no results');
+        }
+
+        return data.place;
+    } catch (error) {
+        console.error("Error getting place details:", error);
+        return null;
+    }
+}
+
+// Update these functions to use the server-side endpoints
+
+// Modified geocodeBusinessAddress function to use server-side geocoding
+function geocodeBusinessAddress(business, index, total) {
+    if (!business || !business.address1) {
+        console.error("Invalid business data for geocoding", business);
+        return;
+    }
+
+    // Construct the address string
+    const addressString = `${business.address1}, ${business.city}, ${business.state} ${business.zip}`;
+
+    // Add a small delay to avoid hitting rate limits
+    setTimeout(async () => {
+        try {
+            // Use server-side geocoding instead of direct Google API call
+            const location = await geocodeAddressServerSide(addressString);
+
+            if (location) {
+                // Store the coordinates in the business object
+                business.lat = location.lat;
+                business.lng = location.lng;
+
+                // Create a Google Maps LatLng object
+                const googleMapsLocation = new google.maps.LatLng(location.lat, location.lng);
+
+                // Create marker
+                addAdvancedMarker(business, googleMapsLocation);
+
+                // Extend bounds
+                bounds.extend(googleMapsLocation);
+
+                // If this is the last business, fit the map to the bounds
+                if (index === total - 1) {
+                    map.fitBounds(bounds);
+
+                    // If we only have one marker, zoom in appropriately
+                    if (total === 1) {
+                        map.setZoom(15);
+                    }
+
+                    // Search for nearby businesses if we have at least one result
+                    if (total >= 1) {
+                        searchNearbyBusinesses(googleMapsLocation, business.type);
+                    }
+                }
+            } else {
+                console.error("Geocoding failed for address: " + addressString);
+            }
+        } catch (error) {
+            console.error("Error in geocodeBusinessAddress:", error);
+        }
+    }, index * CONFIG.geocodeDelay); // Stagger requests
+}
+
+// Modified searchGooglePlaces function to use server-side places search
 async function searchGooglePlaces(formData) {
     try {
         console.log("Searching Google Places for:", formData);
@@ -1264,6 +1646,7 @@ async function searchGooglePlaces(formData) {
 
         // Clear existing markers
         clearMarkers();
+        bounds = new google.maps.LatLngBounds();
 
         // Build search query
         let searchQuery = '';
@@ -1274,18 +1657,11 @@ async function searchGooglePlaces(formData) {
         // Show loading indicator
         const loadingDiv = document.createElement('div');
         loadingDiv.id = 'map-loading';
+        loadingDiv.className = 'loading-indicator';
         loadingDiv.innerHTML = 'Searching for businesses...';
-        loadingDiv.style.position = 'absolute';
-        loadingDiv.style.top = '50%';
-        loadingDiv.style.left = '50%';
-        loadingDiv.style.transform = 'translate(-50%, -50%)';
-        loadingDiv.style.backgroundColor = 'white';
-        loadingDiv.style.padding = '10px';
-        loadingDiv.style.borderRadius = '5px';
-        loadingDiv.style.zIndex = '1000';
         mapContainer.appendChild(loadingDiv);
 
-        // Geocode the address or use the current location
+        // Geocode the address or use current location
         let searchLocation;
 
         // Check if user wants to use their location
@@ -1302,36 +1678,33 @@ async function searchGooglePlaces(formData) {
                 console.log("Using user's current location for search:", searchLocation);
             } catch (error) {
                 console.error("Error getting user location:", error);
-                // Fall back to geocoding the address
                 let useLocationFailed = true;
             }
         }
 
         if (!useMyLocation || typeof useLocationFailed !== 'undefined') {
             try {
-                // Geocode address using Geocoding API directly
-                const geocodeApiUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(formData.address || searchQuery)}&key=${getGoogleMapsApiKey()}`;
+                // Use server-side geocoding instead of direct Google API call
+                const geocodeResult = await geocodeAddressServerSide(formData.address || searchQuery);
 
-                const response = await fetch(geocodeApiUrl);
-                const geocodeData = await response.json();
-
-                if (geocodeData.status === 'OK' && geocodeData.results && geocodeData.results.length > 0) {
-                    const location = geocodeData.results[0].geometry.location;
+                if (geocodeResult) {
                     searchLocation = {
-                        latitude: location.lat,
-                        longitude: location.lng
+                        latitude: geocodeResult.lat,
+                        longitude: geocodeResult.lng
                     };
 
                     // Create a Google Maps LatLng object for map operations
-                    const googleMapsLocation = new google.maps.LatLng(location.lat, location.lng);
+                    const googleMapsLocation = new google.maps.LatLng(
+                        geocodeResult.lat,
+                        geocodeResult.lng
+                    );
 
-                    // Create new bounds
-                    bounds = new google.maps.LatLngBounds();
+                    // Extend bounds
                     bounds.extend(googleMapsLocation);
 
                     console.log("Geocoded search center:", searchLocation);
                 } else {
-                    throw new Error(`Geocoding failed: ${geocodeData.status}`);
+                    throw new Error(`Geocoding failed for address: ${formData.address || searchQuery}`);
                 }
             } catch (error) {
                 console.error("Error geocoding address:", error);
@@ -1357,11 +1730,12 @@ async function searchGooglePlaces(formData) {
         }
 
         try {
-            // Search radius - 80km is about 50 miles
-            const searchRadius = 50000;
-
-            // Use the modern Places API - Text Search
-            const placeResults = await searchPlacesWithTextSearch(searchQuery, searchLocation, searchRadius);
+            // Use server-side places search
+            const placeResults = await searchPlacesServerSide(
+                searchQuery,
+                searchLocation,
+                50000  // 50km radius
+            );
 
             // Remove loading indicator
             const loadingElement = document.getElementById('map-loading');
@@ -1370,14 +1744,7 @@ async function searchGooglePlaces(formData) {
             if (!placeResults || placeResults.length === 0) {
                 console.log("No places found");
                 // Show no results message
-                const searchTableContainer = document.getElementById('search_table');
-                if (searchTableContainer) {
-                    const tableBody = searchTableContainer.querySelector('tbody');
-                    if (tableBody) {
-                        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria within 50 miles.</td></tr>';
-                    }
-                    searchTableContainer.style.display = 'block';
-                }
+                showErrorMessage('No businesses found matching your search criteria within 50 miles.');
                 return;
             }
 
@@ -1388,14 +1755,7 @@ async function searchGooglePlaces(formData) {
 
             if (businessResults.length === 0) {
                 // Show no results message
-                const searchTableContainer = document.getElementById('search_table');
-                if (searchTableContainer) {
-                    const tableBody = searchTableContainer.querySelector('tbody');
-                    if (tableBody) {
-                        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria within 50 miles.</td></tr>';
-                    }
-                    searchTableContainer.style.display = 'block';
-                }
+                showErrorMessage('No businesses found matching your search criteria within 50 miles.');
                 return;
             }
 
@@ -1425,10 +1785,12 @@ async function searchGooglePlaces(formData) {
                 }, 100);
             } else {
                 // If bounds are empty, center on search location
-                map.setCenter(new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude));
+                map.setCenter(new google.maps.LatLng(
+                    searchLocation.latitude,
+                    searchLocation.longitude
+                ));
                 map.setZoom(11);
             }
-
         } catch (error) {
             console.error("Error searching places:", error);
 
@@ -1437,18 +1799,14 @@ async function searchGooglePlaces(formData) {
             if (loadingElement) loadingElement.remove();
 
             // Show error in search results
-            const searchTableContainer = document.getElementById('search_table');
-            if (searchTableContainer) {
-                const tableBody = searchTableContainer.querySelector('tbody');
-                if (tableBody) {
-                    tableBody.innerHTML = `<tr><td colspan="5" class="text-center">Error searching for businesses: ${error.message}</td></tr>`;
-                }
-                searchTableContainer.style.display = 'block';
-            }
+            showErrorMessage(`Error searching for businesses: ${error.message}`);
 
             // Center map on search location if possible
             if (searchLocation) {
-                map.setCenter(new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude));
+                map.setCenter(new google.maps.LatLng(
+                    searchLocation.latitude,
+                    searchLocation.longitude
+                ));
                 map.setZoom(11);
             }
         }
@@ -1460,16 +1818,58 @@ async function searchGooglePlaces(formData) {
         if (loadingElement) loadingElement.remove();
 
         // Show error message
-        const searchTableContainer = document.getElementById('search_table');
-        if (searchTableContainer) {
-            searchTableContainer.style.display = 'block';
-            const tableBody = searchTableContainer.querySelector('tbody');
-            if (tableBody) {
-                tableBody.innerHTML = `<tr><td colspan="5" class="text-center">Error searching for businesses: ${error.message}</td></tr>`;
-            }
-        }
+        showErrorMessage(`Error searching for businesses: ${error.message}`);
     }
 }
+
+// Modified window.addBusinessToDatabase function to use server-side place details
+window.addBusinessToDatabase = async function(placeId) {
+    console.log("Adding place to database:", placeId);
+
+    try {
+        // Use server-side endpoint to get place details
+        const place = await getPlaceDetailsServerSide(placeId);
+
+        if (!place) {
+            throw new Error("Could not retrieve place details");
+        }
+
+        // Create business data object from place details
+        const businessData = {
+            name: place.name || '',
+            address1: place.address_components.street_number + ' ' + place.address_components.route,
+            city: place.address_components.city,
+            state: place.address_components.state,
+            zip: place.address_components.zip,
+            phone: place.phone || '',
+            placeId: place.place_id,
+
+            // Store coordinates for later use
+            lat: place.location.lat || 0,
+            lng: place.location.lng || 0,
+            // Add this for proper GeoJSON formatting
+            location: {
+                type: 'Point',
+                coordinates: [
+                    place.location.lng || 0,
+                    place.location.lat || 0
+                ]
+            }
+        };
+
+        // Log the coordinates to verify they're correct
+        console.log(`Place coordinates: ${businessData.lat}, ${businessData.lng}`);
+
+        // Store in sessionStorage for the add business page to use
+        sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
+
+        // Redirect to add business page
+        window.location.href = 'business-add.html?prefill=true';
+    } catch (error) {
+        console.error("Error fetching place details for addition:", error);
+        alert("Sorry, we couldn't retrieve the details for this business. Please try again or add it manually.");
+    }
+};
 
 /**
  * Search places using the new Places API Text Search endpoint
@@ -1482,6 +1882,12 @@ async function searchPlacesWithTextSearch(query, location, radius) {
     try {
         // Get the API key
         const apiKey = getGoogleMapsApiKey();
+
+        // If no API key, show an error
+        if (!apiKey) {
+            console.error("No Google Maps API key found");
+            throw new Error("Google Maps API key is missing");
+        }
 
         // Create the request body for Text Search
         const requestBody = {
@@ -1501,6 +1907,12 @@ async function searchPlacesWithTextSearch(query, location, radius) {
             };
         }
 
+        console.log("Making Places API request with:", {
+            query: requestBody.textQuery,
+            location: location ? `${location.latitude},${location.longitude}` : 'not provided',
+            radius: radius
+        });
+
         // Set up the request
         const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
             method: 'POST',
@@ -1516,8 +1928,11 @@ async function searchPlacesWithTextSearch(query, location, radius) {
         const data = await response.json();
 
         if (data.error) {
+            console.error("Places API error:", data.error);
             throw new Error(`Places API error: ${data.error.message}`);
         }
+
+        console.log("Places API response:", data);
 
         // Return the places array or an empty array if no results
         return data.places || [];
@@ -1526,6 +1941,32 @@ async function searchPlacesWithTextSearch(query, location, radius) {
         throw error;
     }
 }
+
+// Add an error handling function to show user-friendly messages
+function showErrorMessage(message, container) {
+    // If a specific container is provided, use it; otherwise use default
+    const targetContainer = container || document.getElementById('search_table');
+    if (targetContainer) {
+        targetContainer.style.display = 'block';
+
+        // If it's the search table, look for its tbody
+        const tableBody = targetContainer.querySelector('tbody');
+        if (tableBody) {
+            tableBody.innerHTML = `<tr><td colspan="5" class="text-center error-message">${message}</td></tr>`;
+        } else {
+            // Otherwise just put the message in the container
+            targetContainer.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+
+        // Scroll to the message
+        targetContainer.scrollIntoView({behavior: 'smooth'});
+    } else {
+        // Fallback to alert if no container is available
+        alert(message);
+    }
+}
+
+
 
 /**
  * Process place results into business objects and add markers
@@ -1628,40 +2069,40 @@ function processPlaceResults(places, searchLocation) {
     return businessResults;
 }
 
-/**
- * Get the Google Maps API key from the app configuration
- * @returns {string} API key
- */
-function getGoogleMapsApiKey() {
-    // Try to get API key from window.appConfig
-    if (window.appConfig && window.appConfig.googleMapsApiKey) {
-        return window.appConfig.googleMapsApiKey;
-    }
-
-    // As a fallback, look for a meta tag with the API key
-    const metaTag = document.querySelector('meta[name="google-maps-api-key"]');
-    if (metaTag) {
-        return metaTag.content;
-    }
-
-    // Another option - check if there's a global API key variable
-    if (typeof GOOGLE_MAPS_API_KEY !== 'undefined') {
-        return GOOGLE_MAPS_API_KEY;
-    }
-
-    // Final fallback - look for an API key in any script tags
-    const scriptTags = document.querySelectorAll('script[src*="maps.googleapis.com"]');
-    for (const script of scriptTags) {
-        const src = script.getAttribute('src');
-        const keyMatch = src.match(/[?&]key=([^&]+)/);
-        if (keyMatch && keyMatch[1]) {
-            return keyMatch[1];
-        }
-    }
-
-    console.error("Could not find Google Maps API key");
-    return '';
-}
+// /**
+//  * Get the Google Maps API key from the app configuration
+//  * @returns {string} API key
+//  */
+// function getGoogleMapsApiKey() {
+//     // Try to get API key from window.appConfig
+//     if (window.appConfig && window.appConfig.googleMapsApiKey) {
+//         return window.appConfig.googleMapsApiKey;
+//     }
+//
+//     // As a fallback, look for a meta tag with the API key
+//     const metaTag = document.querySelector('meta[name="google-maps-api-key"]');
+//     if (metaTag) {
+//         return metaTag.content;
+//     }
+//
+//     // Another option - check if there's a global API key variable
+//     if (typeof GOOGLE_MAPS_API_KEY !== 'undefined') {
+//         return GOOGLE_MAPS_API_KEY;
+//     }
+//
+//     // Final fallback - look for an API key in any script tags
+//     const scriptTags = document.querySelectorAll('script[src*="maps.googleapis.com"]');
+//     for (const script of scriptTags) {
+//         const src = script.getAttribute('src');
+//         const keyMatch = src.match(/[?&]key=([^&]+)/);
+//         if (keyMatch && keyMatch[1]) {
+//             return keyMatch[1];
+//         }
+//     }
+//
+//     console.error("Could not find Google Maps API key");
+//     return '';
+// }
 
 // /**
 //  * Perform a custom place search using the Geocoding API
@@ -2709,63 +3150,63 @@ function displayBusinessesOnMap(businesses) {
 //     }
 // }
 
-/**
- * Geocode a business address to get coordinates
- * @param {Object} business - Business object with address data
- * @param {number} index - Index of the business in the array
- * @param {number} total - Total number of businesses
- */
-function geocodeBusinessAddress(business, index, total) {
-    if (!business || !business.address1) {
-        console.error("Invalid business data for geocoding", business);
-        return;
-    }
-
-    // Construct the address string
-    const addressString = `${business.address1}, ${business.city}, ${business.state} ${business.zip}`;
-
-    // Create a geocoder
-    const geocoder = new google.maps.Geocoder();
-
-    // Add a small delay to avoid hitting geocoding rate limits
-    setTimeout(() => {
-        geocoder.geocode({'address': addressString}, function (results, status) {
-            if (status === google.maps.GeocoderStatus.OK) {
-                if (results[0]) {
-                    const location = results[0].geometry.location;
-
-                    // Store the coordinates in the business object
-                    business.lat = location.lat();
-                    business.lng = location.lng();
-
-                    // Create marker
-                    addAdvancedMarker(business, location);
-
-                    // Extend bounds
-                    bounds.extend(location);
-
-                    // If this is the last business, fit the map to the bounds
-                    if (index === total - 1) {
-                        map.fitBounds(bounds);
-
-                        // If we only have one marker, zoom in appropriately
-                        if (total === 1) {
-                            map.setZoom(15);
-                        }
-
-                        // Search for nearby businesses if we have at least one result
-                        if (total >= 1) {
-                            // Use the current business instead of trying to access the businesses array
-                            searchNearbyBusinesses(location, business.type);
-                        }
-                    }
-                }
-            } else {
-                console.error("Geocode failed for address " + addressString + ": " + status);
-            }
-        });
-    }, index * CONFIG.geocodeDelay); // Stagger requests
-}
+// /**
+//  * Geocode a business address to get coordinates
+//  * @param {Object} business - Business object with address data
+//  * @param {number} index - Index of the business in the array
+//  * @param {number} total - Total number of businesses
+//  */
+// function geocodeBusinessAddress(business, index, total) {
+//     if (!business || !business.address1) {
+//         console.error("Invalid business data for geocoding", business);
+//         return;
+//     }
+//
+//     // Construct the address string
+//     const addressString = `${business.address1}, ${business.city}, ${business.state} ${business.zip}`;
+//
+//     // Create a geocoder
+//     const geocoder = new google.maps.Geocoder();
+//
+//     // Add a small delay to avoid hitting geocoding rate limits
+//     setTimeout(() => {
+//         geocoder.geocode({'address': addressString}, function (results, status) {
+//             if (status === google.maps.GeocoderStatus.OK) {
+//                 if (results[0]) {
+//                     const location = results[0].geometry.location;
+//
+//                     // Store the coordinates in the business object
+//                     business.lat = location.lat();
+//                     business.lng = location.lng();
+//
+//                     // Create marker
+//                     addAdvancedMarker(business, location);
+//
+//                     // Extend bounds
+//                     bounds.extend(location);
+//
+//                     // If this is the last business, fit the map to the bounds
+//                     if (index === total - 1) {
+//                         map.fitBounds(bounds);
+//
+//                         // If we only have one marker, zoom in appropriately
+//                         if (total === 1) {
+//                             map.setZoom(15);
+//                         }
+//
+//                         // Search for nearby businesses if we have at least one result
+//                         if (total >= 1) {
+//                             // Use the current business instead of trying to access the businesses array
+//                             searchNearbyBusinesses(location, business.type);
+//                         }
+//                     }
+//                 }
+//             } else {
+//                 console.error("Geocode failed for address " + addressString + ": " + status);
+//             }
+//         });
+//     }, index * CONFIG.geocodeDelay); // Stagger requests
+// }
 
 /**
  * Add an advanced marker to the map (Updated to work with your existing CSS)
@@ -2790,7 +3231,10 @@ async function addAdvancedMarker(business, location) {
             return null;
         }
 
-        // Determine marker color based on whether it's a primary result or nearby result
+        // Ensure business name is a string
+        const businessTitle = business.bname || 'Business';
+
+        // Determine marker color
         const isNearby = business.isNearby === true;
         const pinClass = isNearby ? "nearby" : "primary";
         const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
@@ -2799,12 +3243,12 @@ async function addAdvancedMarker(business, location) {
         const pinElement = document.createElement('div');
         pinElement.className = 'custom-marker';
         pinElement.style.cursor = 'pointer';
-        pinElement.style.zIndex = '1000'; // Higher z-index to prevent POI clicks
+        pinElement.style.zIndex = '1000';
 
         // Get business type icon
         const businessIcon = getBusinessTypeIconHTML(business.type);
 
-        // Set innerHTML with the correct structure to match your CSS
+        // Set innerHTML
         pinElement.innerHTML = `
             <div class="marker-container">
                 <div class="marker-pin ${pinClass}" style="background-color: ${pinColor};">
@@ -2816,11 +3260,11 @@ async function addAdvancedMarker(business, location) {
             </div>
         `;
 
-        // Create the advanced marker
+        // Create the advanced marker - ensure title is a string
         const marker = new AdvancedMarkerElement({
             position: position,
             map: map,
-            title: business.bname,
+            title: String(businessTitle), // Ensure title is always a string
             content: pinElement,
             collisionBehavior: isNearby ? 'OPTIONAL_AND_HIDES_LOWER_PRIORITY' : 'REQUIRED_AND_HIDES_OPTIONAL'
         });
@@ -2830,7 +3274,7 @@ async function addAdvancedMarker(business, location) {
         marker.isNearby = isNearby;
         marker.position = position;
 
-        // Add click event listener - using eventListener rather than 'click' for better compatibility
+        // Add click event listener
         pinElement.addEventListener('click', function(e) {
             console.log("Marker element clicked:", business.bname);
             e.stopPropagation();
@@ -2839,7 +3283,7 @@ async function addAdvancedMarker(business, location) {
 
         // Add the marker to our array
         markers.push(marker);
-        console.log(`Added advanced marker for ${business.bname}`);
+        console.log(`Added advanced marker for ${businessTitle}`);
 
         return marker;
     } catch (error) {
@@ -2863,18 +3307,18 @@ function createFallbackMarker(business, location) {
         // Create a position object from the location
         let position;
         if (location.lat && typeof location.lat === 'function') {
-            // It's a Google Maps LatLng object
             position = { lat: location.lat(), lng: location.lng() };
         } else if (typeof location.lat === 'number') {
-            // It's already a position object
             position = location;
         } else if (business.lat && business.lng) {
-            // Use the coordinates from the business object
             position = { lat: business.lat, lng: business.lng };
         } else {
             console.error("Invalid location for fallback marker:", location);
             return null;
         }
+
+        // Ensure business name is a string
+        const businessTitle = String(business.bname || 'Business');
 
         // Determine marker color
         const isNearby = business.isNearby === true;
@@ -2884,7 +3328,7 @@ function createFallbackMarker(business, location) {
         const marker = new google.maps.Marker({
             position: new google.maps.LatLng(position.lat, position.lng),
             map: map,
-            title: business.bname,
+            title: businessTitle, // Ensure title is a string
             icon: {
                 path: google.maps.SymbolPath.CIRCLE,
                 fillColor: pinColor,
@@ -2908,7 +3352,7 @@ function createFallbackMarker(business, location) {
 
         // Add the marker to our array
         markers.push(marker);
-        console.log(`Added fallback marker for ${business.bname}`);
+        console.log(`Added fallback marker for ${businessTitle}`);
 
         return marker;
     } catch (error) {
@@ -3499,30 +3943,64 @@ function searchNearbyBusinesses(location, businessType) {
         });
 }
 
-// /**
-//  * Debug the current map state
-//  */
-// function debugMapState() {
-//     console.log("==== MAP DEBUGGING INFO ====");
-//     console.log("Map initialized:", mapInitialized);
-//     console.log("Map object exists:", !!map);
-//     if (map) {
-//         console.log("Map center:", map.getCenter().toString());
-//         console.log("Map zoom:", map.getZoom());
-//     }
-//     console.log("Markers count:", markers.length);
-//     if (markers.length > 0) {
-//         console.log("First marker position:", markers[0].position);
-//         console.log("First marker business:", markers[0].business);
-//     }
-//     console.log("Bounds empty:", bounds ? bounds.isEmpty() : "no bounds");
-//     console.log("Map container:", document.getElementById("map"));
-//     if (document.getElementById("map")) {
-//         console.log("Map container display:", window.getComputedStyle(document.getElementById("map")).display);
-//         console.log("Map container dimensions:", document.getElementById("map").offsetWidth, "×", document.getElementById("map").offsetHeight);
-//     }
-//     console.log("==== END DEBUGGING INFO ====");
-// }
+/**
+ * Debug the current map state
+ */
+function debugMapState() {
+    console.log("==== MAP DEBUGGING INFO ====");
+    console.log("Map initialized:", mapInitialized);
+    console.log("Map object exists:", !!map);
+    console.log("Google Maps API Key found:", !!getGoogleMapsApiKey());
+    if (map) {
+        console.log("Map center:", map.getCenter().toString());
+        console.log("Map zoom:", map.getZoom());
+    }
+    console.log("Markers count:", markers.length);
+    if (markers.length > 0) {
+        console.log("First marker position:", markers[0].position);
+        console.log("First marker business:", markers[0].business);
+    }
+    console.log("Bounds empty:", bounds ? bounds.isEmpty() : "no bounds");
+    console.log("Map container:", document.getElementById("map"));
+    if (document.getElementById("map")) {
+        console.log("Map container display:", window.getComputedStyle(document.getElementById("map")).display);
+        console.log("Map container dimensions:", document.getElementById("map").offsetWidth, "×", document.getElementById("map").offsetHeight);
+    }
+    console.log("==== END DEBUGGING INFO ====");
+}
+
+// Fix for the geocoding error - use a server-side approach
+// Add this function to your code
+function getGoogleMapsApiKey() {
+    // Try to get API key from window.appConfig
+    if (window.appConfig && window.appConfig.googleMapsApiKey) {
+        return window.appConfig.googleMapsApiKey;
+    }
+
+    // As a fallback, look for a meta tag with the API key
+    const metaTag = document.querySelector('meta[name="google-maps-api-key"]');
+    if (metaTag) {
+        return metaTag.content;
+    }
+
+    // Another option - check if there's a global API key variable
+    if (typeof GOOGLE_MAPS_API_KEY !== 'undefined') {
+        return GOOGLE_MAPS_API_KEY;
+    }
+
+    // Final fallback - look for an API key in any script tags
+    const scriptTags = document.querySelectorAll('script[src*="maps.googleapis.com"]');
+    for (const script of scriptTags) {
+        const src = script.getAttribute('src');
+        const keyMatch = src.match(/[?&]key=([^&]+)/);
+        if (keyMatch && keyMatch[1]) {
+            return keyMatch[1];
+        }
+    }
+
+    console.error("Could not find Google Maps API key");
+    return '';
+}
 
 /**
  * Geocode a nearby business address
