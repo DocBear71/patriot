@@ -1251,7 +1251,7 @@ async function retrieveFromMongoDB(formData) {
 
 /**
  * Search Google Places when no results found in our database
- * This alternative approach minimizes use of PlacesService
+ * This approach avoids the deprecated PlacesService.textSearch method
  * @param {Object} formData - Form data with search criteria
  */
 async function searchGooglePlaces(formData) {
@@ -1339,20 +1339,43 @@ async function searchGooglePlaces(formData) {
         bounds.extend(searchLocation);
 
         try {
-            // Step 1: Import required libraries
-            await google.maps.importLibrary("places");
+            // Import the Places library for individual place details
+            const { Place } = await google.maps.importLibrary("places");
 
-            // Step 2: Load places asynchronously with custom code
-            const placeIds = await performCustomPlaceSearch(searchQuery, searchLocation, searchRadius);
+            // Create a dummy div for the service
+            // This is necessary since we can't completely avoid PlacesService,
+            // but we'll use it only for the initial search and then use Place API for details
+            const dummyDiv = document.createElement("div");
+            const placesService = new google.maps.places.PlacesService(dummyDiv);
 
-            console.log("Found place IDs:", placeIds);
+            // Define the request for nearby search
+            // The nearbySearch method has fewer issues than textSearch
+            const request = {
+                location: searchLocation,
+                radius: searchRadius,
+                keyword: formData.businessName || searchQuery || "business"
+            };
+
+            // Perform the search
+            const places = await new Promise((resolve, reject) => {
+                placesService.nearbySearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+                        resolve(results);
+                    } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+                        resolve([]);
+                    } else {
+                        reject(new Error(`Places search failed: ${status}`));
+                    }
+                });
+            });
+
+            console.log("Initial places found:", places.length);
 
             // Remove loading indicator if no places found
-            if (!placeIds || placeIds.length === 0) {
+            if (!places || places.length === 0) {
                 const loadingElement = document.getElementById('map-loading');
                 if (loadingElement) loadingElement.remove();
 
-                console.log("No places found");
                 // Show no results message
                 const searchTableContainer = document.getElementById('search_table');
                 if (searchTableContainer) {
@@ -1365,15 +1388,119 @@ async function searchGooglePlaces(formData) {
                 return;
             }
 
-            // Step 3: Get details for each place
-            const businessResults = await fetchPlaceDetailsForIds(placeIds, searchLocation, searchRadius);
+            // Process each place with Place API to avoid warnings for details
+            const businessResults = [];
+            const promises = [];
+
+            for (const placeResult of places) {
+                promises.push((async () => {
+                    try {
+                        // Create a Place instance
+                        const place = new Place({
+                            id: placeResult.place_id
+                        });
+
+                        // Fetch detailed place information
+                        await place.fetchFields({
+                            fields: [
+                                'displayName',
+                                'formattedAddress',
+                                'addressComponents',
+                                'location',
+                                'types',
+                                'nationalPhoneNumber'
+                            ]
+                        });
+
+                        // Extract address components
+                        const addressComponents = {};
+                        if (place.addressComponents) {
+                            for (const component of place.addressComponents) {
+                                for (const type of component.types) {
+                                    addressComponents[type] = component.shortText;
+                                }
+                            }
+                        }
+
+                        // Create address parts
+                        const address1 = `${addressComponents.street_number || ''} ${addressComponents.route || ''}`.trim();
+                        const city = addressComponents.locality || '';
+                        const state = addressComponents.administrative_area_level_1 || '';
+                        const zip = addressComponents.postal_code || '';
+
+                        // Map to business type
+                        let businessType = 'OTHER';
+                        if (place.types) {
+                            if (place.types.includes('restaurant')) businessType = 'REST';
+                            else if (place.types.includes('store')) businessType = 'RETAIL';
+                            else if (place.types.includes('hardware_store')) businessType = 'HARDW';
+                            else if (place.types.includes('gas_station')) businessType = 'FUEL';
+                        }
+
+                        // Calculate distance
+                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            searchLocation,
+                            place.location
+                        );
+
+                        // Check for duplicates
+                        const isDuplicate = markers.some(marker => {
+                            if (!marker.business) return false;
+
+                            if (marker.business.placeId === place.id ||
+                                marker.business._id === 'google_' + place.id) {
+                                return true;
+                            }
+
+                            return false;
+                        });
+
+                        if (isDuplicate) return null;
+
+                        // Create business object
+                        const business = {
+                            _id: 'google_' + place.id,
+                            bname: place.displayName,
+                            address1: address1 || (place.formattedAddress || '').split(',')[0] || '',
+                            city: city,
+                            state: state,
+                            zip: zip,
+                            type: businessType,
+                            phone: place.nationalPhoneNumber || '',
+                            isGooglePlace: true,
+                            placeId: place.id,
+                            lat: place.location?.lat || 0,
+                            lng: place.location?.lng || 0,
+                            distance: distance
+                        };
+
+                        // Add marker
+                        addAdvancedMarker(business, place.location);
+
+                        // Extend bounds
+                        bounds.extend(place.location);
+
+                        return business;
+                    } catch (error) {
+                        console.error(`Error processing place ${placeResult.place_id}:`, error);
+                        return null;
+                    }
+                })());
+            }
+
+            // Wait for all place details to be processed
+            const results = await Promise.all(promises);
+
+            // Filter out null results
+            results.filter(result => result !== null).forEach(business => {
+                businessResults.push(business);
+            });
 
             // Remove loading indicator
             const loadingElement = document.getElementById('map-loading');
             if (loadingElement) loadingElement.remove();
 
-            if (!businessResults || businessResults.length === 0) {
-                console.log("No valid business details found");
+            if (businessResults.length === 0) {
                 // Show no results message
                 const searchTableContainer = document.getElementById('search_table');
                 if (searchTableContainer) {
@@ -1385,8 +1512,6 @@ async function searchGooglePlaces(formData) {
                 }
                 return;
             }
-
-            console.log(`Processed ${businessResults.length} businesses`);
 
             // Sort by distance
             businessResults.sort((a, b) => a.distance - b.distance);
@@ -1394,20 +1519,18 @@ async function searchGooglePlaces(formData) {
             // Display results
             displaySearchResults(businessResults);
 
-            // Fit map to bounds and adjust zoom
+            // Fit map to bounds
             if (!bounds.isEmpty()) {
                 map.fitBounds(bounds);
 
-                // Set appropriate zoom level based on results
+                // Adjust zoom level
                 setTimeout(() => {
                     if (businessResults.length <= 2) {
-                        // For 1-2 results, don't zoom in too far
                         const currentZoom = map.getZoom();
                         if (currentZoom > 14) {
                             map.setZoom(14);
                         }
                     } else if (businessResults.length > 10) {
-                        // For many results, make sure we're not zoomed too far out
                         const currentZoom = map.getZoom();
                         if (currentZoom < 10) {
                             map.setZoom(10);
@@ -1419,6 +1542,7 @@ async function searchGooglePlaces(formData) {
                 map.setCenter(searchLocation);
                 map.setZoom(11);
             }
+
         } catch (error) {
             console.error("Error searching places:", error);
 
