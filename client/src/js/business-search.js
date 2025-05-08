@@ -1482,18 +1482,27 @@ async function geocodeAddressServerSide(address) {
     try {
         console.log(`Geocoding address via server: ${address}`);
 
+        if (!address) {
+            console.error("No address provided for geocoding");
+            return null;
+        }
+
         // Get the base URL
         const baseURL = getBaseURL();
         const url = `${baseURL}/api/geocode?address=${encodeURIComponent(address)}`;
 
+        console.log("Calling geocode API:", url);
         const response = await fetch(url);
+
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `Geocoding failed: ${response.status}`);
+            const errorText = await response.text();
+            console.error(`Geocoding failed with status ${response.status}:`, errorText);
+            throw new Error(`Geocoding failed: ${response.status}`);
         }
 
         const data = await response.json();
         if (!data.success || !data.location) {
+            console.error("Geocoding returned no results:", data);
             throw new Error('Geocoding returned no results');
         }
 
@@ -1501,7 +1510,31 @@ async function geocodeAddressServerSide(address) {
         return data.location;
     } catch (error) {
         console.error("Error geocoding address:", error);
-        return null;
+
+        // Fallback to client-side geocoding
+        try {
+            console.log("Falling back to client-side geocoding");
+            const geocoder = new google.maps.Geocoder();
+            return new Promise((resolve, reject) => {
+                geocoder.geocode({'address': address}, function(results, status) {
+                    if (status === google.maps.GeocoderStatus.OK && results[0]) {
+                        const location = results[0].geometry.location;
+                        const result = {
+                            lat: location.lat(),
+                            lng: location.lng()
+                        };
+                        console.log("Client-side geocoding result:", result);
+                        resolve(result);
+                    } else {
+                        console.error("Client-side geocoding failed:", status);
+                        reject(new Error(`Client-side geocoding failed: ${status}`));
+                    }
+                });
+            });
+        } catch (fallbackError) {
+            console.error("Client-side geocoding fallback also failed:", fallbackError);
+            return null;
+        }
     }
 }
 

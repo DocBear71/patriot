@@ -9,6 +9,8 @@ const axios = require('axios');
  */
 exports.search = async (req, res) => {
     try {
+        console.log("Places search API called with query:", req.query);
+
         const { query, latitude, longitude, radius = 50000 } = req.query;
 
         if (!query) {
@@ -38,8 +40,9 @@ exports.search = async (req, res) => {
             url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${apiKey}`;
         }
 
-        console.log(`Making Places API request with query: ${query}`);
+        console.log("Making Places API request to Google");
         const response = await axios.get(url);
+        console.log("Places API response status:", response.status);
 
         if (response.data.status !== 'OK' && response.data.status !== 'ZERO_RESULTS') {
             console.error(`Places API error: ${response.data.status}, Message: ${response.data.error_message || 'No error message'}`);
@@ -50,7 +53,7 @@ exports.search = async (req, res) => {
             });
         }
 
-        // Process and return the results in a format matching the client-side needs
+        // Process and return the results
         const places = response.data.results.map(place => ({
             place_id: place.place_id,
             name: place.name,
@@ -63,6 +66,7 @@ exports.search = async (req, res) => {
             business_status: place.business_status,
         }));
 
+        console.log(`Found ${places.length} places`);
         return res.json({
             success: true,
             results: places
@@ -72,98 +76,11 @@ exports.search = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Server error while searching places',
-            error: error.message
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 };
 
-/**
- * Get details for a specific place
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-exports.details = async (req, res) => {
-    try {
-        const { placeId } = req.params;
-
-        if (!placeId) {
-            return res.status(400).json({
-                success: false,
-                message: 'Place ID parameter is required'
-            });
-        }
-
-        // Get API key from environment variables
-        const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-        if (!apiKey) {
-            console.error('Google Maps API key is not configured');
-            return res.status(500).json({
-                success: false,
-                message: 'Server configuration error: Google Maps API key is missing'
-            });
-        }
-
-        // Use the Place Details API to get comprehensive information
-        const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,formatted_phone_number,geometry,types,address_components&key=${apiKey}`;
-
-        console.log(`Getting details for place ID: ${placeId}`);
-        const response = await axios.get(url);
-
-        if (response.data.status !== 'OK') {
-            console.error(`Place Details API error: ${response.data.status}, Message: ${response.data.error_message || 'No error message'}`);
-            return res.status(400).json({
-                success: false,
-                message: `Place Details API error: ${response.data.status}`,
-                error: response.data.error_message || 'Unknown error'
-            });
-        }
-
-        // Extract address components
-        const place = response.data.result;
-        const addressComponents = {};
-
-        if (place.address_components) {
-            for (const component of place.address_components) {
-                for (const type of component.types) {
-                    addressComponents[type] = component.short_name;
-                }
-            }
-        }
-
-        // Format the place details in a way that matches client expectations
-        const placeDetails = {
-            place_id: placeId,
-            name: place.name,
-            formatted_address: place.formatted_address,
-            phone: place.formatted_phone_number || '',
-            location: {
-                lat: place.geometry.location.lat,
-                lng: place.geometry.location.lng
-            },
-            address_components: {
-                street_number: addressComponents.street_number || '',
-                route: addressComponents.route || '',
-                city: addressComponents.locality || addressComponents.administrative_area_level_2 || '',
-                state: addressComponents.administrative_area_level_1 || '',
-                zip: addressComponents.postal_code || '',
-                country: addressComponents.country || 'US'
-            },
-            types: place.types
-        };
-
-        return res.json({
-            success: true,
-            place: placeDetails
-        });
-    } catch (error) {
-        console.error('Server place details error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Server error while fetching place details',
-            error: error.message
-        });
-    }
-};
-
-// Export the module
-module.exports = exports;
+// Export the module with a fallback for direct import
+module.exports = exports.search ? exports : { search: exports };
