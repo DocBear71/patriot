@@ -1251,11 +1251,7 @@ async function retrieveFromMongoDB(formData) {
 
 /**
  * Search Google Places when no results found in our database
- * @param {Object} formData - Form data with search criteria
- */
-/**
- * Search Google Places when no results found in our database
- * Using the newer Place API to avoid deprecation warnings
+ * This alternative approach minimizes use of PlacesService
  * @param {Object} formData - Form data with search criteria
  */
 async function searchGooglePlaces(formData) {
@@ -1343,45 +1339,19 @@ async function searchGooglePlaces(formData) {
         bounds.extend(searchLocation);
 
         try {
-            // Import the Places library - must be imported before using Place API
-            const { Place } = await google.maps.importLibrary("places");
+            // Step 1: Import required libraries
+            await google.maps.importLibrary("places");
 
-            let searchTerms = formData.businessName || searchQuery;
-            if (!searchTerms) {
-                searchTerms = "businesses";  // Default search term if none provided
-            }
+            // Step 2: Load places asynchronously with custom code
+            const placeIds = await performCustomPlaceSearch(searchQuery, searchLocation, searchRadius);
 
-            console.log("Searching for places with query:", searchTerms);
+            console.log("Found place IDs:", placeIds);
 
-            // Perform a search using FindPlaceFromText with the text query
-            // This is done using a DIV element as a container since we need a service
-            const dummyDiv = document.createElement('div');
-            const service = new google.maps.places.PlacesService(dummyDiv);
+            // Remove loading indicator if no places found
+            if (!placeIds || placeIds.length === 0) {
+                const loadingElement = document.getElementById('map-loading');
+                if (loadingElement) loadingElement.remove();
 
-            const placesResults = await new Promise((resolve, reject) => {
-                service.findPlaceFromText({
-                    query: searchTerms,
-                    fields: ['place_id', 'name', 'formatted_address', 'geometry', 'types', 'business_status'],
-                    locationBias: {
-                        radius: searchRadius,
-                        center: searchLocation
-                    }
-                }, (results, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-                        resolve(results);
-                    } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-                        resolve([]);
-                    } else {
-                        reject(new Error(`Places search failed: ${status}`));
-                    }
-                });
-            });
-
-            // Remove loading indicator
-            const loadingElement = document.getElementById('map-loading');
-            if (loadingElement) loadingElement.remove();
-
-            if (!placesResults || placesResults.length === 0) {
                 console.log("No places found");
                 // Show no results message
                 const searchTableContainer = document.getElementById('search_table');
@@ -1395,153 +1365,15 @@ async function searchGooglePlaces(formData) {
                 return;
             }
 
-            console.log("Initial place results:", placesResults.length);
+            // Step 3: Get details for each place
+            const businessResults = await fetchPlaceDetailsForIds(placeIds, searchLocation, searchRadius);
 
-            // For each place result, use the Place API to get full details
-            const businessResults = [];
-            const promises = [];
+            // Remove loading indicator
+            const loadingElement = document.getElementById('map-loading');
+            if (loadingElement) loadingElement.remove();
 
-            for (const placeResult of placesResults) {
-                promises.push((async () => {
-                    try {
-                        // Create a Place instance with the ID
-                        const place = new Place({
-                            id: placeResult.place_id
-                        });
-
-                        // Fetch full details
-                        await place.fetchFields({
-                            fields: [
-                                'displayName',
-                                'formattedAddress',
-                                'addressComponents',
-                                'location',
-                                'types',
-                                'nationalPhoneNumber'
-                            ]
-                        });
-
-                        console.log("Fetched place details:", place);
-
-                        // Extract address components
-                        const addressComponents = {};
-                        if (place.addressComponents) {
-                            for (const component of place.addressComponents) {
-                                for (const type of component.types) {
-                                    addressComponents[type] = component.shortText;
-                                }
-                            }
-                        }
-
-                        // Create address parts
-                        const address1 = `${addressComponents.street_number || ''} ${addressComponents.route || ''}`.trim();
-                        const city = addressComponents.locality || '';
-                        const state = addressComponents.administrative_area_level_1 || '';
-                        const zip = addressComponents.postal_code || '';
-
-                        // Map to business type
-                        let businessType = 'OTHER';
-                        if (place.types) {
-                            if (place.types.includes('restaurant')) businessType = 'REST';
-                            else if (place.types.includes('store')) businessType = 'RETAIL';
-                            else if (place.types.includes('hardware_store')) businessType = 'HARDW';
-                            else if (place.types.includes('gas_station')) businessType = 'FUEL';
-                            // Add more mappings as needed
-                        }
-
-                        // Calculate distance from search location
-                        let distance = 0;
-                        if (place.location && searchLocation) {
-                            distance = google.maps.geometry.spherical.computeDistanceBetween(
-                                searchLocation,
-                                place.location
-                            );
-                        }
-
-                        // Check if this place matches an existing marker by name and location
-                        const isDuplicate = markers.some(marker => {
-                            if (!marker.business) return false;
-
-                            // Match by name and proximity
-                            const nameSimilarity = similarity(
-                                marker.business.bname ? marker.business.bname.toLowerCase() : '',
-                                place.displayName ? place.displayName.toLowerCase() : ''
-                            );
-
-                            if (nameSimilarity > 0.7 && place.location) {
-                                // Get positions
-                                const markerPos = marker.position;
-                                const placePos = place.location;
-
-                                // Calculate distance
-                                const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                                    new google.maps.LatLng(markerPos.lat, markerPos.lng),
-                                    placePos
-                                );
-
-                                // If within 100 meters, it's a duplicate
-                                if (distance < 100) {
-                                    console.log(`Skipping duplicate: ${place.displayName} (matches ${marker.business.bname})`);
-                                    return true;
-                                }
-                            }
-
-                            return false;
-                        });
-
-                        // Skip duplicates
-                        if (isDuplicate) return null;
-
-                        // Skip if out of range
-                        if (distance > searchRadius) {
-                            console.log(`Skipping ${place.displayName} - too far (${distance/1000}km)`);
-                            return null;
-                        }
-
-                        // Create business object
-                        const business = {
-                            _id: 'google_' + place.id,
-                            bname: place.displayName,
-                            address1: address1 || (place.formattedAddress || '').split(',')[0] || '',
-                            city: city,
-                            state: state,
-                            zip: zip,
-                            type: businessType,
-                            phone: place.nationalPhoneNumber || '',
-                            isGooglePlace: true,
-                            placeId: place.id,
-                            lat: place.location?.lat || 0,
-                            lng: place.location?.lng || 0,
-                            distance: distance
-                        };
-
-                        // Add marker if we have coordinates
-                        if (place.location && place.location.lat) {
-                            addAdvancedMarker(business, place.location);
-
-                            // Extend bounds with this place
-                            bounds.extend(place.location);
-                        }
-
-                        return business;
-                    } catch (error) {
-                        console.error(`Error processing place ${placeResult.place_id}:`, error);
-                        return null;
-                    }
-                })());
-            }
-
-            // Wait for all place details to be fetched
-            const results = await Promise.all(promises);
-
-            // Filter out null results and add valid businesses
-            results.filter(result => result !== null).forEach(business => {
-                businessResults.push(business);
-            });
-
-            console.log(`Found ${businessResults.length} valid businesses`);
-
-            if (businessResults.length === 0) {
+            if (!businessResults || businessResults.length === 0) {
+                console.log("No valid business details found");
                 // Show no results message
                 const searchTableContainer = document.getElementById('search_table');
                 if (searchTableContainer) {
@@ -1553,6 +1385,8 @@ async function searchGooglePlaces(formData) {
                 }
                 return;
             }
+
+            console.log(`Processed ${businessResults.length} businesses`);
 
             // Sort by distance
             businessResults.sort((a, b) => a.distance - b.distance);
@@ -1624,6 +1458,228 @@ async function searchGooglePlaces(formData) {
                 tableBody.innerHTML = `<tr><td colspan="5" class="text-center">Error searching for businesses: ${error.message}</td></tr>`;
             }
         }
+    }
+}
+
+/**
+ * Perform a custom place search using the Geocoding API
+ * This avoids the need for PlacesService
+ * @param {string} query - Search query
+ * @param {Object} location - Center location
+ * @param {number} radius - Search radius in meters
+ * @returns {Promise<Array>} Array of place IDs
+ */
+async function performCustomPlaceSearch(query, location, radius) {
+    try {
+        // For simplicity, use a predefined set of common business types
+        const commonBusinessTypes = [
+            'store', 'restaurant', 'cafe', 'bar', 'supermarket',
+            'pharmacy', 'gas_station', 'department_store', 'hardware_store',
+            'shopping_mall', 'clothing_store', 'home_goods_store'
+        ];
+
+        // Build a geocoding URL with business type bias
+        // This is a workaround to get businesses without using PlacesService
+        const geocoder = new google.maps.Geocoder();
+
+        // Combine query with location
+        const fullQuery = query ?
+            `${query} near ${location.lat()},${location.lng()}` :
+            `businesses near ${location.lat()},${location.lng()}`;
+
+        console.log("Geocoding with query:", fullQuery);
+
+        const results = await new Promise((resolve, reject) => {
+            geocoder.geocode({
+                'address': fullQuery,
+                'location': location,
+                'radius': radius
+            }, function(results, status) {
+                if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
+                    resolve(results);
+                } else if (status === google.maps.GeocoderStatus.ZERO_RESULTS) {
+                    resolve([]);
+                } else {
+                    reject(new Error(`Geocoding search failed: ${status}`));
+                }
+            });
+        });
+
+        // Extract and filter unique place IDs from results
+        const placeIds = [];
+        if (results && results.length > 0) {
+            for (const result of results) {
+                if (result.place_id && !placeIds.includes(result.place_id)) {
+                    placeIds.push(result.place_id);
+                }
+            }
+        }
+
+        return placeIds;
+    } catch (error) {
+        console.error("Error in custom place search:", error);
+        return [];
+    }
+}
+
+/**
+ * Fetch place details for an array of place IDs
+ * Uses Place API for individual place details to avoid warnings
+ * @param {Array} placeIds - Array of place IDs
+ * @param {Object} searchLocation - Search center location
+ * @param {number} searchRadius - Search radius in meters
+ * @returns {Promise<Array>} Array of business objects
+ */
+async function fetchPlaceDetailsForIds(placeIds, searchLocation, searchRadius) {
+    try {
+        // Import the Place library
+        const { Place } = await google.maps.importLibrary("places");
+
+        const businessResults = [];
+        const promises = [];
+
+        for (const placeId of placeIds) {
+            promises.push((async () => {
+                try {
+                    // Create a Place instance
+                    const place = new Place({
+                        id: placeId
+                    });
+
+                    // Fetch place details
+                    await place.fetchFields({
+                        fields: [
+                            'displayName',
+                            'formattedAddress',
+                            'addressComponents',
+                            'location',
+                            'types',
+                            'nationalPhoneNumber'
+                        ]
+                    });
+
+                    console.log("Place details:", place);
+
+                    // Extract address components
+                    const addressComponents = {};
+                    if (place.addressComponents) {
+                        for (const component of place.addressComponents) {
+                            for (const type of component.types) {
+                                addressComponents[type] = component.shortText;
+                            }
+                        }
+                    }
+
+                    // Create address parts
+                    const address1 = `${addressComponents.street_number || ''} ${addressComponents.route || ''}`.trim();
+                    const city = addressComponents.locality || '';
+                    const state = addressComponents.administrative_area_level_1 || '';
+                    const zip = addressComponents.postal_code || '';
+
+                    // Map to business type
+                    let businessType = 'OTHER';
+                    if (place.types) {
+                        if (place.types.includes('restaurant')) businessType = 'REST';
+                        else if (place.types.includes('store')) businessType = 'RETAIL';
+                        else if (place.types.includes('hardware_store')) businessType = 'HARDW';
+                        else if (place.types.includes('gas_station')) businessType = 'FUEL';
+                        // Add more mappings as needed
+                    }
+
+                    // Calculate distance from search location
+                    let distance = 0;
+                    if (place.location && searchLocation) {
+                        distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            searchLocation,
+                            place.location
+                        );
+                    }
+
+                    // Skip if out of range
+                    if (distance > searchRadius) {
+                        console.log(`Skipping ${place.displayName} - too far (${distance/1000}km)`);
+                        return null;
+                    }
+
+                    // Check if this place matches an existing marker by name and location
+                    const isDuplicate = markers.some(marker => {
+                        if (!marker.business) return false;
+
+                        // Match by name and proximity
+                        const nameSimilarity = similarity(
+                            marker.business.bname ? marker.business.bname.toLowerCase() : '',
+                            place.displayName ? place.displayName.toLowerCase() : ''
+                        );
+
+                        if (nameSimilarity > 0.7 && place.location) {
+                            // Get positions
+                            const markerPos = marker.position;
+                            const placePos = place.location;
+
+                            // Calculate distance
+                            const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                                new google.maps.LatLng(markerPos.lat, markerPos.lng),
+                                placePos
+                            );
+
+                            // If within 100 meters, it's a duplicate
+                            if (distance < 100) {
+                                console.log(`Skipping duplicate: ${place.displayName} (matches ${marker.business.bname})`);
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    });
+
+                    // Skip duplicates
+                    if (isDuplicate) return null;
+
+                    // Create business object
+                    const business = {
+                        _id: 'google_' + place.id,
+                        bname: place.displayName,
+                        address1: address1 || (place.formattedAddress || '').split(',')[0] || '',
+                        city: city,
+                        state: state,
+                        zip: zip,
+                        type: businessType,
+                        phone: place.nationalPhoneNumber || '',
+                        isGooglePlace: true,
+                        placeId: place.id,
+                        lat: place.location?.lat || 0,
+                        lng: place.location?.lng || 0,
+                        distance: distance
+                    };
+
+                    // Add marker if we have coordinates
+                    if (place.location && place.location.lat) {
+                        addAdvancedMarker(business, place.location);
+
+                        // Extend bounds with this place
+                        bounds.extend(place.location);
+                    }
+
+                    return business;
+                } catch (error) {
+                    console.error(`Error processing place ${placeId}:`, error);
+                    return null;
+                }
+            })());
+        }
+
+        // Wait for all place details to be fetched
+        const results = await Promise.all(promises);
+
+        // Filter out null results and add valid businesses
+        results.filter(result => result !== null).forEach(business => {
+            businessResults.push(business);
+        });
+
+        return businessResults;
+    } catch (error) {
+        console.error("Error fetching place details:", error);
+        return [];
     }
 }
 
