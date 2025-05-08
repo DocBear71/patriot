@@ -1229,185 +1229,135 @@ async function searchGooglePlaces(formData) {
     try {
         console.log("Searching Google Places for:", formData);
 
-        // Make sure the map is visible
+        // Make sure the map is visible and sized properly
         const mapContainer = document.getElementById('map');
         if (mapContainer) {
             mapContainer.style.display = 'block';
-            mapContainer.style.height = '400px'; // Set a specific height
+            mapContainer.style.height = '400px';
             console.log("Map container style:", mapContainer.style.display, mapContainer.style.height);
         }
 
-        // Force map refresh if it's already initialized
+        // Force map resize if it's already initialized
         if (mapInitialized && map) {
-            console.log("Triggering map resize event");
+            console.log("Forcing map resize");
             google.maps.event.trigger(map, 'resize');
         }
 
-        // Load the Places library if not already loaded
-        const { PlacesService } = await google.maps.importLibrary("places");
-
-        // Need a map or element for PlacesService
-        const placesService = new PlacesService(document.getElementById('map'));
-
-        // Build the search query based on form data
+        // Build the search query
         let searchQuery = '';
-        if (formData.businessName) {
-            searchQuery += formData.businessName;
-        }
-        if (formData.address) {
-            searchQuery += ' ' + formData.address;
-        }
+        if (formData.businessName) searchQuery += formData.businessName;
+        if (formData.address) searchQuery += ' ' + formData.address;
+        searchQuery = searchQuery.trim();
+
+        console.log("Place search query:", searchQuery);
+
+        // Load the Places library and create service
+        const { PlacesService } = await google.maps.importLibrary("places");
+        const placesService = new PlacesService(document.getElementById('map'));
 
         // Create the request object
         const request = {
-            query: searchQuery.trim(),
+            query: searchQuery,
             fields: ['name', 'formatted_address', 'geometry', 'place_id', 'types']
         };
 
-        // Perform the search
+        // Show loading indicator on map
+        const loadingMessage = document.createElement('div');
+        loadingMessage.id = 'map-loading-message';
+        loadingMessage.innerHTML = 'Searching for businesses...';
+        loadingMessage.style.position = 'absolute';
+        loadingMessage.style.top = '50%';
+        loadingMessage.style.left = '50%';
+        loadingMessage.style.transform = 'translate(-50%, -50%)';
+        loadingMessage.style.background = 'white';
+        loadingMessage.style.padding = '10px';
+        loadingMessage.style.borderRadius = '5px';
+        loadingMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+        loadingMessage.style.zIndex = '100';
+        mapContainer.appendChild(loadingMessage);
+
+        // Perform the search with proper error handling
         placesService.findPlaceFromQuery(request, (results, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+            // Remove loading message
+            const loadingElement = document.getElementById('map-loading-message');
+            if (loadingElement) loadingElement.remove();
+
+            if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
                 console.log("Google Places results:", results);
 
-                // Convert Google Places results to your business format
+                // Clear existing markers
+                clearMarkers();
+
+                // Reset bounds
+                bounds = new google.maps.LatLngBounds();
+
+                // Convert and display results
                 const businessResults = results.map(place => {
-                    // Extract address components if available
-                    let address1 = '';
-                    let city = '';
-                    let state = '';
-                    let zip = '';
+                    // Your existing mapping code here...
+                    // ... (convert Google place to your business format)
 
-                    if (place.formatted_address) {
-                        const addressParts = place.formatted_address.split(',');
-                        if (addressParts.length >= 1) {
-                            address1 = addressParts[0].trim();
-                        }
-                        if (addressParts.length >= 2) {
-                            city = addressParts[1].trim();
-                        }
-                        if (addressParts.length >= 3) {
-                            const stateZip = addressParts[2].trim().split(' ');
-                            if (stateZip.length >= 1) {
-                                state = stateZip[0].trim();
-                            }
-                            if (stateZip.length >= 2) {
-                                zip = stateZip[1].trim();
-                            }
-                        }
+                    // Immediately add marker for this place
+                    if (place.geometry && place.geometry.location) {
+                        const business = {
+                            _id: 'google_' + place.place_id,
+                            bname: place.name,
+                            address1: place.formatted_address || '',
+                            city: '',  // Will be filled in later if available
+                            state: '',
+                            zip: '',
+                            type: 'OTHER', // Default type
+                            isGooglePlace: true,
+                            placeId: place.place_id,
+                            lat: place.geometry.location.lat(),
+                            lng: place.geometry.location.lng()
+                        };
+
+                        // Add marker for this place
+                        addAdvancedMarker(business, place.geometry.location);
+
+                        // Extend bounds
+                        bounds.extend(place.geometry.location);
+
+                        return business;
                     }
+                }).filter(b => b); // Remove any undefined entries
 
-                    // Map Google place types to your business types
-                    let businessType = 'OTHER';
-                    if (place.types) {
-                        if (place.types.includes('restaurant')) businessType = 'REST';
-                        else if (place.types.includes('store')) businessType = 'RETAIL';
-                        else if (place.types.includes('hardware_store')) businessType = 'HARDW';
-                        // Add more type mappings as needed
-                    }
+                // Display results in table
+                displayGoogleSearchResults(businessResults);
 
-                    // Create a business object with Google Place data
-                    return {
-                        _id: 'google_' + place.place_id, // Prefix to indicate it's from Google
-                        bname: place.name,
-                        address1: address1,
-                        city: city,
-                        state: state,
-                        zip: zip,
-                        type: businessType,
-                        phone: '', // Phone not included in basic results
-                        isGooglePlace: true, // Flag to indicate this is from Google Places
-                        placeId: place.place_id,
-                        location: {
-                            type: 'Point',
-                            coordinates: [
-                                place.geometry.location.lng(),
-                                place.geometry.location.lat()
-                            ]
-                        },
-                        lat: place.geometry.location.lat(),
-                        lng: place.geometry.location.lng()
-                    };
-                });
-
-                // Display the Google Places results
-                if (document.getElementById('search_table')) {
-                    // Add a notification that these are Google Places results
-                    const searchTableContainer = document.getElementById('search_table');
-                    if (searchTableContainer) {
-                        const notification = document.createElement('div');
-                        notification.className = 'google-places-notification';
-                        notification.innerHTML = 'The following businesses were found in Google Maps but are not yet in our database. Click "Add to Patriot Thanks" to add them.';
-                        notification.style.padding = '10px';
-                        notification.style.backgroundColor = '#f8f9fa';
-                        notification.style.border = '1px solid #ddd';
-                        notification.style.borderRadius = '5px';
-                        notification.style.marginBottom = '15px';
-
-                        searchTableContainer.appendChild(notification);
-                    }
-
-                    displayGoogleSearchResults(businessResults);
-                    displayBusinessesOnMap(businessResults);
-                } else {
-                    let resultsContainer = document.getElementById('business-search-results');
-                    if (!resultsContainer) {
-                        // Create container if needed
-                        // ...your existing container creation code
-                    }
-                    displayGoogleSearchResults(businessResults, resultsContainer);
+                // Make sure map displays all markers
+                console.log("Fitting map to bounds with", markers.length, "markers");
+                if (!bounds.isEmpty()) {
+                    map.fitBounds(bounds);
+                    console.log("Fitted map to bounds");
                 }
+
+                // Force map visibility again
+                ensureMapVisibility();
             } else {
                 console.log("No results found in Google Places or error:", status);
+                // Show a message on the map
+                const noResultsMessage = document.createElement('div');
+                noResultsMessage.id = 'map-no-results';
+                noResultsMessage.innerHTML = 'No businesses found. Try a different search.';
+                noResultsMessage.style.position = 'absolute';
+                noResultsMessage.style.top = '50%';
+                noResultsMessage.style.left = '50%';
+                noResultsMessage.style.transform = 'translate(-50%, -50%)';
+                noResultsMessage.style.background = 'white';
+                noResultsMessage.style.padding = '10px';
+                noResultsMessage.style.borderRadius = '5px';
+                noResultsMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+                noResultsMessage.style.zIndex = '100';
+                mapContainer.appendChild(noResultsMessage);
 
-                // Show no results message
-                const searchTableContainer = document.getElementById('search_table');
-                if (searchTableContainer) {
-                    const tableBody = searchTableContainer.querySelector('tbody');
-                    if (tableBody) {
-                        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria in our database or Google Maps.</td></tr>';
-                    }
-                    searchTableContainer.style.display = 'block';
-                    searchTableContainer.scrollIntoView({behavior: 'smooth'});
-                } else {
-                    const resultsContainer = document.getElementById('business-search-results');
-                    if (resultsContainer) {
-                        resultsContainer.innerHTML = '<div class="error">No businesses found matching your search criteria in our database or Google Maps.</div>';
-                        resultsContainer.scrollIntoView({behavior: 'smooth'});
-                    }
-                }
+                // Show no results in table
+                // Your code to show no results message in the table
             }
         });
-
-        // After processing results and creating markers
-        console.log("Finished adding Google Places markers, markers count:", markers.length);
-
-        // Force map to fit all markers
-        if (map && bounds && !bounds.isEmpty()) {
-            console.log("Fitting map to bounds");
-            map.fitBounds(bounds);
-
-            // If we only have one marker, zoom in appropriately
-            if (markers.length === 1) {
-                console.log("Single marker, setting zoom level");
-                map.setZoom(15);
-            }
-        }
     } catch (error) {
         console.error("Error searching Google Places:", error);
-
         // Show error message to user
-        let errorContainer;
-        if (document.getElementById('search_table')) {
-            errorContainer = document.getElementById('search_table');
-        } else {
-            errorContainer = document.getElementById('business-search-results');
-        }
-
-        if (errorContainer) {
-            errorContainer.innerHTML = `<div class="error">Error searching Google Maps: ${error.message}</div>`;
-            errorContainer.style.display = 'block';
-            errorContainer.scrollIntoView({behavior: 'smooth'});
-        }
     }
 }
 
@@ -1417,30 +1367,40 @@ async function searchGooglePlaces(formData) {
 function ensureMapVisibility() {
     const mapContainer = document.getElementById('map');
     if (mapContainer) {
-        // Ensure the map container is visible
+        // Force the map to be visible
         mapContainer.style.display = 'block';
-
-        // Set a minimum height if not already set
-        if (!mapContainer.style.height || mapContainer.style.height === 'auto') {
-            mapContainer.style.height = '400px';
-        }
+        mapContainer.style.height = '400px';
 
         console.log("Map container dimensions:", mapContainer.offsetWidth, "x", mapContainer.offsetHeight);
 
-        // If the map is initialized but no markers are showing, check zoom level
-        if (mapInitialized && map && markers.length > 0) {
-            // Force a resize event to refresh the map
+        // Force a resize event on the map
+        if (mapInitialized && map) {
             google.maps.event.trigger(map, 'resize');
 
-            // If we have bounds, fit to them
-            if (bounds && !bounds.isEmpty()) {
-                map.fitBounds(bounds);
-                console.log("Fitting map to bounds");
-            } else if (markers.length === 1) {
-                // If we only have one marker, center on it and zoom in
-                map.setCenter(markers[0].position);
-                map.setZoom(15);
-                console.log("Centering on single marker");
+            // If we have markers, make sure they're visible
+            if (markers.length > 0) {
+                console.log("Fitting map to bounds with", markers.length, "markers");
+
+                // Recreate bounds if needed
+                if (!bounds) bounds = new google.maps.LatLngBounds();
+
+                // Make sure bounds has the markers
+                markers.forEach(marker => {
+                    if (marker && marker.position) {
+                        bounds.extend(marker.position);
+                    }
+                });
+
+                // Only fit bounds if we have valid bounds
+                if (!bounds.isEmpty()) {
+                    map.fitBounds(bounds);
+                    console.log("Fitted map to bounds");
+                } else if (markers.length === 1 && markers[0].position) {
+                    // If only one marker, center on it
+                    map.setCenter(markers[0].position);
+                    map.setZoom(15);
+                    console.log("Centered on single marker");
+                }
             }
         }
     }
@@ -2091,65 +2051,69 @@ function geocodeBusinessAddress(business, index, total) {
  */
 async function addAdvancedMarker(business, location) {
     try {
-        // Import the marker library
+        console.log("Adding marker for business:", business.bname, "at", location);
+
+        // Import the marker library if needed
         const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
-        // Create a position object from the location
-        const position = { lat: location.lat(), lng: location.lng() };
+        // Create position object from location
+        let position;
+        if (location.lat && location.lng) {
+            // It's already a position object
+            position = location;
+        } else if (typeof location.lat === 'function') {
+            // It's a Google Maps LatLng object
+            position = { lat: location.lat(), lng: location.lng() };
+        } else {
+            console.error("Invalid location for marker:", location);
+            return null;
+        }
 
-        // Determine marker color based on whether it's a primary result or nearby result
+        console.log("Creating marker at position:", position);
+
+        // Determine marker color
         const isNearby = business.isNearby === true;
-        const pinClass = isNearby ? "nearby" : "primary";
+        const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
 
-        // Create a pin element
+        // Create pin element with proper structure
         const pinElement = document.createElement('div');
         pinElement.className = 'custom-marker';
-        pinElement.style.cursor = 'pointer';
-        pinElement.style.zIndex = '1000'; // Higher z-index to prevent POI clicks
-
-        // Get business type icon
-        const businessIcon = getBusinessTypeIconHTML(business.type);
-
-        // Set innerHTML with the correct structure to match your CSS
         pinElement.innerHTML = `
             <div class="marker-container">
-                <div class="marker-pin ${pinClass}">
+                <div class="marker-pin" style="background-color: ${pinColor};">
                     <div class="marker-icon">
-                        ${businessIcon}
+                        ${getBusinessTypeIconHTML(business.type)}
                     </div>
                 </div>
                 <div class="marker-shadow"></div>
             </div>
         `;
 
-        // Create the advanced marker
+        // Create the marker
         const marker = new AdvancedMarkerElement({
             position: position,
             map: map,
             title: business.bname,
             content: pinElement,
-            collisionBehavior: isNearby ? 'OPTIONAL_AND_HIDES_LOWER_PRIORITY' : 'REQUIRED_AND_HIDES_OPTIONAL'
+            zIndex: isNearby ? 1 : 2
         });
 
-        // Store the business data with the marker
+        // Store business data and position
         marker.business = business;
-        marker.isNearby = isNearby;
         marker.position = position;
 
-        // Add click event listener
-        pinElement.addEventListener('click', function(e) {
-            console.log("Marker element clicked:", business.bname);
-            e.stopPropagation();
+        // Add click event
+        pinElement.addEventListener('click', () => {
             showInfoWindow(marker);
         });
 
-        // Add the marker to our array
+        // Add to markers array
         markers.push(marker);
-        console.log(`Added advanced marker for ${business.bname}`);
+        console.log("Successfully added marker for", business.bname);
 
         return marker;
     } catch (error) {
-        console.error("Error creating advanced marker:", error);
+        console.error("Error creating marker for", business.bname, ":", error);
         return null;
     }
 }
@@ -2586,6 +2550,28 @@ function searchNearbyBusinesses(location, businessType) {
         });
 }
 
+function debugMapState() {
+    console.log("==== MAP DEBUGGING INFO ====");
+    console.log("Map initialized:", mapInitialized);
+    console.log("Map object exists:", !!map);
+    if (map) {
+        console.log("Map center:", map.getCenter().toString());
+        console.log("Map zoom:", map.getZoom());
+    }
+    console.log("Markers count:", markers.length);
+    if (markers.length > 0) {
+        console.log("First marker position:", markers[0].position);
+        console.log("First marker business:", markers[0].business);
+    }
+    console.log("Bounds empty:", bounds ? bounds.isEmpty() : "no bounds");
+    console.log("Map container:", document.getElementById("map"));
+    if (document.getElementById("map")) {
+        console.log("Map container display:", window.getComputedStyle(document.getElementById("map")).display);
+        console.log("Map container dimensions:", document.getElementById("map").offsetWidth, "×", document.getElementById("map").offsetHeight);
+    }
+    console.log("==== END DEBUGGING INFO ====");
+}
+
 /**
  * Geocode a nearby business address
  * @param {Object} business - Business object
@@ -2625,8 +2611,9 @@ function geocodeNearbyBusiness(business, centerLocation) {
 const originalInitGoogleMap = window.initGoogleMap;
 
 // Create a new wrapper function that calls the original function
+// Make sure the initGoogleMap function is properly defined and accessible
 window.initGoogleMap = async function() {
-    console.log("Global initGoogleMap function called");
+    console.log("initGoogleMap called");
 
     try {
         // Check if map container exists
@@ -2642,59 +2629,56 @@ window.initGoogleMap = async function() {
         const { Map } = await google.maps.importLibrary("maps");
         const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
-        // Create a map centered on the US with POI clicks disabled
+        // Create map
         map = new Map(mapContainer, {
             center: CONFIG.defaultCenter,
             zoom: CONFIG.defaultZoom,
-            mapId: CONFIG.mapId,
-            clickableIcons: true
+            mapId: CONFIG.mapId
         });
 
-        // Create info window and bounds
+        console.log("Map created successfully");
+
+        // Create needed objects
         infoWindow = new google.maps.InfoWindow();
         bounds = new google.maps.LatLngBounds();
 
         // Add initial message
-        addInitialMapMessage(mapContainer);
+        const initialMessage = document.createElement('div');
+        initialMessage.id = 'initial-map-message';
+        initialMessage.innerHTML = 'Search for businesses to see them on the map';
+        initialMessage.style.position = 'absolute';
+        initialMessage.style.top = '50%';
+        initialMessage.style.left = '50%';
+        initialMessage.style.transform = 'translate(-50%, -50%)';
+        initialMessage.style.background = 'white';
+        initialMessage.style.padding = '10px';
+        initialMessage.style.borderRadius = '5px';
+        initialMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+        initialMessage.style.zIndex = '1';
+        mapContainer.appendChild(initialMessage);
 
-        // Add event listener for the reset map button
-        setupResetMapButton();
-
-        // Set flag that map is initialized
+        // Set flag
         mapInitialized = true;
-        console.log("Google Map successfully initialized with Map ID:", CONFIG.mapId);
+        console.log("Map initialization complete");
 
-        // Process any pending businesses to display
+        // Process any pending businesses
         if (pendingBusinessesToDisplay.length > 0) {
-            console.log("Processing pending businesses to display on map");
+            console.log("Processing pending businesses:", pendingBusinessesToDisplay.length);
             displayBusinessesOnMap(pendingBusinessesToDisplay);
             pendingBusinessesToDisplay = [];
         }
 
-        // Setup map handlers
-        await setupMapClickHandler();
-        setupMarkerClickPriority();
-
-        initAdditionalMapFeatures();
-
-        // Add a force refresh of the map
-        setTimeout(() => {
-            if (map) {
-                console.log("Forcing map refresh");
-                google.maps.event.trigger(map, 'resize');
-
-                // If we have bounds, fit to them
-                if (bounds && !bounds.isEmpty()) {
-                    map.fitBounds(bounds);
-                }
-            }
-        }, 500);
+        // Set up map click handler
+        map.addListener('click', function(event) {
+            console.log("Map clicked at", event.latLng.lat(), event.latLng.lng());
+            // Your existing click handler code...
+        });
 
     } catch (error) {
         console.error("Error initializing Google Map:", error);
         mapInitialized = false;
 
-        // Show user-friendly error message
+        // Show error message
         const mapContainer = document.getElementById("map");
         if (mapContainer) {
             mapContainer.innerHTML = `
