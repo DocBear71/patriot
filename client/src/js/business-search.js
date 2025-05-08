@@ -2275,6 +2275,29 @@ function showInfoWindow(marker) {
         ? `<p><strong>Phone:</strong> ${business.phone}</p>`
         : '';
 
+    // Check if this is a Google Places result or a database result
+    const isGooglePlace = business._id && business._id.toString().startsWith('google_');
+
+    // Create incentives section based on whether it's a Google Places result
+    const incentivesSection = isGooglePlace
+        ? `<div class="info-window-incentives">
+             <p><strong>Incentives:</strong> <em>Not in database yet</em></p>
+           </div>`
+        : `<div id="info-window-incentives-${business._id}">
+             <p><strong>Incentives:</strong> <em>Loading...</em></p>
+           </div>`;
+
+    // Add an "Add to Database" button if it's a Google Places result
+    const actionButton = isGooglePlace
+        ? `<button class="add-to-db-btn" 
+                onclick="window.addBusinessToDatabase('${business.placeId}')">
+             Add to Patriot Thanks
+           </button>`
+        : `<button class="view-details-btn" 
+                onclick="window.viewBusinessDetails('${business._id}')">
+             View Details
+           </button>`;
+
     // Content for the info window with scrollable container
     const contentString = `
     <div class="info-window-wrapper">
@@ -2286,16 +2309,11 @@ function showInfoWindow(marker) {
           <p><strong>Address:</strong><br>${addressLine}</p>
           ${phoneDisplay}
           <p><strong>Type:</strong> ${businessType}</p>
-          <div id="info-window-incentives-${business._id}">
-            <p><strong>Incentives:</strong> <em>Loading...</em></p>
-          </div>
+          ${incentivesSection}
         </div>
       </div>
       <div class="info-window-footer">
-        <button class="view-details-btn" 
-                onclick="window.viewBusinessDetails('${business._id}')">
-          View Details
-        </button>
+        ${actionButton}
       </div>
     </div>
     `;
@@ -2303,8 +2321,8 @@ function showInfoWindow(marker) {
     // Create info window if it doesn't exist
     if (!infoWindow) {
         infoWindow = new google.maps.InfoWindow({
-            maxWidth: 320, // Set a larger max width
-            disableAutoPan: false // Enable auto-panning
+            maxWidth: 320,
+            disableAutoPan: false
         });
     }
 
@@ -2321,8 +2339,10 @@ function showInfoWindow(marker) {
     // Apply custom CSS to make scrollable content
     applyInfoWindowScrollableStyles();
 
-    // Fetch incentives for this business
-    fetchBusinessIncentivesForInfoWindow(business._id);
+    // Only fetch incentives for businesses from our database
+    if (!isGooglePlace) {
+        fetchBusinessIncentivesForInfoWindow(business._id);
+    }
 }
 
 /**
