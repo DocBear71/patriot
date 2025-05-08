@@ -155,34 +155,34 @@ function getUserLocation() {
     });
 }
 
-/**
- * Reverse geocode coordinates to get address
- * @param {Object} location - Object with lat and lng properties
- * @returns {Promise<string>} Formatted address
- */
-async function reverseGeocode(location) {
-    try {
-        const geocoder = new google.maps.Geocoder();
-
-        return new Promise((resolve, reject) => {
-            geocoder.geocode({ 'location': location }, (results, status) => {
-                if (status === google.maps.GeocoderStatus.OK) {
-                    if (results[0]) {
-                        console.log("Reverse geocoded address:", results[0].formatted_address);
-                        resolve(results[0].formatted_address);
-                    } else {
-                        reject(new Error("No results found"));
-                    }
-                } else {
-                    reject(new Error(`Geocoder failed due to: ${status}`));
-                }
-            });
-        });
-    } catch (error) {
-        console.error("Error reverse geocoding:", error);
-        return null;
-    }
-}
+// /**
+//  * Reverse geocode coordinates to get address
+//  * @param {Object} location - Object with lat and lng properties
+//  * @returns {Promise<string>} Formatted address
+//  */
+// async function reverseGeocode(location) {
+//     try {
+//         const geocoder = new google.maps.Geocoder();
+//
+//         return new Promise((resolve, reject) => {
+//             geocoder.geocode({ 'location': location }, (results, status) => {
+//                 if (status === google.maps.GeocoderStatus.OK) {
+//                     if (results[0]) {
+//                         console.log("Reverse geocoded address:", results[0].formatted_address);
+//                         resolve(results[0].formatted_address);
+//                     } else {
+//                         reject(new Error("No results found"));
+//                     }
+//                 } else {
+//                     reject(new Error(`Geocoder failed due to: ${status}`));
+//                 }
+//             });
+//         });
+//     } catch (error) {
+//         console.error("Error reverse geocoding:", error);
+//         return null;
+//     }
+// }
 
 /**
  * Add some CSS to style the markers properly
@@ -1251,7 +1251,7 @@ async function retrieveFromMongoDB(formData) {
 
 /**
  * Search Google Places when no results found in our database
- * This approach avoids the deprecated PlacesService.textSearch method
+ * Using the completely new Places API (v1) to avoid deprecation warnings
  * @param {Object} formData - Form data with search criteria
  */
 async function searchGooglePlaces(formData) {
@@ -1288,9 +1288,6 @@ async function searchGooglePlaces(formData) {
         loadingDiv.style.zIndex = '1000';
         mapContainer.appendChild(loadingDiv);
 
-        // Search radius - 80km is about 50 miles
-        const searchRadius = 80000;
-
         // Geocode the address or use the current location
         let searchLocation;
 
@@ -1301,8 +1298,11 @@ async function searchGooglePlaces(formData) {
         if (useMyLocation) {
             try {
                 const userLocation = await getUserLocation();
-                searchLocation = new google.maps.LatLng(userLocation.lat, userLocation.lng);
-                console.log("Using user's current location for search:", searchLocation.lat(), searchLocation.lng());
+                searchLocation = {
+                    latitude: userLocation.lat,
+                    longitude: userLocation.lng
+                };
+                console.log("Using user's current location for search:", searchLocation);
             } catch (error) {
                 console.error("Error getting user location:", error);
                 // Fall back to geocoding the address
@@ -1311,71 +1311,67 @@ async function searchGooglePlaces(formData) {
         }
 
         if (!useMyLocation || typeof useLocationFailed !== 'undefined') {
-            const geocoder = new google.maps.Geocoder();
             try {
-                const results = await new Promise((resolve, reject) => {
-                    geocoder.geocode({ 'address': formData.address || searchQuery }, function(results, status) {
-                        if (status === google.maps.GeocoderStatus.OK && results[0]) {
-                            resolve(results);
-                        } else {
-                            reject(new Error("Geocoding failed: " + status));
-                        }
-                    });
-                });
+                // Geocode address using Geocoding API directly
+                const geocodeApiUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(formData.address || searchQuery)}&key=${getGoogleMapsApiKey()}`;
 
-                searchLocation = results[0].geometry.location;
-                console.log("Geocoded search center:", searchLocation.lat(), searchLocation.lng());
+                const response = await fetch(geocodeApiUrl);
+                const geocodeData = await response.json();
+
+                if (geocodeData.status === 'OK' && geocodeData.results && geocodeData.results.length > 0) {
+                    const location = geocodeData.results[0].geometry.location;
+                    searchLocation = {
+                        latitude: location.lat,
+                        longitude: location.lng
+                    };
+
+                    // Create a Google Maps LatLng object for map operations
+                    const googleMapsLocation = new google.maps.LatLng(location.lat, location.lng);
+
+                    // Create new bounds
+                    bounds = new google.maps.LatLngBounds();
+                    bounds.extend(googleMapsLocation);
+
+                    console.log("Geocoded search center:", searchLocation);
+                } else {
+                    throw new Error(`Geocoding failed: ${geocodeData.status}`);
+                }
             } catch (error) {
                 console.error("Error geocoding address:", error);
 
                 // Fall back to default US center
-                searchLocation = new google.maps.LatLng(CONFIG.defaultCenter.lat, CONFIG.defaultCenter.lng);
+                searchLocation = {
+                    latitude: CONFIG.defaultCenter.lat,
+                    longitude: CONFIG.defaultCenter.lng
+                };
+
+                // Create a Google Maps LatLng object for map operations
+                const googleMapsLocation = new google.maps.LatLng(
+                    CONFIG.defaultCenter.lat,
+                    CONFIG.defaultCenter.lng
+                );
+
+                // Create new bounds
+                bounds = new google.maps.LatLngBounds();
+                bounds.extend(googleMapsLocation);
+
                 console.log("Using default US center for search");
             }
         }
 
-        // Create new bounds
-        bounds = new google.maps.LatLngBounds();
-        bounds.extend(searchLocation);
-
         try {
-            // Import the Places library for individual place details
-            const { Place } = await google.maps.importLibrary("places");
+            // Search radius - 80km is about 50 miles
+            const searchRadius = 80000;
 
-            // Create a dummy div for the service
-            // This is necessary since we can't completely avoid PlacesService,
-            // but we'll use it only for the initial search and then use Place API for details
-            const dummyDiv = document.createElement("div");
-            const placesService = new google.maps.places.PlacesService(dummyDiv);
+            // Use the modern Places API - Text Search
+            const placeResults = await searchPlacesWithTextSearch(searchQuery, searchLocation, searchRadius);
 
-            // Define the request for nearby search
-            // The nearbySearch method has fewer issues than textSearch
-            const request = {
-                location: searchLocation,
-                radius: searchRadius,
-                keyword: formData.businessName || searchQuery || "business"
-            };
+            // Remove loading indicator
+            const loadingElement = document.getElementById('map-loading');
+            if (loadingElement) loadingElement.remove();
 
-            // Perform the search
-            const places = await new Promise((resolve, reject) => {
-                placesService.nearbySearch(request, (results, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-                        resolve(results);
-                    } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-                        resolve([]);
-                    } else {
-                        reject(new Error(`Places search failed: ${status}`));
-                    }
-                });
-            });
-
-            console.log("Initial places found:", places.length);
-
-            // Remove loading indicator if no places found
-            if (!places || places.length === 0) {
-                const loadingElement = document.getElementById('map-loading');
-                if (loadingElement) loadingElement.remove();
-
+            if (!placeResults || placeResults.length === 0) {
+                console.log("No places found");
                 // Show no results message
                 const searchTableContainer = document.getElementById('search_table');
                 if (searchTableContainer) {
@@ -1388,117 +1384,10 @@ async function searchGooglePlaces(formData) {
                 return;
             }
 
-            // Process each place with Place API to avoid warnings for details
-            const businessResults = [];
-            const promises = [];
+            console.log("Found places:", placeResults.length);
 
-            for (const placeResult of places) {
-                promises.push((async () => {
-                    try {
-                        // Create a Place instance
-                        const place = new Place({
-                            id: placeResult.place_id
-                        });
-
-                        // Fetch detailed place information
-                        await place.fetchFields({
-                            fields: [
-                                'displayName',
-                                'formattedAddress',
-                                'addressComponents',
-                                'location',
-                                'types',
-                                'nationalPhoneNumber'
-                            ]
-                        });
-
-                        // Extract address components
-                        const addressComponents = {};
-                        if (place.addressComponents) {
-                            for (const component of place.addressComponents) {
-                                for (const type of component.types) {
-                                    addressComponents[type] = component.shortText;
-                                }
-                            }
-                        }
-
-                        // Create address parts
-                        const address1 = `${addressComponents.street_number || ''} ${addressComponents.route || ''}`.trim();
-                        const city = addressComponents.locality || '';
-                        const state = addressComponents.administrative_area_level_1 || '';
-                        const zip = addressComponents.postal_code || '';
-
-                        // Map to business type
-                        let businessType = 'OTHER';
-                        if (place.types) {
-                            if (place.types.includes('restaurant')) businessType = 'REST';
-                            else if (place.types.includes('store')) businessType = 'RETAIL';
-                            else if (place.types.includes('hardware_store')) businessType = 'HARDW';
-                            else if (place.types.includes('gas_station')) businessType = 'FUEL';
-                        }
-
-                        // Calculate distance
-                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            searchLocation,
-                            place.location
-                        );
-
-                        // Check for duplicates
-                        const isDuplicate = markers.some(marker => {
-                            if (!marker.business) return false;
-
-                            if (marker.business.placeId === place.id ||
-                                marker.business._id === 'google_' + place.id) {
-                                return true;
-                            }
-
-                            return false;
-                        });
-
-                        if (isDuplicate) return null;
-
-                        // Create business object
-                        const business = {
-                            _id: 'google_' + place.id,
-                            bname: place.displayName,
-                            address1: address1 || (place.formattedAddress || '').split(',')[0] || '',
-                            city: city,
-                            state: state,
-                            zip: zip,
-                            type: businessType,
-                            phone: place.nationalPhoneNumber || '',
-                            isGooglePlace: true,
-                            placeId: place.id,
-                            lat: place.location?.lat || 0,
-                            lng: place.location?.lng || 0,
-                            distance: distance
-                        };
-
-                        // Add marker
-                        addAdvancedMarker(business, place.location);
-
-                        // Extend bounds
-                        bounds.extend(place.location);
-
-                        return business;
-                    } catch (error) {
-                        console.error(`Error processing place ${placeResult.place_id}:`, error);
-                        return null;
-                    }
-                })());
-            }
-
-            // Wait for all place details to be processed
-            const results = await Promise.all(promises);
-
-            // Filter out null results
-            results.filter(result => result !== null).forEach(business => {
-                businessResults.push(business);
-            });
-
-            // Remove loading indicator
-            const loadingElement = document.getElementById('map-loading');
-            if (loadingElement) loadingElement.remove();
+            // Process places into business objects and add markers
+            const businessResults = processPlaceResults(placeResults, searchLocation);
 
             if (businessResults.length === 0) {
                 // Show no results message
@@ -1520,7 +1409,7 @@ async function searchGooglePlaces(formData) {
             displaySearchResults(businessResults);
 
             // Fit map to bounds
-            if (!bounds.isEmpty()) {
+            if (bounds && !bounds.isEmpty()) {
                 map.fitBounds(bounds);
 
                 // Adjust zoom level
@@ -1539,7 +1428,7 @@ async function searchGooglePlaces(formData) {
                 }, 100);
             } else {
                 // If bounds are empty, center on search location
-                map.setCenter(searchLocation);
+                map.setCenter(new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude));
                 map.setZoom(11);
             }
 
@@ -1562,7 +1451,7 @@ async function searchGooglePlaces(formData) {
 
             // Center map on search location if possible
             if (searchLocation) {
-                map.setCenter(searchLocation);
+                map.setCenter(new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude));
                 map.setZoom(11);
             }
         }
@@ -1586,226 +1475,418 @@ async function searchGooglePlaces(formData) {
 }
 
 /**
- * Perform a custom place search using the Geocoding API
- * This avoids the need for PlacesService
- * @param {string} query - Search query
- * @param {Object} location - Center location
+ * Search places using the new Places API Text Search endpoint
+ * @param {string} query - Search query text
+ * @param {Object} location - Location with latitude and longitude
  * @param {number} radius - Search radius in meters
- * @returns {Promise<Array>} Array of place IDs
+ * @returns {Promise<Array>} Array of place results
  */
-async function performCustomPlaceSearch(query, location, radius) {
+async function searchPlacesWithTextSearch(query, location, radius) {
     try {
-        // For simplicity, use a predefined set of common business types
-        const commonBusinessTypes = [
-            'store', 'restaurant', 'cafe', 'bar', 'supermarket',
-            'pharmacy', 'gas_station', 'department_store', 'hardware_store',
-            'shopping_mall', 'clothing_store', 'home_goods_store'
-        ];
+        // Get the API key
+        const apiKey = getGoogleMapsApiKey();
 
-        // Build a geocoding URL with business type bias
-        // This is a workaround to get businesses without using PlacesService
-        const geocoder = new google.maps.Geocoder();
+        // Create the request body for Text Search
+        const requestBody = {
+            textQuery: query || "businesses"
+        };
 
-        // Combine query with location
-        const fullQuery = query ?
-            `${query} near ${location.lat()},${location.lng()}` :
-            `businesses near ${location.lat()},${location.lng()}`;
-
-        console.log("Geocoding with query:", fullQuery);
-
-        const results = await new Promise((resolve, reject) => {
-            geocoder.geocode({
-                'address': fullQuery,
-                'location': location,
-                'radius': radius
-            }, function(results, status) {
-                if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
-                    resolve(results);
-                } else if (status === google.maps.GeocoderStatus.ZERO_RESULTS) {
-                    resolve([]);
-                } else {
-                    reject(new Error(`Geocoding search failed: ${status}`));
+        // Add location bias if available
+        if (location) {
+            requestBody.locationBias = {
+                circle: {
+                    center: {
+                        latitude: location.latitude,
+                        longitude: location.longitude
+                    },
+                    radius: radius
                 }
-            });
-        });
-
-        // Extract and filter unique place IDs from results
-        const placeIds = [];
-        if (results && results.length > 0) {
-            for (const result of results) {
-                if (result.place_id && !placeIds.includes(result.place_id)) {
-                    placeIds.push(result.place_id);
-                }
-            }
+            };
         }
 
-        return placeIds;
+        // Set up the request
+        const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': apiKey,
+                'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.primaryType,places.nationalPhoneNumber'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        // Parse the response
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(`Places API error: ${data.error.message}`);
+        }
+
+        // Return the places array or an empty array if no results
+        return data.places || [];
     } catch (error) {
-        console.error("Error in custom place search:", error);
-        return [];
+        console.error("Error in searchPlacesWithTextSearch:", error);
+        throw error;
     }
 }
 
 /**
- * Fetch place details for an array of place IDs
- * Uses Place API for individual place details to avoid warnings
- * @param {Array} placeIds - Array of place IDs
+ * Process place results into business objects and add markers
+ * @param {Array} places - Place results from API
  * @param {Object} searchLocation - Search center location
- * @param {number} searchRadius - Search radius in meters
- * @returns {Promise<Array>} Array of business objects
+ * @returns {Array} Array of business objects
  */
-async function fetchPlaceDetailsForIds(placeIds, searchLocation, searchRadius) {
-    try {
-        // Import the Place library
-        const { Place } = await google.maps.importLibrary("places");
+function processPlaceResults(places, searchLocation) {
+    const businessResults = [];
 
-        const businessResults = [];
-        const promises = [];
+    // Create the search location as LatLng for distance calculations
+    const searchLatLng = new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude);
 
-        for (const placeId of placeIds) {
-            promises.push((async () => {
-                try {
-                    // Create a Place instance
-                    const place = new Place({
-                        id: placeId
-                    });
+    places.forEach(place => {
+        try {
+            // Skip if no location
+            if (!place.location) return;
 
-                    // Fetch place details
-                    await place.fetchFields({
-                        fields: [
-                            'displayName',
-                            'formattedAddress',
-                            'addressComponents',
-                            'location',
-                            'types',
-                            'nationalPhoneNumber'
-                        ]
-                    });
+            // Extract address components
+            const addressParts = place.formattedAddress ? place.formattedAddress.split(',') : [];
+            let address1 = '';
+            let city = '';
+            let state = '';
+            let zip = '';
 
-                    console.log("Place details:", place);
+            if (addressParts.length >= 1) address1 = addressParts[0].trim();
+            if (addressParts.length >= 2) city = addressParts[1].trim();
+            if (addressParts.length >= 3) {
+                const stateZip = addressParts[2].trim().split(' ');
+                if (stateZip.length >= 1) state = stateZip[0].trim();
+                if (stateZip.length >= 2) zip = stateZip[1].trim();
+            }
 
-                    // Extract address components
-                    const addressComponents = {};
-                    if (place.addressComponents) {
-                        for (const component of place.addressComponents) {
-                            for (const type of component.types) {
-                                addressComponents[type] = component.shortText;
-                            }
-                        }
-                    }
+            // Map to business type
+            let businessType = 'OTHER';
+            if (place.primaryType) {
+                if (place.primaryType === 'restaurant') businessType = 'REST';
+                else if (place.primaryType === 'store') businessType = 'RETAIL';
+                else if (place.primaryType === 'hardware_store') businessType = 'HARDW';
+                else if (place.primaryType === 'gas_station') businessType = 'FUEL';
+                // Add more mappings as needed
+            }
 
-                    // Create address parts
-                    const address1 = `${addressComponents.street_number || ''} ${addressComponents.route || ''}`.trim();
-                    const city = addressComponents.locality || '';
-                    const state = addressComponents.administrative_area_level_1 || '';
-                    const zip = addressComponents.postal_code || '';
+            // Calculate distance
+            const placeLatLng = new google.maps.LatLng(
+                place.location.latitude,
+                place.location.longitude
+            );
 
-                    // Map to business type
-                    let businessType = 'OTHER';
-                    if (place.types) {
-                        if (place.types.includes('restaurant')) businessType = 'REST';
-                        else if (place.types.includes('store')) businessType = 'RETAIL';
-                        else if (place.types.includes('hardware_store')) businessType = 'HARDW';
-                        else if (place.types.includes('gas_station')) businessType = 'FUEL';
-                        // Add more mappings as needed
-                    }
+            const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                searchLatLng,
+                placeLatLng
+            );
 
-                    // Calculate distance from search location
-                    let distance = 0;
-                    if (place.location && searchLocation) {
-                        distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            searchLocation,
-                            place.location
-                        );
-                    }
+            // Check for duplicates
+            const isDuplicate = markers.some(marker => {
+                if (!marker.business) return false;
 
-                    // Skip if out of range
-                    if (distance > searchRadius) {
-                        console.log(`Skipping ${place.displayName} - too far (${distance/1000}km)`);
-                        return null;
-                    }
-
-                    // Check if this place matches an existing marker by name and location
-                    const isDuplicate = markers.some(marker => {
-                        if (!marker.business) return false;
-
-                        // Match by name and proximity
-                        const nameSimilarity = similarity(
-                            marker.business.bname ? marker.business.bname.toLowerCase() : '',
-                            place.displayName ? place.displayName.toLowerCase() : ''
-                        );
-
-                        if (nameSimilarity > 0.7 && place.location) {
-                            // Get positions
-                            const markerPos = marker.position;
-                            const placePos = place.location;
-
-                            // Calculate distance
-                            const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                                new google.maps.LatLng(markerPos.lat, markerPos.lng),
-                                placePos
-                            );
-
-                            // If within 100 meters, it's a duplicate
-                            if (distance < 100) {
-                                console.log(`Skipping duplicate: ${place.displayName} (matches ${marker.business.bname})`);
-                                return true;
-                            }
-                        }
-
-                        return false;
-                    });
-
-                    // Skip duplicates
-                    if (isDuplicate) return null;
-
-                    // Create business object
-                    const business = {
-                        _id: 'google_' + place.id,
-                        bname: place.displayName,
-                        address1: address1 || (place.formattedAddress || '').split(',')[0] || '',
-                        city: city,
-                        state: state,
-                        zip: zip,
-                        type: businessType,
-                        phone: place.nationalPhoneNumber || '',
-                        isGooglePlace: true,
-                        placeId: place.id,
-                        lat: place.location?.lat || 0,
-                        lng: place.location?.lng || 0,
-                        distance: distance
-                    };
-
-                    // Add marker if we have coordinates
-                    if (place.location && place.location.lat) {
-                        addAdvancedMarker(business, place.location);
-
-                        // Extend bounds with this place
-                        bounds.extend(place.location);
-                    }
-
-                    return business;
-                } catch (error) {
-                    console.error(`Error processing place ${placeId}:`, error);
-                    return null;
+                if (marker.business.placeId === place.id ||
+                    marker.business._id === 'google_' + place.id) {
+                    return true;
                 }
-            })());
-        }
 
-        // Wait for all place details to be fetched
-        const results = await Promise.all(promises);
+                return false;
+            });
 
-        // Filter out null results and add valid businesses
-        results.filter(result => result !== null).forEach(business => {
+            if (isDuplicate) return;
+
+            // Create business object
+            const business = {
+                _id: 'google_' + place.id,
+                bname: place.displayName,
+                address1: address1,
+                city: city,
+                state: state,
+                zip: zip,
+                type: businessType,
+                phone: place.nationalPhoneNumber || '',
+                isGooglePlace: true,
+                placeId: place.id,
+                lat: place.location.latitude,
+                lng: place.location.longitude,
+                distance: distance
+            };
+
+            // Add marker
+            addAdvancedMarker(business, placeLatLng);
+
+            // Extend bounds
+            bounds.extend(placeLatLng);
+
+            // Add to results
             businessResults.push(business);
-        });
+        } catch (error) {
+            console.error("Error processing place:", error);
+            // Skip this place and continue with others
+        }
+    });
 
-        return businessResults;
-    } catch (error) {
-        console.error("Error fetching place details:", error);
-        return [];
-    }
+    return businessResults;
 }
+
+/**
+ * Get the Google Maps API key from the app configuration
+ * @returns {string} API key
+ */
+function getGoogleMapsApiKey() {
+    // Try to get API key from window.appConfig
+    if (window.appConfig && window.appConfig.googleMapsApiKey) {
+        return window.appConfig.googleMapsApiKey;
+    }
+
+    // As a fallback, look for a meta tag with the API key
+    const metaTag = document.querySelector('meta[name="google-maps-api-key"]');
+    if (metaTag) {
+        return metaTag.content;
+    }
+
+    // Another option - check if there's a global API key variable
+    if (typeof GOOGLE_MAPS_API_KEY !== 'undefined') {
+        return GOOGLE_MAPS_API_KEY;
+    }
+
+    // Final fallback - look for an API key in any script tags
+    const scriptTags = document.querySelectorAll('script[src*="maps.googleapis.com"]');
+    for (const script of scriptTags) {
+        const src = script.getAttribute('src');
+        const keyMatch = src.match(/[?&]key=([^&]+)/);
+        if (keyMatch && keyMatch[1]) {
+            return keyMatch[1];
+        }
+    }
+
+    console.error("Could not find Google Maps API key");
+    return '';
+}
+
+// /**
+//  * Perform a custom place search using the Geocoding API
+//  * This avoids the need for PlacesService
+//  * @param {string} query - Search query
+//  * @param {Object} location - Center location
+//  * @param {number} radius - Search radius in meters
+//  * @returns {Promise<Array>} Array of place IDs
+//  */
+// async function performCustomPlaceSearch(query, location, radius) {
+//     try {
+//         // For simplicity, use a predefined set of common business types
+//         const commonBusinessTypes = [
+//             'store', 'restaurant', 'cafe', 'bar', 'supermarket',
+//             'pharmacy', 'gas_station', 'department_store', 'hardware_store',
+//             'shopping_mall', 'clothing_store', 'home_goods_store'
+//         ];
+//
+//         // Build a geocoding URL with business type bias
+//         // This is a workaround to get businesses without using PlacesService
+//         const geocoder = new google.maps.Geocoder();
+//
+//         // Combine query with location
+//         const fullQuery = query ?
+//             `${query} near ${location.lat()},${location.lng()}` :
+//             `businesses near ${location.lat()},${location.lng()}`;
+//
+//         console.log("Geocoding with query:", fullQuery);
+//
+//         const results = await new Promise((resolve, reject) => {
+//             geocoder.geocode({
+//                 'address': fullQuery,
+//                 'location': location,
+//                 'radius': radius
+//             }, function(results, status) {
+//                 if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
+//                     resolve(results);
+//                 } else if (status === google.maps.GeocoderStatus.ZERO_RESULTS) {
+//                     resolve([]);
+//                 } else {
+//                     reject(new Error(`Geocoding search failed: ${status}`));
+//                 }
+//             });
+//         });
+//
+//         // Extract and filter unique place IDs from results
+//         const placeIds = [];
+//         if (results && results.length > 0) {
+//             for (const result of results) {
+//                 if (result.place_id && !placeIds.includes(result.place_id)) {
+//                     placeIds.push(result.place_id);
+//                 }
+//             }
+//         }
+//
+//         return placeIds;
+//     } catch (error) {
+//         console.error("Error in custom place search:", error);
+//         return [];
+//     }
+// }
+//
+// /**
+//  * Fetch place details for an array of place IDs
+//  * Uses Place API for individual place details to avoid warnings
+//  * @param {Array} placeIds - Array of place IDs
+//  * @param {Object} searchLocation - Search center location
+//  * @param {number} searchRadius - Search radius in meters
+//  * @returns {Promise<Array>} Array of business objects
+//  */
+// async function fetchPlaceDetailsForIds(placeIds, searchLocation, searchRadius) {
+//     try {
+//         // Import the Place library
+//         const { Place } = await google.maps.importLibrary("places");
+//
+//         const businessResults = [];
+//         const promises = [];
+//
+//         for (const placeId of placeIds) {
+//             promises.push((async () => {
+//                 try {
+//                     // Create a Place instance
+//                     const place = new Place({
+//                         id: placeId
+//                     });
+//
+//                     // Fetch place details
+//                     await place.fetchFields({
+//                         fields: [
+//                             'displayName',
+//                             'formattedAddress',
+//                             'addressComponents',
+//                             'location',
+//                             'types',
+//                             'nationalPhoneNumber'
+//                         ]
+//                     });
+//
+//                     console.log("Place details:", place);
+//
+//                     // Extract address components
+//                     const addressComponents = {};
+//                     if (place.addressComponents) {
+//                         for (const component of place.addressComponents) {
+//                             for (const type of component.types) {
+//                                 addressComponents[type] = component.shortText;
+//                             }
+//                         }
+//                     }
+//
+//                     // Create address parts
+//                     const address1 = `${addressComponents.street_number || ''} ${addressComponents.route || ''}`.trim();
+//                     const city = addressComponents.locality || '';
+//                     const state = addressComponents.administrative_area_level_1 || '';
+//                     const zip = addressComponents.postal_code || '';
+//
+//                     // Map to business type
+//                     let businessType = 'OTHER';
+//                     if (place.types) {
+//                         if (place.types.includes('restaurant')) businessType = 'REST';
+//                         else if (place.types.includes('store')) businessType = 'RETAIL';
+//                         else if (place.types.includes('hardware_store')) businessType = 'HARDW';
+//                         else if (place.types.includes('gas_station')) businessType = 'FUEL';
+//                         // Add more mappings as needed
+//                     }
+//
+//                     // Calculate distance from search location
+//                     let distance = 0;
+//                     if (place.location && searchLocation) {
+//                         distance = google.maps.geometry.spherical.computeDistanceBetween(
+//                             searchLocation,
+//                             place.location
+//                         );
+//                     }
+//
+//                     // Skip if out of range
+//                     if (distance > searchRadius) {
+//                         console.log(`Skipping ${place.displayName} - too far (${distance/1000}km)`);
+//                         return null;
+//                     }
+//
+//                     // Check if this place matches an existing marker by name and location
+//                     const isDuplicate = markers.some(marker => {
+//                         if (!marker.business) return false;
+//
+//                         // Match by name and proximity
+//                         const nameSimilarity = similarity(
+//                             marker.business.bname ? marker.business.bname.toLowerCase() : '',
+//                             place.displayName ? place.displayName.toLowerCase() : ''
+//                         );
+//
+//                         if (nameSimilarity > 0.7 && place.location) {
+//                             // Get positions
+//                             const markerPos = marker.position;
+//                             const placePos = place.location;
+//
+//                             // Calculate distance
+//                             const distance = google.maps.geometry.spherical.computeDistanceBetween(
+//                                 new google.maps.LatLng(markerPos.lat, markerPos.lng),
+//                                 placePos
+//                             );
+//
+//                             // If within 100 meters, it's a duplicate
+//                             if (distance < 100) {
+//                                 console.log(`Skipping duplicate: ${place.displayName} (matches ${marker.business.bname})`);
+//                                 return true;
+//                             }
+//                         }
+//
+//                         return false;
+//                     });
+//
+//                     // Skip duplicates
+//                     if (isDuplicate) return null;
+//
+//                     // Create business object
+//                     const business = {
+//                         _id: 'google_' + place.id,
+//                         bname: place.displayName,
+//                         address1: address1 || (place.formattedAddress || '').split(',')[0] || '',
+//                         city: city,
+//                         state: state,
+//                         zip: zip,
+//                         type: businessType,
+//                         phone: place.nationalPhoneNumber || '',
+//                         isGooglePlace: true,
+//                         placeId: place.id,
+//                         lat: place.location?.lat || 0,
+//                         lng: place.location?.lng || 0,
+//                         distance: distance
+//                     };
+//
+//                     // Add marker if we have coordinates
+//                     if (place.location && place.location.lat) {
+//                         addAdvancedMarker(business, place.location);
+//
+//                         // Extend bounds with this place
+//                         bounds.extend(place.location);
+//                     }
+//
+//                     return business;
+//                 } catch (error) {
+//                     console.error(`Error processing place ${placeId}:`, error);
+//                     return null;
+//                 }
+//             })());
+//         }
+//
+//         // Wait for all place details to be fetched
+//         const results = await Promise.all(promises);
+//
+//         // Filter out null results and add valid businesses
+//         results.filter(result => result !== null).forEach(business => {
+//             businessResults.push(business);
+//         });
+//
+//         return businessResults;
+//     } catch (error) {
+//         console.error("Error fetching place details:", error);
+//         return [];
+//     }
+// }
 
 
 
@@ -1855,91 +1936,91 @@ function ensureMapVisibility() {
     }
 }
 
-/**
- * Display Google Places search results
- * @param {Array} businesses - Array of business objects from Google Places
- */
-function displayGoogleSearchResults(businesses) {
-    const businessSearchTable = document.getElementById('business_search');
-    const searchTableContainer = document.getElementById('search_table');
-
-    if (!businessSearchTable || !searchTableContainer) {
-        console.error("Required elements not found in the DOM");
-        return;
-    }
-
-    // Get the table body
-    let tableBody = businessSearchTable.querySelector('tbody');
-    if (!tableBody) {
-        console.error("Table body not found within business_search table");
-        return;
-    }
-
-    // Clear existing rows
-    tableBody.innerHTML = '';
-
-    // Make sure businesses is an array
-    if (!Array.isArray(businesses) || businesses.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
-        searchTableContainer.style.display = 'block';
-        searchTableContainer.scrollIntoView({behavior: 'smooth'});
-        return;
-    }
-
-    // Show the search results table
-    searchTableContainer.style.display = 'block';
-
-    // Hide the "hidden" text in the h5
-    const searchTableH5 = searchTableContainer.querySelector('h5');
-    if (searchTableH5) {
-        searchTableH5.style.display = 'none';
-    }
-
-    // Add each business to the table
-    businesses.forEach(business => {
-        if (!business) return; // skip null or undefined entries
-
-        // Format the address line
-        const addressLine = business.address1 ?
-            `${business.address1}<br>${business.city}, ${business.state} ${business.zip}` :
-            'Address information not available';
-
-        // Convert the business type code to a readable label
-        const businessType = getBusinessTypeLabel(business.type);
-
-        // Format distance if available
-        const distanceText = business.distance ?
-            ` (${(business.distance / 1609.34).toFixed(1)} miles)` : '';
-
-        // Create a new row
-        const row = document.createElement('tr');
-
-        // Add a View on Map button and Add to Database button
-        const viewMapButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
-        const addToDbButton = business.isGooglePlace ?
-            `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.placeId}')">Add to Patriot Thanks</button>` :
-            '';
-
-        // First populate with basic business info
-        row.innerHTML = `
-            <th class="left_table" data-business-id="${business._id}">${business.bname}${distanceText}</th>
-            <th class="left_table">${addressLine}</th>
-            <th class="left_table">${businessType}</th>
-            <th class="right_table">${business.isGooglePlace ? 'Not in database yet' : 'Loading incentives...'}</th>
-            <th class="center_table">${viewMapButton} ${addToDbButton}</th>
-        `;
-
-        tableBody.appendChild(row);
-
-        // Only fetch incentives for businesses in our database
-        if (!business.isGooglePlace) {
-            fetchBusinessIncentives(business._id);
-        }
-    });
-
-    // Scroll to the results
-    searchTableContainer.scrollIntoView({behavior: 'smooth'});
-}
+// /**
+//  * Display Google Places search results
+//  * @param {Array} businesses - Array of business objects from Google Places
+//  */
+// function displayGoogleSearchResults(businesses) {
+//     const businessSearchTable = document.getElementById('business_search');
+//     const searchTableContainer = document.getElementById('search_table');
+//
+//     if (!businessSearchTable || !searchTableContainer) {
+//         console.error("Required elements not found in the DOM");
+//         return;
+//     }
+//
+//     // Get the table body
+//     let tableBody = businessSearchTable.querySelector('tbody');
+//     if (!tableBody) {
+//         console.error("Table body not found within business_search table");
+//         return;
+//     }
+//
+//     // Clear existing rows
+//     tableBody.innerHTML = '';
+//
+//     // Make sure businesses is an array
+//     if (!Array.isArray(businesses) || businesses.length === 0) {
+//         tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
+//         searchTableContainer.style.display = 'block';
+//         searchTableContainer.scrollIntoView({behavior: 'smooth'});
+//         return;
+//     }
+//
+//     // Show the search results table
+//     searchTableContainer.style.display = 'block';
+//
+//     // Hide the "hidden" text in the h5
+//     const searchTableH5 = searchTableContainer.querySelector('h5');
+//     if (searchTableH5) {
+//         searchTableH5.style.display = 'none';
+//     }
+//
+//     // Add each business to the table
+//     businesses.forEach(business => {
+//         if (!business) return; // skip null or undefined entries
+//
+//         // Format the address line
+//         const addressLine = business.address1 ?
+//             `${business.address1}<br>${business.city}, ${business.state} ${business.zip}` :
+//             'Address information not available';
+//
+//         // Convert the business type code to a readable label
+//         const businessType = getBusinessTypeLabel(business.type);
+//
+//         // Format distance if available
+//         const distanceText = business.distance ?
+//             ` (${(business.distance / 1609.34).toFixed(1)} miles)` : '';
+//
+//         // Create a new row
+//         const row = document.createElement('tr');
+//
+//         // Add a View on Map button and Add to Database button
+//         const viewMapButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
+//         const addToDbButton = business.isGooglePlace ?
+//             `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.placeId}')">Add to Patriot Thanks</button>` :
+//             '';
+//
+//         // First populate with basic business info
+//         row.innerHTML = `
+//             <th class="left_table" data-business-id="${business._id}">${business.bname}${distanceText}</th>
+//             <th class="left_table">${addressLine}</th>
+//             <th class="left_table">${businessType}</th>
+//             <th class="right_table">${business.isGooglePlace ? 'Not in database yet' : 'Loading incentives...'}</th>
+//             <th class="center_table">${viewMapButton} ${addToDbButton}</th>
+//         `;
+//
+//         tableBody.appendChild(row);
+//
+//         // Only fetch incentives for businesses in our database
+//         if (!business.isGooglePlace) {
+//             fetchBusinessIncentives(business._id);
+//         }
+//     });
+//
+//     // Scroll to the results
+//     searchTableContainer.scrollIntoView({behavior: 'smooth'});
+// }
 
 /**
  * Show info window for Google Places results not in the database
@@ -2603,33 +2684,33 @@ function displayBusinessesOnMap(businesses) {
     }
 }
 
-/**
- * Function to enhance markers with images
- */
-async function enhanceMarkersWithImages() {
-    // Only process if we have markers
-    if (!markers || markers.length === 0) return;
-
-    console.log("Enhancing markers with images...");
-
-    for (const marker of markers) {
-        if (!marker.business) continue;
-
-        // Skip if business already has an image
-        if (marker.business.image_url) continue;
-
-        // Try to get an image for the business
-        const imageUrl = await fetchPlacePhotosForBusiness(marker.business);
-
-        if (imageUrl) {
-            // Update the business object
-            marker.business.image_url = imageUrl;
-
-            // Update the marker with the new image
-            updateMarkerWithImage(marker, imageUrl);
-        }
-    }
-}
+// /**
+//  * Function to enhance markers with images
+//  */
+// async function enhanceMarkersWithImages() {
+//     // Only process if we have markers
+//     if (!markers || markers.length === 0) return;
+//
+//     console.log("Enhancing markers with images...");
+//
+//     for (const marker of markers) {
+//         if (!marker.business) continue;
+//
+//         // Skip if business already has an image
+//         if (marker.business.image_url) continue;
+//
+//         // Try to get an image for the business
+//         const imageUrl = await fetchPlacePhotosForBusiness(marker.business);
+//
+//         if (imageUrl) {
+//             // Update the business object
+//             marker.business.image_url = imageUrl;
+//
+//             // Update the marker with the new image
+//             updateMarkerWithImage(marker, imageUrl);
+//         }
+//     }
+// }
 
 /**
  * Geocode a business address to get coordinates
@@ -2839,73 +2920,73 @@ function createFallbackMarker(business, location) {
     }
 }
 
-/**
- * Create an Advanced Marker (using the recommended API)
- */
-async function createAdvancedMarker(business) {
-    try {
-        if (!business || !business.lat || !business.lng) {
-            console.error("Invalid business data for marker:", business);
-            return null;
-        }
-
-        // Import the AdvancedMarkerElement library
-        const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
-
-        // Create position object from business coordinates
-        const position = {
-            lat: business.lat,
-            lng: business.lng
-        };
-
-        console.log(`Creating advanced marker for ${business.bname} at position:`, position);
-
-        // Determine marker color based on type
-        const isNearby = business.isNearby === true;
-        const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
-
-        // Create a pin element using the proper modern approach
-        const pin = new PinElement({
-            background: pinColor,
-            borderColor: "#ffffff",
-            glyphColor: "#ffffff",
-            scale: 1.2,
-        });
-
-        // Create the advanced marker
-        const marker = new AdvancedMarkerElement({
-            position: position,
-            map: map,
-            title: business.bname,
-            content: pin.element,
-        });
-
-        // Store business data with the marker
-        marker.business = business;
-
-        // UPDATED: Use 'gmp-click' event instead of 'click'
-        marker.addEventListener("gmp-click", () => {
-            console.log(`Marker clicked for: ${business.bname}`);
-            showInfoWindow(marker);
-        });
-
-        // Add to markers array
-        markers.push(marker);
-        console.log(`Successfully added marker for ${business.bname} - Markers count: ${markers.length}`);
-
-        return marker;
-    } catch (error) {
-        console.error(`Error creating marker for ${business ? business.bname : 'unknown business'}:`, error);
-
-        // Fall back to standard marker as backup if advanced marker fails
-        try {
-            return fallbackCreateStandardMarker(business);
-        } catch (fallbackError) {
-            console.error("Fallback marker creation also failed:", fallbackError);
-            return null;
-        }
-    }
-}
+// /**
+//  * Create an Advanced Marker (using the recommended API)
+//  */
+// async function createAdvancedMarker(business) {
+//     try {
+//         if (!business || !business.lat || !business.lng) {
+//             console.error("Invalid business data for marker:", business);
+//             return null;
+//         }
+//
+//         // Import the AdvancedMarkerElement library
+//         const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
+//
+//         // Create position object from business coordinates
+//         const position = {
+//             lat: business.lat,
+//             lng: business.lng
+//         };
+//
+//         console.log(`Creating advanced marker for ${business.bname} at position:`, position);
+//
+//         // Determine marker color based on type
+//         const isNearby = business.isNearby === true;
+//         const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
+//
+//         // Create a pin element using the proper modern approach
+//         const pin = new PinElement({
+//             background: pinColor,
+//             borderColor: "#ffffff",
+//             glyphColor: "#ffffff",
+//             scale: 1.2,
+//         });
+//
+//         // Create the advanced marker
+//         const marker = new AdvancedMarkerElement({
+//             position: position,
+//             map: map,
+//             title: business.bname,
+//             content: pin.element,
+//         });
+//
+//         // Store business data with the marker
+//         marker.business = business;
+//
+//         // UPDATED: Use 'gmp-click' event instead of 'click'
+//         marker.addEventListener("gmp-click", () => {
+//             console.log(`Marker clicked for: ${business.bname}`);
+//             showInfoWindow(marker);
+//         });
+//
+//         // Add to markers array
+//         markers.push(marker);
+//         console.log(`Successfully added marker for ${business.bname} - Markers count: ${markers.length}`);
+//
+//         return marker;
+//     } catch (error) {
+//         console.error(`Error creating marker for ${business ? business.bname : 'unknown business'}:`, error);
+//
+//         // Fall back to standard marker as backup if advanced marker fails
+//         try {
+//             return fallbackCreateStandardMarker(business);
+//         } catch (fallbackError) {
+//             console.error("Fallback marker creation also failed:", fallbackError);
+//             return null;
+//         }
+//     }
+// }
 
 /**
  * Fallback function to create a standard marker if advanced marker fails
@@ -3000,57 +3081,57 @@ function getBusinessTypeIconHTML(businessType) {
 }
 
 
-/**
- * Get an SVG icon for a business type (new function)
- * @param {string} businessType - Business type code
- * @returns {string} SVG icon markup
- */
-function getBusinessTypeSVGIcon(businessType) {
-    // Map business types to SVG icons
-    const businessTypeIcons = {
-        'AUTO': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#EA4335" d="M5,11L6.5,6.5H17.5L19,11M17.5,16A1.5,1.5 0 0,1 16,14.5A1.5,1.5 0 0,1 17.5,13A1.5,1.5 0 0,1 19,14.5A1.5,1.5 0 0,1 17.5,16M6.5,16A1.5,1.5 0 0,1 5,14.5A1.5,1.5 0 0,1 6.5,13A1.5,1.5 0 0,1 8,14.5A1.5,1.5 0 0,1 6.5,16M18.92,6C18.72,5.42 18.16,5 17.5,5H6.5C5.84,5 5.28,5.42 5.08,6L3,12V20A1,1 0 0,0 4,21H5A1,1 0 0,0 6,20V19H18V20A1,1 0 0,0 19,21H20A1,1 0 0,0 21,20V12L18.92,6Z"/></svg>',
-        'BEAU': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M15.5,9.63C15.31,6.84 14.18,4.12 12.06,2C9.92,4.14 8.74,6.86 8.5,9.63C9.79,10.31 10.97,11.19 12,12.26C13.03,11.2 14.21,10.32 15.5,9.63M12,15.45C9.85,12.17 6.18,10 2,10C2,20 11.32,21.89 12,22C12.68,21.88 22,20 22,10C17.82,10 14.15,12.17 12,15.45Z"/></svg>',
-        'REST': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#FBC02D" d="M8.1,13.34L3.91,9.16C2.35,7.59 2.35,5.06 3.91,3.5L10.93,10.5L8.1,13.34M14.88,11.53L13.41,13L20.29,19.88L18.88,21.29L12,14.41L5.12,21.29L3.71,19.88L13.47,10.12C12.76,8.59 13.26,6.44 14.85,4.85C16.76,2.93 19.5,2.57 20.96,4.03C22.43,5.5 22.07,8.24 20.15,10.15C18.56,11.74 16.41,12.24 14.88,11.53Z"/></svg>',
-        'GROC': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#0F9D58" d="M7,18A2,2 0 0,1 5,20A2,2 0 0,1 3,18A2,2 0 0,1 5,16A2,2 0 0,1 7,18M17,18A2,2 0 0,1 15,20A2,2 0 0,1 13,18A2,2 0 0,1 15,16A2,2 0 0,1 17,18M7.17,14.75L7.2,14.63L8.1,13H15.55C16.3,13 16.96,12.59 17.3,11.97L21.16,4.96L19.42,4H19.41L18.31,6L15.55,11H8.53L8.4,10.73L6.16,6L5.21,4L4.27,2H1V4H3L6.6,11.59L5.25,14.04C5.09,14.32 5,14.65 5,15A2,2 0 0,0 7,17H19V15H7.42C7.29,15 7.17,14.89 7.17,14.75Z"/></svg>',
-        'OTHER': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#616161" d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,7V9H16V13C16,14.1 15.1,15 14,15H12V17H8V13H12V11H8V7H12Z"/></svg>'
-        // Add more type-specific icons as needed
-    };
+// /**
+//  * Get an SVG icon for a business type (new function)
+//  * @param {string} businessType - Business type code
+//  * @returns {string} SVG icon markup
+//  */
+// function getBusinessTypeSVGIcon(businessType) {
+//     // Map business types to SVG icons
+//     const businessTypeIcons = {
+//         'AUTO': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#EA4335" d="M5,11L6.5,6.5H17.5L19,11M17.5,16A1.5,1.5 0 0,1 16,14.5A1.5,1.5 0 0,1 17.5,13A1.5,1.5 0 0,1 19,14.5A1.5,1.5 0 0,1 17.5,16M6.5,16A1.5,1.5 0 0,1 5,14.5A1.5,1.5 0 0,1 6.5,13A1.5,1.5 0 0,1 8,14.5A1.5,1.5 0 0,1 6.5,16M18.92,6C18.72,5.42 18.16,5 17.5,5H6.5C5.84,5 5.28,5.42 5.08,6L3,12V20A1,1 0 0,0 4,21H5A1,1 0 0,0 6,20V19H18V20A1,1 0 0,0 19,21H20A1,1 0 0,0 21,20V12L18.92,6Z"/></svg>',
+//         'BEAU': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M15.5,9.63C15.31,6.84 14.18,4.12 12.06,2C9.92,4.14 8.74,6.86 8.5,9.63C9.79,10.31 10.97,11.19 12,12.26C13.03,11.2 14.21,10.32 15.5,9.63M12,15.45C9.85,12.17 6.18,10 2,10C2,20 11.32,21.89 12,22C12.68,21.88 22,20 22,10C17.82,10 14.15,12.17 12,15.45Z"/></svg>',
+//         'REST': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#FBC02D" d="M8.1,13.34L3.91,9.16C2.35,7.59 2.35,5.06 3.91,3.5L10.93,10.5L8.1,13.34M14.88,11.53L13.41,13L20.29,19.88L18.88,21.29L12,14.41L5.12,21.29L3.71,19.88L13.47,10.12C12.76,8.59 13.26,6.44 14.85,4.85C16.76,2.93 19.5,2.57 20.96,4.03C22.43,5.5 22.07,8.24 20.15,10.15C18.56,11.74 16.41,12.24 14.88,11.53Z"/></svg>',
+//         'GROC': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#0F9D58" d="M7,18A2,2 0 0,1 5,20A2,2 0 0,1 3,18A2,2 0 0,1 5,16A2,2 0 0,1 7,18M17,18A2,2 0 0,1 15,20A2,2 0 0,1 13,18A2,2 0 0,1 15,16A2,2 0 0,1 17,18M7.17,14.75L7.2,14.63L8.1,13H15.55C16.3,13 16.96,12.59 17.3,11.97L21.16,4.96L19.42,4H19.41L18.31,6L15.55,11H8.53L8.4,10.73L6.16,6L5.21,4L4.27,2H1V4H3L6.6,11.59L5.25,14.04C5.09,14.32 5,14.65 5,15A2,2 0 0,0 7,17H19V15H7.42C7.29,15 7.17,14.89 7.17,14.75Z"/></svg>',
+//         'OTHER': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#616161" d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,7V9H16V13C16,14.1 15.1,15 14,15H12V17H8V13H12V11H8V7H12Z"/></svg>'
+//         // Add more type-specific icons as needed
+//     };
+//
+//     // Return the icon for this business type, or a default
+//     return businessTypeIcons[businessType] ||
+//         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#616161" d="M12,7V3H2V21H22V7H12M10,19H4V17H10V19M10,15H4V13H10V15M10,11H4V9H10V11M10,7H4V5H10V7M20,19H12V5H20V19M18,11H14V13H18V11M18,7H14V9H18V7M18,15H14V17H18V15Z"/></svg>';
+// }
 
-    // Return the icon for this business type, or a default
-    return businessTypeIcons[businessType] ||
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#616161" d="M12,7V3H2V21H22V7H12M10,19H4V17H10V19M10,15H4V13H10V15M10,11H4V9H10V11M10,7H4V5H10V7M20,19H12V5H20V19M18,11H14V13H18V11M18,7H14V9H18V7M18,15H14V17H18V15Z"/></svg>';
-}
 
-
-/**
- * Fetch icon for a business based on its type
- * @param {Object} business - Business object
- * @returns {Promise<string>} Icon URL
- */
-async function fetchPlacePhotosForBusiness(business) {
-    if (!business) {
-        console.log("No business data provided");
-        return getDefaultBusinessIcon();
-    }
-
-    try {
-        // Check cache first
-        const cacheKey = business._id || business.bname + business.address1;
-        if (placeCache.has(cacheKey)) {
-            return placeCache.get(cacheKey);
-        }
-
-        // Get an appropriate icon based on business type
-        const iconUrl = getBusinessTypeIcon(business.type);
-
-        // Add to cache
-        placeCache.set(cacheKey, iconUrl);
-        return iconUrl;
-    } catch (error) {
-        console.error(`Error getting business icon: ${error.message}`);
-        return getDefaultBusinessIcon();
-    }
-}
+// /**
+//  * Fetch icon for a business based on its type
+//  * @param {Object} business - Business object
+//  * @returns {Promise<string>} Icon URL
+//  */
+// async function fetchPlacePhotosForBusiness(business) {
+//     if (!business) {
+//         console.log("No business data provided");
+//         return getDefaultBusinessIcon();
+//     }
+//
+//     try {
+//         // Check cache first
+//         const cacheKey = business._id || business.bname + business.address1;
+//         if (placeCache.has(cacheKey)) {
+//             return placeCache.get(cacheKey);
+//         }
+//
+//         // Get an appropriate icon based on business type
+//         const iconUrl = getBusinessTypeIcon(business.type);
+//
+//         // Add to cache
+//         placeCache.set(cacheKey, iconUrl);
+//         return iconUrl;
+//     } catch (error) {
+//         console.error(`Error getting business icon: ${error.message}`);
+//         return getDefaultBusinessIcon();
+//     }
+// }
 
 /**
  * Get an appropriate icon for a business type
@@ -3103,47 +3184,47 @@ function getDefaultBusinessIcon() {
     return 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png';
 }
 
-/**
- * Update an existing marker with an image
- * @param {Object} marker - Marker object
- * @param {string} imageUrl - URL of the image
- */
-function updateMarkerWithImage(marker, imageUrl) {
-    if (!marker || !marker.content) return;
-
-    const business = marker.business;
-    if (!business) return;
-
-    const isNearby = business.isNearby === true;
-    const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
-
-    // Create new content with the image
-    const pinElement = document.createElement('div');
-    pinElement.className = 'custom-marker';
-    pinElement.style.cursor = 'pointer';
-    pinElement.style.zIndex = '1000';
-
-    pinElement.innerHTML = `
-    <div class="marker-container">
-      <div class="marker-pin" style="background-color: ${pinColor};">
-        <div class="marker-image-container">
-          <img src="${imageUrl}" alt="${business.bname}" class="marker-image">
-        </div>
-      </div>
-      <div class="marker-shadow"></div>
-    </div>
-  `;
-
-    // Replace the old content
-    marker.content = pinElement;
-
-    // Re-add the click event listener
-    pinElement.addEventListener('click', function(e) {
-        console.log("Updated marker element clicked:", business.bname);
-        e.stopPropagation();
-        showInfoWindow(marker);
-    });
-}
+// /**
+//  * Update an existing marker with an image
+//  * @param {Object} marker - Marker object
+//  * @param {string} imageUrl - URL of the image
+//  */
+// function updateMarkerWithImage(marker, imageUrl) {
+//     if (!marker || !marker.content) return;
+//
+//     const business = marker.business;
+//     if (!business) return;
+//
+//     const isNearby = business.isNearby === true;
+//     const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
+//
+//     // Create new content with the image
+//     const pinElement = document.createElement('div');
+//     pinElement.className = 'custom-marker';
+//     pinElement.style.cursor = 'pointer';
+//     pinElement.style.zIndex = '1000';
+//
+//     pinElement.innerHTML = `
+//     <div class="marker-container">
+//       <div class="marker-pin" style="background-color: ${pinColor};">
+//         <div class="marker-image-container">
+//           <img src="${imageUrl}" alt="${business.bname}" class="marker-image">
+//         </div>
+//       </div>
+//       <div class="marker-shadow"></div>
+//     </div>
+//   `;
+//
+//     // Replace the old content
+//     marker.content = pinElement;
+//
+//     // Re-add the click event listener
+//     pinElement.addEventListener('click', function(e) {
+//         console.log("Updated marker element clicked:", business.bname);
+//         e.stopPropagation();
+//         showInfoWindow(marker);
+//     });
+// }
 
 /**
  * Show info window for a marker with scrollable content
@@ -3421,30 +3502,30 @@ function searchNearbyBusinesses(location, businessType) {
         });
 }
 
-/**
- * Debug the current map state
- */
-function debugMapState() {
-    console.log("==== MAP DEBUGGING INFO ====");
-    console.log("Map initialized:", mapInitialized);
-    console.log("Map object exists:", !!map);
-    if (map) {
-        console.log("Map center:", map.getCenter().toString());
-        console.log("Map zoom:", map.getZoom());
-    }
-    console.log("Markers count:", markers.length);
-    if (markers.length > 0) {
-        console.log("First marker position:", markers[0].position);
-        console.log("First marker business:", markers[0].business);
-    }
-    console.log("Bounds empty:", bounds ? bounds.isEmpty() : "no bounds");
-    console.log("Map container:", document.getElementById("map"));
-    if (document.getElementById("map")) {
-        console.log("Map container display:", window.getComputedStyle(document.getElementById("map")).display);
-        console.log("Map container dimensions:", document.getElementById("map").offsetWidth, "×", document.getElementById("map").offsetHeight);
-    }
-    console.log("==== END DEBUGGING INFO ====");
-}
+// /**
+//  * Debug the current map state
+//  */
+// function debugMapState() {
+//     console.log("==== MAP DEBUGGING INFO ====");
+//     console.log("Map initialized:", mapInitialized);
+//     console.log("Map object exists:", !!map);
+//     if (map) {
+//         console.log("Map center:", map.getCenter().toString());
+//         console.log("Map zoom:", map.getZoom());
+//     }
+//     console.log("Markers count:", markers.length);
+//     if (markers.length > 0) {
+//         console.log("First marker position:", markers[0].position);
+//         console.log("First marker business:", markers[0].business);
+//     }
+//     console.log("Bounds empty:", bounds ? bounds.isEmpty() : "no bounds");
+//     console.log("Map container:", document.getElementById("map"));
+//     if (document.getElementById("map")) {
+//         console.log("Map container display:", window.getComputedStyle(document.getElementById("map")).display);
+//         console.log("Map container dimensions:", document.getElementById("map").offsetWidth, "×", document.getElementById("map").offsetHeight);
+//     }
+//     console.log("==== END DEBUGGING INFO ====");
+// }
 
 /**
  * Geocode a nearby business address
@@ -3540,89 +3621,89 @@ window.focusOnMapMarker = function(businessId) {
     }
 };
 
-// Save the original initGoogleMap function
-const originalInitGoogleMap = window.initGoogleMap;
-
-// Create a new wrapper function that calls the original function
-// Make sure the initGoogleMap function is properly defined and accessible
-window.initGoogleMap = async function() {
-    console.log("initGoogleMap called");
-
-    try {
-        // Check if map container exists
-        const mapContainer = document.getElementById("map");
-        if (!mapContainer) {
-            console.error("Map container not found in the DOM");
-            return;
-        }
-
-        console.log("Map container dimensions:", mapContainer.offsetWidth, "x", mapContainer.offsetHeight);
-
-        // Import required libraries
-        const { Map } = await google.maps.importLibrary("maps");
-        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-
-        // Create map
-        map = new Map(mapContainer, {
-            center: CONFIG.defaultCenter,
-            zoom: CONFIG.defaultZoom,
-            mapId: CONFIG.mapId
-        });
-
-        console.log("Map created successfully");
-
-        // Create needed objects
-        infoWindow = new google.maps.InfoWindow();
-        bounds = new google.maps.LatLngBounds();
-
-        // Add initial message
-        const initialMessage = document.createElement('div');
-        initialMessage.id = 'initial-map-message';
-        initialMessage.innerHTML = 'Search for businesses to see them on the map';
-        initialMessage.style.position = 'absolute';
-        initialMessage.style.top = '50%';
-        initialMessage.style.left = '50%';
-        initialMessage.style.transform = 'translate(-50%, -50%)';
-        initialMessage.style.background = 'white';
-        initialMessage.style.padding = '10px';
-        initialMessage.style.borderRadius = '5px';
-        initialMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
-        initialMessage.style.zIndex = '1';
-        mapContainer.appendChild(initialMessage);
-
-        // Set flag
-        mapInitialized = true;
-        console.log("Map initialization complete");
-
-        // Process any pending businesses
-        if (pendingBusinessesToDisplay.length > 0) {
-            console.log("Processing pending businesses:", pendingBusinessesToDisplay.length);
-            displayBusinessesOnMap(pendingBusinessesToDisplay);
-            pendingBusinessesToDisplay = [];
-        }
-
-        // Set up map click handler
-        map.addListener('click', function(event) {
-            console.log("Map clicked at", event.latLng.lat(), event.latLng.lng());
-            // Your existing click handler code...
-        });
-
-    } catch (error) {
-        console.error("Error initializing Google Map:", error);
-        mapInitialized = false;
-
-        // Show error message
-        const mapContainer = document.getElementById("map");
-        if (mapContainer) {
-            mapContainer.innerHTML = `
-                <div style="text-align: center; padding: 20px;">
-                    <p>Sorry, we couldn't load the map. Please try refreshing the page.</p>
-                    <p>Error: ${error.message}</p>
-                </div>
-            `;
-        }
-    }
-};
+// // Save the original initGoogleMap function
+// const originalInitGoogleMap = window.initGoogleMap;
+//
+// // Create a new wrapper function that calls the original function
+// // Make sure the initGoogleMap function is properly defined and accessible
+// window.initGoogleMap = async function() {
+//     console.log("initGoogleMap called");
+//
+//     try {
+//         // Check if map container exists
+//         const mapContainer = document.getElementById("map");
+//         if (!mapContainer) {
+//             console.error("Map container not found in the DOM");
+//             return;
+//         }
+//
+//         console.log("Map container dimensions:", mapContainer.offsetWidth, "x", mapContainer.offsetHeight);
+//
+//         // Import required libraries
+//         const { Map } = await google.maps.importLibrary("maps");
+//         const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+//
+//         // Create map
+//         map = new Map(mapContainer, {
+//             center: CONFIG.defaultCenter,
+//             zoom: CONFIG.defaultZoom,
+//             mapId: CONFIG.mapId
+//         });
+//
+//         console.log("Map created successfully");
+//
+//         // Create needed objects
+//         infoWindow = new google.maps.InfoWindow();
+//         bounds = new google.maps.LatLngBounds();
+//
+//         // Add initial message
+//         const initialMessage = document.createElement('div');
+//         initialMessage.id = 'initial-map-message';
+//         initialMessage.innerHTML = 'Search for businesses to see them on the map';
+//         initialMessage.style.position = 'absolute';
+//         initialMessage.style.top = '50%';
+//         initialMessage.style.left = '50%';
+//         initialMessage.style.transform = 'translate(-50%, -50%)';
+//         initialMessage.style.background = 'white';
+//         initialMessage.style.padding = '10px';
+//         initialMessage.style.borderRadius = '5px';
+//         initialMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+//         initialMessage.style.zIndex = '1';
+//         mapContainer.appendChild(initialMessage);
+//
+//         // Set flag
+//         mapInitialized = true;
+//         console.log("Map initialization complete");
+//
+//         // Process any pending businesses
+//         if (pendingBusinessesToDisplay.length > 0) {
+//             console.log("Processing pending businesses:", pendingBusinessesToDisplay.length);
+//             displayBusinessesOnMap(pendingBusinessesToDisplay);
+//             pendingBusinessesToDisplay = [];
+//         }
+//
+//         // Set up map click handler
+//         map.addListener('click', function(event) {
+//             console.log("Map clicked at", event.latLng.lat(), event.latLng.lng());
+//             // Your existing click handler code...
+//         });
+//
+//     } catch (error) {
+//         console.error("Error initializing Google Map:", error);
+//         mapInitialized = false;
+//
+//         // Show error message
+//         const mapContainer = document.getElementById("map");
+//         if (mapContainer) {
+//             mapContainer.innerHTML = `
+//                 <div style="text-align: center; padding: 20px;">
+//                     <p>Sorry, we couldn't load the map. Please try refreshing the page.</p>
+//                     <p>Error: ${error.message}</p>
+//                 </div>
+//             `;
+//         }
+//     }
+// };
 
 // Initialize when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
