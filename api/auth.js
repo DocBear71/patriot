@@ -1,28 +1,189 @@
-/// auth.js - Modified for case-insensitive email handling
+// api/auth.js - Consolidated authentication API with all features
 const connect = require('../config/db');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { ObjectId } = mongoose.Types;
 const jwt = require('jsonwebtoken');
-const User = require('../models/Users');
-const Business = require('../models/Business');
-const Incentive = require('../models/Incentive');
-const AdminCode = require('../models/AdminCode');
 const nodemailer = require('nodemailer');
+const {ObjectId} = mongoose.Types;
+
+// Initialize models with error handling
+let User, AdminCode, Business, Incentive;
+
+try {
+    User = mongoose.model('User');
+    AdminCode = mongoose.model('AdminCode');
+    Business = mongoose.model('Business');
+    Incentive = mongoose.model('Incentive');
+} catch (error) {
+    // If models aren't registered yet, define them
+
+    // User schema
+    const userSchema = new mongoose.Schema({
+        fname: String,
+        lname: String,
+        address1: String,
+        address2: String,
+        city: String,
+        state: String,
+        zip: String,
+        status: String,
+        level: String,
+        email: String,
+        password: String,
+        isAdmin: Boolean,
+        resetToken: String,
+        resetTokenExpires: Date,
+        created_at: {type: Date, default: Date.now},
+        updated_at: {type: Date, default: Date.now},
+    });
+
+    // Admin Code schema
+    const adminCodeSchema = new mongoose.Schema({
+        code: String,
+        description: String,
+        expiration: Date,
+        created_at: {type: Date, default: Date.now}
+    });
+
+    // Initialize models that aren't already registered
+    if (!User) {
+        try {
+            User = mongoose.model('User');
+        } catch (error) {
+            User = mongoose.model('User', userSchema, 'users');
+        }
+    }
+
+    if (!AdminCode) {
+        try {
+            AdminCode = mongoose.model('AdminCode');
+        } catch (error) {
+            AdminCode = mongoose.model('AdminCode', adminCodeSchema, 'admin_codes');
+        }
+    }
+
+    // These models might not be needed in this file, but include them to avoid errors
+    try {
+        Business = mongoose.model('Business');
+        Incentive = mongoose.model('Incentive');
+    } catch (modelError) {
+        console.log('Note: Business or Incentive models not available, will be used conditionally');
+    }
+}
+
+// Create email transporter for password reset
+const transporter = nodemailer.createTransport({
+    host: 'mail.patriotthanks.com',
+    port: 465,  // Outgoing SMTP port
+    secure: true, // true for port 465 (SSL/TLS)
+    auth: {
+        user: process.env.EMAIL_USER || 'forgotpassword@patriotthanks.com',
+        pass: process.env.EMAIL_PASS || '1369Bkcsdp55chtdp81??'
+    },
+    tls: {
+        // Do not fail on invalid certs
+        rejectUnauthorized: false
+    }
+});
+
+// Verify email configuration
+transporter.verify(function (error, success) {
+    if (error) {
+        console.error('SMTP connection error:', error);
+    } else {
+        console.log('SMTP server is ready to send emails');
+    }
+});
+
 /**
- * Consolidated authentication API handler
+ * HELPER FUNCTIONS
+ */
+
+// Helper to establish DB connection
+async function connectDB() {
+    try {
+        await connect;
+        console.log("Database connection established");
+        return {success: true};
+    } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return {
+            success: false,
+            error: dbError,
+            message: 'Database connection error'
+        };
+    }
+}
+
+// Helper to verify admin access
+async function verifyAdminAccess(req) {
+    // Get session token from request headers
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return {success: false, status: 401, message: 'Authorization required'};
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    // Verify token and check admin status
+    let userId;
+    try {
+        // Using the same JWT secret
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+        userId = decoded.userId;
+    } catch (error) {
+        console.error("Token verification error:", error);
+        return {success: false, status: 401, message: 'Invalid or expired token'};
+    }
+
+    // Connect to MongoDB if not already connected
+    const dbConnection = await connectDB();
+    if (!dbConnection.success) {
+        return {
+            success: false,
+            status: 500,
+            message: 'Database connection error',
+            error: dbConnection.error.message
+        };
+    }
+
+    // Check if user exists and is admin
+    const user = await User.findById(userId);
+
+    if (!user) {
+        return {success: false, status: 404, message: 'User not found'};
+    }
+
+    if (user.level !== 'Admin' && user.isAdmin !== true) {
+        return {success: false, status: 403, message: 'Admin access required'};
+    }
+
+    return {success: true, userId, user};
+}
+
+/**
+ * Main API handler - routes all authentication requests
  */
 module.exports = async (req, res) => {
-    // Handle OPTIONS request
+    // Handle OPTIONS request for CORS
     if (req.method === 'OPTIONS') {
+        res.setHeader('Access-Control-Allow-Origin', 'https://www.patriotthanks.com');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, PATCH, DELETE, POST, PUT');
+        res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, ' +
+            'Content-MD5, Content-Type, Date, X-Api-Version, Authorization, cache-control, ' +
+            'pragma, expires, if-modified-since, if-none-match, user-agent, referer, cookie');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.status(200).end();
         return;
     }
 
     // Route based on operation parameter
-    const { operation } = req.query;
+    const {operation} = req.query;
+    console.log(`Auth API called with operation: ${operation || 'none'}, method: ${req.method}`);
 
     try {
+        // Route to appropriate handler based on operation
         switch (operation) {
             case 'login':
                 return await handleLogin(req, res);
@@ -45,284 +206,41 @@ module.exports = async (req, res) => {
             case 'reset-password':
                 return await handleResetPassword(req, res);
             default:
-                // If no operation specified, return API info for GET requests
+                // Legacy path handling for direct URL access
+                const path = req.url.split('?')[0];
+                if (path.endsWith('/login')) {
+                    return await handleLogin(req, res);
+                } else if (path.endsWith('/register')) {
+                    return await handleRegister(req, res);
+                } else if (path.endsWith('/verify-admin-code')) {
+                    return await handleVerifyAdmin(req, res);
+                }
+
+                // Default information response for GET requests
                 if (req.method === 'GET') {
                     return res.status(200).json({
                         message: 'Authentication API is available',
-                        operations: ['login', 'register', 'verify-admin', 'verify-token', 'list-users',
-                            'update-user', 'delete-user', 'dashboard-stats', 'forgot-password', 'reset-password'],
+                        operations: [
+                            'login',
+                            'register',
+                            'verify-admin',
+                            'verify-token',
+                            'list-users',
+                            'update-user',
+                            'delete-user',
+                            'dashboard-stats',
+                            'forgot-password',
+                            'reset-password'
+                        ]
                     });
                 }
-                return res.status(400).json({ message: 'Invalid operation' });
+                return res.status(400).json({message: 'Invalid operation'});
         }
     } catch (error) {
         console.error(`Error in auth API (${operation || 'unknown'}):`, error);
-        return res.status(500).json({ message: 'Server error: ' + error.message });
+        return res.status(500).json({message: 'Server error: ' + error.message});
     }
 };
-
-/**
- * Handle user deletion (admin functionality)
- */
-async function handleDeleteUser(req, res) {
-    // Verify the token and check admin status
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authorization required' });
-    }
-
-    const token = authHeader.split(' ')[1];
-
-    try {
-        // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
-
-        // Connect to MongoDB
-        try {
-            await connect;
-            console.log("Database connection established");
-        } catch (dbError) {
-            console.error("Database connection error:", dbError);
-            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
-        }
-
-        // Find the admin user
-        const adminUser = await User.findById(decoded.userId);
-
-        if (!adminUser) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        if (adminUser.level !== 'Admin' && adminUser.isAdmin !== true) {
-            return res.status(403).json({ message: 'Admin access required' });
-        }
-
-        // Get user ID from request body
-        const { userId } = req.body;
-
-        if (!userId) {
-            return res.status(400).json({ message: 'User ID is required' });
-        }
-
-        // Delete the user
-        const result = await User.findByIdAndDelete(userId);
-
-        if (!result) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Return success response
-        return res.status(200).json({
-            message: 'User deleted successfully',
-            userId: userId
-        });
-    } catch (error) {
-        console.error('Error deleting user:', error);
-
-        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-            return res.status(401).json({ message: 'Invalid or expired token' });
-        }
-
-        return res.status(500).json({ message: 'Server error', error: error.message });
-    }
-}
-
-/**
- * Handle dashboard statistics (admin functionality)
- */
-async function handleDashboardStats(req, res) {
-    console.log("Dashboard stats handler called");
-
-    // Make sure all collections are properly defined
-    console.log("Available collections check:");
-
-    // Verify the token and check admin status
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authorization required' });
-    }
-
-    const token = authHeader.split(' ')[1];
-
-    try {
-        // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
-
-        // Connect to MongoDB
-        try {
-            await connect;
-            console.log("Database connection established");
-        } catch (dbError) {
-            console.error("Database connection error:", dbError);
-            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
-        }
-
-        // Find the admin user
-        const adminUser = await User.findById(decoded.userId);
-
-        if (!adminUser) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        if (adminUser.level !== 'Admin' && adminUser.isAdmin !== true) {
-            return res.status(403).json({ message: 'Admin access required' });
-        }
-
-        // Get user counts
-        const totalUsers = await User.countDocuments();
-
-        // Count users created this month
-        const thisMonth = new Date();
-        thisMonth.setDate(1); // Set to first day of current month
-        thisMonth.setHours(0, 0, 0, 0); // Set to beginning of the day
-
-        const newUsersThisMonth = await User.countDocuments({
-            created_at: { $gte: thisMonth }
-        });
-
-        // Calculate users from previous month for percentage change
-        const pastMonthDate = new Date();
-        pastMonthDate.setMonth(pastMonthDate.getMonth() - 1);
-
-        const usersPastMonth = await User.countDocuments({
-            created_at: { $lt: pastMonthDate }
-        });
-
-        const userChange = usersPastMonth > 0
-            ? Math.round(((totalUsers - usersPastMonth) / usersPastMonth) * 100)
-            : 100;
-        // Get business counts - with error handling
-        let totalBusiness = 0;
-        let businessesPastMonth = 0;
-        let newBusinessesThisMonth = 0;
-        let businessChange = 0;
-
-
-        try {
-            totalBusiness = await Business.countDocuments();
-            businessesPastMonth = await Business.countDocuments({
-                created_at: { $lt: pastMonthDate }
-            });
-            newBusinessesThisMonth = totalBusiness - businessesPastMonth;
-            businessChange = businessesPastMonth > 0
-                ? Math.round(((totalBusiness - businessesPastMonth) / businessesPastMonth) * 100)
-                : 100;
-            console.log('Business counts retrieved successfully');
-        } catch (error) {
-            console.error('Error getting business counts:', error);
-        }
-
-        // Get incentive counts - with error handling
-        let totalIncentives = 0;
-        let incentivesPastMonth = 0;
-        let newIncentivesThisMonth = 0;
-        let incentiveChange = 0;
-
-        try {
-            // Check if Incentive model is available
-            if (Incentive && typeof Incentive.countDocuments === 'function') {
-                totalIncentives = await Incentive.countDocuments();
-
-                newIncentivesThisMonth = await Incentive.countDocuments({
-                    created_at: { $gte: thisMonth }
-                });
-
-                // Calculate incentives from previous month for percentage change
-                incentivesPastMonth = await Incentive.countDocuments({
-                    created_at: { $lt: pastMonthDate }
-                });
-
-                // Calculate percentage change
-                const incentiveChange = incentivesPastMonth > 0
-                    ? Math.round(((totalIncentives - incentivesPastMonth) / incentivesPastMonth) * 100)
-                    : 100;
-
-                console.log('Incentive counts retrieved successfully');
-            } else {
-                console.error('Incentive model not available or countDocuments not a function');
-            }
-        } catch (error) {
-            console.error('Error getting incentive counts:', error);
-        }
-
-        // Return dashboard statistics
-        return res.status(200).json({
-            userCount: totalUsers,
-            userChange: userChange,
-            newUsersThisMonth: newUsersThisMonth,
-            businessCount: totalBusiness,
-            businessChange: businessChange,
-            newBusinessesThisMonth: newBusinessesThisMonth,
-            incentiveCount: totalIncentives,
-            incentiveChange: incentiveChange,
-            newIncentivesThisMonth: newIncentivesThisMonth, // Add this line
-            timestamp: new Date()
-        });
-    } catch (error) {
-        console.error('Error generating dashboard stats:', error);
-
-        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-            return res.status(401).json({ message: 'Invalid or expired token' });
-        }
-
-        return res.status(500).json({ message: 'Server error', error: error.message });
-    }
-}
-
-function handleVerifyToken(req, res) {
-    console.log("Verify token handler called");
-    res.setHeader('Access-Control-Allow-Origin', 'https://www.patriotthanks.com');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, PATCH, DELETE, POST, PUT');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, ' +
-                                                    'Content-MD5, Content-Type, Date, X-Api-Version, Authorization, cache-control, ' +
-                                                    'pragma, expires, if-modified-since, if-none-match, user-agent, referer, cookie');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-    // Get token from Authorization header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authorization required' });
-    }
-
-    const token = authHeader.split(' ')[1];
-
-    try {
-        // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
-
-        // Connect to MongoDB
-        connect.then(async () => {
-            console.log("Database connection established");
-
-            // Find the user
-            const user = await User.findById(decoded.userId);
-
-            if (!user) {
-                return res.status(404).json({ message: 'User not found' });
-            }
-
-            // Return user information
-            return res.status(200).json({
-                isValid: true,
-                userId: user._id,
-                isAdmin: user.isAdmin || user.level === 'Admin',
-                level: user.level,
-                name: `${user.fname} ${user.lname}`
-            });
-        }).catch(error => {
-            console.error("Database connection error:", error);
-            return res.status(500).json({ message: 'Database connection error', error: error.message });
-        });
-    } catch (error) {
-        console.error('Token verification error:', error);
-
-        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-            return res.status(401).json({ message: 'Invalid or expired token' });
-        }
-
-        return res.status(500).json({ message: 'Server error', error: error.message });
-    }
-}
 
 /**
  * Handle user login
@@ -330,32 +248,32 @@ function handleVerifyToken(req, res) {
 async function handleLogin(req, res) {
     // Handle GET request for testing
     if (req.method === 'GET') {
-        return res.status(200).json({ message: 'Login API is available' });
+        return res.status(200).json({message: 'Login API is available'});
     }
 
     // Only allow POST requests
     if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method not allowed' });
+        return res.status(405).json({message: 'Method not allowed'});
     }
 
     console.log("Login API hit:", req.method);
 
     try {
-        // Connect to MongoDB - fix the connection call
-        try {
-            await connect;  // Since connect is already a Promise, just await it
-            console.log("Database connection established");
-        } catch (dbError) {
-            console.error("Database connection error:", dbError);
-            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        // Connect to database
+        const dbConnection = await connectDB();
+        if (!dbConnection.success) {
+            return res.status(500).json({
+                message: dbConnection.message,
+                error: dbConnection.error.message
+            });
         }
 
         // Extract login credentials from request body
-        const { email, password } = req.body;
+        const {email, password} = req.body;
 
         // Basic validation
         if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required' });
+            return res.status(400).json({message: 'Email and password are required'});
         }
 
         // Convert email to lowercase for case-insensitive comparison
@@ -363,17 +281,17 @@ async function handleLogin(req, res) {
         console.log("Normalized email for login:", normalizedEmail);
 
         // Find user by email - use case-insensitive search
-        const user = await User.findOne({ email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') } });
+        const user = await User.findOne({email: {$regex: new RegExp(`^${normalizedEmail}$`, 'i')}});
 
         if (!user) {
-            return res.status(401).json({ message: 'Invalid email or password' });
+            return res.status(401).json({message: 'Invalid email or password'});
         }
 
         // Compare passwords
         const isPasswordValid = await bcrypt.compare(password, user.password);
 
         if (!isPasswordValid) {
-            return res.status(401).json({ message: 'Invalid email or password' });
+            return res.status(401).json({message: 'Invalid email or password'});
         }
 
         // Generate JWT token
@@ -383,10 +301,9 @@ async function handleLogin(req, res) {
                 isAdmin: user.isAdmin || user.level === 'Admin'
             },
             process.env.JWT_SECRET || 'patriot-thanks-secret-key',
-            { expiresIn: process.env.JWT_EXPIRY || '7d' }
+            {expiresIn: process.env.JWT_EXPIRY || '7d'}
         );
         console.log('JWT Token generated successfully');
-        console.log('Generated token:', token);
 
         // Return success response with user info (excluding password)
         const userInfo = user.toObject();
@@ -406,45 +323,46 @@ async function handleLogin(req, res) {
             level: user.level,
             status: user.status,
             isAdmin: user.isAdmin || false,
-            token: token // Add the token to the response
+            token: token
         });
     } catch (error) {
         console.error('Error generating JWT token:', error);
-        return res.status(500).json({ message: 'Server error during login: ' + error.message });
+        return res.status(500).json({message: 'Server error during login: ' + error.message});
     }
 }
+
 /**
  * Handle user registration
  */
 async function handleRegister(req, res) {
     // Handle GET request for testing
     if (req.method === 'GET') {
-        return res.status(200).json({ message: 'User registration API is available' });
+        return res.status(200).json({message: 'User registration API is available'});
     }
 
     // Only allow POST requests
     if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method not allowed' });
+        return res.status(405).json({message: 'Method not allowed'});
     }
 
     console.log("User registration API hit:", req.method);
     console.log("Request body:", req.body);
 
     try {
-        // Connect to MongoDB - fix the connection call
-        try {
-            await connect;  // Since connect is already a Promise, just await it
-            console.log("Database connection established");
-        } catch (dbError) {
-            console.error("Database connection error:", dbError);
-            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        // Connect to database
+        const dbConnection = await connectDB();
+        if (!dbConnection.success) {
+            return res.status(500).json({
+                message: dbConnection.message,
+                error: dbConnection.error.message
+            });
         }
 
         const userData = req.body;
 
         // Basic validation
         if (!userData.email || (!userData.password && !userData.psw)) {
-            return res.status(400).json({ message: 'Email and password are required' });
+            return res.status(400).json({message: 'Email and password are required'});
         }
 
         // Normalize email to lowercase for case-insensitive matching
@@ -452,9 +370,9 @@ async function handleRegister(req, res) {
         console.log("Normalized email for registration:", userData.email);
 
         // Check if user already exists - use case-insensitive search
-        const existingUser = await User.findOne({ email: { $regex: new RegExp(`^${userData.email}$`, 'i') } });
+        const existingUser = await User.findOne({email: {$regex: new RegExp(`^${userData.email}$`, 'i')}});
         if (existingUser) {
-            return res.status(409).json({ message: 'User with this email already exists' });
+            return res.status(409).json({message: 'User with this email already exists'});
         }
 
         // Add timestamp fields
@@ -492,19 +410,28 @@ async function handleRegister(req, res) {
         });
     } catch (error) {
         console.error('User creation failed:', error);
-        return res.status(500).json({ message: 'Server error during user creation: ' + error.message });
+        return res.status(500).json({message: 'Server error during user creation: ' + error.message});
     }
 }
 
-
 /**
- * Handle user updates (admin functionality)
+ * Handle token verification
  */
-async function handleUpdateUser(req, res) {
-    // Verify the token and check admin status
+async function handleVerifyToken(req, res) {
+    console.log("Verify token handler called");
+
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', 'https://www.patriotthanks.com');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, PATCH, DELETE, POST, PUT');
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, ' +
+        'Content-MD5, Content-Type, Date, X-Api-Version, Authorization, cache-control, ' +
+        'pragma, expires, if-modified-since, if-none-match, user-agent, referer, cookie');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+    // Get token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authorization required' });
+        return res.status(401).json({message: 'Authorization required'});
     }
 
     const token = authHeader.split(' ')[1];
@@ -513,72 +440,104 @@ async function handleUpdateUser(req, res) {
         // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
 
-        // Connect to MongoDB
-        try {
-            await connect;
-            console.log("Database connection established");
-        } catch (dbError) {
-            console.error("Database connection error:", dbError);
-            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        // Connect to database
+        const dbConnection = await connectDB();
+        if (!dbConnection.success) {
+            return res.status(500).json({
+                message: dbConnection.message,
+                error: dbConnection.error.message
+            });
         }
 
-        // Find the admin user
-        const adminUser = await User.findById(decoded.userId);
+        // Find the user
+        const user = await User.findById(decoded.userId);
 
-        if (!adminUser) {
-            return res.status(404).json({ message: 'User not found' });
+        if (!user) {
+            return res.status(404).json({message: 'User not found'});
         }
 
-        if (adminUser.level !== 'Admin' && adminUser.isAdmin !== true) {
-            return res.status(403).json({ message: 'Admin access required' });
+        // Return user information
+        return res.status(200).json({
+            isValid: true,
+            userId: user._id,
+            isAdmin: user.isAdmin || user.level === 'Admin',
+            level: user.level,
+            name: `${user.fname} ${user.lname}`
+        });
+    } catch (error) {
+        console.error('Token verification error:', error);
+
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+            return res.status(401).json({message: 'Invalid or expired token'});
         }
 
-        // Get user data from request body
-        const userData = req.body;
-        const userId = userData.userId;
+        return res.status(500).json({message: 'Server error', error: error.message});
+    }
+}
 
-        if (!userId) {
-            return res.status(400).json({ message: 'User ID is required' });
+/**
+ * Handle admin code verification
+ */
+async function handleVerifyAdmin(req, res) {
+    // Handle GET request for testing
+    if (req.method === 'GET') {
+        return res.status(200).json({message: 'Admin Verification API is available'});
+    }
+
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+        return res.status(405).json({message: 'Method not allowed'});
+    }
+
+    console.log("Admin code verification API hit:", req.method);
+
+    try {
+        // Extract verification data from request body
+        const {code, userId} = req.body;
+
+        // Basic validation
+        if (!code) {
+            return res.status(400).json({message: 'Access code is required'});
         }
 
-        // Remove userId from update data
-        delete userData.userId;
-
-        // Add timestamp
-        userData.updated_at = new Date();
-
-        // Hash password if provided
-        if (userData.password) {
-            userData.password = await bcrypt.hash(userData.password, 10);
-        } else {
-            // Don't update password if not provided
-            delete userData.password;
+        // Connect to database
+        const dbConnection = await connectDB();
+        if (!dbConnection.success) {
+            return res.status(500).json({
+                message: dbConnection.message,
+                error: dbConnection.error.message
+            });
         }
 
-        // Update the user
-        const result = await User.findByIdAndUpdate(
-            userId,
-            { $set: userData },
-            { new: true }
-        );
+        // Find the code in the admin_codes collection
+        const adminCode = await AdminCode.findOne({code: code});
 
-        if (!result) {
-            return res.status(404).json({ message: 'User not found' });
+        if (!adminCode) {
+            return res.status(401).json({message: 'Invalid admin access code'});
+        }
+
+        // Check if code is expired
+        if (adminCode.expiration && new Date() > new Date(adminCode.expiration)) {
+            return res.status(401).json({message: 'Admin access code has expired'});
+        }
+
+        // If userId is provided, update the user's status to Admin
+        if (userId) {
+            await User.updateOne(
+                {_id: new ObjectId(userId)},
+                {$set: {status: 'AD', isAdmin: true, updated_at: new Date()}}
+            );
         }
 
         // Return success response
         return res.status(200).json({
-            message: 'User updated successfully',
-            userId: result._id
+            message: 'Admin access verified successfully',
+            description: adminCode.description,
+            access: true
         });
     } catch (error) {
-        console.error('Error updating user:', error);
-
-        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-            return res.status(401).json({ message: 'Invalid or expired token' });
-        }
-
-        return res.status(500).json({ message: 'Server error', error: error.message });
+        console.error('Admin verification error:', error);
+        return res.status(500).json({message: 'Server error during admin verification: ' + error.message});
     }
 }
 
@@ -586,38 +545,13 @@ async function handleUpdateUser(req, res) {
  * Handle listing users (admin functionality)
  */
 async function handleListUsers(req, res) {
-    // First, verify the token and check admin status
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authorization required' });
+    // Verify admin access
+    const adminCheck = await verifyAdminAccess(req);
+    if (!adminCheck.success) {
+        return res.status(adminCheck.status).json({message: adminCheck.message});
     }
 
-    const token = authHeader.split(' ')[1];
-
-    // Verify token
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
-
-        // Connect to MongoDB
-        try {
-            await connect;  // Since connect is already a Promise, just await it
-            console.log("Database connection established");
-        } catch (dbError) {
-            console.error("Database connection error:", dbError);
-            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
-        }
-
-        // Find the admin user
-        const adminUser = await User.findById(decoded.userId);
-
-        if (!adminUser) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        if (adminUser.level !== 'Admin' && adminUser.isAdmin !== true) {
-            return res.status(403).json({ message: 'Admin access required' });
-        }
-
         // Parse query parameters
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
@@ -630,9 +564,9 @@ async function handleListUsers(req, res) {
         if (req.query.search) {
             const searchRegex = new RegExp(req.query.search, 'i');
             filter.$or = [
-                { fname: searchRegex },
-                { lname: searchRegex },
-                { email: searchRegex }
+                {fname: searchRegex},
+                {lname: searchRegex},
+                {email: searchRegex}
             ];
         }
 
@@ -652,9 +586,10 @@ async function handleListUsers(req, res) {
         // Get users
         const users = await User.find(filter)
             .select('-password') // Exclude password
-            .sort({ created_at: -1 })
+            .sort({created_at: -1})
             .skip(skip)
-            .limit(limit);
+            .limit(limit)
+            .lean();
 
         return res.status(200).json({
             users,
@@ -665,133 +600,242 @@ async function handleListUsers(req, res) {
         });
     } catch (error) {
         console.error('Error in list-users:', error);
-
-        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-            return res.status(401).json({ message: 'Invalid or expired token' });
-        }
-
-        return res.status(500).json({ message: 'Server error', error: error.message });
+        return res.status(500).json({message: 'Server error', error: error.message});
     }
 }
 
 /**
- * Handle admin code verification
+ * Handle user updates (admin functionality)
  */
-async function handleVerifyAdmin(req, res) {
-    // Handle GET request for testing
-    if (req.method === 'GET') {
-        return res.status(200).json({ message: 'Admin Verification API is available' });
+async function handleUpdateUser(req, res) {
+    // Verify admin access
+    const adminCheck = await verifyAdminAccess(req);
+    if (!adminCheck.success) {
+        return res.status(adminCheck.status).json({message: adminCheck.message});
     }
-
-    // Only allow POST requests
-    if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method not allowed' });
-    }
-
-    console.log("Admin code verification API hit:", req.method);
 
     try {
-        // Extract verification data from request body
-        const { code, userId } = req.body;
+        // Get user data from request body
+        const userData = req.body;
+        const userId = userData.userId;
 
-        // Basic validation
-        if (!code) {
-            return res.status(400).json({ message: 'Access code is required' });
+        if (!userId) {
+            return res.status(400).json({message: 'User ID is required'});
         }
 
-        // Connect to MongoDB - fix the connection call
-        try {
-            await connect;  // Since connect is already a Promise, just await it
-            console.log("Database connection established");
-        } catch (dbError) {
-            console.error("Database connection error:", dbError);
-            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        // Remove userId from update data
+        delete userData.userId;
+
+        // Add timestamp
+        userData.updated_at = new Date();
+
+        // Hash password if provided
+        if (userData.password) {
+            userData.password = await bcrypt.hash(userData.password, 10);
+        } else {
+            // Don't update password if not provided
+            delete userData.password;
         }
 
-        // Find the code in the admin_codes collection
-        const adminCode = await AdminCode.findOne({ code: code });
+        // Update the user
+        const result = await User.findByIdAndUpdate(
+            userId,
+            {$set: userData},
+            {new: true}
+        );
 
-        if (!adminCode) {
-            return res.status(401).json({ message: 'Invalid admin access code' });
-        }
-
-        // Check if code is expired
-        if (adminCode.expiration && new Date() > new Date(adminCode.expiration)) {
-            return res.status(401).json({ message: 'Admin access code has expired' });
-        }
-
-        // If userId is provided, update the user's status to Admin
-        if (userId) {
-            await User.updateOne(
-                { _id: new ObjectId(userId) },
-                { $set: { status: 'AD', isAdmin: true, updated_at: new Date() } }
-            );
+        if (!result) {
+            return res.status(404).json({message: 'User not found'});
         }
 
         // Return success response
         return res.status(200).json({
-            message: 'Admin access verified successfully',
-            description: adminCode.description,
-            access: true
+            message: 'User updated successfully',
+            userId: result._id
         });
     } catch (error) {
-        console.error('Admin verification error:', error);
-        return res.status(500).json({ message: 'Server error during admin verification: ' + error.message });
+        console.error('Error updating user:', error);
+        return res.status(500).json({message: 'Server error', error: error.message});
     }
 }
 
-// Create a transporter for email sending with Bluehost SMTP settings
-const transporter = nodemailer.createTransport({
-    host: 'mail.patriotthanks.com',
-    port: 465,  // Outgoing SMTP port as specified by Bluehost
-    secure: true, // true for port 465 (SSL/TLS)
-    auth: {
-        user: process.env.EMAIL_USER || 'forgotpassword@patriotthanks.com', // Full email address
-        pass: process.env.EMAIL_PASS || '1369Bkcsdp55chtdp81??'
-    },
-    tls: {
-        // Do not fail on invalid certs
-        rejectUnauthorized: false
+/**
+ * Handle user deletion (admin functionality)
+ */
+async function handleDeleteUser(req, res) {
+    // Verify admin access
+    const adminCheck = await verifyAdminAccess(req);
+    if (!adminCheck.success) {
+        return res.status(adminCheck.status).json({message: adminCheck.message});
     }
-});
 
-// Verify the connection configuration
-transporter.verify(function(error, success) {
-    if (error) {
-        console.error('SMTP connection error:', error);
-    } else {
-        console.log('SMTP server is ready to send emails');
+    try {
+        // Get user ID from request body
+        const {userId} = req.body;
+
+        if (!userId) {
+            return res.status(400).json({message: 'User ID is required'});
+        }
+
+        // Prevent deleting self
+        if (userId === adminCheck.userId) {
+            return res.status(403).json({message: 'You cannot delete your own account'});
+        }
+
+        // Delete the user
+        const result = await User.findByIdAndDelete(userId);
+
+        if (!result) {
+            return res.status(404).json({message: 'User not found'});
+        }
+
+        // Return success response
+        return res.status(200).json({
+            message: 'User deleted successfully',
+            userId: userId
+        });
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        return res.status(500).json({message: 'Server error', error: error.message});
     }
-});
+}
+
+/**
+ * Handle dashboard statistics (admin functionality)
+ */
+async function handleDashboardStats(req, res) {
+    console.log("Dashboard stats handler called");
+
+    // Verify admin access
+    const adminCheck = await verifyAdminAccess(req);
+    if (!adminCheck.success) {
+        return res.status(adminCheck.status).json({message: adminCheck.message});
+    }
+
+    try {
+        // Get user counts
+        const totalUsers = await User.countDocuments();
+
+        // Count users created this month
+        const thisMonth = new Date();
+        thisMonth.setDate(1); // Set to first day of current month
+        thisMonth.setHours(0, 0, 0, 0); // Set to beginning of the day
+
+        const newUsersThisMonth = await User.countDocuments({
+            created_at: {$gte: thisMonth}
+        });
+
+        // Calculate users from previous month for percentage change
+        const pastMonthDate = new Date();
+        pastMonthDate.setMonth(pastMonthDate.getMonth() - 1);
+
+        const usersPastMonth = await User.countDocuments({
+            created_at: {$lt: pastMonthDate}
+        });
+
+        const userChange = usersPastMonth > 0
+            ? Math.round(((totalUsers - usersPastMonth) / usersPastMonth) * 100)
+            : 100;
+
+        // Get business counts - with error handling
+        let totalBusiness = 0;
+        let businessesPastMonth = 0;
+        let newBusinessesThisMonth = 0;
+        let businessChange = 0;
+
+        try {
+            if (Business) {
+                totalBusiness = await Business.countDocuments();
+                businessesPastMonth = await Business.countDocuments({
+                    created_at: {$lt: pastMonthDate}
+                });
+                newBusinessesThisMonth = totalBusiness - businessesPastMonth;
+                businessChange = businessesPastMonth > 0
+                    ? Math.round(((totalBusiness - businessesPastMonth) / businessesPastMonth) * 100)
+                    : 100;
+                console.log('Business counts retrieved successfully');
+            }
+        } catch (error) {
+            console.error('Error getting business counts:', error);
+        }
+
+        // Get incentive counts - with error handling
+        let totalIncentives = 0;
+        let incentivesPastMonth = 0;
+        let newIncentivesThisMonth = 0;
+        let incentiveChange = 0;
+
+        try {
+            // Check if Incentive model is available
+            if (Incentive && typeof Incentive.countDocuments === 'function') {
+                totalIncentives = await Incentive.countDocuments();
+
+                newIncentivesThisMonth = await Incentive.countDocuments({
+                    created_at: {$gte: thisMonth}
+                });
+
+                // Calculate incentives from previous month for percentage change
+                incentivesPastMonth = await Incentive.countDocuments({
+                    created_at: {$lt: pastMonthDate}
+                });
+
+                // Calculate percentage change
+                incentiveChange = incentivesPastMonth > 0
+                    ? Math.round(((totalIncentives - incentivesPastMonth) / incentivesPastMonth) * 100)
+                    : 100;
+
+                console.log('Incentive counts retrieved successfully');
+            }
+        } catch (error) {
+            console.error('Error getting incentive counts:', error);
+        }
+
+        // Return dashboard statistics
+        return res.status(200).json({
+            userCount: totalUsers,
+            userChange: userChange,
+            newUsersThisMonth: newUsersThisMonth,
+            businessCount: totalBusiness,
+            businessChange: businessChange,
+            newBusinessesThisMonth: newBusinessesThisMonth,
+            incentiveCount: totalIncentives,
+            incentiveChange: incentiveChange,
+            newIncentivesThisMonth: newIncentivesThisMonth,
+            timestamp: new Date()
+        });
+    } catch (error) {
+        console.error('Error generating dashboard stats:', error);
+        return res.status(500).json({message: 'Server error', error: error.message});
+    }
+}
 
 /**
  * Handle forgot password request
- * Generates a reset token and (in production) would send an email
  */
 async function handleForgotPassword(req, res) {
     // Only allow POST requests
     if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method not allowed' });
+        return res.status(405).json({message: 'Method not allowed'});
     }
 
     console.log("Forgot password API hit:", req.method);
 
     try {
-        // Connect to MongoDB
-        try {
-            await connect;
-            console.log("Database connection established");
-        } catch (dbError) {
-            console.error("Database connection error:", dbError);
-            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        // Connect to database
+        const dbConnection = await connectDB();
+        if (!dbConnection.success) {
+            return res.status(500).json({
+                message: dbConnection.message,
+                error: dbConnection.error.message
+            });
         }
 
         // Extract email from request body
-        const { email } = req.body;
+        const {email} = req.body;
 
         // Basic validation
         if (!email) {
-            return res.status(400).json({ message: 'Email is required' });
+            return res.status(400).json({message: 'Email is required'});
         }
 
         // Normalize email to lowercase for case-insensitive comparison
@@ -799,7 +843,7 @@ async function handleForgotPassword(req, res) {
         console.log("Normalized email for password reset:", normalizedEmail);
 
         // Find user by email - use case-insensitive search
-        const user = await User.findOne({ email: { $regex: new RegExp(`^${normalizedEmail}$`, 'i') } });
+        const user = await User.findOne({email: {$regex: new RegExp(`^${normalizedEmail}$`, 'i')}});
 
         // Don't reveal if user exists for security
         if (!user) {
@@ -811,18 +855,15 @@ async function handleForgotPassword(req, res) {
 
         // Generate a secure reset token
         const resetToken = jwt.sign(
-            { userId: user._id },
+            {userId: user._id},
             process.env.JWT_SECRET || 'patriot-thanks-secret-key',
-            { expiresIn: '1h' } // Token expires in 1 hour
+            {expiresIn: '1h'} // Token expires in 1 hour
         );
 
         // Store the reset token and expiration in the user document
         user.resetToken = resetToken;
         user.resetTokenExpires = new Date(Date.now() + 3600000); // 1 hour from now
         await user.save();
-
-        // Email sending logic remains the same...
-        // Rest of the function remains unchanged
 
         // Get base URL for reset link
         const baseURL = process.env.BASE_URL || 'https://patriotthanks.vercel.app';
@@ -837,7 +878,6 @@ async function handleForgotPassword(req, res) {
                 },
                 to: email,
                 subject: 'Patriot Thanks - Password Reset Request',
-                // Email template remains the same...
                 html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background-color: #f8f9fa; padding: 20px; text-align: center;">
@@ -907,12 +947,12 @@ async function handleForgotPassword(req, res) {
 
             return res.status(200).json({
                 message: 'If this email is registered, a reset link has been sent.',
-                ...(isDev && { resetLink, emailError: emailError.message }) // Only in development
+                ...(isDev && {resetLink, emailError: emailError.message}) // Only in development
             });
         }
     } catch (error) {
         console.error('Error in forgot password:', error);
-        return res.status(500).json({ message: 'Server error: ' + error.message });
+        return res.status(500).json({message: 'Server error: ' + error.message});
     }
 }
 
@@ -923,37 +963,37 @@ async function handleForgotPassword(req, res) {
 async function handleResetPassword(req, res) {
     // Only allow POST requests
     if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method not allowed' });
+        return res.status(405).json({message: 'Method not allowed'});
     }
 
     console.log("Reset password API hit:", req.method);
 
     try {
-        // Connect to MongoDB
-        try {
-            await connect;
-            console.log("Database connection established");
-        } catch (dbError) {
-            console.error("Database connection error:", dbError);
-            return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+        // Connect to database
+        const dbConnection = await connectDB();
+        if (!dbConnection.success) {
+            return res.status(500).json({
+                message: dbConnection.message,
+                error: dbConnection.error.message
+            });
         }
 
         // Extract token and new password from request body
-        const { token, password } = req.body;
+        const {token, password} = req.body;
 
         // Basic validation
         if (!token || !password) {
-            return res.status(400).json({ message: 'Token and new password are required' });
+            return res.status(400).json({message: 'Token and new password are required'});
         }
 
         // Find user with this reset token and check if it's still valid
         const user = await User.findOne({
             resetToken: token,
-            resetTokenExpires: { $gt: new Date() }
+            resetTokenExpires: {$gt: new Date()}
         });
 
         if (!user) {
-            return res.status(400).json({ message: 'Invalid or expired reset token' });
+            return res.status(400).json({message: 'Invalid or expired reset token'});
         }
 
         // Hash the new password
@@ -971,7 +1011,6 @@ async function handleResetPassword(req, res) {
         });
     } catch (error) {
         console.error('Error in reset password:', error);
-        return res.status(500).json({ message: 'Server error: ' + error.message });
+        return res.status(500).json({message: 'Server error: ' + error.message});
     }
 }
-

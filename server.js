@@ -57,7 +57,6 @@ updateEnvFile();
 // Create Express app
 const app = express();
 
-
 // Enable JSON parsing and CORS
 app.use(express.json());
 app.use(cors());
@@ -68,7 +67,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// setup route handler function for API enpoints
+// setup route handler function for API endpoints
 function createApiHandler(apiModule) {
     return async (req, res) => {
         try {
@@ -81,34 +80,51 @@ function createApiHandler(apiModule) {
 }
 
 // import consolidated API modules
-const authApi = require('./api/auth/index');
+const authApi = require('./api/auth');
 const businessApi = require('./api/business');
 const contactApi = require('./api/contact');
 const incentivesApi = require('./api/incentives');
-const usersApi = require('./api/users/index');
-const adminApi = require('./api/admin/users/index');
-const adminUsersApi = require('./api/admin/users/[userId]');
-const verifyTokenApi = require('./api/admin-verify');
-
+const usersApi = require('./api/users'); // Updated to point to the consolidated users API
 
 // Mount consolidated API routes
 app.all('/api/business', createApiHandler(businessApi));
 app.all('/api/contact', createApiHandler(contactApi));
 app.all('/api/incentives', createApiHandler(incentivesApi));
-app.all('/api/users/index', createApiHandler(usersApi));
 app.all('/api/auth', createApiHandler(authApi));
-app.all('/api/admin/users/index', createApiHandler(adminApi));
-app.all('/api/admin/users/[userId]', createApiHandler(adminUsersApi));
-app.all('/api/admin-verify', createApiHandler(verifyTokenApi));
 
-// mount legacy API routes to maintain backward compatibility
+// Mount the consolidated users API with all route patterns
+app.all('/api/users', createApiHandler(usersApi));
+app.all('/api/users/:operation', createApiHandler(usersApi));
+app.all('/api/admin/users', createApiHandler(usersApi));
+app.all('/api/admin/users/:userId', createApiHandler(usersApi));
+
+// Mount legacy API routes to maintain backward compatibility
 app.all('/api/login', createApiHandler(authApi));
 app.all('/api/register', createApiHandler(authApi));
 app.all('/api/verify-admin-code', createApiHandler(authApi));
 app.all('/api/business-search', createApiHandler(businessApi));
 app.all('/api/incentives/add', createApiHandler(incentivesApi));
-app.all('/api/users/password', createApiHandler(usersApi));
-app.all('/api/users/update', createApiHandler(usersApi));
+
+// Special handling for the legacy user routes to ensure they work with our consolidated API
+app.all('/api/users/password', (req, res) => {
+    req.query.operation = 'password';
+    createApiHandler(usersApi)(req, res);
+});
+
+app.all('/api/users/update', (req, res) => {
+    req.query.operation = 'update';
+    createApiHandler(usersApi)(req, res);
+});
+
+app.all('/api/users/profile', (req, res) => {
+    req.query.operation = 'profile';
+    createApiHandler(usersApi)(req, res);
+});
+
+app.all('/api/users/get', (req, res) => {
+    req.query.operation = 'get';
+    createApiHandler(usersApi)(req, res);
+});
 
 // test API route
 app.get('/api/test', (req, res) => {
