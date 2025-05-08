@@ -1192,9 +1192,6 @@ async function retrieveFromMongoDB(formData) {
             params.address = formData.address;
         }
 
-        // Process location if needed (your existing location code)
-        // ...
-
         const queryParams = new URLSearchParams(params).toString();
 
         // Determine the base URL
@@ -1361,7 +1358,7 @@ async function searchGooglePlaces(formData) {
 
         try {
             // Search radius - 80km is about 50 miles
-            const searchRadius = 80000;
+            const searchRadius = 50000;
 
             // Use the modern Places API - Text Search
             const placeResults = await searchPlacesWithTextSearch(searchQuery, searchLocation, searchRadius);
