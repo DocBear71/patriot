@@ -1229,6 +1229,20 @@ async function searchGooglePlaces(formData) {
     try {
         console.log("Searching Google Places for:", formData);
 
+        // Make sure the map is visible
+        const mapContainer = document.getElementById('map');
+        if (mapContainer) {
+            mapContainer.style.display = 'block';
+            mapContainer.style.height = '400px'; // Set a specific height
+            console.log("Map container style:", mapContainer.style.display, mapContainer.style.height);
+        }
+
+        // Force map refresh if it's already initialized
+        if (mapInitialized && map) {
+            console.log("Triggering map resize event");
+            google.maps.event.trigger(map, 'resize');
+        }
+
         // Load the Places library if not already loaded
         const { PlacesService } = await google.maps.importLibrary("places");
 
@@ -1363,6 +1377,21 @@ async function searchGooglePlaces(formData) {
                 }
             }
         });
+
+        // After processing results and creating markers
+        console.log("Finished adding Google Places markers, markers count:", markers.length);
+
+        // Force map to fit all markers
+        if (map && bounds && !bounds.isEmpty()) {
+            console.log("Fitting map to bounds");
+            map.fitBounds(bounds);
+
+            // If we only have one marker, zoom in appropriately
+            if (markers.length === 1) {
+                console.log("Single marker, setting zoom level");
+                map.setZoom(15);
+            }
+        }
     } catch (error) {
         console.error("Error searching Google Places:", error);
 
@@ -1378,6 +1407,41 @@ async function searchGooglePlaces(formData) {
             errorContainer.innerHTML = `<div class="error">Error searching Google Maps: ${error.message}</div>`;
             errorContainer.style.display = 'block';
             errorContainer.scrollIntoView({behavior: 'smooth'});
+        }
+    }
+}
+
+/**
+ * Ensure map is visible and properly sized
+ */
+function ensureMapVisibility() {
+    const mapContainer = document.getElementById('map');
+    if (mapContainer) {
+        // Ensure the map container is visible
+        mapContainer.style.display = 'block';
+
+        // Set a minimum height if not already set
+        if (!mapContainer.style.height || mapContainer.style.height === 'auto') {
+            mapContainer.style.height = '400px';
+        }
+
+        console.log("Map container dimensions:", mapContainer.offsetWidth, "x", mapContainer.offsetHeight);
+
+        // If the map is initialized but no markers are showing, check zoom level
+        if (mapInitialized && map && markers.length > 0) {
+            // Force a resize event to refresh the map
+            google.maps.event.trigger(map, 'resize');
+
+            // If we have bounds, fit to them
+            if (bounds && !bounds.isEmpty()) {
+                map.fitBounds(bounds);
+                console.log("Fitting map to bounds");
+            } else if (markers.length === 1) {
+                // If we only have one marker, center on it and zoom in
+                map.setCenter(markers[0].position);
+                map.setZoom(15);
+                console.log("Centering on single marker");
+            }
         }
     }
 }
@@ -1473,12 +1537,10 @@ window.addGooglePlaceToDatabase = function(placeId) {
     window.addBusinessToDatabase(placeId);
 };
 
-/**
- * Initialize Google Map - globally accessible function called by Google Maps API
- */
-
+// initGoogleMap function
 window.initGoogleMap = async function() {
     console.log("Global initGoogleMap function called");
+    console.log("Map container exists:", !!document.getElementById("map"));
 
     try {
         // Check if map container exists
@@ -1487,6 +1549,8 @@ window.initGoogleMap = async function() {
             console.error("Map container not found in the DOM");
             return;
         }
+
+        console.log("Map container dimensions:", mapContainer.offsetWidth, "x", mapContainer.offsetHeight);
 
         // Import required libraries
         const { Map } = await google.maps.importLibrary("maps");
@@ -1499,6 +1563,8 @@ window.initGoogleMap = async function() {
             mapId: CONFIG.mapId,
             clickableIcons: true
         });
+
+        console.log("Map object created:", !!map);
 
         // Create info window and bounds
         infoWindow = new google.maps.InfoWindow();
@@ -1527,6 +1593,19 @@ window.initGoogleMap = async function() {
 
         initAdditionalMapFeatures();
 
+        // Add a force refresh of the map
+        setTimeout(() => {
+            if (map) {
+                console.log("Forcing map refresh");
+                google.maps.event.trigger(map, 'resize');
+
+                // If we have bounds, fit to them
+                if (bounds && !bounds.isEmpty()) {
+                    map.fitBounds(bounds);
+                }
+            }
+        }, 500);
+
     } catch (error) {
         console.error("Error initializing Google Map:", error);
         mapInitialized = false;
@@ -1535,11 +1614,11 @@ window.initGoogleMap = async function() {
         const mapContainer = document.getElementById("map");
         if (mapContainer) {
             mapContainer.innerHTML = `
-        <div style="text-align: center; padding: 20px;">
-          <p>Sorry, we couldn't load the map. Please try refreshing the page.</p>
-          <p>Error: ${error.message}</p>
-        </div>
-      `;
+                <div style="text-align: center; padding: 20px;">
+                    <p>Sorry, we couldn't load the map. Please try refreshing the page.</p>
+                    <p>Error: ${error.message}</p>
+                </div>
+            `;
         }
     }
 };
@@ -1908,6 +1987,19 @@ function displayBusinessesOnMap(businesses) {
         // Geocode the business address to get coordinates
         geocodeBusinessAddress(business, index, businesses.length);
     });
+
+    ensureMapVisibility();
+
+    // If we have at least one business with coordinates, show the map
+    const hasCoordinates = businesses.some(business =>
+        business.lat && business.lng ||
+        (business.location && business.location.coordinates &&
+            business.location.coordinates.length === 2)
+    );
+
+    if (hasCoordinates) {
+        document.getElementById('map-container').style.display = 'block';
+    }
 }
 
 /**
@@ -2534,13 +2626,85 @@ const originalInitGoogleMap = window.initGoogleMap;
 
 // Create a new wrapper function that calls the original function
 window.initGoogleMap = async function() {
-    // Call the original function first
-    await originalInitGoogleMap.call(this);
+    console.log("Global initGoogleMap function called");
 
-    // Then add our enhancements
-    infoWindow = createEnhancedInfoWindow();
-    customizeInfoWindows();
-    console.log("Enhanced info window initialized");
+    try {
+        // Check if map container exists
+        const mapContainer = document.getElementById("map");
+        if (!mapContainer) {
+            console.error("Map container not found in the DOM");
+            return;
+        }
+
+        console.log("Map container dimensions:", mapContainer.offsetWidth, "x", mapContainer.offsetHeight);
+
+        // Import required libraries
+        const { Map } = await google.maps.importLibrary("maps");
+        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+        // Create a map centered on the US with POI clicks disabled
+        map = new Map(mapContainer, {
+            center: CONFIG.defaultCenter,
+            zoom: CONFIG.defaultZoom,
+            mapId: CONFIG.mapId,
+            clickableIcons: true
+        });
+
+        // Create info window and bounds
+        infoWindow = new google.maps.InfoWindow();
+        bounds = new google.maps.LatLngBounds();
+
+        // Add initial message
+        addInitialMapMessage(mapContainer);
+
+        // Add event listener for the reset map button
+        setupResetMapButton();
+
+        // Set flag that map is initialized
+        mapInitialized = true;
+        console.log("Google Map successfully initialized with Map ID:", CONFIG.mapId);
+
+        // Process any pending businesses to display
+        if (pendingBusinessesToDisplay.length > 0) {
+            console.log("Processing pending businesses to display on map");
+            displayBusinessesOnMap(pendingBusinessesToDisplay);
+            pendingBusinessesToDisplay = [];
+        }
+
+        // Setup map handlers
+        await setupMapClickHandler();
+        setupMarkerClickPriority();
+
+        initAdditionalMapFeatures();
+
+        // Add a force refresh of the map
+        setTimeout(() => {
+            if (map) {
+                console.log("Forcing map refresh");
+                google.maps.event.trigger(map, 'resize');
+
+                // If we have bounds, fit to them
+                if (bounds && !bounds.isEmpty()) {
+                    map.fitBounds(bounds);
+                }
+            }
+        }, 500);
+
+    } catch (error) {
+        console.error("Error initializing Google Map:", error);
+        mapInitialized = false;
+
+        // Show user-friendly error message
+        const mapContainer = document.getElementById("map");
+        if (mapContainer) {
+            mapContainer.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <p>Sorry, we couldn't load the map. Please try refreshing the page.</p>
+                    <p>Error: ${error.message}</p>
+                </div>
+            `;
+        }
+    }
 };
 
 // Initialize when the DOM is fully loaded
