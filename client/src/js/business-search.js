@@ -83,16 +83,16 @@ function showPlaceInfoWindow(place, position) {
     // Format the content with an "Add to Database" button and scrollable area - using your existing CSS classes
     const contentString = `
     <div class="info-window">
-        <h3>${place.displayName || 'Unnamed Place'}</h3>
-        <p><strong>Address:</strong><br>${place.formattedAddress || 'Address not available'}</p>
-        ${place.nationalPhoneNumber ? `<p><strong>Phone:</strong> ${place.nationalPhoneNumber}</p>` : ''}
+        <h3>${place.name || place.displayName || 'Unnamed Place'}</h3>
+        <p><strong>Address:</strong><br>${place.formatted_address || place.formattedAddress || 'Address not available'}</p>
+        ${place.formatted_phone_number || place.nationalPhoneNumber ? `<p><strong>Phone:</strong> ${place.formatted_phone_number || place.nationalPhoneNumber}</p>` : ''}
         ${distanceText}
         <p><strong>Type:</strong> ${placeTypeLabel}</p>
         <p><strong>Incentives:</strong> <em>Not in database</em></p>
         <p>This business is not yet in the Patriot Thanks database.</p>
         <div class="info-window-actions">
             <button class="add-business-btn" 
-                    onclick="window.addBusinessToDatabase('${place.id}')">
+                    onclick="window.addBusinessToDatabase('${place.place_id || place.id}')">
                 Add to Patriot Thanks
             </button>
         </div>
@@ -110,7 +110,10 @@ function showPlaceInfoWindow(place, position) {
     }
 
     infoWindow.open(map);
+
+    console.log("Opened Place info window");
 }
+
 
 /**
  * Get the user's current location
@@ -2004,69 +2007,71 @@ async function setupMapClickHandler() {
 
     console.log("Setting up map click handler");
 
-    try {
-        // Import the Places library
-        const { Place } = await google.maps.importLibrary("places");
+    // Add click listener for POIs on the map
+    map.addListener('click', function(event) {
+        console.log("Map clicked", event);
 
-        // Listen for POI clicks (Points of Interest - businesses, landmarks, etc.)
-        map.addListener('click', async function(event) {
-            console.log("Map clicked", event);
+        // Check if clicked on a POI (a place on the map)
+        if (event.placeId) {
+            // Stop the default info window
+            event.stop();
 
-            // Check if clicked on a POI (a place on the map)
-            if (event.placeId) {
-                // Stop the default info window
-                event.stop();
+            console.log("POI clicked, placeId:", event.placeId);
 
-                console.log("POI clicked, placeId:", event.placeId);
+            // Check if this is already one of our markers
+            const existingMarker = markers.find(marker =>
+                marker.business &&
+                (marker.business.placeId === event.placeId ||
+                    marker.business._id === 'google_' + event.placeId)
+            );
 
-                try {
-                    // Check if this is already one of our markers
-                    const existingMarker = markers.find(marker =>
-                        marker.business &&
-                        (marker.business.placeId === event.placeId ||
-                            marker.business._id === 'google_' + event.placeId)
-                    );
+            if (existingMarker) {
+                // If it's already one of our markers, show our custom info window
+                console.log("Found existing marker for clicked place");
+                showInfoWindow(existingMarker);
+                return;
+            }
 
-                    if (existingMarker) {
-                        // If it's already one of our markers, show our custom info window
-                        console.log("Found existing marker for clicked place");
-                        showInfoWindow(existingMarker);
-                        return;
-                    }
+            // Otherwise, fetch place details using the Places Service
+            const service = new google.maps.places.PlacesService(map);
 
-                    // Otherwise, create a Place instance with the clicked place ID
-                    const place = new Place({
-                        id: event.placeId
-                    });
-
-                    // Fetch the place details using the new API
-                    await place.fetchFields({
-                        fields: [
-                            'displayName',
-                            'formattedAddress',
-                            'location',
-                            'types',
-                            'businessStatus',
-                            'nationalPhoneNumber'
-                        ]
-                    });
-
+            service.getDetails({
+                placeId: event.placeId,
+                fields: [
+                    'name',
+                    'formatted_address',
+                    'geometry',
+                    'types',
+                    'formatted_phone_number'
+                ]
+            }, function(place, status) {
+                if (status === google.maps.places.PlacesServiceStatus.OK && place) {
                     console.log("Place details:", place);
+
+                    // Add distance if possible
+                    if (place.geometry && place.geometry.location) {
+                        // Try to calculate distance from current center
+                        const center = map.getCenter();
+                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            center,
+                            place.geometry.location
+                        );
+                        place.distance = distance;
+                    }
 
                     // Show custom info window with "Add to Database" option
                     showPlaceInfoWindow(place, event.latLng);
-                } catch (error) {
-                    console.error("Error fetching place details:", error);
+                } else {
+                    console.error("Error fetching place details:", status);
                     alert("Error loading place details. Please try again.");
                 }
-            }
-        });
+            });
+        }
+    });
 
-        console.log("Map click handler set up");
-    } catch (error) {
-        console.error("Error setting up map click handler:", error);
-    }
+    console.log("Map click handler set up");
 }
+
 
 
 /**
@@ -2961,7 +2966,10 @@ function showInfoWindow(marker) {
 
     // Open the info window based on marker type
     try {
-        if (typeof marker.position === 'object' && marker.position !== null) {
+        if (marker.getPosition) {
+            // It's a standard Google Maps marker
+            infoWindow.open(map, marker);
+        } else if (typeof marker.position === 'object' && marker.position !== null) {
             // For both AdvancedMarkerElement and position objects
             if (marker.position.lat && typeof marker.position.lat === 'function') {
                 // It's a LatLng object
@@ -2978,9 +2986,6 @@ function showInfoWindow(marker) {
                 // Try to open it against the marker
                 infoWindow.open(map, marker);
             }
-        } else if (marker.getPosition) {
-            // Standard Google Maps marker
-            infoWindow.open(map, marker);
         } else {
             // Fallback for any other marker type
             if (business.lat && business.lng) {
