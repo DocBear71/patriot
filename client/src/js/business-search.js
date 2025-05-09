@@ -46,6 +46,70 @@ function clearMarkers() {
     });
     markers = [];
 }
+
+// Global flag to track if Google Maps is being initialized
+let googleMapsInitializing = false;
+
+// Global flag to track if Google Maps is already initialized
+let googleMapsInitialized = false;
+
+// Function to safely initialize Google Maps once
+function ensureGoogleMapsInitialized() {
+    // If already initialized or currently initializing, don't do anything
+    if (googleMapsInitialized || googleMapsInitializing) {
+        console.log("Google Maps already initialized or initializing");
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve, reject) => {
+        try {
+            googleMapsInitializing = true;
+            console.log("Starting Google Maps initialization");
+
+            // Check if Google Maps API is already loaded
+            if (window.google && window.google.maps) {
+                console.log("Google Maps API is already loaded, just initializing map");
+                initGoogleMap();
+                googleMapsInitialized = true;
+                googleMapsInitializing = false;
+                resolve();
+                return;
+            }
+
+            // Get API key from config
+            const apiKey = window.appConfig?.googleMapsApiKey || 'AIzaSyCHKhYZwQR37M_0QctXUQe6VFRFrlhaYj8';
+            const mapId = window.appConfig?.googleMapsMapId || 'ebe8ec43a7bc252d';
+
+            // Create a callback function for when Maps loads
+            window.initGoogleMapCallback = function() {
+                console.log("Google Maps callback executed");
+                initGoogleMap();
+                googleMapsInitialized = true;
+                googleMapsInitializing = false;
+                resolve();
+            };
+
+            // Create the script element
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMapCallback&loading=async&v=weekly`;
+            script.async = true;
+            script.defer = true;
+            script.onerror = function(error) {
+                console.error('Google Maps API failed to load:', error);
+                googleMapsInitializing = false;
+                reject(error);
+            };
+
+            // Add the script to the page
+            document.head.appendChild(script);
+        } catch (error) {
+            googleMapsInitializing = false;
+            console.error("Error initializing Google Maps:", error);
+            reject(error);
+        }
+    });
+}
+
 /**
  * View business details
  * @param {string} businessId - Business ID
@@ -1679,37 +1743,57 @@ async function geocodeAddressClientSide(address) {
  * @param {number} radius - Search radius in meters
  * @returns {Promise<Array>} Places search results
  */
-async function searchPlacesClientSide(query, location, radius = 50000) {
-    try {
-        console.log(`Searching places client-side: ${query}`);
+async function searchPlacesClientSide(query, location) {
+    // Make sure Google Maps is initialized first
+    await ensureGoogleMapsInitialized();
 
-        // Create location as LatLng
-        const center = new google.maps.LatLng(
-            location.latitude || location.lat,
-            location.longitude || location.lng
-        );
+    return new Promise((resolve, reject) => {
+        try {
+            console.log("Using client-side Places API search:", query);
 
-        // Create search request
-        const request = {
-            query: query,
-            location: center,
-            radius: radius
-        };
+            // Create a map div if not already present (needed for PlacesService)
+            let mapDiv = document.getElementById('map');
+            if (!mapDiv) {
+                console.error("Map element not found, creating temporary map div");
+                mapDiv = document.createElement('div');
+                mapDiv.id = 'temp-map-div';
+                mapDiv.style.display = 'none';
+                document.body.appendChild(mapDiv);
 
-        // Create PlacesService
-        const mapDiv = document.getElementById('map');
-        const service = new google.maps.places.PlacesService(mapDiv);
+                // Create a temporary map if needed
+                if (!map) {
+                    map = new google.maps.Map(mapDiv, {
+                        center: { lat: location.latitude || location.lat || 0, lng: location.longitude || location.lng || 0 },
+                        zoom: 10
+                    });
+                }
+            }
 
-        // Return promise that resolves with the places results
-        return new Promise((resolve, reject) => {
-            service.textSearch(request, function(results, status) {
+            // Create location as LatLng object
+            const center = new google.maps.LatLng(
+                location.latitude || location.lat,
+                location.longitude || location.lng
+            );
+
+            // Create the places service
+            const service = new google.maps.places.PlacesService(map);
+
+            // Set up the search request
+            const request = {
+                query: query,
+                location: center,
+                radius: 50000 // 50km radius
+            };
+
+            // Perform the search
+            service.textSearch(request, (results, status) => {
                 if (status === google.maps.places.PlacesServiceStatus.OK) {
-                    console.log(`Found ${results.length} places client-side`);
+                    console.log(`Found ${results.length} places via client-side API`);
 
-                    // Format results to match our expected format
-                    const places = results.map(place => ({
-                        place_id: place.place_id,
+                    // Process the results into a consistent format
+                    const formattedResults = results.map(place => ({
                         id: place.place_id,
+                        place_id: place.place_id,
                         name: place.name,
                         displayName: place.name,
                         formatted_address: place.formatted_address,
@@ -1718,28 +1802,32 @@ async function searchPlacesClientSide(query, location, radius = 50000) {
                             lat: place.geometry.location.lat(),
                             lng: place.geometry.location.lng()
                         },
-                        geometry: {
-                            location: {
-                                lat: place.geometry.location.lat(),
-                                lng: place.geometry.location.lng()
-                            }
-                        },
                         types: place.types,
-                        business_status: place.business_status,
-                        photos: place.photos
+                        business_status: place.business_status
                     }));
 
-                    resolve(places);
+                    // Clean up temporary div if we created one
+                    if (mapDiv.id === 'temp-map-div') {
+                        document.body.removeChild(mapDiv);
+                    }
+
+                    resolve(formattedResults);
                 } else {
-                    console.error("Client-side places search failed:", status);
-                    reject(new Error(`Client-side places search failed: ${status}`));
+                    console.error("Places search failed:", status);
+
+                    // Clean up temporary div if we created one
+                    if (mapDiv.id === 'temp-map-div') {
+                        document.body.removeChild(mapDiv);
+                    }
+
+                    reject(new Error(`Places search failed: ${status}`));
                 }
             });
-        });
-    } catch (error) {
-        console.error("Error in client-side places search:", error);
-        return [];
-    }
+        } catch (error) {
+            console.error("Error in client-side places search:", error);
+            reject(error);
+        }
+    });
 }
 
 // Update these functions to use the server-side endpoints
@@ -1896,7 +1984,7 @@ async function searchGooglePlaces(formData) {
 
         try {
             // Use server-side places search
-            const placeResults = await searchPlacesServerSide(
+            const placeResults = await searchPlacesClientSide(
                 searchQuery,
                 searchLocation,
                 50000  // 50km radius
@@ -2753,10 +2841,9 @@ window.addGooglePlaceToDatabase = async function(placeId) {
     }
 };
 
-// initGoogleMap function
-window.initGoogleMap = async function() {
+// Modify your existing initGoogleMap function
+window.initGoogleMap = function() {
     console.log("Global initGoogleMap function called");
-    console.log("Map container exists:", !!document.getElementById("map"));
 
     try {
         // Check if map container exists
@@ -2768,59 +2855,47 @@ window.initGoogleMap = async function() {
 
         console.log("Map container dimensions:", mapContainer.offsetWidth, "x", mapContainer.offsetHeight);
 
-        // Import required libraries
-        const { Map } = await google.maps.importLibrary("maps");
-        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+        // Only create the map if it doesn't already exist
+        if (!map) {
+            // Create a map centered on the US with POI clicks enabled
+            map = new google.maps.Map(mapContainer, {
+                center: CONFIG.defaultCenter,
+                zoom: CONFIG.defaultZoom,
+                mapId: CONFIG.mapId,
+                clickableIcons: true
+            });
 
-        // Create a map centered on the US with POI clicks disabled
-        map = new Map(mapContainer, {
-            center: CONFIG.defaultCenter,
-            zoom: CONFIG.defaultZoom,
-            mapId: CONFIG.mapId,
-            clickableIcons: true
-        });
+            console.log("Map object created:", !!map);
 
-        console.log("Map object created:", !!map);
+            // Create info window and bounds
+            infoWindow = new google.maps.InfoWindow();
+            bounds = new google.maps.LatLngBounds();
 
-        // Create info window and bounds
-        infoWindow = new google.maps.InfoWindow();
-        bounds = new google.maps.LatLngBounds();
+            // Add initial message
+            addInitialMapMessage(mapContainer);
 
-        // Add initial message
-        addInitialMapMessage(mapContainer);
+            // Add event listener for the reset map button
+            setupResetMapButton();
 
-        // Add event listener for the reset map button
-        setupResetMapButton();
+            // Set flag that map is initialized
+            mapInitialized = true;
+            console.log("Google Map successfully initialized with Map ID:", CONFIG.mapId);
 
-        // Set flag that map is initialized
-        mapInitialized = true;
-        console.log("Google Map successfully initialized with Map ID:", CONFIG.mapId);
-
-        // Process any pending businesses to display
-        if (pendingBusinessesToDisplay.length > 0) {
-            console.log("Processing pending businesses to display on map");
-            displayBusinessesOnMap(pendingBusinessesToDisplay);
-            pendingBusinessesToDisplay = [];
-        }
-
-        // Setup map handlers
-        await setupMapClickHandler();
-        setupMarkerClickPriority();
-
-        initAdditionalMapFeatures();
-
-        // Add a force refresh of the map
-        setTimeout(() => {
-            if (map) {
-                console.log("Forcing map refresh");
-                google.maps.event.trigger(map, 'resize');
-
-                // If we have bounds, fit to them
-                if (bounds && !bounds.isEmpty()) {
-                    map.fitBounds(bounds);
-                }
+            // Process any pending businesses to display
+            if (pendingBusinessesToDisplay.length > 0) {
+                console.log("Processing pending businesses to display on map");
+                displayBusinessesOnMap(pendingBusinessesToDisplay);
+                pendingBusinessesToDisplay = [];
             }
-        }, 500);
+
+            // Setup map handlers
+            setupMapClickHandler();
+            setupMarkerClickPriority();
+
+            initAdditionalMapFeatures();
+        } else {
+            console.log("Map already exists, skipping initialization");
+        }
 
     } catch (error) {
         console.error("Error initializing Google Map:", error);

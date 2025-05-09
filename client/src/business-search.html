@@ -294,22 +294,24 @@
 <script>
     // Show debug controls only in development environment
     document.addEventListener('DOMContentLoaded', function() {
-        // Get API key and mapId from runtime config
-        const apiKey = window.appConfig.googleMapsApiKey;
-        const mapId = window.appConfig.googleMapsMapId;
+        if (window.appConfig && window.appConfig.environment === 'development') {
+            const debugControls = document.getElementById('debug-controls');
+            if (debugControls) {
+                debugControls.style.display = 'block';
 
-        console.log("Loading Google Maps with Map ID:", mapId);
-
-        // Create and insert the Google Maps script with all recommended parameters
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMap&loading=async&v=weekly`;
-        script.async = true;
-        script.defer = true;
-        script.onerror = function() {
-            console.error('Google Maps API failed to load. Check your API key.');
-            alert('Error loading Google Maps. Please try again later.');
-        };
-        document.head.appendChild(script);
+                // Add event listener for the debug button
+                const debugBtn = document.getElementById('debug-map-btn');
+                if (debugBtn) {
+                    debugBtn.addEventListener('click', function() {
+                        if (typeof debugMapState === 'function') {
+                            debugMapState();
+                        } else {
+                            console.log("debugMapState function not available");
+                        }
+                    });
+                }
+            }
+        }
     });
 </script>
 </body>
