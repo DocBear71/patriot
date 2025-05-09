@@ -23,6 +23,9 @@ module.exports = async (req, res) => {
                 message: 'Server configuration error: Google Maps API key is missing'
             });
         }
+        // At the beginning of your API handler
+        console.log("API Key length:", process.env.GOOGLE_MAPS_API_KEY ? process.env.GOOGLE_MAPS_API_KEY.length : 0);
+        console.log("API Key first 4 chars:", process.env.GOOGLE_MAPS_API_KEY ? process.env.GOOGLE_MAPS_API_KEY.slice(0, 4) : "none");
 
         const encodedAddress = encodeURIComponent(address);
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
