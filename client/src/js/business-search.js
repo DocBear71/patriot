@@ -557,7 +557,7 @@ function getUserLocation() {
 // }
 
 /**
- * Add some CSS to style the markers properly
+ * Add custom CSS to style the markers properly
  */
 function addCustomMarkerStyles() {
     if (!document.getElementById('custom-marker-css')) {
@@ -567,6 +567,13 @@ function addCustomMarkerStyles() {
             .custom-marker {
                 cursor: pointer;
             }
+            
+            .marker-container {
+                position: relative;
+                width: 32px;
+                height: 40px;
+            }
+            
             .marker-pin {
                 width: 32px;
                 height: 40px;
@@ -577,35 +584,71 @@ function addCustomMarkerStyles() {
                 justify-content: center;
                 align-items: center;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                position: absolute;
+                top: 0;
+                left: 0;
             }
+            
+            .marker-pin.nearby {
+                background-color: #4285F4;
+            }
+            
             .marker-icon {
                 transform: rotate(45deg);
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                width: 24px;
-                height: 24px;
+                width: 20px;
+                height: 20px;
             }
-            .info-window {
-                padding: 10px;
-                max-width: 300px;
+            
+            .marker-icon i {
+                font-size: 14px !important;
+                color: white !important;
             }
-            .info-window h3 {
-                margin-top: 0;
-                margin-bottom: 10px;
-                color: #212121;
+            
+            .marker-shadow {
+                background-color: rgba(0, 0, 0, 0.2);
+                border-radius: 50%;
+                height: 14px;
+                width: 14px;
+                position: absolute;
+                bottom: -3px;
+                left: 9px;
+                filter: blur(2px);
+                z-index: -1;
             }
-            .add-business-btn {
-                background-color: #EA4335;
-                color: white;
-                border: none;
+            
+            /* Info window action button styling */
+            .info-window-actions .add-business-btn,
+            .info-window-actions .view-details-btn {
+                margin-top: 8px;
+                font-weight: bold;
+                text-transform: uppercase;
+                font-size: 12px;
                 padding: 8px 12px;
                 border-radius: 4px;
                 cursor: pointer;
-                margin-top: 10px;
+                transition: background-color 0.2s ease;
+                border: none;
+                color: white;
+                letter-spacing: 0.5px;
             }
-            .add-business-btn:hover {
+            
+            .info-window-actions .add-business-btn {
+                background-color: #EA4335;
+            }
+            
+            .info-window-actions .add-business-btn:hover {
                 background-color: #D32F2F;
+            }
+            
+            .info-window-actions .view-details-btn {
+                background-color: #4285F4;
+            }
+            
+            .info-window-actions .view-details-btn:hover {
+                background-color: #2A75F3;
             }
         `;
         document.head.appendChild(style);
@@ -3160,6 +3203,9 @@ function showGooglePlaceInfoWindow(business, position) {
     // Set content and open
     infoWindow.setContent(contentString);
 
+    // Apply scrollable styles
+    applyInfoWindowScrollableStyles();
+
     // Handle position
     if (position.lat && typeof position.lat === 'function') {
         infoWindow.setPosition(position);
@@ -3168,6 +3214,22 @@ function showGooglePlaceInfoWindow(business, position) {
     }
 
     infoWindow.open(map);
+
+    // Add event listener to ensure scrollable styles are applied
+    google.maps.event.addListener(infoWindow, 'domready', function() {
+        console.log("Google Place info window DOM ready, forcing scrollable behavior");
+
+        // Force scrollable styling application
+        const iwOuter = document.querySelector('.gm-style-iw');
+        if (iwOuter) {
+            // Force scrollable
+            const iwContainer = iwOuter.querySelector('.gm-style-iw-d');
+            if (iwContainer) {
+                iwContainer.style.overflow = 'auto';
+                iwContainer.style.maxHeight = '350px';
+            }
+        }
+    });
 
     console.log("Opened Google Place info window");
 }
@@ -3311,6 +3373,36 @@ window.initGoogleMap = function() {
         }
     }
 };
+
+/**
+ * Initialize the advanced marker creation with proper setup
+ */
+async function initAdvancedMarkers() {
+    try {
+        // Add the custom marker styles
+        addCustomMarkerStyles();
+
+        // Check if Font Awesome is loaded
+        if (!document.querySelector('link[href*="font-awesome"]')) {
+            console.warn("Font Awesome might not be loaded - adding fallback");
+
+            // Add fallback Font Awesome if needed
+            const fontAwesomeLink = document.createElement('link');
+            fontAwesomeLink.rel = 'stylesheet';
+            fontAwesomeLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css';
+            document.head.appendChild(fontAwesomeLink);
+        }
+
+        // Load the marker library in advance
+        await google.maps.importLibrary("marker");
+        console.log("Advanced marker library loaded successfully");
+
+        return true;
+    } catch (error) {
+        console.error("Error initializing advanced markers:", error);
+        return false;
+    }
+}
 
 /**
  * Add initial message to map
@@ -3650,6 +3742,129 @@ function addCustomMarkerStyleFixes() {
 }
 
 /**
+ * Apply custom CSS to make info windows scrollable
+ */
+function applyInfoWindowScrollableStyles() {
+    if (!document.getElementById('info-window-scrollable-styles')) {
+        const style = document.createElement('style');
+        style.id = 'info-window-scrollable-styles';
+        style.textContent = `
+            /* Info window structure */
+            .gm-style .gm-style-iw-c {
+                padding: 0 !important;
+                border-radius: 8px !important;
+                box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3) !important;
+                max-width: 330px !important;
+                max-height: 400px !important;
+                overflow: hidden !important;
+            }
+            
+            .gm-style .gm-style-iw-d {
+                overflow: auto !important;
+                max-height: 350px !important;
+                padding-right: 8px !important; /* Allow space for scrollbar */
+            }
+            
+            /* Custom info window styles */
+            .info-window {
+                padding: 12px;
+                max-width: 300px;
+            }
+            
+            .info-window h3 {
+                margin-top: 0;
+                margin-bottom: 10px;
+                color: #212121;
+                font-size: 16px;
+                line-height: 1.3;
+            }
+            
+            .info-window p {
+                margin: 6px 0;
+                font-size: 14px;
+                line-height: 1.4;
+            }
+            
+            .info-window-actions {
+                margin-top: 12px;
+                padding-top: 8px;
+                border-top: 1px solid #eee;
+                text-align: right;
+            }
+            
+            .add-business-btn {
+                background-color: #EA4335;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 5px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            
+            .add-business-btn:hover {
+                background-color: #D32F2F;
+            }
+            
+            .view-details-btn {
+                background-color: #4285F4;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 5px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            
+            .view-details-btn:hover {
+                background-color: #2A75F3;
+            }
+            
+            /* Incentives list */
+            .incentives-list {
+                margin: 8px 0;
+                padding-left: 20px;
+            }
+            
+            .incentives-list li {
+                margin-bottom: 6px;
+            }
+            
+            /* Custom scrollbar styles */
+            .gm-style .gm-style-iw-d::-webkit-scrollbar {
+                width: 6px;
+                height: 6px;
+            }
+            
+            .gm-style .gm-style-iw-d::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 3px;
+            }
+            
+            .gm-style .gm-style-iw-d::-webkit-scrollbar-thumb {
+                background: #c1c1c1;
+                border-radius: 3px;
+            }
+            
+            .gm-style .gm-style-iw-d::-webkit-scrollbar-thumb:hover {
+                background: #a8a8a8;
+            }
+            
+            /* Close button adjustment */
+            .gm-ui-hover-effect {
+                top: 2px !important;
+                right: 2px !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+/**
  * Customize Google Maps info windows globally
  */
 function customizeInfoWindows() {
@@ -3892,7 +4107,7 @@ function displayBusinessesOnMap(businesses) {
 // }
 
 /**
- * Add an advanced marker to the map (Updated to work with your existing CSS)
+ * Add an advanced marker to the map (Updated to ensure icons display correctly)
  * @param {Object} business - Business object
  * @param {Object} location - Google Maps location object
  */
@@ -3903,7 +4118,6 @@ async function addAdvancedMarker(business, location) {
 
         // Create a position object from the location
         let position;
-
         if (location instanceof google.maps.LatLng) {
             // It's already a LatLng object
             position = location;
@@ -3938,16 +4152,16 @@ async function addAdvancedMarker(business, location) {
         const pinClass = isNearby ? "nearby" : "primary";
         const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
 
-        // Create a pin element
-        const pinElement = document.createElement('div');
-        pinElement.className = 'custom-marker';
-        pinElement.style.cursor = 'pointer';
-        pinElement.style.zIndex = '1000';
-
         // Get business type icon
         const businessIcon = getBusinessTypeIconHTML(business.type);
 
-        // Set innerHTML
+        // Create a pin element
+        const pinElement = document.createElement('div');
+        pinElement.className = 'custom-marker';
+        pinElement.setAttribute('title', businessTitle);
+        pinElement.style.cursor = 'pointer';
+
+        // Set innerHTML with container for better positioning
         pinElement.innerHTML = `
             <div class="marker-container">
                 <div class="marker-pin ${pinClass}" style="background-color: ${pinColor};">
@@ -4447,6 +4661,9 @@ function showInfoWindow(marker) {
     // Set content for the info window
     infoWindow.setContent(contentString);
 
+    // Apply scrollable styles
+    applyInfoWindowScrollableStyles();
+
     // Open the info window based on marker type
     try {
         if (marker.getPosition) {
@@ -4493,104 +4710,39 @@ function showInfoWindow(marker) {
     if (!isGooglePlace) {
         fetchBusinessIncentivesForInfoWindow(business._id);
     }
+
+    // Add event listener to ensure scrollable styles are applied when the window opens
+    google.maps.event.addListener(infoWindow, 'domready', function() {
+        console.log("Info window DOM ready, forcing scrollable behavior");
+
+        // Force scrollable styling application
+        const iwOuter = document.querySelector('.gm-style-iw');
+        if (iwOuter) {
+            const iwBackground = iwOuter.previousElementSibling;
+            if (iwBackground) {
+                iwBackground.style.display = 'none'; // Remove background if needed
+            }
+
+            // Force scrollable
+            const iwCloseBtn = iwOuter.nextElementSibling;
+            if (iwCloseBtn) {
+                iwCloseBtn.style.top = '3px';
+                iwCloseBtn.style.right = '3px';
+            }
+
+            // Add specific scrollable class to the container
+            const iwContainer = iwOuter.querySelector('.gm-style-iw-d');
+            if (iwContainer) {
+                iwContainer.style.overflow = 'auto';
+                iwContainer.style.maxHeight = '350px';
+            }
+        }
+    });
 }
 
 
-/**
- * Apply custom CSS to make info windows scrollable
- */
-function applyInfoWindowScrollableStyles() {
-    if (!document.getElementById('info-window-scrollable-styles')) {
-        const style = document.createElement('style');
-        style.id = 'info-window-scrollable-styles';
-        style.textContent = `
-            /* Info window structure */
-            .info-window-wrapper {
-                width: 300px;
-                max-width: 300px;
-                display: flex;
-                flex-direction: column;
-            }
-            
-            .info-window-header {
-                padding: 8px 12px;
-                border-bottom: 1px solid #eee;
-                background-color: #f8f8f8;
-            }
-            
-            .info-window-header h3 {
-                margin: 0;
-                font-size: 16px;
-                color: #333;
-                word-break: break-word;
-            }
-            
-            .info-window-content {
-                max-height: 200px;
-                overflow: hidden;
-                position: relative;
-            }
-            
-            .info-window-scrollable {
-                padding: 10px 12px;
-                overflow-y: auto;
-                max-height: 200px;
-                scrollbar-width: thin;
-                scrollbar-color: #ddd #f8f8f8;
-            }
-            
-            .info-window-scrollable::-webkit-scrollbar {
-                width: 8px;
-            }
-            
-            .info-window-scrollable::-webkit-scrollbar-track {
-                background: #f8f8f8;
-            }
-            
-            .info-window-scrollable::-webkit-scrollbar-thumb {
-                background-color: #ddd;
-                border-radius: 4px;
-                border: 2px solid #f8f8f8;
-            }
-            
-            .info-window-footer {
-                padding: 8px 12px;
-                border-top: 1px solid #eee;
-                background-color: #f8f8f8;
-                display: flex;
-                justify-content: flex-end;
-            }
-            
-            /* Incentives list */
-            .incentives-list {
-                margin: 8px 0;
-                padding-left: 20px;
-            }
-            
-            .incentives-list li {
-                margin-bottom: 6px;
-            }
-            
-            /* Override Google's default styles */
-            .gm-style .gm-style-iw-c {
-                padding: 0 !important;
-                border-radius: 8px !important;
-                box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3) !important;
-            }
-            
-            .gm-style .gm-style-iw-d {
-                overflow: hidden !important;
-                padding: 0 !important;
-            }
-            
-            /* Ensure the info window size is consistent */
-            .gm-style-iw.gm-style-iw-c {
-                max-width: 320px !important;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-}
+
+
 
 /**
  * Search for nearby businesses of similar type
