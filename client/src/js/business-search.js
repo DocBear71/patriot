@@ -4153,7 +4153,7 @@ async function addAdvancedMarker(business, location) {
         const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
 
         // Get business type icon
-        const businessIcon = getBusinessTypeIconHTML(business.type);
+        const businessIcon = getBusinessTypeIcon(business.type);
 
         // Create a pin element
         const pinElement = document.createElement('div');
