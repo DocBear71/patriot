@@ -4153,7 +4153,7 @@ async function addAdvancedMarker(business, location) {
         const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
 
         // Get business type icon
-        const businessIcon = getBusinessTypeIcon(business.type);
+        const businessIcon = getBusinessTypeIconHTML(business.type);
 
         // Create a pin element
         const pinElement = document.createElement('div');
@@ -4396,42 +4396,42 @@ function fallbackCreateStandardMarker(business) {
 }
 
 /**
- * Get HTML for a business type icon
+ * Get HTML for a business type icon - Updated to ensure icons display properly
  * @param {string} businessType - Business type code
  * @returns {string} Icon HTML
  */
 function getBusinessTypeIconHTML(businessType) {
     // Map business types to icon HTML
-    // Using Font Awesome icons that are already included in your project
+    // Using Font Awesome icons with proper styling to ensure visibility
     const iconMap = {
-        'AUTO': '<i class="fas fa-car" style="transform: rotate(-45deg);"></i>',
-        'BEAU': '<i class="fas fa-spa" style="transform: rotate(-45deg);"></i>',
-        'BOOK': '<i class="fas fa-book" style="transform: rotate(-45deg);"></i>',
-        'CLTH': '<i class="fas fa-tshirt" style="transform: rotate(-45deg);"></i>',
-        'CONV': '<i class="fas fa-store" style="transform: rotate(-45deg);"></i>',
-        'DEPT': '<i class="fas fa-shopping-bag" style="transform: rotate(-45deg);"></i>',
-        'ELEC': '<i class="fas fa-bolt" style="transform: rotate(-45deg);"></i>',
-        'ENTR': '<i class="fas fa-film" style="transform: rotate(-45deg);"></i>',
-        'FURN': '<i class="fas fa-couch" style="transform: rotate(-45deg);"></i>',
-        'FUEL': '<i class="fas fa-gas-pump" style="transform: rotate(-45deg);"></i>',
-        'GIFT': '<i class="fas fa-gift" style="transform: rotate(-45deg);"></i>',
-        'GROC': '<i class="fas fa-shopping-cart" style="transform: rotate(-45deg);"></i>',
-        'HARDW': '<i class="fas fa-hammer" style="transform: rotate(-45deg);"></i>',
-        'HEAL': '<i class="fas fa-heartbeat" style="transform: rotate(-45deg);"></i>',
-        'JEWL': '<i class="fas fa-gem" style="transform: rotate(-45deg);"></i>',
-        'OTHER': '<i class="fas fa-store-alt" style="transform: rotate(-45deg);"></i>',
-        'RX': '<i class="fas fa-prescription-bottle-alt" style="transform: rotate(-45deg);"></i>',
-        'REST': '<i class="fas fa-utensils" style="transform: rotate(-45deg);"></i>',
-        'RETAIL': '<i class="fas fa-shopping-basket" style="transform: rotate(-45deg);"></i>',
-        'SERV': '<i class="fas fa-concierge-bell" style="transform: rotate(-45deg);"></i>',
-        'SPEC': '<i class="fas fa-star" style="transform: rotate(-45deg);"></i>',
-        'SPRT': '<i class="fas fa-football-ball" style="transform: rotate(-45deg);"></i>',
-        'TECH': '<i class="fas fa-laptop" style="transform: rotate(-45deg);"></i>',
-        'TOYS': '<i class="fas fa-gamepad" style="transform: rotate(-45deg);"></i>'
+        'AUTO': '<i class="fas fa-car" aria-hidden="true"></i>',
+        'BEAU': '<i class="fas fa-spa" aria-hidden="true"></i>',
+        'BOOK': '<i class="fas fa-book" aria-hidden="true"></i>',
+        'CLTH': '<i class="fas fa-tshirt" aria-hidden="true"></i>',
+        'CONV': '<i class="fas fa-store" aria-hidden="true"></i>',
+        'DEPT': '<i class="fas fa-shopping-bag" aria-hidden="true"></i>',
+        'ELEC': '<i class="fas fa-bolt" aria-hidden="true"></i>',
+        'ENTR': '<i class="fas fa-film" aria-hidden="true"></i>',
+        'FURN': '<i class="fas fa-couch" aria-hidden="true"></i>',
+        'FUEL': '<i class="fas fa-gas-pump" aria-hidden="true"></i>',
+        'GIFT': '<i class="fas fa-gift" aria-hidden="true"></i>',
+        'GROC': '<i class="fas fa-shopping-cart" aria-hidden="true"></i>',
+        'HARDW': '<i class="fas fa-hammer" aria-hidden="true"></i>',
+        'HEAL': '<i class="fas fa-heartbeat" aria-hidden="true"></i>',
+        'JEWL': '<i class="fas fa-gem" aria-hidden="true"></i>',
+        'OTHER': '<i class="fas fa-store-alt" aria-hidden="true"></i>',
+        'RX': '<i class="fas fa-prescription-bottle-alt" aria-hidden="true"></i>',
+        'REST': '<i class="fas fa-utensils" aria-hidden="true"></i>',
+        'RETAIL': '<i class="fas fa-shopping-basket" aria-hidden="true"></i>',
+        'SERV': '<i class="fas fa-concierge-bell" aria-hidden="true"></i>',
+        'SPEC': '<i class="fas fa-star" aria-hidden="true"></i>',
+        'SPRT': '<i class="fas fa-football-ball" aria-hidden="true"></i>',
+        'TECH': '<i class="fas fa-laptop" aria-hidden="true"></i>',
+        'TOYS': '<i class="fas fa-gamepad" aria-hidden="true"></i>'
     };
 
     // Return the icon for this business type, or a default
-    return iconMap[businessType] || '<i class="fas fa-store" style="transform: rotate(-45deg);"></i>';
+    return iconMap[businessType] || '<i class="fas fa-store" aria-hidden="true"></i>';
 }
 
 
