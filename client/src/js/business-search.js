@@ -1473,108 +1473,130 @@ async function retrieveFromMongoDB(formData) {
 
 // Add these functions to your business-search.js file to use the server-side endpoints
 
-/**
- * Geocode an address using the server-side endpoint
- * @param {string} address - Address to geocode
- * @returns {Promise<{lat: number, lng: number} | null>} Location coordinates or null
- */
+// /**
+//  * Geocode an address using the server-side endpoint
+//  * @param {string} address - Address to geocode
+//  * @returns {Promise<{lat: number, lng: number} | null>} Location coordinates or null
+//  */
+// async function geocodeAddressServerSide(address) {
+//     try {
+//         console.log(`Geocoding address via server: ${address}`);
+//
+//         if (!address) {
+//             console.error("No address provided for geocoding");
+//             return null;
+//         }
+//
+//         // Get the base URL
+//         const baseURL = getBaseURL();
+//         const url = `${baseURL}/api/geocode?address=${encodeURIComponent(address)}`;
+//
+//         console.log("Calling geocode API:", url);
+//         const response = await fetch(url);
+//
+//         if (!response.ok) {
+//             const errorText = await response.text();
+//             console.error(`Geocoding failed with status ${response.status}:`, errorText);
+//             throw new Error(`Geocoding failed: ${response.status}`);
+//         }
+//
+//         const data = await response.json();
+//         if (!data.success || !data.location) {
+//             console.error("Geocoding returned no results:", data);
+//             throw new Error('Geocoding returned no results');
+//         }
+//
+//         console.log(`Geocoding result:`, data.location);
+//         return data.location;
+//     } catch (error) {
+//         console.error("Error geocoding address:", error);
+//
+//         // Fallback to client-side geocoding
+//         try {
+//             console.log("Falling back to client-side geocoding");
+//             const geocoder = new google.maps.Geocoder();
+//             return new Promise((resolve, reject) => {
+//                 geocoder.geocode({'address': address}, function(results, status) {
+//                     if (status === google.maps.GeocoderStatus.OK && results[0]) {
+//                         const location = results[0].geometry.location;
+//                         const result = {
+//                             lat: location.lat(),
+//                             lng: location.lng()
+//                         };
+//                         console.log("Client-side geocoding result:", result);
+//                         resolve(result);
+//                     } else {
+//                         console.error("Client-side geocoding failed:", status);
+//                         reject(new Error(`Client-side geocoding failed: ${status}`));
+//                     }
+//                 });
+//             });
+//         } catch (fallbackError) {
+//             console.error("Client-side geocoding fallback also failed:", fallbackError);
+//             return null;
+//         }
+//     }
+// }
+//
+// /**
+//  * Search for places via the server-side endpoint
+//  * @param {string} query - Search query
+//  * @param {Object} location - Location with latitude and longitude
+//  * @param {number} radius - Search radius in meters
+//  * @returns {Promise<Array>} Places search results
+//  */
+// async function searchPlacesServerSide(query, location, radius = 50000) {
+//     try {
+//         console.log(`Searching places via server: ${query}`);
+//
+//         // Get the base URL
+//         const baseURL = getBaseURL();
+//
+//         // Build the URL with query parameters
+//         let url = `${baseURL}/api/places/search?query=${encodeURIComponent(query)}`;
+//
+//         // Add location params if available
+//         if (location && location.latitude && location.longitude) {
+//             url += `&latitude=${location.latitude}&longitude=${location.longitude}&radius=${radius}`;
+//         }
+//
+//         const response = await fetch(url);
+//         if (!response.ok) {
+//             const errorData = await response.json();
+//             throw new Error(errorData.message || `Places search failed: ${response.status}`);
+//         }
+//
+//         const data = await response.json();
+//         if (!data.success) {
+//             throw new Error('Places search returned an error');
+//         }
+//
+//         console.log(`Found ${data.results.length} places`);
+//         return data.results;
+//     } catch (error) {
+//         console.error("Error searching places:", error);
+//         return [];
+//     }
+// }
+
+// Update the existing geocodeAddressServerSide function to always use the client-side fallback
 async function geocodeAddressServerSide(address) {
     try {
-        console.log(`Geocoding address via server: ${address}`);
-
-        if (!address) {
-            console.error("No address provided for geocoding");
-            return null;
-        }
-
-        // Get the base URL
-        const baseURL = getBaseURL();
-        const url = `${baseURL}/api/geocode?address=${encodeURIComponent(address)}`;
-
-        console.log("Calling geocode API:", url);
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Geocoding failed with status ${response.status}:`, errorText);
-            throw new Error(`Geocoding failed: ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (!data.success || !data.location) {
-            console.error("Geocoding returned no results:", data);
-            throw new Error('Geocoding returned no results');
-        }
-
-        console.log(`Geocoding result:`, data.location);
-        return data.location;
+        // Always use client-side geocoding for now
+        return await geocodeAddressClientSide(address);
     } catch (error) {
-        console.error("Error geocoding address:", error);
-
-        // Fallback to client-side geocoding
-        try {
-            console.log("Falling back to client-side geocoding");
-            const geocoder = new google.maps.Geocoder();
-            return new Promise((resolve, reject) => {
-                geocoder.geocode({'address': address}, function(results, status) {
-                    if (status === google.maps.GeocoderStatus.OK && results[0]) {
-                        const location = results[0].geometry.location;
-                        const result = {
-                            lat: location.lat(),
-                            lng: location.lng()
-                        };
-                        console.log("Client-side geocoding result:", result);
-                        resolve(result);
-                    } else {
-                        console.error("Client-side geocoding failed:", status);
-                        reject(new Error(`Client-side geocoding failed: ${status}`));
-                    }
-                });
-            });
-        } catch (fallbackError) {
-            console.error("Client-side geocoding fallback also failed:", fallbackError);
-            return null;
-        }
+        console.error("Geocoding fallback failed:", error);
+        return null;
     }
 }
 
-/**
- * Search for places via the server-side endpoint
- * @param {string} query - Search query
- * @param {Object} location - Location with latitude and longitude
- * @param {number} radius - Search radius in meters
- * @returns {Promise<Array>} Places search results
- */
+// Update the existing searchPlacesServerSide function to always use the client-side fallback
 async function searchPlacesServerSide(query, location, radius = 50000) {
     try {
-        console.log(`Searching places via server: ${query}`);
-
-        // Get the base URL
-        const baseURL = getBaseURL();
-
-        // Build the URL with query parameters
-        let url = `${baseURL}/api/places/search?query=${encodeURIComponent(query)}`;
-
-        // Add location params if available
-        if (location && location.latitude && location.longitude) {
-            url += `&latitude=${location.latitude}&longitude=${location.longitude}&radius=${radius}`;
-        }
-
-        const response = await fetch(url);
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `Places search failed: ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (!data.success) {
-            throw new Error('Places search returned an error');
-        }
-
-        console.log(`Found ${data.results.length} places`);
-        return data.results;
+        // Always use client-side places search for now
+        return await searchPlacesClientSide(query, location, radius);
     } catch (error) {
-        console.error("Error searching places:", error);
+        console.error("Places search fallback failed:", error);
         return [];
     }
 }
@@ -1607,6 +1629,116 @@ async function getPlaceDetailsServerSide(placeId) {
     } catch (error) {
         console.error("Error getting place details:", error);
         return null;
+    }
+}
+
+/**
+ * Geocode an address using client-side geocoding
+ * @param {string} address - Address to geocode
+ * @returns {Promise<{lat: number, lng: number} | null>} Location coordinates or null
+ */
+async function geocodeAddressClientSide(address) {
+    try {
+        console.log(`Geocoding address client-side: ${address}`);
+
+        if (!address) {
+            console.error("No address provided for geocoding");
+            return null;
+        }
+
+        // Create a new geocoder
+        const geocoder = new google.maps.Geocoder();
+
+        // Return a promise that resolves with the geocoding result
+        return new Promise((resolve, reject) => {
+            geocoder.geocode({'address': address}, function(results, status) {
+                if (status === google.maps.GeocoderStatus.OK && results[0]) {
+                    const location = results[0].geometry.location;
+                    const result = {
+                        lat: location.lat(),
+                        lng: location.lng()
+                    };
+                    console.log("Client-side geocoding result:", result);
+                    resolve(result);
+                } else {
+                    console.error("Client-side geocoding failed:", status);
+                    reject(new Error(`Client-side geocoding failed: ${status}`));
+                }
+            });
+        });
+    } catch (error) {
+        console.error("Error in client-side geocoding:", error);
+        return null;
+    }
+}
+
+/**
+ * Search for places using client-side Places API
+ * @param {string} query - Search query
+ * @param {Object} location - Location with latitude and longitude
+ * @param {number} radius - Search radius in meters
+ * @returns {Promise<Array>} Places search results
+ */
+async function searchPlacesClientSide(query, location, radius = 50000) {
+    try {
+        console.log(`Searching places client-side: ${query}`);
+
+        // Create location as LatLng
+        const center = new google.maps.LatLng(
+            location.latitude || location.lat,
+            location.longitude || location.lng
+        );
+
+        // Create search request
+        const request = {
+            query: query,
+            location: center,
+            radius: radius
+        };
+
+        // Create PlacesService
+        const mapDiv = document.getElementById('map');
+        const service = new google.maps.places.PlacesService(mapDiv);
+
+        // Return promise that resolves with the places results
+        return new Promise((resolve, reject) => {
+            service.textSearch(request, function(results, status) {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    console.log(`Found ${results.length} places client-side`);
+
+                    // Format results to match our expected format
+                    const places = results.map(place => ({
+                        place_id: place.place_id,
+                        id: place.place_id,
+                        name: place.name,
+                        displayName: place.name,
+                        formatted_address: place.formatted_address,
+                        formattedAddress: place.formatted_address,
+                        location: {
+                            lat: place.geometry.location.lat(),
+                            lng: place.geometry.location.lng()
+                        },
+                        geometry: {
+                            location: {
+                                lat: place.geometry.location.lat(),
+                                lng: place.geometry.location.lng()
+                            }
+                        },
+                        types: place.types,
+                        business_status: place.business_status,
+                        photos: place.photos
+                    }));
+
+                    resolve(places);
+                } else {
+                    console.error("Client-side places search failed:", status);
+                    reject(new Error(`Client-side places search failed: ${status}`));
+                }
+            });
+        });
+    } catch (error) {
+        console.error("Error in client-side places search:", error);
+        return [];
     }
 }
 
