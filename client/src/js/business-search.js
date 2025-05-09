@@ -1,5 +1,313 @@
 // brand new business-search.js not working properly
 
+// Enhanced debugging functions to help identify and fix issues
+
+/**
+ * Debug the current map state with detailed information
+ */
+function debugMapState() {
+    console.log("==== MAP DEBUGGING INFO ====");
+    console.log("Map initialized:", mapInitialized);
+    console.log("Map object exists:", !!map);
+
+    if (map) {
+        try {
+            const center = map.getCenter();
+            console.log("Map center:", center ? `${center.lat()}, ${center.lng()}` : "undefined");
+            console.log("Map zoom:", map.getZoom());
+            console.log("Map type:", map.getMapTypeId());
+            console.log("Map ID:", map.getMapId());
+        } catch (error) {
+            console.error("Error getting map properties:", error);
+        }
+    }
+
+    console.log("Markers count:", markers ? markers.length : 0);
+
+    if (markers && markers.length > 0) {
+        console.log("Markers summary:");
+        markers.forEach((marker, index) => {
+            try {
+                let position;
+                if (marker.getPosition) {
+                    position = marker.getPosition();
+                } else if (marker.position) {
+                    position = marker.position;
+                }
+
+                const positionStr = position ?
+                    (typeof position.lat === 'function' ?
+                        `${position.lat()}, ${position.lng()}` :
+                        `${position.lat}, ${position.lng}`) :
+                    "unknown";
+
+                console.log(`  Marker #${index}: Business: ${marker.business ? marker.business.bname : 'unknown'}, Position: ${positionStr}`);
+            } catch (error) {
+                console.error(`  Error getting marker #${index} info:`, error);
+            }
+        });
+    }
+
+    console.log("Bounds:", bounds ? "exists" : "not created");
+    if (bounds) {
+        try {
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
+            console.log("  NE:", ne ? `${ne.lat()}, ${ne.lng()}` : "undefined");
+            console.log("  SW:", sw ? `${sw.lat()}, ${sw.lng()}` : "undefined");
+            console.log("  Empty:", bounds.isEmpty());
+
+            // Check for invalid coordinates
+            if (ne && sw) {
+                const hasNaN = isNaN(ne.lat()) || isNaN(ne.lng()) || isNaN(sw.lat()) || isNaN(sw.lng());
+                console.log("  Has NaN coordinates:", hasNaN);
+            }
+        } catch (error) {
+            console.error("  Error getting bounds info:", error);
+        }
+    }
+
+    console.log("Map container:", document.getElementById("map") ? "found" : "not found");
+    const mapContainer = document.getElementById("map");
+    if (mapContainer) {
+        console.log("  Display:", window.getComputedStyle(mapContainer).display);
+        console.log("  Dimensions:", `${mapContainer.offsetWidth} × ${mapContainer.offsetHeight}`);
+        console.log("  Position:", mapContainer.style.position);
+        console.log("  Visibility:", window.getComputedStyle(mapContainer).visibility);
+        console.log("  Z-index:", window.getComputedStyle(mapContainer).zIndex);
+    }
+
+    // Check for Google Maps libraries
+    console.log("Google Maps libraries:");
+    console.log("  maps:", !!google.maps);
+    console.log("  places:", !!google.maps.places);
+    console.log("  geometry:", !!google.maps.geometry);
+    console.log("  marker:", !!google.maps.marker);
+
+    console.log("Google Maps API Key:", getGoogleMapsApiKey() ? "found" : "not found");
+    console.log("==== END DEBUGGING INFO ====");
+}
+
+/**
+ * Validate a position object to ensure it has valid coordinates
+ * @param {Object} position - Position object to validate
+ * @returns {boolean} True if position is valid
+ */
+function isValidPosition(position) {
+    if (!position) {
+        console.warn("Position is null or undefined");
+        return false;
+    }
+
+    let lat, lng;
+
+    if (position instanceof google.maps.LatLng) {
+        try {
+            lat = position.lat();
+            lng = position.lng();
+        } catch (error) {
+            console.warn("Error getting lat/lng from LatLng:", error);
+            return false;
+        }
+    } else if (typeof position.lat === 'function' && typeof position.lng === 'function') {
+        try {
+            lat = position.lat();
+            lng = position.lng();
+        } catch (error) {
+            console.warn("Error calling lat/lng functions:", error);
+            return false;
+        }
+    } else if (position.lat !== undefined && position.lng !== undefined) {
+        lat = parseFloat(position.lat);
+        lng = parseFloat(position.lng);
+    } else {
+        console.warn("Position does not have lat/lng properties");
+        return false;
+    }
+
+    // Check for NaN, Infinity, or out of range values
+    if (isNaN(lat) || isNaN(lng)) {
+        console.warn("Position has NaN coordinates:", lat, lng);
+        return false;
+    }
+
+    if (!isFinite(lat) || !isFinite(lng)) {
+        console.warn("Position has non-finite coordinates:", lat, lng);
+        return false;
+    }
+
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+        console.warn("Position coordinates out of range:", lat, lng);
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Create a safe LatLng object from various position formats
+ * @param {Object} position - Position object in various formats
+ * @returns {google.maps.LatLng|null} Google LatLng object or null if invalid
+ */
+function createSafeLatLng(position) {
+    if (!position) {
+        return null;
+    }
+
+    try {
+        if (position instanceof google.maps.LatLng) {
+            // Already a LatLng, just validate it
+            if (isValidPosition(position)) {
+                return position;
+            }
+            return null;
+        }
+
+        let lat, lng;
+
+        if (typeof position.lat === 'function' && typeof position.lng === 'function') {
+            lat = position.lat();
+            lng = position.lng();
+        } else if (position.lat !== undefined && position.lng !== undefined) {
+            lat = parseFloat(position.lat);
+            lng = parseFloat(position.lng);
+        } else if (position.latitude !== undefined && position.longitude !== undefined) {
+            lat = parseFloat(position.latitude);
+            lng = parseFloat(position.longitude);
+        } else if (Array.isArray(position) && position.length >= 2) {
+            lat = parseFloat(position[0]);
+            lng = parseFloat(position[1]);
+        } else {
+            console.warn("Position format not recognized:", position);
+            return null;
+        }
+
+        // Validate the coordinates
+        if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
+            console.warn("Invalid coordinates:", lat, lng);
+            return null;
+        }
+
+        if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+            console.warn("Coordinates out of range:", lat, lng);
+            return null;
+        }
+
+        // Create a new LatLng object
+        return new google.maps.LatLng(lat, lng);
+    } catch (error) {
+        console.error("Error creating LatLng:", error);
+        return null;
+    }
+}
+
+/**
+ * Safe implementation of the fitBounds function
+ * @param {google.maps.Map} mapObj - Google Maps object
+ * @param {google.maps.LatLngBounds} boundsObj - Bounds object
+ * @param {number} defaultZoom - Default zoom level if bounds fail
+ * @returns {boolean} True if bounds were successfully fitted
+ */
+function safelyFitBounds(mapObj, boundsObj, defaultZoom = 11) {
+    if (!mapObj || !boundsObj) {
+        return false;
+    }
+
+    try {
+        // Validate bounds
+        const ne = boundsObj.getNorthEast();
+        const sw = boundsObj.getSouthWest();
+
+        if (!ne || !sw || isNaN(ne.lat()) || isNaN(ne.lng()) || isNaN(sw.lat()) || isNaN(sw.lng())) {
+            console.warn("Invalid bounds for fitBounds:", boundsObj);
+            return false;
+        }
+
+        if (boundsObj.isEmpty()) {
+            console.warn("Empty bounds, not fitting");
+            return false;
+        }
+
+        // All looks good, try to fit the bounds
+        mapObj.fitBounds(boundsObj);
+        return true;
+    } catch (error) {
+        console.error("Error fitting bounds:", error);
+
+        // Try to set a default zoom as fallback
+        try {
+            if (defaultZoom !== undefined) {
+                mapObj.setZoom(defaultZoom);
+            }
+        } catch (zoomError) {
+            console.error("Error setting fallback zoom:", zoomError);
+        }
+
+        return false;
+    }
+}
+
+/**
+ * Safely center the map on a position
+ * @param {google.maps.Map} mapObj - Google Maps object
+ * @param {Object} position - Position to center on
+ * @param {number} zoom - Zoom level to set
+ * @returns {boolean} True if center was successful
+ */
+function safelySetCenter(mapObj, position, zoom) {
+    if (!mapObj) {
+        return false;
+    }
+
+    try {
+        const safePosition = createSafeLatLng(position);
+        if (!safePosition) {
+            return false;
+        }
+
+        mapObj.setCenter(safePosition);
+
+        if (zoom !== undefined) {
+            mapObj.setZoom(zoom);
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Error setting map center:", error);
+        return false;
+    }
+}
+
+/**
+ * Create a new clean bounds object
+ * @returns {google.maps.LatLngBounds} New bounds object
+ */
+function createNewBounds() {
+    return new google.maps.LatLngBounds();
+}
+
+/**
+ * Reset the map view to default
+ */
+function safeResetMapView() {
+    if (!mapInitialized || !map) {
+        console.error("Cannot reset map view - map not initialized");
+        return;
+    }
+
+    try {
+        // Center on US and zoom out with safe method
+        safelySetCenter(map, CONFIG.defaultCenter, CONFIG.defaultZoom);
+
+        // Close any open info windows
+        if (infoWindow) {
+            infoWindow.close();
+        }
+    } catch (error) {
+        console.error("Error resetting map view:", error);
+    }
+}
+
 /**
  * Enhanced business-search.js with Google Maps functionality
  * Implements AdvancedMarkerElement with proper error handling and performance optimizations
@@ -1771,8 +2079,8 @@ async function searchPlacesClientSide(query, location) {
 
             // Create location as LatLng object
             const center = new google.maps.LatLng(
-                location.latitude || location.lat,
-                location.longitude || location.lng
+                parseFloat(location.latitude) || parseFloat(location.lat) || 0,
+                parseFloat(location.longitude) || parseFloat(location.lng) || 0
             );
 
             // Create the places service
@@ -1787,24 +2095,36 @@ async function searchPlacesClientSide(query, location) {
 
             // Perform the search
             service.textSearch(request, (results, status) => {
-                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
                     console.log(`Found ${results.length} places via client-side API`);
 
                     // Process the results into a consistent format
-                    const formattedResults = results.map(place => ({
-                        id: place.place_id,
-                        place_id: place.place_id,
-                        name: place.name,
-                        displayName: place.name,
-                        formatted_address: place.formatted_address,
-                        formattedAddress: place.formatted_address,
-                        location: {
-                            lat: place.geometry.location.lat(),
-                            lng: place.geometry.location.lng()
-                        },
-                        types: place.types,
-                        business_status: place.business_status
-                    }));
+                    const formattedResults = results.map(place => {
+                        // Ensure we have valid location data
+                        if (!place.geometry || !place.geometry.location) {
+                            console.warn("Place missing geometry or location:", place);
+                            return null;
+                        }
+
+                        return {
+                            id: place.place_id,
+                            place_id: place.place_id,
+                            name: place.name,
+                            displayName: place.name,
+                            formatted_address: place.formatted_address,
+                            formattedAddress: place.formatted_address,
+                            // Store both formats of location for compatibility
+                            location: {
+                                lat: place.geometry.location.lat(),
+                                lng: place.geometry.location.lng()
+                            },
+                            geometry: {
+                                location: place.geometry.location
+                            },
+                            types: place.types,
+                            business_status: place.business_status
+                        };
+                    }).filter(place => place !== null); // Remove null entries
 
                     // Clean up temporary div if we created one
                     if (mapDiv.id === 'temp-map-div') {
@@ -1820,7 +2140,11 @@ async function searchPlacesClientSide(query, location) {
                         document.body.removeChild(mapDiv);
                     }
 
-                    reject(new Error(`Places search failed: ${status}`));
+                    if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+                        resolve([]);
+                    } else {
+                        reject(new Error(`Places search failed: ${status}`));
+                    }
                 }
             });
         } catch (error) {
@@ -1899,6 +2223,8 @@ async function searchGooglePlaces(formData) {
 
         // Clear existing markers
         clearMarkers();
+
+        // Create new bounds
         bounds = new google.maps.LatLngBounds();
 
         // Build search query
@@ -1937,8 +2263,8 @@ async function searchGooglePlaces(formData) {
 
         if (!useMyLocation || typeof useLocationFailed !== 'undefined') {
             try {
-                // Use server-side geocoding instead of direct Google API call
-                const geocodeResult = await geocodeAddressServerSide(formData.address || searchQuery);
+                // Use client-side geocoding
+                const geocodeResult = await geocodeAddressClientSide(formData.address || searchQuery);
 
                 if (geocodeResult) {
                     searchLocation = {
@@ -1974,8 +2300,7 @@ async function searchGooglePlaces(formData) {
                     CONFIG.defaultCenter.lng
                 );
 
-                // Create new bounds
-                bounds = new google.maps.LatLngBounds();
+                // Extend bounds
                 bounds.extend(googleMapsLocation);
 
                 console.log("Using default US center for search");
@@ -1983,11 +2308,10 @@ async function searchGooglePlaces(formData) {
         }
 
         try {
-            // Use server-side places search
+            // Use client-side places search
             const placeResults = await searchPlacesClientSide(
                 searchQuery,
-                searchLocation,
-                50000  // 50km radius
+                searchLocation
             );
 
             // Remove loading indicator
@@ -2018,26 +2342,59 @@ async function searchGooglePlaces(formData) {
             // Display results
             displaySearchResults(businessResults);
 
-            // Fit map to bounds
+            // Safe bounds adjustment
             if (bounds && !bounds.isEmpty()) {
-                map.fitBounds(bounds);
+                // Check if bounds has valid coordinates before fitting
+                let validBounds = true;
+                const ne = bounds.getNorthEast();
+                const sw = bounds.getSouthWest();
 
-                // Adjust zoom level
-                setTimeout(() => {
-                    if (businessResults.length <= 2) {
-                        const currentZoom = map.getZoom();
-                        if (currentZoom > 14) {
-                            map.setZoom(14);
-                        }
-                    } else if (businessResults.length > 10) {
-                        const currentZoom = map.getZoom();
-                        if (currentZoom < 10) {
-                            map.setZoom(10);
-                        }
+                if (isNaN(ne.lat()) || isNaN(ne.lng()) || isNaN(sw.lat()) || isNaN(sw.lng())) {
+                    console.warn("Invalid bounds coordinates detected, using center position instead");
+                    validBounds = false;
+                }
+
+                if (validBounds) {
+                    try {
+                        map.fitBounds(bounds);
+
+                        // Adjust zoom level safely
+                        setTimeout(() => {
+                            try {
+                                if (businessResults.length <= 2) {
+                                    const currentZoom = map.getZoom();
+                                    if (currentZoom > 14) {
+                                        map.setZoom(14);
+                                    }
+                                } else if (businessResults.length > 10) {
+                                    const currentZoom = map.getZoom();
+                                    if (currentZoom < 10) {
+                                        map.setZoom(10);
+                                    }
+                                }
+                            } catch (zoomError) {
+                                console.error("Error adjusting zoom:", zoomError);
+                            }
+                        }, 100);
+                    } catch (fitBoundsError) {
+                        console.error("Error fitting bounds:", fitBoundsError);
+                        // If fitBounds fails, center on search location
+                        map.setCenter(new google.maps.LatLng(
+                            searchLocation.latitude,
+                            searchLocation.longitude
+                        ));
+                        map.setZoom(11);
                     }
-                }, 100);
+                } else {
+                    // Use search location as center
+                    map.setCenter(new google.maps.LatLng(
+                        searchLocation.latitude,
+                        searchLocation.longitude
+                    ));
+                    map.setZoom(11);
+                }
             } else {
-                // If bounds are empty, center on search location
+                // If bounds is empty, center on search location
                 map.setCenter(new google.maps.LatLng(
                     searchLocation.latitude,
                     searchLocation.longitude
@@ -2056,11 +2413,15 @@ async function searchGooglePlaces(formData) {
 
             // Center map on search location if possible
             if (searchLocation) {
-                map.setCenter(new google.maps.LatLng(
-                    searchLocation.latitude,
-                    searchLocation.longitude
-                ));
-                map.setZoom(11);
+                try {
+                    map.setCenter(new google.maps.LatLng(
+                        searchLocation.latitude,
+                        searchLocation.longitude
+                    ));
+                    map.setZoom(11);
+                } catch (centerError) {
+                    console.error("Error centering map:", centerError);
+                }
             }
         }
     } catch (error) {
@@ -2233,6 +2594,12 @@ function processPlaceResults(places, searchLocation) {
     // Create the search location as LatLng for distance calculations
     const searchLatLng = new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude);
 
+    // Create new bounds for this search
+    bounds = new google.maps.LatLngBounds();
+
+    // Extend bounds with the search center location
+    bounds.extend(searchLatLng);
+
     places.forEach(place => {
         try {
             // Skip if no location
@@ -2263,12 +2630,40 @@ function processPlaceResults(places, searchLocation) {
                 // Add more mappings as needed
             }
 
-            // Calculate distance
-            const placeLatLng = new google.maps.LatLng(
-                place.location.latitude,
-                place.location.longitude
-            );
+            // Properly create Google Maps LatLng object for place location
+            let placeLatLng;
 
+            // Handle different formats of location data
+            if (place.location && place.location.lat && place.location.lng) {
+                // Direct lat/lng format
+                placeLatLng = new google.maps.LatLng(
+                    parseFloat(place.location.lat),
+                    parseFloat(place.location.lng)
+                );
+            } else if (place.location && typeof place.location.latitude === 'number' && typeof place.location.longitude === 'number') {
+                // Latitude/longitude format
+                placeLatLng = new google.maps.LatLng(
+                    place.location.latitude,
+                    place.location.longitude
+                );
+            } else if (place.geometry && place.geometry.location) {
+                // Standard Places API format
+                if (typeof place.geometry.location.lat === 'function') {
+                    // It's already a LatLng object
+                    placeLatLng = place.geometry.location;
+                } else {
+                    // It's a lat/lng literal
+                    placeLatLng = new google.maps.LatLng(
+                        place.geometry.location.lat,
+                        place.geometry.location.lng
+                    );
+                }
+            } else {
+                console.warn("Place has no valid location data:", place);
+                return; // Skip this place
+            }
+
+            // Calculate distance
             const distance = google.maps.geometry.spherical.computeDistanceBetween(
                 searchLatLng,
                 placeLatLng
@@ -2279,7 +2674,9 @@ function processPlaceResults(places, searchLocation) {
                 if (!marker.business) return false;
 
                 if (marker.business.placeId === place.id ||
-                    marker.business._id === 'google_' + place.id) {
+                    marker.business.placeId === place.place_id ||
+                    marker.business._id === 'google_' + place.id ||
+                    marker.business._id === 'google_' + place.place_id) {
                     return true;
                 }
 
@@ -2290,25 +2687,25 @@ function processPlaceResults(places, searchLocation) {
 
             // Create business object
             const business = {
-                _id: 'google_' + place.id,
-                bname: place.displayName,
+                _id: 'google_' + (place.id || place.place_id),
+                bname: place.displayName || place.name || 'Unknown Business',
                 address1: address1,
                 city: city,
                 state: state,
                 zip: zip,
                 type: businessType,
-                phone: place.nationalPhoneNumber || '',
+                phone: place.nationalPhoneNumber || place.formatted_phone_number || '',
                 isGooglePlace: true,
-                placeId: place.id,
-                lat: place.location.latitude,
-                lng: place.location.longitude,
+                placeId: place.id || place.place_id,
+                lat: placeLatLng.lat(),
+                lng: placeLatLng.lng(),
                 distance: distance
             };
 
-            // Add marker
+            // Add marker with properly created LatLng object
             addAdvancedMarker(business, placeLatLng);
 
-            // Extend bounds
+            // Add this location to the bounds
             bounds.extend(placeLatLng);
 
             // Add to results
@@ -2321,6 +2718,7 @@ function processPlaceResults(places, searchLocation) {
 
     return businessResults;
 }
+
 
 // /**
 //  * Get the Google Maps API key from the app configuration
@@ -2970,17 +3368,62 @@ window.focusOnMapMarker = function(businessId) {
     const marker = markers.find(m => m.business && m.business._id === businessId);
 
     if (marker) {
-        // Center the map on this marker
-        map.setCenter(marker.position);
-        map.setZoom(16);
+        try {
+            // Get position based on marker type
+            let position;
+            if (marker.getPosition) {
+                // Standard marker
+                position = marker.getPosition();
+            } else if (marker.position) {
+                // Advanced marker
+                if (typeof marker.position.lat === 'function') {
+                    // It's already a LatLng object
+                    position = marker.position;
+                } else {
+                    // It's a position object with lat/lng properties
+                    position = new google.maps.LatLng(
+                        parseFloat(marker.position.lat),
+                        parseFloat(marker.position.lng)
+                    );
+                }
+            } else if (marker.business && marker.business.lat && marker.business.lng) {
+                // Fall back to business object coordinates
+                position = new google.maps.LatLng(
+                    parseFloat(marker.business.lat),
+                    parseFloat(marker.business.lng)
+                );
+            } else {
+                console.error("Could not determine marker position");
+                alert("Could not focus on this business on the map.");
+                return;
+            }
 
-        // Open the info window for this marker
-        showInfoWindow(marker);
+            // Verify position has valid coordinates
+            if (isNaN(position.lat()) || isNaN(position.lng())) {
+                console.error("Invalid marker position coordinates:", position);
+                alert("This business has invalid map coordinates.");
+                return;
+            }
 
-        // Scroll to the map
-        document.getElementById('map').scrollIntoView({behavior: 'smooth'});
+            // Center the map on this marker
+            map.setCenter(position);
+            map.setZoom(16);
 
-        console.log("Successfully focused on marker for business:", businessId);
+            // Open the info window for this marker
+            if (marker.business.isGooglePlace) {
+                showGooglePlaceInfoWindow(marker.business, position);
+            } else {
+                showInfoWindow(marker);
+            }
+
+            // Scroll to the map
+            document.getElementById('map').scrollIntoView({behavior: 'smooth'});
+
+            console.log("Successfully focused on marker for business:", businessId);
+        } catch (error) {
+            console.error("Error focusing on marker:", error);
+            alert("There was an error focusing on this business on the map.");
+        }
     } else {
         console.warn(`No marker found for business ID: ${businessId}`);
         alert("This business could not be located on the map. It may not have a complete address.");
@@ -3460,19 +3903,35 @@ async function addAdvancedMarker(business, location) {
 
         // Create a position object from the location
         let position;
-        if (location.lat && typeof location.lat === 'function') {
-            position = { lat: location.lat(), lng: location.lng() };
-        } else if (typeof location.lat === 'number') {
+
+        if (location instanceof google.maps.LatLng) {
+            // It's already a LatLng object
             position = location;
+        } else if (location.lat && typeof location.lat === 'function') {
+            // It's a LatLng-like object with lat() method
+            position = location;
+        } else if (typeof location.lat === 'number' && typeof location.lng === 'number') {
+            // It's a position object with numeric lat/lng
+            position = new google.maps.LatLng(location.lat, location.lng);
         } else if (business.lat && business.lng) {
-            position = { lat: business.lat, lng: business.lng };
+            // Use the coordinates from the business object
+            position = new google.maps.LatLng(
+                parseFloat(business.lat),
+                parseFloat(business.lng)
+            );
         } else {
-            console.error("Invalid position for marker");
+            console.error("Invalid position for marker:", location);
+            return null;
+        }
+
+        // Validate position has real coordinates
+        if (isNaN(position.lat()) || isNaN(position.lng())) {
+            console.error("Position has NaN coordinates:", position);
             return null;
         }
 
         // Ensure business name is a string
-        const businessTitle = business.bname || 'Business';
+        const businessTitle = typeof business.bname === 'string' ? business.bname : String(business.bname || 'Business');
 
         // Determine marker color
         const isNearby = business.isNearby === true;
@@ -3500,11 +3959,11 @@ async function addAdvancedMarker(business, location) {
             </div>
         `;
 
-        // Create the advanced marker - ensure title is a string
+        // Create the advanced marker
         const marker = new AdvancedMarkerElement({
             position: position,
             map: map,
-            title: String(businessTitle), // Ensure title is always a string
+            title: businessTitle,
             content: pinElement,
             collisionBehavior: isNearby ? 'OPTIONAL_AND_HIDES_LOWER_PRIORITY' : 'REQUIRED_AND_HIDES_OPTIONAL'
         });
@@ -3516,7 +3975,7 @@ async function addAdvancedMarker(business, location) {
 
         // Add click event listener
         pinElement.addEventListener('click', function(e) {
-            console.log("Marker element clicked:", business.bname);
+            console.log("Marker element clicked:", businessTitle);
             e.stopPropagation();
             showInfoWindow(marker);
         });

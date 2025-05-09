@@ -25,7 +25,7 @@ module.exports = async (req, res) => {
         }
         // At the beginning of your API handler
         console.log("API Key length:", process.env.GOOGLE_MAPS_API_KEY ? process.env.GOOGLE_MAPS_API_KEY.length : 0);
-        console.log("API Key first 4 chars:", process.env.GOOGLE_MAPS_API_KEY ? process.env.GOOGLE_MAPS_API_KEY.slice(0, 4) : "none");
+        console.log("API Key first 10 chars:", process.env.GOOGLE_MAPS_API_KEY ? process.env.GOOGLE_MAPS_API_KEY.slice(0, 10) : "none");
 
         const encodedAddress = encodeURIComponent(address);
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;

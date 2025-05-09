@@ -44,7 +44,7 @@ async function handlePlacesSearch(req, res) {
     }
     // At the beginning of your API handler
     console.log("API Key length:", process.env.GOOGLE_MAPS_API_KEY ? process.env.GOOGLE_MAPS_API_KEY.length : 0);
-    console.log("API Key first 4 chars:", process.env.GOOGLE_MAPS_API_KEY ? process.env.GOOGLE_MAPS_API_KEY.slice(0, 4) : "none");
+    console.log("API Key first 10 chars:", process.env.GOOGLE_MAPS_API_KEY ? process.env.GOOGLE_MAPS_API_KEY.slice(0, 10) : "none");
     // Use Place Search API (Text Search) for simpler queries
     let url;
     if (latitude && longitude) {
