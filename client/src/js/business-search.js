@@ -557,7 +557,7 @@ function getUserLocation() {
 // }
 
 /**
- * Add custom CSS to style the markers properly
+ * Add custom CSS to style the markers properly with explicit Font Awesome icon handling
  */
 function addCustomMarkerStyles() {
     if (!document.getElementById('custom-marker-css')) {
@@ -602,9 +602,31 @@ function addCustomMarkerStyles() {
                 height: 20px;
             }
             
-            .marker-icon i {
+            /* Critical fix - ensure Font Awesome icons are visible */
+            .marker-icon i.fas,
+            .marker-icon i.fa,
+            .marker-icon i.far,
+            .marker-icon i.fab {
+                display: inline-block !important;
                 font-size: 14px !important;
                 color: white !important;
+                line-height: 1 !important;
+                width: auto !important;
+                height: auto !important;
+                vertical-align: middle !important;
+            }
+            
+            /* Fallback icon content for missing Font Awesome */
+            .marker-icon i.fas.fa-store-alt:after {
+                content: "🏪";
+                font-family: sans-serif;
+                font-size: 14px;
+            }
+            
+            .marker-icon i.fas.fa-shopping-cart:after {
+                content: "🛒";
+                font-family: sans-serif;
+                font-size: 14px;
             }
             
             .marker-shadow {
@@ -620,6 +642,13 @@ function addCustomMarkerStyles() {
             }
             
             /* Info window action button styling */
+            .info-window-actions {
+                margin-top: 12px;
+                padding-top: 8px;
+                border-top: 1px solid #eee;
+                text-align: right;
+            }
+            
             .info-window-actions .add-business-btn,
             .info-window-actions .view-details-btn {
                 margin-top: 8px;
@@ -633,6 +662,7 @@ function addCustomMarkerStyles() {
                 border: none;
                 color: white;
                 letter-spacing: 0.5px;
+                display: inline-block;
             }
             
             .info-window-actions .add-business-btn {
@@ -2261,7 +2291,7 @@ async function searchGooglePlaces(formData) {
         const mapContainer = document.getElementById('map');
         if (mapContainer) {
             mapContainer.style.display = 'block';
-            mapContainer.style.height = '400px';
+            mapContainer.style.height = '500px';
         }
 
         // Clear existing markers
@@ -3030,7 +3060,7 @@ function ensureMapVisibility() {
     if (mapContainer) {
         // Force the map to be visible and sized properly
         mapContainer.style.display = 'block';
-        mapContainer.style.height = '400px';
+        mapContainer.style.height = '500px';
 
         console.log("Map container dimensions:", mapContainer.offsetWidth, "x", mapContainer.offsetHeight);
 
@@ -4107,7 +4137,7 @@ function displayBusinessesOnMap(businesses) {
 // }
 
 /**
- * Add an advanced marker to the map (Updated to ensure icons display correctly)
+ * Add an advanced marker to the map with font/emoji fallbacks
  * @param {Object} business - Business object
  * @param {Object} location - Google Maps location object
  */
@@ -4152,8 +4182,11 @@ async function addAdvancedMarker(business, location) {
         const pinClass = isNearby ? "nearby" : "primary";
         const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
 
-        // Get business type icon
-        const businessIcon = getBusinessTypeIconHTML(business.type);
+        // Get business type icon - try alternative text icon if Font Awesome issues
+        const useTextIcons = true; // Set to true to use emoji icons instead of Font Awesome
+        const businessIcon = useTextIcons ?
+            getBusinessTypeTextIcon(business.type) :
+            getBusinessTypeIconHTML(business.type);
 
         // Create a pin element
         const pinElement = document.createElement('div');
@@ -4396,42 +4429,78 @@ function fallbackCreateStandardMarker(business) {
 }
 
 /**
- * Get HTML for a business type icon - Updated to ensure icons display properly
+ * Get HTML for a business type icon - Updated with explicit styling
  * @param {string} businessType - Business type code
  * @returns {string} Icon HTML
  */
 function getBusinessTypeIconHTML(businessType) {
-    // Map business types to icon HTML
-    // Using Font Awesome icons with proper styling to ensure visibility
+    // Map business types to icon HTML with inline styles to ensure visibility
     const iconMap = {
-        'AUTO': '<i class="fas fa-car" aria-hidden="true"></i>',
-        'BEAU': '<i class="fas fa-spa" aria-hidden="true"></i>',
-        'BOOK': '<i class="fas fa-book" aria-hidden="true"></i>',
-        'CLTH': '<i class="fas fa-tshirt" aria-hidden="true"></i>',
-        'CONV': '<i class="fas fa-store" aria-hidden="true"></i>',
-        'DEPT': '<i class="fas fa-shopping-bag" aria-hidden="true"></i>',
-        'ELEC': '<i class="fas fa-bolt" aria-hidden="true"></i>',
-        'ENTR': '<i class="fas fa-film" aria-hidden="true"></i>',
-        'FURN': '<i class="fas fa-couch" aria-hidden="true"></i>',
-        'FUEL': '<i class="fas fa-gas-pump" aria-hidden="true"></i>',
-        'GIFT': '<i class="fas fa-gift" aria-hidden="true"></i>',
-        'GROC': '<i class="fas fa-shopping-cart" aria-hidden="true"></i>',
-        'HARDW': '<i class="fas fa-hammer" aria-hidden="true"></i>',
-        'HEAL': '<i class="fas fa-heartbeat" aria-hidden="true"></i>',
-        'JEWL': '<i class="fas fa-gem" aria-hidden="true"></i>',
-        'OTHER': '<i class="fas fa-store-alt" aria-hidden="true"></i>',
-        'RX': '<i class="fas fa-prescription-bottle-alt" aria-hidden="true"></i>',
-        'REST': '<i class="fas fa-utensils" aria-hidden="true"></i>',
-        'RETAIL': '<i class="fas fa-shopping-basket" aria-hidden="true"></i>',
-        'SERV': '<i class="fas fa-concierge-bell" aria-hidden="true"></i>',
-        'SPEC': '<i class="fas fa-star" aria-hidden="true"></i>',
-        'SPRT': '<i class="fas fa-football-ball" aria-hidden="true"></i>',
-        'TECH': '<i class="fas fa-laptop" aria-hidden="true"></i>',
-        'TOYS': '<i class="fas fa-gamepad" aria-hidden="true"></i>'
+        'AUTO': '<i class="fas fa-car" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'BEAU': '<i class="fas fa-spa" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'BOOK': '<i class="fas fa-book" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'CLTH': '<i class="fas fa-tshirt" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'CONV': '<i class="fas fa-store" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'DEPT': '<i class="fas fa-shopping-bag" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'ELEC': '<i class="fas fa-bolt" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'ENTR': '<i class="fas fa-film" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'FURN': '<i class="fas fa-couch" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'FUEL': '<i class="fas fa-gas-pump" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'GIFT': '<i class="fas fa-gift" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'GROC': '<i class="fas fa-shopping-cart" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'HARDW': '<i class="fas fa-hammer" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'HEAL': '<i class="fas fa-heartbeat" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'JEWL': '<i class="fas fa-gem" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'OTHER': '<i class="fas fa-store-alt" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'RX': '<i class="fas fa-prescription-bottle-alt" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'REST': '<i class="fas fa-utensils" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'RETAIL': '<i class="fas fa-shopping-basket" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'SERV': '<i class="fas fa-concierge-bell" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'SPEC': '<i class="fas fa-star" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'SPRT': '<i class="fas fa-football-ball" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'TECH': '<i class="fas fa-laptop" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>',
+        'TOYS': '<i class="fas fa-gamepad" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>'
     };
 
-    // Return the icon for this business type, or a default
-    return iconMap[businessType] || '<i class="fas fa-store" aria-hidden="true"></i>';
+    // Return the icon for this business type, or a default with inline styling
+    return iconMap[businessType] || '<i class="fas fa-store" aria-hidden="true" style="color: white !important; display: inline-block !important;"></i>';
+}
+
+/**
+ * Alternative marker approach using text content instead of Font Awesome
+ * Use this if Font Awesome icons aren't working
+ */
+function getBusinessTypeTextIcon(businessType) {
+    // Map business types to emoji or text symbols
+    const iconMap = {
+        'AUTO': '🚗',
+        'BEAU': '💇',
+        'BOOK': '📚',
+        'CLTH': '👕',
+        'CONV': '🏪',
+        'DEPT': '🛍️',
+        'ELEC': '⚡',
+        'ENTR': '🎬',
+        'FURN': '🪑',
+        'FUEL': '⛽',
+        'GIFT': '🎁',
+        'GROC': '🛒',
+        'HARDW': '🔨',
+        'HEAL': '❤️',
+        'JEWL': '💎',
+        'OTHER': '🏬',
+        'RX': '💊',
+        'REST': '🍽️',
+        'RETAIL': '🛍️',
+        'SERV': '🔧',
+        'SPEC': '⭐',
+        'SPRT': '🏈',
+        'TECH': '💻',
+        'TOYS': '🎮'
+    };
+
+    // Return with styling
+    return `<span style="font-size: 16px; color: white;">${iconMap[businessType] || '🏬'}</span>`;
 }
 
 
