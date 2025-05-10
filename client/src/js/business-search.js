@@ -2091,6 +2091,24 @@ async function geocodeAddressClientSide(address) {
             return null;
         }
 
+        // Ensure Google Maps API is loaded
+        if (!window.google || !window.google.maps) {
+            await new Promise((resolve, reject) => {
+                const checkInterval = setInterval(() => {
+                    if (window.google && window.google.maps) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 200);
+
+                // Set a timeout in case Google Maps never loads
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    reject(new Error("Google Maps API failed to load"));
+                }, 10000);
+            });
+        }
+
         // Create a new geocoder
         const geocoder = new google.maps.Geocoder();
 
@@ -2119,14 +2137,30 @@ async function geocodeAddressClientSide(address) {
 
 /**
  * Search for places using client-side Places API
+ * Complete replacement that uses the updated Places API
  * @param {string} query - Search query
  * @param {Object} location - Location with latitude and longitude
  * @param {number} radius - Search radius in meters
  * @returns {Promise<Array>} Places search results
  */
-async function searchPlacesClientSide(query, location) {
+async function searchPlacesClientSide(query, location, radius = 50000) {
     // Make sure Google Maps is initialized first
-    await ensureGoogleMapsInitialized();
+    if (!window.google || !window.google.maps) {
+        await new Promise((resolve, reject) => {
+            const checkInterval = setInterval(() => {
+                if (window.google && window.google.maps) {
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 200);
+
+            // Set a timeout in case Google Maps never loads
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                reject(new Error("Google Maps API failed to load"));
+            }, 10000);
+        });
+    }
 
     return new Promise((resolve, reject) => {
         try {
@@ -2144,7 +2178,10 @@ async function searchPlacesClientSide(query, location) {
                 // Create a temporary map if needed
                 if (!map) {
                     map = new google.maps.Map(mapDiv, {
-                        center: { lat: location.latitude || location.lat || 0, lng: location.longitude || location.lng || 0 },
+                        center: {
+                            lat: location.latitude || location.lat || 0,
+                            lng: location.longitude || location.lng || 0
+                        },
                         zoom: 10
                     });
                 }
@@ -2163,7 +2200,7 @@ async function searchPlacesClientSide(query, location) {
             const request = {
                 query: query,
                 location: center,
-                radius: 50000 // 50km radius
+                radius: radius // 50km radius
             };
 
             // Perform the search
@@ -2227,9 +2264,13 @@ async function searchPlacesClientSide(query, location) {
     });
 }
 
-// Update these functions to use the server-side endpoints
-
-// Modified geocodeBusinessAddress function to use server-side geocoding
+/**
+ * Geocode a business address to get coordinates
+ * Uses a client-side approach with proper error handling
+ * @param {Object} business - Business object with address data
+ * @param {number} index - Index of the business in the array
+ * @param {number} total - Total number of businesses
+ */
 function geocodeBusinessAddress(business, index, total) {
     if (!business || !business.address1) {
         console.error("Invalid business data for geocoding", business);
@@ -2242,40 +2283,59 @@ function geocodeBusinessAddress(business, index, total) {
     // Add a small delay to avoid hitting rate limits
     setTimeout(async () => {
         try {
-            // Use server-side geocoding instead of direct Google API call
-            const location = await geocodeAddressServerSide(addressString);
+            // Use client-side geocoding directly
+            const geocoder = new google.maps.Geocoder();
 
-            if (location) {
-                // Store the coordinates in the business object
-                business.lat = location.lat;
-                business.lng = location.lng;
+            geocoder.geocode({'address': addressString}, function(results, status) {
+                if (status === google.maps.GeocoderStatus.OK) {
+                    if (results[0]) {
+                        const location = results[0].geometry.location;
 
-                // Create a Google Maps LatLng object
-                const googleMapsLocation = new google.maps.LatLng(location.lat, location.lng);
+                        // Store the coordinates in the business object
+                        business.lat = location.lat();
+                        business.lng = location.lng();
 
-                // Create marker
-                addAdvancedMarker(business, googleMapsLocation);
+                        // Create marker
+                        addAdvancedMarker(business, location);
 
-                // Extend bounds
-                bounds.extend(googleMapsLocation);
+                        // Extend bounds if valid
+                        if (bounds && location) {
+                            bounds.extend(location);
+                        }
 
-                // If this is the last business, fit the map to the bounds
-                if (index === total - 1) {
-                    map.fitBounds(bounds);
+                        // If this is the last business, fit the map to the bounds
+                        if (index === total - 1) {
+                            if (bounds && !bounds.isEmpty()) {
+                                // Safely set map bounds
+                                try {
+                                    map.fitBounds(bounds);
+                                } catch (error) {
+                                    console.error("Error fitting bounds:", error);
+                                    // Fallback to center on the location
+                                    map.setCenter(location);
+                                    map.setZoom(15);
+                                }
+                            } else {
+                                // If bounds is empty or invalid, just center on the location
+                                map.setCenter(location);
+                                map.setZoom(15);
+                            }
 
-                    // If we only have one marker, zoom in appropriately
-                    if (total === 1) {
-                        map.setZoom(15);
+                            // If we only have one marker, zoom in appropriately
+                            if (total === 1) {
+                                map.setZoom(15);
+                            }
+
+                            // Search for nearby businesses if we have at least one result
+                            if (total >= 1) {
+                                searchNearbyBusinesses(location, business.type);
+                            }
+                        }
                     }
-
-                    // Search for nearby businesses if we have at least one result
-                    if (total >= 1) {
-                        searchNearbyBusinesses(googleMapsLocation, business.type);
-                    }
+                } else {
+                    console.error("Geocode failed for address " + addressString + ": " + status);
                 }
-            } else {
-                console.error("Geocoding failed for address: " + addressString);
-            }
+            });
         } catch (error) {
             console.error("Error in geocodeBusinessAddress:", error);
         }
@@ -2509,43 +2569,79 @@ async function searchGooglePlaces(formData) {
     }
 }
 
-// Modified window.addBusinessToDatabase function to use server-side place details
+/**
+* Add a business to the database
+* @param {string} placeId - Google Place ID
+*/
 window.addBusinessToDatabase = async function(placeId) {
     console.log("Adding place to database:", placeId);
 
     try {
-        // Use server-side endpoint to get place details
-        const place = await getPlaceDetailsServerSide(placeId);
-
-        if (!place) {
-            throw new Error("Could not retrieve place details");
+        // Check if Google Maps API is loaded
+        if (!window.google || !window.google.maps) {
+            throw new Error("Google Maps API is not loaded");
         }
 
-        // Create business data object from place details
+        // Import the Places library properly
+        const { Place } = await google.maps.importLibrary("places");
+
+        // Create a Place instance
+        const place = new Place({
+            id: placeId
+        });
+
+        // Fetch comprehensive place details
+        await place.fetchFields({
+            fields: [
+                'displayName',
+                'formattedAddress',
+                'addressComponents',
+                'location',
+                'nationalPhoneNumber'
+            ]
+        });
+
+        console.log("Place details retrieved:", place);
+
+        // Extract address components from the place
+        const addressComponents = {};
+
+        // Process address components correctly
+        if (place.addressComponents) {
+            place.addressComponents.forEach(component => {
+                component.types.forEach(type => {
+                    addressComponents[type] = component.shortText || component.text;
+                });
+            });
+        }
+
+        // Build the address with proper fallbacks
         const businessData = {
-            name: place.name || '',
-            address1: place.address_components.street_number + ' ' + place.address_components.route,
-            city: place.address_components.city,
-            state: place.address_components.state,
-            zip: place.address_components.zip,
-            phone: place.phone || '',
-            placeId: place.place_id,
+            name: place.displayName || '',
+            address1: `${addressComponents.street_number || ''} ${addressComponents.route || ''}`.trim(),
+            city: addressComponents.locality || addressComponents.administrative_area_level_2 || '',
+            state: addressComponents.administrative_area_level_1 || '',
+            zip: addressComponents.postal_code || '',
+            phone: place.nationalPhoneNumber || '',
+            placeId: place.id,
 
             // Store coordinates for later use
-            lat: place.location.lat || 0,
-            lng: place.location.lng || 0,
+            lat: place.location ? place.location.lat : 0,
+            lng: place.location ? place.location.lng : 0,
+
             // Add this for proper GeoJSON formatting
             location: {
                 type: 'Point',
                 coordinates: [
-                    place.location.lng || 0,
-                    place.location.lat || 0
+                    place.location ? place.location.lng : 0,
+                    place.location ? place.location.lat : 0
                 ]
             }
         };
 
         // Log the coordinates to verify they're correct
         console.log(`Place coordinates: ${businessData.lat}, ${businessData.lng}`);
+        console.log("Business data prepared:", businessData);
 
         // Store in sessionStorage for the add business page to use
         sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
@@ -2554,7 +2650,9 @@ window.addBusinessToDatabase = async function(placeId) {
         window.location.href = 'business-add.html?prefill=true';
     } catch (error) {
         console.error("Error fetching place details for addition:", error);
-        alert("Sorry, we couldn't retrieve the details for this business. Please try again or add it manually.");
+
+        // More helpful error message with debugging tips
+        alert(`Sorry, we couldn't retrieve the details for this business.\n\nError: ${error.message}\n\nPlease try again or add it manually.`);
     }
 };
 
