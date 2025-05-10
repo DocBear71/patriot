@@ -248,7 +248,7 @@ function loadExistingChains() {
 
                 chainsHTML += `
                     <div class="card mb-2 chain-item" data-chain-id="${chain._id}" data-chain-name="${chain.bname}">
-                        <div class="card-body d-flex justify-content-between align-items-left py-2">
+                        <div class="card-body d-flex justify-content-between py-2">
                             <div>
                                 <h4 class="mb-0">${chain.bname}</h4>
                                 <small>${businessTypeLabel}</small>
