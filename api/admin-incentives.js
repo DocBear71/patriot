@@ -137,6 +137,11 @@ async function handleListIncentives(req, res) {
             filter.is_available = req.query.is_available === 'true';
         }
 
+        // Add date filter if provided
+        if (req.query.created_after) {
+            filter.created_at = { $gte: new Date(req.query.created_after) };
+        }
+
         // Add search filter if provided
         if (req.query.search) {
             const searchRegex = new RegExp(req.query.search, 'i');
@@ -147,10 +152,10 @@ async function handleListIncentives(req, res) {
         }
 
         // Count total incentives matching the filter
-        const total = await Incentive.countDocuments(filter); // Fixed: Incentive not Incentives
+        const total = await Incentive.countDocuments(filter);
 
         // Execute the query with pagination
-        const incentives = await Incentive.find(filter) // Fixed: Incentive not Incentives
+        const incentives = await Incentive.find(filter)
             .sort({ created_at: -1 })
             .skip(skip)
             .limit(limit)
@@ -161,7 +166,7 @@ async function handleListIncentives(req, res) {
             const incentiveObj = incentive;
 
             // Look up business name if business_id is present
-            if (incentive.business_id) { // Fixed: incentive not Incentives
+            if (incentive.business_id) {
                 try {
                     const business = await Business.findById(incentive.business_id);
                     if (business) {

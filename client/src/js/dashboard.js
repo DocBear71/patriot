@@ -690,7 +690,41 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            // Make API request for incentives list
+            // First, fetch total count of all incentives
+            const totalResponse = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=1`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': 'no-cache'
+                }
+            });
+
+            if (!totalResponse.ok) {
+                throw totalResponse;
+            }
+
+            const totalData = await totalResponse.json();
+            console.log("Total incentives data:", totalData);
+            const totalCount = totalData.total || 0;
+
+            // Next, fetch count of available incentives
+            const availableResponse = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&is_available=true&page=1&limit=1`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': 'no-cache'
+                }
+            });
+
+            if (!availableResponse.ok) {
+                throw availableResponse;
+            }
+
+            const availableData = await availableResponse.json();
+            console.log("Available incentives data:", availableData);
+            const availableCount = availableData.total || 0;
+
+            // Now, fetch the sample for display (limit 5)
             const response = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=5`, {
                 method: 'GET',
                 headers: {
@@ -713,55 +747,57 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const data = await response.json();
-            console.log("Incentives data from API:", data);
+            console.log("Incentives sample data from API:", data);
 
-            // Store the total count from the API
-            const incentives = data.incentives || data.results || [];
-            const totalCount = data.total || 0; // Use the total count from API
-
-            // Update the dashboard stats with the correct total
+            // Store the data in dashboardStats
             if (dashboardStats) {
                 dashboardStats.incentiveCount = totalCount;
+                dashboardStats.availableIncentiveCount = availableCount;
             }
 
-            // Count available incentives
-            const availableCount = incentives.filter(i => i.is_available).length;
-
-            // For new incentives this month:
-            // If totalCount is much higher than the list length, we need to estimate
-            // because we don't have all the incentives to check creation dates
-            let newCount = 0;
-
-            // Check if we have creation dates to calculate actual new incentives
-            const thisMonth = new Date().getMonth();
+            // Calculate new incentives this month
+            // Use a separate query for this month's new incentives
+            const thisMonth = new Date().getMonth() + 1; // JavaScript months are 0-indexed
             const thisYear = new Date().getFullYear();
 
-            // Count new incentives in our sample
-            incentives.forEach(incentive => {
-                if (incentive.created_at) {
-                    const createdDate = new Date(incentive.created_at);
-                    if (createdDate.getMonth() === thisMonth && createdDate.getFullYear() === thisYear) {
-                        newCount++;
+            try {
+                // Format date for query: YYYY-MM
+                const yearMonthStr = `${thisYear}-${thisMonth.toString().padStart(2, '0')}`;
+
+                const newResponse = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&created_after=${yearMonthStr}-01&page=1&limit=1`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+
+                if (newResponse.ok) {
+                    const newData = await newResponse.json();
+                    console.log("New incentives this month:", newData);
+                    const newCount = newData.total || 0;
+
+                    // Store in dashboard stats
+                    if (dashboardStats) {
+                        dashboardStats.newIncentivesThisMonth = newCount;
                     }
                 }
-            });
-
-            // Adjust the estimate if we have a partial dataset
-            if (totalCount > incentives.length) {
-                // Scale the estimate based on what we found in our sample
-                newCount = Math.round((newCount / incentives.length) * totalCount);
+            } catch (error) {
+                console.error("Error fetching new incentives:", error);
+                // Fallback to estimate
+                if (dashboardStats) {
+                    dashboardStats.newIncentivesThisMonth = Math.round(totalCount * 0.1); // Estimate 10% are new
+                }
             }
 
-            // Save new count to dashboardStats
-            if (dashboardStats) {
-                dashboardStats.newIncentivesThisMonth = newCount;
-            }
+            // Store the sample for display
+            const incentives = data.incentives || data.results || [];
 
             // Render incentives in the table
             renderDashboardIncentives(incentives);
 
             // Update the stats directly with the correct counts
-            updateIncentiveStats(totalCount, availableCount, newCount);
+            updateIncentiveStats(totalCount, availableCount, dashboardStats.newIncentivesThisMonth || 0);
 
         } catch (error) {
             handleApiError(error, () => {
