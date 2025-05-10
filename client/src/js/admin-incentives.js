@@ -356,6 +356,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    /**
+     * Update the total count in the UI
+     * @param {number} count - The total count of items
+     */
+    function updateTotalCount(count) {
+        // Find the heading element that contains the management title
+        const headingEl = document.querySelector('.admin-header h2');
+
+        if (headingEl) {
+            // Get the base text without any existing badge
+            const baseText = headingEl.textContent.split(' ').slice(0, 2).join(' ');
+
+            // Update the heading to include the count
+            headingEl.innerHTML = `${baseText} <span class="badge badge-info">${count} total</span>`;
+        }
+    }
+
     // Load incentives from API
     async function loadIncentives() {
         try {
@@ -413,11 +430,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             console.log("Incentives data from API:", data);
 
-            // Check if we have results property (for existing API) or incentives property (for new API)
-            incentives = data.results || data.incentives || [];
+            // Store the total count from the API response
+            incentives = data.incentives || data.results || [];
             totalPages = data.totalPages || Math.ceil((data.total || 0) / itemsPerPage) || 1;
+            totalItems = data.total || 0; // <-- Make sure to capture this value
 
-            // Render incentives in the table
+            // Update the UI to show the total count
+            updateTotalCount(totalItems);
+
+           // Render incentives in the table
             renderIncentives();
 
             // Update pagination

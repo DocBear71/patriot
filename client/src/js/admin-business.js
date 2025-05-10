@@ -242,6 +242,23 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
 
+    /**
+     * Update the total count in the UI
+     * @param {number} count - The total count of items
+     */
+    function updateTotalCount(count) {
+        // Find the heading element that contains the management title
+        const headingEl = document.querySelector('.admin-header h2');
+
+        if (headingEl) {
+            // Get the base text without any existing badge
+            const baseText = headingEl.textContent.split(' ').slice(0, 2).join(' ');
+
+            // Update the heading to include the count
+            headingEl.innerHTML = `${baseText} <span class="badge badge-info">${count} total</span>`;
+        }
+    }
+
     // Load businesses from API
     async function loadBusinesses() {
         try {
@@ -292,9 +309,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw response;
             }
 
+            // Similarly, in loadBusinesses() in admin-business.js:
+
             const data = await response.json();
             businesses = data.businesses || [];
             totalPages = data.totalPages || 1;
+            totalItems = data.total || 0; // <-- Capture this value
+
+            // Update the UI to show the total count
+            updateTotalCount(totalItems);
 
             // Render businesses in the table
             renderBusinesses();
