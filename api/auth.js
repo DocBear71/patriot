@@ -956,6 +956,130 @@ async function handleForgotPassword(req, res) {
     }
 }
 
+async function handleDashboardStats(req, res) {
+    try {
+        // Connect to MongoDB
+        await connect;
+
+        // Get user count and growth
+        const userCount = await User.countDocuments();
+
+        // Get count of users created last month
+        const lastMonthStart = new Date();
+        lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+        lastMonthStart.setDate(1);
+        lastMonthStart.setHours(0, 0, 0, 0);
+
+        const lastMonthEnd = new Date();
+        lastMonthEnd.setDate(0); // Last day of previous month
+        lastMonthEnd.setHours(23, 59, 59, 999);
+
+        const lastMonthUsers = await User.countDocuments({
+            created_at: {
+                $gte: lastMonthStart,
+                $lte: lastMonthEnd
+            }
+        });
+
+        // Get count of users created this month
+        const thisMonthStart = new Date();
+        thisMonthStart.setDate(1);
+        thisMonthStart.setHours(0, 0, 0, 0);
+
+        const newUsersThisMonth = await User.countDocuments({
+            created_at: {
+                $gte: thisMonthStart
+            }
+        });
+
+        // Get count of active users (non-deleted)
+        const activeUserCount = await User.countDocuments({
+            status: { $ne: 'deleted' }
+        });
+
+        // Calculate user change percentage
+        let userChange = 0;
+        if (userCount > lastMonthUsers && lastMonthUsers > 0) {
+            userChange = Math.round(((userCount - lastMonthUsers) / lastMonthUsers) * 100);
+        } else if (newUsersThisMonth > 0) {
+            // If we can't calculate properly, use new users as an estimate
+            userChange = Math.round((newUsersThisMonth / userCount) * 100);
+        }
+
+        // Get business count and growth - use the Business model
+        const businessCount = await Business.countDocuments();
+
+        // Get count of businesses created last month
+        const lastMonthBusinesses = await Business.countDocuments({
+            created_at: {
+                $gte: lastMonthStart,
+                $lte: lastMonthEnd
+            }
+        });
+
+        // Get count of businesses created this month
+        const newBusinessesThisMonth = await Business.countDocuments({
+            created_at: {
+                $gte: thisMonthStart
+            }
+        });
+
+        // Calculate business change percentage
+        let businessChange = 0;
+        if (businessCount > lastMonthBusinesses && lastMonthBusinesses > 0) {
+            businessChange = Math.round(((businessCount - lastMonthBusinesses) / lastMonthBusinesses) * 100);
+        } else if (newBusinessesThisMonth > 0) {
+            // If we can't calculate properly, use new businesses as an estimate
+            businessChange = Math.round((newBusinessesThisMonth / businessCount) * 100);
+        }
+
+        // Get incentive count and growth - use the Incentive model
+        const incentiveCount = await Incentive.countDocuments();
+
+        // Get count of incentives created last month
+        const lastMonthIncentives = await Incentive.countDocuments({
+            created_at: {
+                $gte: lastMonthStart,
+                $lte: lastMonthEnd
+            }
+        });
+
+        // Get count of incentives created this month
+        const newIncentivesThisMonth = await Incentive.countDocuments({
+            created_at: {
+                $gte: thisMonthStart
+            }
+        });
+
+        // Calculate incentive change percentage
+        let incentiveChange = 0;
+        if (incentiveCount > lastMonthIncentives && lastMonthIncentives > 0) {
+            incentiveChange = Math.round(((incentiveCount - lastMonthIncentives) / lastMonthIncentives) * 100);
+        } else if (newIncentivesThisMonth > 0) {
+            // If we can't calculate properly, use new incentives as an estimate
+            incentiveChange = Math.round((newIncentivesThisMonth / incentiveCount) * 100);
+        }
+
+        // Return the stats data
+        return res.status(200).json({
+            userCount,
+            userChange,
+            activeUserCount,
+            newUsersThisMonth,
+            businessCount,
+            businessChange,
+            newBusinessesThisMonth,
+            incentiveCount,
+            incentiveChange,
+            newIncentivesThisMonth
+        });
+
+    } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+        return res.status(500).json({ message: 'Error retrieving dashboard statistics', error: error.message });
+    }
+}
+
 /**
  * Handle password reset
  * Verifies the reset token and updates the password
