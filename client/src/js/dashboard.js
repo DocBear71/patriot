@@ -88,20 +88,23 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const data = await response.json();
+            console.log("Dashboard stats from API:", data);
+
+            // Store the response data
             dashboardStats = data;
 
             // Update dashboard UI with real stats
             updateDashboardStats();
-            hideLoadingSpinner()
+            hideLoadingSpinner();
         } catch (error) {
             handleApiError(error, () => {
                 // Use placeholder stats
                 dashboardStats = {
                     userCount: 127,
                     userChange: 12,
-                    businessCount: 42,
+                    businessCount: 22, // Set to actual count
                     businessChange: 8,
-                    incentiveCount: 86,
+                    incentiveCount: 16, // Set to actual count
                     incentiveChange: 23
                 };
                 updateDashboardStats();
@@ -308,7 +311,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Load businesses from API
-// Update to the loadBusinesses function in dashboard.js
     async function loadBusinesses() {
         try {
             // Show loading indicator in dashboard businesses table
@@ -359,10 +361,71 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const data = await response.json();
+            console.log("Businesses data from API:", data);
+
+            // Extract the data we need
             businesses = data.businesses || [];
+            const totalCount = data.total || 0; // Get the total count from API
+
+            // Update dashboardStats with the correct total
+            if (dashboardStats) {
+                dashboardStats.businessCount = totalCount;
+            }
+
+            // Count active businesses in our sample
+            const activeCount = businesses.filter(b => b.status === 'active').length;
+
+            // Scale the active count if we have a partial dataset
+            let scaledActiveCount = activeCount;
+            if (totalCount > businesses.length) {
+                // Calculate a ratio based on our sample
+                const activeRatio = activeCount / businesses.length;
+                scaledActiveCount = Math.round(activeRatio * totalCount);
+            }
+
+            // Check for new businesses this month
+            const thisMonth = new Date().getMonth();
+            const thisYear = new Date().getFullYear();
+
+            let newCount = 0;
+            businesses.forEach(business => {
+                if (business.created_at) {
+                    const createdDate = new Date(business.created_at);
+                    if (createdDate.getMonth() === thisMonth && createdDate.getFullYear() === thisYear) {
+                        newCount++;
+                    }
+                }
+            });
+
+            // Scale the new count if we have a partial dataset
+            if (totalCount > businesses.length && businesses.length > 0) {
+                newCount = Math.round((newCount / businesses.length) * totalCount);
+            }
+
+            // Save to dashboardStats
+            if (dashboardStats) {
+                dashboardStats.newBusinessesThisMonth = newCount;
+            }
 
             // Render businesses in the table
             renderBusinesses();
+
+            // Directly update the business stats with the correct counts
+            const totalBusinessesCount = document.getElementById('total-businesses-count');
+            if (totalBusinessesCount) {
+                totalBusinessesCount.textContent = totalCount.toString();
+            }
+
+            const activeBusinessesCount = document.getElementById('active-businesses-count');
+            if (activeBusinessesCount) {
+                activeBusinessesCount.textContent = scaledActiveCount.toString();
+            }
+
+            const newBusinessesCount = document.getElementById('new-businesses-count');
+            if (newBusinessesCount) {
+                newBusinessesCount.textContent = newCount.toString();
+            }
+
         } catch (error) {
             handleApiError(error, () => {
                 // If API fails, show error message instead of redirecting
@@ -450,26 +513,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Update business stats
     function updateBusinessStats() {
-        // Total businesses count
+        // Total businesses count - use the count from dashboardStats
         const totalBusinessesCount = document.getElementById('total-businesses-count');
         if (totalBusinessesCount) {
-            totalBusinessesCount.textContent = dashboardStats.businessCount || businesses.length || '0';
+            totalBusinessesCount.textContent = (dashboardStats && dashboardStats.businessCount) || '0';
         }
 
         // Active businesses count
         const activeBusinessesCount = document.getElementById('active-businesses-count');
-        if (activeBusinessesCount) {
-            // Calculate or use API data for active count
-            const activeCount = businesses.filter(b => b.status === 'active').length;
-            activeBusinessesCount.textContent = activeCount || Math.floor((dashboardStats.businessCount || 0) * 0.8);
+        if (activeBusinessesCount && dashboardStats) {
+            // If we have a specific active count, use it, otherwise estimate
+            const activeCount = dashboardStats.activeBusinessCount ||
+                Math.floor((dashboardStats.businessCount || 0) * 0.95); // Most businesses are active
+            activeBusinessesCount.textContent = activeCount.toString();
         }
 
         // New businesses count
         const newBusinessesCount = document.getElementById('new-businesses-count');
-        if (newBusinessesCount) {
-            // Get new businesses count from dashboardStats or estimate
-            newBusinessesCount.textContent = dashboardStats.newBusinessesThisMonth ||
-                Math.floor((dashboardStats.businessCount || businesses.length || 0) * 0.15); // Fallback estimate
+        if (newBusinessesCount && dashboardStats) {
+            newBusinessesCount.textContent = (dashboardStats.newBusinessesThisMonth || '0').toString();
         }
     }
 
@@ -546,9 +608,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            // First, ensure we have the latest dashboard stats
-            await loadDashboardStats();
-
             // Make API request for incentives list
             const response = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=5`, {
                 method: 'GET',
@@ -572,10 +631,56 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const data = await response.json();
-            const incentives = data.incentives || [];
+            console.log("Incentives data from API:", data);
+
+            // Store the total count from the API
+            const incentives = data.incentives || data.results || [];
+            const totalCount = data.total || 0; // Use the total count from API
+
+            // Update the dashboard stats with the correct total
+            if (dashboardStats) {
+                dashboardStats.incentiveCount = totalCount;
+            }
+
+            // Count available incentives
+            const availableCount = incentives.filter(i => i.is_available).length;
+
+            // For new incentives this month:
+            // If totalCount is much higher than the list length, we need to estimate
+            // because we don't have all the incentives to check creation dates
+            let newCount = 0;
+
+            // Check if we have creation dates to calculate actual new incentives
+            const thisMonth = new Date().getMonth();
+            const thisYear = new Date().getFullYear();
+
+            // Count new incentives in our sample
+            incentives.forEach(incentive => {
+                if (incentive.created_at) {
+                    const createdDate = new Date(incentive.created_at);
+                    if (createdDate.getMonth() === thisMonth && createdDate.getFullYear() === thisYear) {
+                        newCount++;
+                    }
+                }
+            });
+
+            // Adjust the estimate if we have a partial dataset
+            if (totalCount > incentives.length) {
+                // Scale the estimate based on what we found in our sample
+                newCount = Math.round((newCount / incentives.length) * totalCount);
+            }
+
+            // Save new count to dashboardStats
+            if (dashboardStats) {
+                dashboardStats.newIncentivesThisMonth = newCount;
+            }
 
             // Render incentives in the table
             renderDashboardIncentives(incentives);
+
+            // Update the stats directly with the correct counts
+            updateIncentiveStats(totalCount, availableCount, newCount);
+
         } catch (error) {
             handleApiError(error, () => {
                 // Fallback handling
@@ -622,6 +727,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+
 // Render incentives in the dashboard
     function renderDashboardIncentives(incentives) {
         const incentiveTableBody = document.getElementById('dashboard-incentives-table');
@@ -650,36 +756,29 @@ document.addEventListener('DOMContentLoaded', function () {
             // Format amount
             const amountText = incentive.amount ? `${incentive.amount}%` : 'N/A';
 
-            // Format date
-            const dateCreated = incentive.created_at ? new Date(incentive.created_at).toLocaleDateString() : 'Unknown';
-
             const row = document.createElement('tr');
             row.innerHTML = `
-            <td>${incentive.businessName || 'Unknown Business'}</td>
-            <td>${typeLabel}${otherDesc}</td>
-            <td class="${availabilityClass}">${availabilityText}</td>
-            <td>${amountText}</td>
-            <td>${incentive.information || 'No information available'}</td>
-            <td>
-                <div class="action-btns">
-                    <a href="admin-incentives.html?edit=${incentive._id}" class="btn btn-sm btn-info">Edit</a>
-                </div>
-            </td>
-        `;
+        <td>${incentive.businessName || 'Unknown Business'}</td>
+        <td>${typeLabel}${otherDesc}</td>
+        <td class="${availabilityClass}">${availabilityText}</td>
+        <td>${amountText}</td>
+        <td>${incentive.information || 'No information available'}</td>
+        <td>
+            <div class="action-btns">
+                <a href="admin-incentives.html?edit=${incentive._id}" class="btn btn-sm btn-info">Edit</a>
+            </div>
+        </td>
+    `;
 
             incentiveTableBody.appendChild(row);
         });
 
-        // Update incentive stats based on these incentives
-        const totalCount = dashboardStats.incentiveCount || incentives.length;
-        const availableCount = incentives.filter(i => i.is_available).length;
-        const newCount = dashboardStats.newIncentivesThisMonth || Math.round(totalCount * 0.2);
-
-        updateIncentiveStats(totalCount, availableCount, newCount);
+        // Don't update the counts here as they're now updated directly in the loadIncentives function
 
         // Add quick search functionality
         setupIncentiveQuickSearch();
     }
+
 
 // Helper function to get incentive type label
     function getIncentiveTypeLabel(typeCode) {
@@ -698,19 +797,17 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateIncentiveStats(totalCount, availableCount, newCount) {
         const totalIncentivesCount = document.getElementById('total-incentives-count');
         if (totalIncentivesCount) {
-            totalIncentivesCount.textContent = totalCount;
+            totalIncentivesCount.textContent = totalCount.toString();
         }
 
         const availableIncentivesCount = document.getElementById('available-incentives-count');
         if (availableIncentivesCount) {
-            availableIncentivesCount.textContent = String(availableCount || Math.round(totalCount * 0.85)); // Fallback estimate
+            availableIncentivesCount.textContent = availableCount.toString();
         }
 
         const newIncentivesCount = document.getElementById('new-incentives-count');
         if (newIncentivesCount) {
-            // Use the newIncentivesThisMonth value from dashboardStats if available
-            // of fall back to the estimated newCount, or 0 as a last resort.
-            newIncentivesCount.textContent = String(dashboardStats.newIncentivesThisMonth || newCount || 0);
+            newIncentivesCount.textContent = newCount.toString();
         }
     }
 
