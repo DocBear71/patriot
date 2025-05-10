@@ -1,4 +1,4 @@
-// api/incentives.js - Combined incentives endpoint handlers
+// api/incentives.js - Combined incentives endpoint handlers with chain support
 const connect = require('../config/db');
 const mongoose = require('mongoose');
 const Business = require('../models/Business');
@@ -28,6 +28,10 @@ module.exports = async (req, res) => {
         else if (req.method === 'GET' && operation === 'add') {
             return res.status(200).json({ message: 'Incentives Add API is available' });
         }
+        // If it's a DELETE request or operation=delete
+        else if (req.method === 'DELETE' || operation === 'delete') {
+            return await handleDeleteIncentive(req, res);
+        }
         // If it's a GET request (with or without operation=get), retrieve incentives
         else if (req.method === 'GET') {
             return await handleGetIncentives(req, res);
@@ -42,7 +46,7 @@ module.exports = async (req, res) => {
 };
 
 /**
- * Handle GET request for retrieving incentives for a business
+ * Handle GET request for retrieving incentives for a business with chain support
  */
 async function handleGetIncentives(req, res) {
     console.log("Get Incentives API hit:", req.method);
@@ -67,14 +71,84 @@ async function handleGetIncentives(req, res) {
         return res.status(500).json({ message: 'Database connection error', error: dbError.message });
     }
 
-    // Find incentives for the business
-    console.log("Query being executed:", { business_id: businessId });
-    const incentives = await Incentive.find({ business_id: businessId }).exec();
+    let incentives = [];
+
+    // Check if this is a Google Places result (not in our database)
+    if (businessId.startsWith('place_')) {
+        // For Places API results, we need to check for chain incentives
+        // Extract chain_id if it was included in the request
+        const chainId = req.query.chain_id;
+
+        if (chainId) {
+            // Get chain-wide incentives
+            const chainIncentives = await Incentive.find({
+                business_id: chainId,
+                is_available: true
+            }).lean();
+
+            if (chainIncentives.length > 0) {
+                // Mark as chain-wide incentives
+                chainIncentives.forEach(incentive => {
+                    incentive.is_chain_wide = true;
+                });
+
+                incentives = [...chainIncentives];
+            }
+        }
+
+        return res.status(200).json({
+            message: 'Chain incentives retrieved for Google Places result',
+            results: incentives
+        });
+    }
+
+    // First get incentives directly associated with this business
+    incentives = await Incentive.find({ business_id: businessId }).lean();
     console.log(`Found ${incentives.length} incentives for business ${businessId}`);
 
+    // For businesses in our database:
+    // Check if this is a chain location
+    const business = await Business.findById(businessId).lean();
+
+    if (business && business.chain_id) {
+        // Check if the chain has universal incentives enabled
+        const chainBusiness = await Business.findById(business.chain_id).lean();
+
+        if (chainBusiness && chainBusiness.universal_incentives) {
+            console.log(`Business ${businessId} is part of chain ${business.chain_id}, fetching chain incentives`);
+
+            const chainIncentives = await Incentive.find({
+                business_id: business.chain_id,
+                is_available: true
+            }).lean();
+
+            console.log(`Found ${chainIncentives.length} chain incentives for chain ${business.chain_id}`);
+
+            // Add chain incentives that don't conflict with location-specific ones
+            if (chainIncentives.length > 0) {
+                chainIncentives.forEach(chainIncentive => {
+                    const hasLocationOverride = incentives.some(
+                        li => li.type === chainIncentive.type
+                    );
+
+                    if (!hasLocationOverride) {
+                        // Mark as chain-wide incentive
+                        chainIncentive.is_chain_wide = true;
+                        incentives.push(chainIncentive);
+                    }
+                });
+            }
+        }
+    }
+
+    // Return all incentives (location-specific + chain-wide)
     return res.status(200).json({
         message: 'Incentives retrieved successfully.',
-        results: incentives
+        results: incentives,
+        chain_info: business && business.chain_id ? {
+            id: business.chain_id,
+            name: business.chain_name
+        } : null
     });
 }
 
@@ -103,8 +177,8 @@ async function handleAddIncentive(req, res) {
     }
 
     // Check if the business exists
-    const businessExists = await Business.findById(incentiveData.business_id).exec();
-    if (!businessExists) {
+    const business = await Business.findById(incentiveData.business_id).exec();
+    if (!business) {
         return res.status(404).json({ message: 'Business not found' });
     }
 
@@ -133,5 +207,46 @@ async function handleAddIncentive(req, res) {
     return res.status(201).json({
         message: 'Incentive added successfully',
         incentiveId: savedIncentive._id
+    });
+}
+
+/**
+ * Handle DELETE request for removing an incentive
+ */
+async function handleDeleteIncentive(req, res) {
+    console.log("Delete Incentive API hit:", req.method);
+    console.log("Query parameters:", req.query);
+    console.log("Request body:", req.body);
+
+    // Get incentive ID from query params or body
+    const incentiveId = req.query.id || (req.body && req.body.incentive_id);
+
+    if (!incentiveId) {
+        return res.status(400).json({ message: 'Incentive ID is required' });
+    }
+
+    // Connect to MongoDB
+    try {
+        await connect;
+        console.log("Database connection established");
+    } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return res.status(500).json({ message: 'Database connection error', error: dbError.message });
+    }
+
+    // Check if incentive exists
+    const existingIncentive = await Incentive.findById(incentiveId);
+    if (!existingIncentive) {
+        return res.status(404).json({ message: 'Incentive not found' });
+    }
+
+    // Delete the incentive
+    await Incentive.findByIdAndDelete(incentiveId);
+    console.log(`Deleted incentive ${incentiveId}`);
+
+    // Return success response
+    return res.status(200).json({
+        message: 'Incentive deleted successfully',
+        incentiveId: incentiveId
     });
 }

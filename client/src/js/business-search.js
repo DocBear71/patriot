@@ -938,7 +938,7 @@ function fetchBusinessIncentivesForInfoWindow(businessId) {
  * Fetch incentives for a specific business
  * @param {string} businessId - Business ID
  */
-function fetchBusinessIncentives(businessId) {
+function fetchBusinessIncentives(businessId, chainId = null) {
     if (!businessId) {
         console.error("No business ID provided for fetching incentives");
         return;
@@ -947,8 +947,12 @@ function fetchBusinessIncentives(businessId) {
     // Determine the base URL
     const baseURL = getBaseURL();
 
-    // Use the API endpoint with the baseURL
-    const apiURL = `${baseURL}/api/incentives.js?business_id=${businessId}`;
+    // Build the API URL with optional chain_id
+    let apiURL = `${baseURL}/api/incentives.js?business_id=${businessId}`;
+    if (chainId) {
+        apiURL += `&chain_id=${chainId}`;
+    }
+
     console.log("Fetching incentives from: ", apiURL);
 
     fetch(apiURL)
@@ -984,9 +988,13 @@ function fetchBusinessIncentives(businessId) {
                     const otherDescription = incentive.other_description ?
                         ` (${incentive.other_description})` : '';
 
+                    // Add a badge for chain-wide incentives
+                    const chainBadge = incentive.is_chain_wide ?
+                        '<span class="chain-badge small">Chain-wide</span>' : '';
+
                     incentivesHTML += `
             <div class="incentive-item">
-              <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}%
+              <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
               <div class="incentive-info">${incentive.information || ''}</div>
             </div>
           `;
@@ -1005,6 +1013,79 @@ function fetchBusinessIncentives(businessId) {
 
             if (incentivesCell) {
                 incentivesCell.innerHTML = 'Error loading incentives';
+            }
+        });
+}
+
+function fetchChainIncentivesForPlacesResult(placeId, chainId) {
+    if (!placeId || !chainId) {
+        console.error("Missing place ID or chain ID for fetching chain incentives");
+        return;
+    }
+
+    // Determine the base URL
+    const baseURL = getBaseURL();
+
+    // Build the API URL to fetch chain incentives for Places result
+    const apiURL = `${baseURL}/api/incentives.js?business_id=${placeId}&chain_id=${chainId}`;
+
+    console.log("Fetching chain incentives for Places result: ", apiURL);
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch chain incentives: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`Chain incentives data for place ${placeId}:`, data);
+
+            // Find the cell where we'll display incentives
+            const incentivesCell = document.getElementById(`incentives-for-${placeId}`);
+
+            if (!incentivesCell) {
+                console.error(`Could not find cell for incentives-for-${placeId}`);
+                return;
+            }
+
+            // Check if there are any chain incentives
+            if (!data.results || data.results.length === 0) {
+                incentivesCell.innerHTML = 'No chain incentives available';
+                return;
+            }
+
+            // Build HTML for the chain incentives
+            let incentivesHTML = '';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ?
+                        ` (${incentive.other_description})` : '';
+
+                    incentivesHTML += `
+            <div class="incentive-item">
+              <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% 
+              <span class="chain-badge small">Chain-wide</span>
+              <div class="incentive-info">${incentive.information || ''}</div>
+            </div>
+          `;
+                }
+            });
+
+            if (incentivesHTML === '') {
+                incentivesCell.innerHTML = 'Not in database yet';
+            } else {
+                incentivesCell.innerHTML = incentivesHTML;
+            }
+        })
+        .catch(error => {
+            console.error(`Error fetching chain incentives for place ${placeId}:`, error);
+            const incentivesCell = document.getElementById(`incentives-for-${placeId}`);
+
+            if (incentivesCell) {
+                incentivesCell.innerHTML = 'Not in database yet';
             }
         });
 }
@@ -1072,25 +1153,58 @@ function displaySearchResults(businesses) {
             // Convert the business type code to a readable label
             const businessType = getBusinessTypeLabel(business.type);
 
-            // Then create a new row
+            // Check if this is a chain location
+            const isChainLocation = business.chain_id ? true : false;
+            const isParentChain = business.is_chain ? true : false;
+            const isFromPlacesApi = business.is_from_places_api ? true : false;
+
+            // Create appropriate badge for chain businesses
+            let chainBadge = '';
+            if (isParentChain) {
+                chainBadge = '<span class="chain-badge">National Chain</span>';
+            } else if (isChainLocation) {
+                chainBadge = '<span class="chain-badge">Chain Location</span>';
+            } else if (isFromPlacesApi) {
+                chainBadge = `<span class="chain-badge">Potential ${business.chain_name || 'Chain'} Location</span>`;
+            }
+
+            // Determine the business ID to use for incentives lookup
+            let businessIdForIncentives = business._id;
+            let chainIdForIncentives = business.chain_id || null;
+
+            // Create a new row
             const row = document.createElement('tr');
 
-            // Add a View on Map button
-            const viewMapButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
+            // Create the appropriate button based on business type
+            let actionButton;
+            if (isFromPlacesApi) {
+                // For Google Places results, offer to add to database
+                actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.place_data?.place_id || ''}', '${chainIdForIncentives || ''}')">Add to Database</button>`;
+            } else {
+                // For database businesses, show map view
+                actionButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
+            }
 
             // First populate with basic business info
             row.innerHTML = `
-        <th class="left_table" data-business-id="${business._id}">${business.bname}</th>
+        <th class="left_table" data-business-id="${business._id}">
+          ${business.bname} ${chainBadge}
+        </th>
         <th class="left_table">${addressLine}</th>
         <th class="left_table">${businessType}</th>
-        <th class="right_table" id="incentives-for-${business._id}">Loading incentives...</th>
-        <th class="center_table">${viewMapButton}</th>
+        <th class="right_table" id="incentives-for-${business._id}">${isFromPlacesApi ? 'Not in database yet' : 'Loading incentives...'}</th>
+        <th class="center_table">${actionButton}</th>
       `;
 
             tableBody.appendChild(row);
 
-            // Now fetch incentives for this business
-            fetchBusinessIncentives(business._id);
+            // Fetch incentives with chain support, except for Places API results
+            if (!isFromPlacesApi) {
+                fetchBusinessIncentives(business._id, chainIdForIncentives);
+            } else if (chainIdForIncentives) {
+                // For Places API results with chain, get chain incentives
+                fetchChainIncentivesForPlacesResult(business._id, chainIdForIncentives);
+            }
         });
 
         // Scroll to the results
@@ -1101,6 +1215,7 @@ function displaySearchResults(businesses) {
         alert("There was an error displaying the search results: " + error.message);
     }
 }
+
 
 /**
  * Display business search results for other pages
@@ -2573,16 +2688,11 @@ async function searchGooglePlaces(formData) {
 * Add a business to the database
 * @param {string} placeId - Google Place ID
 */
-window.addBusinessToDatabase = async function(placeId) {
-    console.log("Adding place to database:", placeId);
+window.addBusinessToDatabase = async function(placeId, chainId = null) {
+    console.log("Adding place to database:", placeId, "Chain ID:", chainId);
 
     try {
-        // Check if Google Maps API is loaded
-        if (!window.google || !window.google.maps) {
-            throw new Error("Google Maps API is not loaded");
-        }
-
-        // Import the Places library properly
+        // Load the Places library
         const { Place } = await google.maps.importLibrary("places");
 
         // Create a Place instance
@@ -2601,47 +2711,53 @@ window.addBusinessToDatabase = async function(placeId) {
             ]
         });
 
-        console.log("Place details retrieved:", place);
-
         // Extract address components from the place
-        const addressComponents = {};
-
-        // Process address components correctly
-        if (place.addressComponents) {
-            place.addressComponents.forEach(component => {
-                component.types.forEach(type => {
-                    addressComponents[type] = component.shortText || component.text;
-                });
-            });
-        }
-
-        // Build the address with proper fallbacks
         const businessData = {
             name: place.displayName || '',
-            address1: `${addressComponents.street_number || ''} ${addressComponents.route || ''}`.trim(),
-            city: addressComponents.locality || addressComponents.administrative_area_level_2 || '',
-            state: addressComponents.administrative_area_level_1 || '',
-            zip: addressComponents.postal_code || '',
+            address1: getAddressComponentFromPlace(place, 'street_number') + ' ' +
+                getAddressComponentFromPlace(place, 'route'),
+            city: getAddressComponentFromPlace(place, 'locality'),
+            state: getAddressComponentFromPlace(place, 'administrative_area_level_1'),
+            zip: getAddressComponentFromPlace(place, 'postal_code'),
             phone: place.nationalPhoneNumber || '',
             placeId: place.id,
 
             // Store coordinates for later use
-            lat: place.location ? place.location.lat : 0,
-            lng: place.location ? place.location.lng : 0,
+            lat: place.location?.lat || 0,
+            lng: place.location?.lng || 0,
 
             // Add this for proper GeoJSON formatting
             location: {
                 type: 'Point',
                 coordinates: [
-                    place.location ? place.location.lng : 0,
-                    place.location ? place.location.lat : 0
+                    place.location?.lng || 0,
+                    place.location?.lat || 0
                 ]
             }
         };
 
+        // Add chain information if provided
+        if (chainId) {
+            businessData.chain_id = chainId;
+
+            // Try to get chain name from existing chain
+            try {
+                const baseURL = getBaseURL();
+                const chainResponse = await fetch(`${baseURL}/api/business.js?operation=get&id=${chainId}`);
+                if (chainResponse.ok) {
+                    const chainData = await chainResponse.json();
+                    if (chainData.result) {
+                        businessData.chain_name = chainData.result.bname;
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching chain info:", error);
+                // Continue without chain name, it will be set on the server
+            }
+        }
+
         // Log the coordinates to verify they're correct
         console.log(`Place coordinates: ${businessData.lat}, ${businessData.lng}`);
-        console.log("Business data prepared:", businessData);
 
         // Store in sessionStorage for the add business page to use
         sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
@@ -2650,11 +2766,35 @@ window.addBusinessToDatabase = async function(placeId) {
         window.location.href = 'business-add.html?prefill=true';
     } catch (error) {
         console.error("Error fetching place details for addition:", error);
-
-        // More helpful error message with debugging tips
-        alert(`Sorry, we couldn't retrieve the details for this business.\n\nError: ${error.message}\n\nPlease try again or add it manually.`);
+        alert("Sorry, we couldn't retrieve the details for this business. Please try again or add it manually.");
     }
 };
+
+// Add CSS for Chain Indicators
+function addChainBadgeStyles() {
+    if (!document.getElementById('chain-badge-css')) {
+        const style = document.createElement('style');
+        style.id = 'chain-badge-css';
+        style.textContent = `
+      .chain-badge {
+        display: inline-block;
+        background-color: #4285F4;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        margin-left: 5px;
+        font-weight: normal;
+      }
+
+      .chain-badge.small {
+        font-size: 0.7em;
+        padding: 1px 4px;
+      }
+    `;
+        document.head.appendChild(style);
+    }
+}
 
 /**
  * Search places using the new Places API Text Search endpoint
@@ -5203,4 +5343,5 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize business search functionality
     initBusinessSearch();
     addCustomMarkerStyles();
+    addChainBadgeStyles();
 });

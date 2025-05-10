@@ -44,7 +44,11 @@ const businessSchema = new mongoose.Schema({
     universal_incentives: {
         type: Boolean,
         default: false
-    }
+    },
+    locations: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Business'
+    }],
 });
 
 // Create a 2dsphere index for geospatial queries

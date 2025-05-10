@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Patriot Thanks: Manage Business Chains</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="description" content="Patriot Thanks application to manage business chains and their incentives">
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css">
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/forms.css" rel="stylesheet">
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/form-validation.css" rel="stylesheet">
+    <link href="./css/table.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="./js/reset-functionality.js"></script>
+
+    <!-- Chain management specific styles -->
+    <style>
+        .section-title {
+            margin-top: 30px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .card-header {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+
+        .chain-badge {
+            display: inline-block;
+            background-color: #4285F4;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-left: 5px;
+        }
+
+        .chain-badge.small {
+            font-size: 0.7em;
+            padding: 1px 4px;
+        }
+
+        .locations-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .location-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .location-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .btn-action {
+            margin-right: 5px;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4285F4;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+    </style>
+</head>
+
+<body style="padding-top: 70px" id="page_layout">
+<!--Navigation bar-->
+<div id="nav-placeholder">
+</div>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
+            // Load the login handler after the navbar is loaded
+            $.getScript("./js/login-handler.js")
+            .done(function() {
+                console.log("Login handler script loaded successfully");
+            })
+            .fail(function() {
+                console.error("Failed to load login-handler.js");
+            });
+        });
+    });
+</script>
+<!--end of Navigation bar-->
+<header>
+    <br>
+    <div class="left-banner">
+        <a href="index.html">
+            <img src="./images/docbearlogov4.png" alt="DocBear logo">
+        </a>
+    </div>
+    <div class="right-banner">
+        <br>
+        <h1>Patriot Thanks</h1>
+        <hr>
+        <h4>Manage Business Chains</h4>
+    </div>
+    <div style="clear:left;"></div>
+</header>
+<main>
+    <div class="container">
+        <section>
+            <h2 class="section-title">National Chain Management</h2>
+            <p class="paragraph_style">
+                This page allows you to manage national business chains and their locations.
+                When a business is marked as a national chain, you can set universal incentives that apply
+                to all locations, even if they're not specifically in our database.
+            </p>
+
+            <!-- Create New Chain Section -->
+            <div class="card">
+                <div class="card-header">
+                    Create New Chain
+                </div>
+                <div class="card-body">
+                    <form id="create-chain-form">
+                        <div class="form-group">
+                            <label for="chain-name">Chain Name:</label>
+                            <input type="text" class="form-control" id="chain-name" placeholder="Enter chain name (e.g., Home Depot, Lowe's)" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="chain-type">Business Type:</label>
+                            <select class="form-control" id="chain-type" required>
+                                <option value="">Select business type...</option>
+                                <option value="AUTO">Automotive</option>
+                                <option value="BEAU">Beauty</option>
+                                <option value="BOOK">Bookstore</option>
+                                <option value="CLTH">Clothing</option>
+                                <option value="CONV">Convenience Store/Gas Station</option>
+                                <option value="DEPT">Department Store</option>
+                                <option value="ELEC">Electronics</option>
+                                <option value="ENTR">Entertainment</option>
+                                <option value="FURN">Furniture</option>
+                                <option value="FUEL">Fuel Station/Truck Stop</option>
+                                <option value="GIFT">Gift Shop</option>
+                                <option value="GROC">Grocery</option>
+                                <option value="HARDW">Hardware</option>
+                                <option value="HEAL">Health</option>
+                                <option value="JEWL">Jewelry</option>
+                                <option value="OTHER">Other</option>
+                                <option value="RX">Pharmacy</option>
+                                <option value="REST">Restaurant</option>
+                                <option value="RETAIL">Retail</option>
+                                <option value="SERV">Service</option>
+                                <option value="SPEC">Specialty</option>
+                                <option value="SPRT">Sporting Goods</option>
+                                <option value="TECH">Technology</option>
+                                <option value="TOYS">Toys</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="universal-incentives" checked>
+                                <label class="form-check-label" for="universal-incentives">
+                                    Enable universal incentives for all locations
+                                </label>
+                                <small class="form-text text-muted">When checked, incentives added to this chain will apply to all locations.</small>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Create Chain</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Search Existing Chains Section -->
+            <h3 class="section-title">Existing Chains</h3>
+            <div class="search-box">
+                <input type="text" class="form-control" id="search-chain" placeholder="Search for a chain...">
+            </div>
+
+            <div id="chains-list" class="chains-list">
+                <!-- Chains will be loaded here dynamically -->
+                <div class="text-center py-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                    <p>Loading chains...</p>
+                </div>
+            </div>
+
+            <!-- Chain Details Section (will show when a chain is selected) -->
+            <div id="chain-details" class="card" style="display: none;">
+                <div class="card-header">
+                    <span id="selected-chain-name">Chain Details</span>
+                    <span class="chain-badge">National Chain</span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Chain Information</h4>
+                            <form id="update-chain-form">
+                                <input type="hidden" id="selected-chain-id">
+
+                                <div class="form-group">
+                                    <label for="update-chain-name">Chain Name:</label>
+                                    <input type="text" class="form-control" id="update-chain-name">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="update-chain-type">Business Type:</label>
+                                    <select class="form-control" id="update-chain-type">
+                                        <option value="AUTO">Automotive</option>
+                                        <option value="BEAU">Beauty</option>
+                                        <option value="BOOK">Bookstore</option>
+                                        <option value="CLTH">Clothing</option>
+                                        <option value="CONV">Convenience Store/Gas Station</option>
+                                        <option value="DEPT">Department Store</option>
+                                        <option value="ELEC">Electronics</option>
+                                        <option value="ENTR">Entertainment</option>
+                                        <option value="FURN">Furniture</option>
+                                        <option value="FUEL">Fuel Station/Truck Stop</option>
+                                        <option value="GIFT">Gift Shop</option>
+                                        <option value="GROC">Grocery</option>
+                                        <option value="HARDW">Hardware</option>
+                                        <option value="HEAL">Health</option>
+                                        <option value="JEWL">Jewelry</option>
+                                        <option value="OTHER">Other</option>
+                                        <option value="RX">Pharmacy</option>
+                                        <option value="REST">Restaurant</option>
+                                        <option value="RETAIL">Retail</option>
+                                        <option value="SERV">Service</option>
+                                        <option value="SPEC">Specialty</option>
+                                        <option value="SPRT">Sporting Goods</option>
+                                        <option value="TECH">Technology</option>
+                                        <option value="TOYS">Toys</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Universal Incentives:</label>
+                                    <div class="form-check">
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="update-universal-incentives">
+                                            <span class="slider"></span>
+                                        </label>
+                                        <small class="form-text text-muted ml-3">When enabled, incentives added to this chain will apply to all locations.</small>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">Update Chain</button>
+                                <button type="button" id="delete-chain-btn" class="btn btn-danger">Delete Chain</button>
+                            </form>
+                        </div>
+
+                        <div class="col-md-6">
+                            <h4>Chain Incentives</h4>
+                            <div id="chain-incentives">
+                                <p>Select a chain to view its incentives.</p>
+                            </div>
+                            <button id="manage-incentives-btn" class="btn btn-info">Manage Incentives</button>
+
+                            <h4 class="mt-4">Chain Locations</h4>
+                            <div id="chain-locations" class="locations-list">
+                                <p>No locations found for this chain.</p>
+                            </div>
+                            <button id="add-location-btn" class="btn btn-success">Add Location</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modals for Add Location and other operations will be here -->
+            <div class="modal fade" id="add-location-modal" tabindex="-1" role="dialog" aria-labelledby="addLocationModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="addLocationModalLabel">Add Location to Chain</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group mb-4">
+                                <input type="text" class="form-control" id="search-business" placeholder="Search for a business to add as a location...">
+                            </div>
+
+                            <div id="business-search-results" class="search-results">
+                                <!-- Businesses will be loaded here -->
+                                <p class="text-center">Search for a business to add as a location</p>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="manage-incentives-modal" tabindex="-1" role="dialog" aria-labelledby="manageIncentivesModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="manageIncentivesModalLabel">Manage Chain Incentives</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <h6>Current Chain Incentives</h6>
+                            <div id="modal-chain-incentives" class="mb-4">
+                                <p>No incentives found.</p>
+                            </div>
+
+                            <h6>Add New Incentive</h6>
+                            <form id="add-chain-incentive-form">
+                                <div class="form-group">
+                                    <label for="incentive-type">Type:</label>
+                                    <select class="form-control" id="incentive-type" required>
+                                        <option value="">Select incentive type...</option>
+                                        <option value="VT">Veteran</option>
+                                        <option value="AD">Active Duty</option>
+                                        <option value="FR">First Responder</option>
+                                        <option value="SP">Spouse</option>
+                                        <option value="OT">Other</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group" id="other-description-group" style="display: none;">
+                                    <label for="other-description">Description:</label>
+                                    <input type="text" class="form-control" id="other-description" placeholder="Enter description for 'Other' type">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="incentive-amount">Amount (%):</label>
+                                    <input type="number" class="form-control" id="incentive-amount" min="0" max="100" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="incentive-info">Additional Information:</label>
+                                    <textarea class="form-control" id="incentive-info" rows="3" placeholder="Enter any additional information or restrictions"></textarea>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">Add Incentive</button>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+<footer class="footer_style"><br>
+    <p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p>
+</footer>
+<script>
+    function checkAdminStatus() {
+        try {
+            // Get auth token
+            const token = getAuthToken();
+            if (!token) {
+                console.error("No auth token found");
+                window.location.href = '/index.html?login=required&redirect=' + encodeURIComponent(window.location.pathname);
+                return false;
+            }
+
+            // Determine the base URL
+            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    ? `http://${window.location.host}`
+                    : window.location.origin;
+
+            try {
+                // Get verification asynchronously but continue loading for better UX
+                fetch(`${baseURL}/api/auth.js?operation=verify-token`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Cache-Control': 'no-cache'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = '/index.html?login=required&redirect=' + encodeURIComponent(window.location.pathname);
+                            return false;
+                        }
+
+                        // For development - can be removed in production
+                        const useDevMode = confirm('API error encountered. Would you like to bypass admin verification for development purposes?');
+                        if (useDevMode) {
+                            console.warn('DEVELOPMENT MODE: Bypassing admin verification');
+                            return true;
+                        }
+
+                        showAccessDenied();
+                        return false;
+                    }
+
+                    return response.json();
+                })
+                .then(data => {
+                    const isAdminUser = data.isAdmin === true || data.level === 'Admin';
+
+                    if (!isAdminUser) {
+                        showAccessDenied();
+                    }
+
+                    return isAdminUser;
+                })
+                .catch(error => {
+                    console.error('Error checking admin status:', error);
+
+                    // For development - can be removed in production
+                    const useDevMode = confirm('API error encountered. Would you like to bypass admin verification for development purposes?');
+                    if (useDevMode) {
+                        console.warn('DEVELOPMENT MODE: Bypassing admin verification');
+                        return true;
+                    }
+
+                    showAccessDenied();
+                    return false;
+                });
+            } catch (error) {
+                console.error('Error in admin status check:', error);
+                showAccessDenied();
+                return false;
+            }
+        } catch (error) {
+            console.error('Error in admin status check:', error);
+            showAccessDenied();
+            return false;
+        }
+    }
+
+    function showAccessDenied() {
+        document.querySelector('main').innerHTML = `
+        <div class="container">
+            <div class="alert alert-danger" role="alert">
+                <h4 class="alert-heading">Access Denied</h4>
+                <p>You do not have permission to access this page. Only administrators can manage business chains.</p>
+                <hr>
+                <p class="mb-0">Please <a href="/index.html">return to the homepage</a> or contact an administrator if you believe this is an error.</p>
+            </div>
+        </div>
+    `;
+    }
+
+    function getAuthToken() {
+        try {
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (!sessionData) {
+                console.error('No session data found');
+                return null;
+            }
+
+            const session = JSON.parse(sessionData);
+            if (!session.token) {
+                console.error('No token found in session data');
+                return null;
+            }
+
+            return session.token;
+        } catch (error) {
+            console.error('Error retrieving auth token:', error);
+            return null;
+        }
+    }
+
+    // Check admin access when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        checkAdminStatus();
+    });
+</script>
+<!-- Chain Management Script -->
+<script src="./js/chain-management.js"></script>
+
+</body>
+</html>
