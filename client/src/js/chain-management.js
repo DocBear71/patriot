@@ -243,12 +243,15 @@ function loadExistingChains() {
             let chainsHTML = '';
 
             data.results.forEach(chain => {
+                // Get the business type label for display
+                const businessTypeLabel = getBusinessTypeLabel(chain.type);
+
                 chainsHTML += `
                     <div class="card mb-2 chain-item" data-chain-id="${chain._id}" data-chain-name="${chain.bname}">
                         <div class="card-body d-flex justify-content-between align-items-center py-2">
                             <div>
                                 <h5 class="mb-0">${chain.bname}</h5>
-                                <small>${getBusinessTypeLabel(chain.type)}</small>
+                                <small>${businessTypeLabel}</small>
                             </div>
                             <div>
                                 <small>${chain.locations ? chain.locations.length : 0} locations</small>
