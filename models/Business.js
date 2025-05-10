@@ -21,8 +21,8 @@ const businessSchema = new mongoose.Schema({
     location: {
         type: {
             type: String,
-            enum: ['Point'],
-            default: 'Point'
+            enum: ['Point', null],  // Allow null type
+            default: null           // Default to null instead of 'Point'
         },
         coordinates: {
             type: [Number],  // [longitude, latitude]
@@ -52,7 +52,10 @@ const businessSchema = new mongoose.Schema({
 });
 
 // Create a 2dsphere index for geospatial queries
-businessSchema.index({ location: '2dsphere' });
+businessSchema.index(
+    { location: '2dsphere' },
+    { partialFilerExpression: { 'location.type': 'Point'}}
+);
 
 // Export the model - use the 'business' collection
 module.exports = mongoose.model('Business', businessSchema, 'business');

@@ -300,26 +300,35 @@ function createNewChain() {
     // Get the base URL
     const baseURL = getBaseURL();
 
-    // Prepare the chain data
+    // Prepare the chain data WITHOUT the problematic location field
     const chainData = {
         bname: chainName,
         type: chainType,
         is_chain: true,
         universal_incentives: universalIncentives,
-        locations: []
+        locations: [],
+        // Explicitly set location with coordinates (this is just a placeholder - you can set to null later if needed)
+        location: {
+            type: 'Point',
+            coordinates: [0, 0]  // Default to [0,0] (null island)
+        }
     };
 
     // Make API request to create the chain
     fetch(`${baseURL}/api/business.js?operation=create`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`
         },
         body: JSON.stringify(chainData)
     })
         .then(response => {
             if (!response.ok) {
-                throw new Error(`Failed to create chain: ${response.status}`);
+                return response.text().then(text => {
+                    console.error("API Error Response:", text);
+                    throw new Error(`Failed to create chain: ${response.status}`);
+                });
             }
             return response.json();
         })
