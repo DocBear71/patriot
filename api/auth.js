@@ -857,109 +857,137 @@ async function handleDashboardStats(req, res) {
         // Connect to MongoDB
         await connect;
 
+        // Check if models are defined/initialized
+        if (!User || !Business || !Incentive) {
+            console.error('One or more models are undefined. Ensuring models are initialized properly.');
+
+            // Try to initialize models if they're not already defined
+            try {
+                if (!User) User = mongoose.model('User');
+                if (!Business) Business = mongoose.model('Business');
+                if (!Incentive) Incentive = mongoose.model('Incentive');
+            } catch (modelError) {
+                console.error('Error initializing models:', modelError);
+                return res.status(500).json({
+                    message: 'Error retrieving dashboard statistics: Models not initialized properly',
+                    error: modelError.message
+                });
+            }
+        }
+
+        // Calculate date ranges for this month and last month
         const now = new Date();
         const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const lastMonthEnd = new Date(thisMonthStart);
         lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
         const lastMonthStart = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1);
 
-        // Get user count and growth
-        const userCount = await User.countDocuments();
+        // Initialize stats objects with default values
+        let stats = {
+            userCount: 0,
+            userChange: 0,
+            newUsersThisMonth: 0,
+            businessCount: 0,
+            businessChange: 0,
+            newBusinessesThisMonth: 0,
+            incentiveCount: 0,
+            incentiveChange: 0,
+            newIncentivesThisMonth: 0,
+            availableIncentiveCount: 0
+        };
 
-        // Get count of users created last month
-        const lastMonthUsers = await User.countDocuments({
-            created_at: {
-                $gte: lastMonthStart,
-                $lte: lastMonthEnd
+        // Get user stats if User model is available
+        if (User) {
+            // Get user count and growth
+            stats.userCount = await User.countDocuments();
+
+            // Get count of users created last month
+            const lastMonthUsers = await User.countDocuments({
+                created_at: {
+                    $gte: lastMonthStart,
+                    $lte: lastMonthEnd
+                }
+            });
+
+            stats.newUsersThisMonth = await User.countDocuments({
+                created_at: {
+                    $gte: thisMonthStart
+                }
+            });
+
+            // Calculate User change percentage
+            if (stats.userCount > lastMonthUsers && lastMonthUsers > 0) {
+                stats.userChange = Math.round(((stats.userCount - lastMonthUsers) / lastMonthUsers) * 100);
+            } else if (stats.newUsersThisMonth > 0) {
+                stats.userChange = Math.round((stats.newUsersThisMonth / stats.userCount) * 100);
             }
-        });
-
-        const newUsersThisMonth = await User.countDocuments({
-            created_at: {
-                $gte: thisMonthStart
-            }
-        });
-
-        // Calculate User change percentage
-        let userChange = 0;
-        if (userCount > lastMonthUsers && lastMonthUsers > 0) {
-            userChange = Math.round((userCount - lastMonthUsers) / lastMonthUsers) * 100;
-        } else if (newUsersThisMonth > 0) {
-            userChange = Math.round((newUsersThisMonth / userCount) * 100);
         }
 
-        // Get business count and growth - use the Business model
-        const businessCount = await Business.countDocuments();
+        // Get business stats if Business model is available
+        if (Business) {
+            // Get business count and growth
+            stats.businessCount = await Business.countDocuments();
 
-        // Get count of businesses created last month
-        const lastMonthBusinesses = await Business.countDocuments({
-            created_at: {
-                $gte: lastMonthStart,
-                $lte: lastMonthEnd
+            // Get count of businesses created last month
+            const lastMonthBusinesses = await Business.countDocuments({
+                created_at: {
+                    $gte: lastMonthStart,
+                    $lte: lastMonthEnd
+                }
+            });
+
+            // Get count of businesses created this month
+            stats.newBusinessesThisMonth = await Business.countDocuments({
+                created_at: {
+                    $gte: thisMonthStart
+                }
+            });
+
+            // Calculate business change percentage
+            if (stats.businessCount > lastMonthBusinesses && lastMonthBusinesses > 0) {
+                stats.businessChange = Math.round(((stats.businessCount - lastMonthBusinesses) / lastMonthBusinesses) * 100);
+            } else if (stats.newBusinessesThisMonth > 0) {
+                // If we can't calculate properly, use new businesses as an estimate
+                stats.businessChange = Math.round((stats.newBusinessesThisMonth / stats.businessCount) * 100);
             }
-        });
-
-        // Get count of businesses created this month
-        const newBusinessesThisMonth = await Business.countDocuments({
-            created_at: {
-                $gte: thisMonthStart
-            }
-        });
-
-        // Calculate business change percentage
-        let businessChange = 0;
-        if (businessCount > lastMonthBusinesses && lastMonthBusinesses > 0) {
-            businessChange = Math.round(((businessCount - lastMonthBusinesses) / lastMonthBusinesses) * 100);
-        } else if (newBusinessesThisMonth > 0) {
-            // If we can't calculate properly, use new businesses as an estimate
-            businessChange = Math.round((newBusinessesThisMonth / businessCount) * 100);
         }
 
-        // Get incentive count and growth - use the Incentive model
-        const incentiveCount = await Incentive.countDocuments();
+        // Get incentive stats if Incentive model is available
+        if (Incentive) {
+            // Get incentive count and growth
+            stats.incentiveCount = await Incentive.countDocuments();
 
-        // Get count of incentives created last month
-        const lastMonthIncentives = await Incentive.countDocuments({
-            created_at: {
-                $gte: lastMonthStart,
-                $lte: lastMonthEnd
+            // Get count of incentives created last month
+            const lastMonthIncentives = await Incentive.countDocuments({
+                created_at: {
+                    $gte: lastMonthStart,
+                    $lte: lastMonthEnd
+                }
+            });
+
+            // Get count of incentives created this month
+            stats.newIncentivesThisMonth = await Incentive.countDocuments({
+                created_at: {
+                    $gte: thisMonthStart
+                }
+            });
+
+            // Calculate incentive change percentage
+            if (stats.incentiveCount > lastMonthIncentives && lastMonthIncentives > 0) {
+                stats.incentiveChange = Math.round(((stats.incentiveCount - lastMonthIncentives) / lastMonthIncentives) * 100);
+            } else if (stats.newIncentivesThisMonth > 0) {
+                // If we can't calculate properly, use new incentives as an estimate
+                stats.incentiveChange = Math.round((stats.newIncentivesThisMonth / stats.incentiveCount) * 100);
             }
-        });
 
-        // Get count of incentives created this month
-        const newIncentivesThisMonth = await Incentive.countDocuments({
-            created_at: {
-                $gte: thisMonthStart
-            }
-        });
-
-        // Calculate incentive change percentage
-        let incentiveChange = 0;
-        if (incentiveCount > lastMonthIncentives && lastMonthIncentives > 0) {
-            incentiveChange = Math.round(((incentiveCount - lastMonthIncentives) / lastMonthIncentives) * 100);
-        } else if (newIncentivesThisMonth > 0) {
-            // If we can't calculate properly, use new incentives as an estimate
-            incentiveChange = Math.round((newIncentivesThisMonth / incentiveCount) * 100);
+            // Get count of available incentives
+            stats.availableIncentiveCount = await Incentive.countDocuments({
+                is_available: true
+            });
         }
-
-        // Get count of available incentives
-        const availableIncentiveCount = await Incentive.countDocuments({
-            is_available: true
-        });
 
         // Return the stats data
-        return res.status(200).json({
-            userCount,
-            userChange,
-            newUsersThisMonth,
-            businessCount,
-            businessChange,
-            newBusinessesThisMonth,
-            incentiveCount,
-            incentiveChange,
-            newIncentivesThisMonth,
-            availableIncentiveCount
-        });
+        return res.status(200).json(stats);
 
     } catch (error) {
         console.error('Error fetching dashboard stats:', error);
