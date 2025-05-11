@@ -183,9 +183,9 @@ function enableRestrictedLinks(user) {
         // Check if the item should be enabled based on path
         if ((item.href.includes('business-add.html') ||
                 item.href.includes('incentive-add.html')) ||
-            ((user.isAdmin || user.level === 'Admin') &&
+            // ((user.isAdmin || user.level === 'Admin') &&
                 (item.href.includes('business-update.html') ||
-                    item.href.includes('incentive-update.html')))) {
+                    item.href.includes('incentive-update.html'))) {
             console.log("Enabling restricted link:", item.href);
             item.classList.remove('disabled');
         }
