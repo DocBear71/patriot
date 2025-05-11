@@ -857,6 +857,12 @@ async function handleDashboardStats(req, res) {
         // Connect to MongoDB
         await connect;
 
+        const now = new Date();
+        const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastMonthEnd = new Date(thisMonthStart);
+        lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
+        const lastMonthStart = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1);
+
         // Get user count and growth
         const userCount = await User.countDocuments();
 
