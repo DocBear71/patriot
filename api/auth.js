@@ -945,7 +945,6 @@ async function handleDashboardStats(req, res) {
         return res.status(200).json({
             userCount,
             userChange,
-            activeUserCount,
             newUsersThisMonth,
             businessCount,
             businessChange,

@@ -140,6 +140,8 @@ module.exports = async (req, res) => {
                 switch (req.method) {
                     case 'GET':
                         return await handleAdminGetUsers(req, res);
+                    case 'admin-list-users':
+                        return await handleAdminGetUsers(req, res);
                     case 'POST':
                         return await handleAdminCreateUser(req, res);
                     default:
