@@ -1467,7 +1467,7 @@ function addResponsiveTableStyles() {
         .select-business {
           margin: 8px 0;
           display: inline-block;
-          color: #00f;
+          background-color: #00f;
         }
       }
     `;
