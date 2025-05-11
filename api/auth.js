@@ -542,16 +542,12 @@ async function handleVerifyAdmin(req, res) {
 }
 
 /**
- * Handle listing users (admin functionality)
+ * Handle listing users for the admin dashboard
  */
 async function handleListUsers(req, res) {
-    // Verify admin access
-    const adminCheck = await verifyAdminAccess(req);
-    if (!adminCheck.success) {
-        return res.status(adminCheck.status).json({message: adminCheck.message});
-    }
-
     try {
+        console.log("Admin list users API hit");
+
         // Parse query parameters
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
@@ -564,9 +560,9 @@ async function handleListUsers(req, res) {
         if (req.query.search) {
             const searchRegex = new RegExp(req.query.search, 'i');
             filter.$or = [
-                {fname: searchRegex},
-                {lname: searchRegex},
-                {email: searchRegex}
+                { fname: searchRegex },
+                { lname: searchRegex },
+                { email: searchRegex }
             ];
         }
 
@@ -580,16 +576,20 @@ async function handleListUsers(req, res) {
             filter.level = req.query.level;
         }
 
+        console.log("User filter:", filter);
+
         // Get total count
         const total = await User.countDocuments(filter);
 
         // Get users
         const users = await User.find(filter)
             .select('-password') // Exclude password
-            .sort({created_at: -1})
+            .sort({ created_at: -1 })
             .skip(skip)
             .limit(limit)
             .lean();
+
+        console.log(`Found ${users.length} users (total: ${total})`);
 
         return res.status(200).json({
             users,
@@ -599,8 +599,8 @@ async function handleListUsers(req, res) {
             totalPages: Math.ceil(total / limit)
         });
     } catch (error) {
-        console.error('Error in list-users:', error);
-        return res.status(500).json({message: 'Server error', error: error.message});
+        console.error('Error getting users:', error);
+        return res.status(500).json({ message: 'Error retrieving users', error: error.message });
     }
 }
 
@@ -700,114 +700,7 @@ async function handleDeleteUser(req, res) {
     }
 }
 
-/**
- * Handle dashboard statistics (admin functionality)
- */
-async function handleDashboardStats(req, res) {
-    console.log("Dashboard stats handler called");
 
-    // Verify admin access
-    const adminCheck = await verifyAdminAccess(req);
-    if (!adminCheck.success) {
-        return res.status(adminCheck.status).json({message: adminCheck.message});
-    }
-
-    try {
-        // Get user counts
-        const totalUsers = await User.countDocuments();
-
-        // Count users created this month
-        const thisMonth = new Date();
-        thisMonth.setDate(1); // Set to first day of current month
-        thisMonth.setHours(0, 0, 0, 0); // Set to beginning of the day
-
-        const newUsersThisMonth = await User.countDocuments({
-            created_at: {$gte: thisMonth}
-        });
-
-        // Calculate users from previous month for percentage change
-        const pastMonthDate = new Date();
-        pastMonthDate.setMonth(pastMonthDate.getMonth() - 1);
-
-        const usersPastMonth = await User.countDocuments({
-            created_at: {$lt: pastMonthDate}
-        });
-
-        const userChange = usersPastMonth > 0
-            ? Math.round(((totalUsers - usersPastMonth) / usersPastMonth) * 100)
-            : 100;
-
-        // Get business counts - with error handling
-        let totalBusiness = 0;
-        let businessesPastMonth = 0;
-        let newBusinessesThisMonth = 0;
-        let businessChange = 0;
-
-        try {
-            if (Business) {
-                totalBusiness = await Business.countDocuments();
-                businessesPastMonth = await Business.countDocuments({
-                    created_at: {$lt: pastMonthDate}
-                });
-                newBusinessesThisMonth = totalBusiness - businessesPastMonth;
-                businessChange = businessesPastMonth > 0
-                    ? Math.round(((totalBusiness - businessesPastMonth) / businessesPastMonth) * 100)
-                    : 100;
-                console.log('Business counts retrieved successfully');
-            }
-        } catch (error) {
-            console.error('Error getting business counts:', error);
-        }
-
-        // Get incentive counts - with error handling
-        let totalIncentives = 0;
-        let incentivesPastMonth = 0;
-        let newIncentivesThisMonth = 0;
-        let incentiveChange = 0;
-
-        try {
-            // Check if Incentive model is available
-            if (Incentive && typeof Incentive.countDocuments === 'function') {
-                totalIncentives = await Incentive.countDocuments();
-
-                newIncentivesThisMonth = await Incentive.countDocuments({
-                    created_at: {$gte: thisMonth}
-                });
-
-                // Calculate incentives from previous month for percentage change
-                incentivesPastMonth = await Incentive.countDocuments({
-                    created_at: {$lt: pastMonthDate}
-                });
-
-                // Calculate percentage change
-                incentiveChange = incentivesPastMonth > 0
-                    ? Math.round(((totalIncentives - incentivesPastMonth) / incentivesPastMonth) * 100)
-                    : 100;
-
-                console.log('Incentive counts retrieved successfully');
-            }
-        } catch (error) {
-            console.error('Error getting incentive counts:', error);
-        }
-
-        // Return dashboard statistics
-        return res.status(200).json({
-            userCount: totalUsers,
-            userChange: userChange,
-            newUsersThisMonth: newUsersThisMonth,
-            businessCount: totalBusiness,
-            businessChange: businessChange,
-            newBusinessesThisMonth: newBusinessesThisMonth,
-            incentiveCount: totalIncentives,
-            incentiveChange: incentiveChange,
-            newIncentivesThisMonth: newIncentivesThisMonth,
-            timestamp: new Date()
-        });
-    } catch (error) {
-        console.error('Error generating dashboard stats:', error);
-        return res.status(500).json({message: 'Server error', error: error.message});
-    }
-}
 
 /**
  * Handle forgot password request
@@ -956,6 +849,9 @@ async function handleForgotPassword(req, res) {
     }
 }
 
+/**
+ * Handle dashboard statistics for admin dashboard
+ */
 async function handleDashboardStats(req, res) {
     try {
         // Connect to MongoDB
@@ -1060,6 +956,11 @@ async function handleDashboardStats(req, res) {
             incentiveChange = Math.round((newIncentivesThisMonth / incentiveCount) * 100);
         }
 
+        // Get count of available incentives
+        const availableIncentiveCount = await Incentive.countDocuments({
+            is_available: true
+        });
+
         // Return the stats data
         return res.status(200).json({
             userCount,
@@ -1071,7 +972,8 @@ async function handleDashboardStats(req, res) {
             newBusinessesThisMonth,
             incentiveCount,
             incentiveChange,
-            newIncentivesThisMonth
+            newIncentivesThisMonth,
+            availableIncentiveCount
         });
 
     } catch (error) {

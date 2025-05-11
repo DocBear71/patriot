@@ -3,7 +3,7 @@ const connect = require('../config/db');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 let Business = require('../models/Business');
-let User = require('../models/Users');
+let User = require('../models/User');
 
 /**
  * Consolidated business API handler

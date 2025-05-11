@@ -1,7 +1,7 @@
 // Application dependencies
 const express = require('express');
 const userRouter = express.Router();
-const Users = require('../models/Users');
+const Users = require('../models/User');
 
 // route definitions
 // Get all Users
