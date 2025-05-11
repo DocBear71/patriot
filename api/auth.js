@@ -861,26 +861,12 @@ async function handleDashboardStats(req, res) {
         const userCount = await User.countDocuments();
 
         // Get count of users created last month
-        const lastMonthStart = new Date();
-        lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
-        lastMonthStart.setDate(1);
-        lastMonthStart.setHours(0, 0, 0, 0);
-
-        const lastMonthEnd = new Date();
-        lastMonthEnd.setDate(0); // Last day of previous month
-        lastMonthEnd.setHours(23, 59, 59, 999);
-
         const lastMonthUsers = await User.countDocuments({
             created_at: {
-                $gte: lastMonthStart,
+                $get: lastMonthStart,
                 $lte: lastMonthEnd
             }
         });
-
-        // Get count of users created this month
-        const thisMonthStart = new Date();
-        thisMonthStart.setDate(1);
-        thisMonthStart.setHours(0, 0, 0, 0);
 
         const newUsersThisMonth = await User.countDocuments({
             created_at: {
@@ -888,17 +874,11 @@ async function handleDashboardStats(req, res) {
             }
         });
 
-        // Get count of active users (non-deleted)
-        const activeUserCount = await User.countDocuments({
-            status: { $ne: 'deleted' }
-        });
-
-        // Calculate user change percentage
+        // Calculate User change percentage
         let userChange = 0;
         if (userCount > lastMonthUsers && lastMonthUsers > 0) {
-            userChange = Math.round(((userCount - lastMonthUsers) / lastMonthUsers) * 100);
+            userChange = Math.round((userCount - lastMonthUsers) / lastMonthUsers) * 100;
         } else if (newUsersThisMonth > 0) {
-            // If we can't calculate properly, use new users as an estimate
             userChange = Math.round((newUsersThisMonth / userCount) * 100);
         }
 
