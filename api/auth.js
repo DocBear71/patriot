@@ -857,21 +857,29 @@ async function handleDashboardStats(req, res) {
         // Connect to MongoDB
         await connect;
 
-        // Check if models are defined/initialized
-        if (!User || !Business || !Incentive) {
-            console.error('One or more models are undefined. Ensuring models are initialized properly.');
+        // Important: Explicitly import models from their respective files
+        // These should be at the top of your file, but in case they're missing:
+        try {
+            // Try to use existing models first
+            if (!User) User = mongoose.model('User');
+            if (!Business) Business = mongoose.model('Business');
+            if (!Incentive) Incentive = mongoose.model('Incentive');
+            if (!AdminCode) AdminCode = mongoose.model('AdminCode');
+        } catch (modelError) {
+            console.log('Some models need to be imported:', modelError.message);
 
-            // Try to initialize models if they're not already defined
+            // Import models directly from their files
             try {
-                if (!User) User = mongoose.model('User');
-                if (!Business) Business = mongoose.model('Business');
-                if (!Incentive) Incentive = mongoose.model('Incentive');
-            } catch (modelError) {
-                console.error('Error initializing models:', modelError);
-                return res.status(500).json({
-                    message: 'Error retrieving dashboard statistics: Models not initialized properly',
-                    error: modelError.message
-                });
+                if (!User) User = require('../models/User');
+                if (!Business) Business = require('../models/Business');
+                if (!Incentive) Incentive = require('../models/Incentive');
+                if (!AdminCode) AdminCode = require('../models/AdminCode');
+
+                // Log success
+                console.log('Models imported successfully');
+            } catch (importError) {
+                console.error('Error importing model files:', importError);
+                // Try to continue with whatever models are available
             }
         }
 
@@ -896,102 +904,149 @@ async function handleDashboardStats(req, res) {
             availableIncentiveCount: 0
         };
 
+        // Add debug info about model availability
+        console.log('Model availability check:',
+            'User:', !!User,
+            'Business:', !!Business,
+            'Incentive:', !!Incentive
+        );
+
         // Get user stats if User model is available
         if (User) {
-            // Get user count and growth
-            stats.userCount = await User.countDocuments();
+            try {
+                console.log('Fetching user stats...');
+                // Get user count and growth
+                stats.userCount = await User.countDocuments();
+                console.log(`Found ${stats.userCount} users`);
 
-            // Get count of users created last month
-            const lastMonthUsers = await User.countDocuments({
-                created_at: {
-                    $gte: lastMonthStart,
-                    $lte: lastMonthEnd
+                // Get count of users created last month
+                const lastMonthUsers = await User.countDocuments({
+                    created_at: {
+                        $gte: lastMonthStart,
+                        $lte: lastMonthEnd
+                    }
+                });
+                console.log(`Found ${lastMonthUsers} users from last month`);
+
+                stats.newUsersThisMonth = await User.countDocuments({
+                    created_at: {
+                        $gte: thisMonthStart
+                    }
+                });
+                console.log(`Found ${stats.newUsersThisMonth} new users this month`);
+
+                // Calculate User change percentage
+                if (stats.userCount > 0 && lastMonthUsers > 0) {
+                    stats.userChange = Math.round(((stats.userCount - lastMonthUsers) / lastMonthUsers) * 100);
+                } else if (stats.newUsersThisMonth > 0 && stats.userCount > 0) {
+                    stats.userChange = Math.round((stats.newUsersThisMonth / stats.userCount) * 100);
                 }
-            });
-
-            stats.newUsersThisMonth = await User.countDocuments({
-                created_at: {
-                    $gte: thisMonthStart
-                }
-            });
-
-            // Calculate User change percentage
-            if (stats.userCount > lastMonthUsers && lastMonthUsers > 0) {
-                stats.userChange = Math.round(((stats.userCount - lastMonthUsers) / lastMonthUsers) * 100);
-            } else if (stats.newUsersThisMonth > 0) {
-                stats.userChange = Math.round((stats.newUsersThisMonth / stats.userCount) * 100);
+            } catch (userError) {
+                console.error('Error getting user stats:', userError);
+                // Continue with default values
             }
         }
 
         // Get business stats if Business model is available
         if (Business) {
-            // Get business count and growth
-            stats.businessCount = await Business.countDocuments();
+            try {
+                console.log('Fetching business stats...');
+                // Get business count and growth
+                stats.businessCount = await Business.countDocuments();
+                console.log(`Found ${stats.businessCount} businesses`);
 
-            // Get count of businesses created last month
-            const lastMonthBusinesses = await Business.countDocuments({
-                created_at: {
-                    $gte: lastMonthStart,
-                    $lte: lastMonthEnd
+                // Get count of businesses created last month
+                const lastMonthBusinesses = await Business.countDocuments({
+                    created_at: {
+                        $gte: lastMonthStart,
+                        $lte: lastMonthEnd
+                    }
+                });
+                console.log(`Found ${lastMonthBusinesses} businesses from last month`);
+
+                // Get count of businesses created this month
+                stats.newBusinessesThisMonth = await Business.countDocuments({
+                    created_at: {
+                        $gte: thisMonthStart
+                    }
+                });
+                console.log(`Found ${stats.newBusinessesThisMonth} new businesses this month`);
+
+                // Calculate business change percentage
+                if (stats.businessCount > 0 && lastMonthBusinesses > 0) {
+                    stats.businessChange = Math.round(((stats.businessCount - lastMonthBusinesses) / lastMonthBusinesses) * 100);
+                } else if (stats.newBusinessesThisMonth > 0 && stats.businessCount > 0) {
+                    // If we can't calculate properly, use new businesses as an estimate
+                    stats.businessChange = Math.round((stats.newBusinessesThisMonth / stats.businessCount) * 100);
                 }
-            });
-
-            // Get count of businesses created this month
-            stats.newBusinessesThisMonth = await Business.countDocuments({
-                created_at: {
-                    $gte: thisMonthStart
-                }
-            });
-
-            // Calculate business change percentage
-            if (stats.businessCount > lastMonthBusinesses && lastMonthBusinesses > 0) {
-                stats.businessChange = Math.round(((stats.businessCount - lastMonthBusinesses) / lastMonthBusinesses) * 100);
-            } else if (stats.newBusinessesThisMonth > 0) {
-                // If we can't calculate properly, use new businesses as an estimate
-                stats.businessChange = Math.round((stats.newBusinessesThisMonth / stats.businessCount) * 100);
+            } catch (businessError) {
+                console.error('Error getting business stats:', businessError);
+                // Continue with default values
             }
         }
 
         // Get incentive stats if Incentive model is available
         if (Incentive) {
-            // Get incentive count and growth
-            stats.incentiveCount = await Incentive.countDocuments();
+            try {
+                console.log('Fetching incentive stats...');
+                // Get incentive count and growth
+                stats.incentiveCount = await Incentive.countDocuments();
+                console.log(`Found ${stats.incentiveCount} incentives`);
 
-            // Get count of incentives created last month
-            const lastMonthIncentives = await Incentive.countDocuments({
-                created_at: {
-                    $gte: lastMonthStart,
-                    $lte: lastMonthEnd
+                // Get count of incentives created last month
+                const lastMonthIncentives = await Incentive.countDocuments({
+                    created_at: {
+                        $gte: lastMonthStart,
+                        $lte: lastMonthEnd
+                    }
+                });
+                console.log(`Found ${lastMonthIncentives} incentives from last month`);
+
+                // Get count of incentives created this month
+                stats.newIncentivesThisMonth = await Incentive.countDocuments({
+                    created_at: {
+                        $gte: thisMonthStart
+                    }
+                });
+                console.log(`Found ${stats.newIncentivesThisMonth} new incentives this month`);
+
+                // Calculate incentive change percentage
+                if (stats.incentiveCount > 0 && lastMonthIncentives > 0) {
+                    stats.incentiveChange = Math.round(((stats.incentiveCount - lastMonthIncentives) / lastMonthIncentives) * 100);
+                } else if (stats.newIncentivesThisMonth > 0 && stats.incentiveCount > 0) {
+                    // If we can't calculate properly, use new incentives as an estimate
+                    stats.incentiveChange = Math.round((stats.newIncentivesThisMonth / stats.incentiveCount) * 100);
                 }
-            });
 
-            // Get count of incentives created this month
-            stats.newIncentivesThisMonth = await Incentive.countDocuments({
-                created_at: {
-                    $gte: thisMonthStart
-                }
-            });
-
-            // Calculate incentive change percentage
-            if (stats.incentiveCount > lastMonthIncentives && lastMonthIncentives > 0) {
-                stats.incentiveChange = Math.round(((stats.incentiveCount - lastMonthIncentives) / lastMonthIncentives) * 100);
-            } else if (stats.newIncentivesThisMonth > 0) {
-                // If we can't calculate properly, use new incentives as an estimate
-                stats.incentiveChange = Math.round((stats.newIncentivesThisMonth / stats.incentiveCount) * 100);
+                // Get count of available incentives
+                stats.availableIncentiveCount = await Incentive.countDocuments({
+                    is_available: true
+                });
+                console.log(`Found ${stats.availableIncentiveCount} available incentives`);
+            } catch (incentiveError) {
+                console.error('Error getting incentive stats:', incentiveError);
+                // Continue with default values
             }
-
-            // Get count of available incentives
-            stats.availableIncentiveCount = await Incentive.countDocuments({
-                is_available: true
-            });
         }
+
+        console.log('Final stats:', stats);
 
         // Return the stats data
         return res.status(200).json(stats);
 
     } catch (error) {
         console.error('Error fetching dashboard stats:', error);
-        return res.status(500).json({ message: 'Error retrieving dashboard statistics', error: error.message });
+
+        // Try to return some stats if possible
+        if (stats && Object.keys(stats).length > 0) {
+            console.log('Returning partial stats despite error');
+            return res.status(200).json(stats);
+        }
+
+        return res.status(500).json({
+            message: 'Error retrieving dashboard statistics',
+            error: error.message
+        });
     }
 }
 
