@@ -346,7 +346,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Render users in the dashboard table
     function renderDashboardUsers() {
         const userTableBody = document.getElementById('dashboard-users-table');
-        if (!userTableBody) return;
+        if (!userTableBody) {
+            console.error("User table body element not found");
+            return;
+        }
 
         if (users.length === 0) {
             userTableBody.innerHTML = '<tr><td colspan="6" class="text-center">No users found</td></tr>';
@@ -365,20 +368,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Status badge
             let statusBadge = '';
-            if (user.status === 'AD') {
-                statusBadge = '<span class="badge badge-active">Active Duty</span>';
-            } else if (user.status === 'VT') {
-                statusBadge = '<span class="badge badge-active">Veteran</span>';
-            } else if (user.status === 'FR') {
-                statusBadge = '<span class="badge badge-active">First Responder</span>';
-            } else if (user.status === 'SP') {
-                statusBadge = '<span class="badge badge-active">Spouse</span>';
-            } else if (user.status === 'BO') {
-                statusBadge = '<span class="badge badge-active">Business Owner</span>';
-            } else if (user.status === 'SU') {
-                statusBadge = '<span class="badge badge-active">Supporter</span>';
-            } else {
-                statusBadge = '<span class="badge badge-secondary">Unknown</span>';
+            switch (user.status) {
+                case 'AD':
+                    statusBadge = '<span class="badge badge-active">Active Duty</span>';
+                    break;
+                case 'VT':
+                    statusBadge = '<span class="badge badge-veteran">Veteran</span>';
+                    break;
+                case 'FR':
+                    statusBadge = '<span class="badge badge-first-responder">First Responder</span>';
+                    break;
+                case 'SP':
+                    statusBadge = '<span class="badge badge-spouse">Spouse</span>';
+                    break;
+                case 'BO':
+                    statusBadge = '<span class="badge badge-business-owner">Business Owner</span>';
+                    break;
+                case 'SU':
+                    statusBadge = '<span class="badge badge-supporter">Supporter</span>';
+                    break;
+                default:
+                    statusBadge = '<span class="badge badge-secondary">Unknown</span>';
             }
 
             // Level badge
@@ -405,24 +415,46 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${user.fname} ${user.lname}</td>
-                <td>${user.email}</td>
-                <td>${statusBadge}</td>
-                <td>${levelBadge}</td>
-                <td>${formattedDate}</td>
-                <td>
-                    <div class="action-btns">
-                        <a href="admin-users.html?edit=${user._id}" class="btn btn-sm btn-info">Edit</a>
-                    </div>
-                </td>
-            `;
+            <td>${user.fname || ''} ${user.lname || ''}</td>
+            <td>${user.email || 'N/A'}</td>
+            <td>${statusBadge}</td>
+            <td>${levelBadge}</td>
+            <td>${formattedDate}</td>
+            <td>
+                <div class="action-buttons">
+                    <a href="admin-users.html?edit=${user._id}" class="btn btn-sm btn-info">Edit</a>
+                </div>
+            </td>
+        `;
 
             userTableBody.appendChild(row);
         });
 
+        // Update user stats if we have dashboard stats
+        if (dashboardStats) {
+            // Total users
+            const totalUsersCount = document.getElementById('total-users-count');
+            if (totalUsersCount) {
+                totalUsersCount.textContent = dashboardStats.userCount || '0';
+            }
+
+            // Active users
+            const activeUsersCount = document.getElementById('active-users-count');
+            if (activeUsersCount) {
+                activeUsersCount.textContent = dashboardStats.activeUserCount || '0';
+            }
+
+            // New users this month
+            const newUsersCount = document.getElementById('new-users-count');
+            if (newUsersCount) {
+                newUsersCount.textContent = dashboardStats.newUsersThisMonth || '0';
+            }
+        }
+
         // Add quick search functionality to the dashboard users table
         setupQuickSearch();
     }
+
 
     // Setup quick search for dashboard users table
     function setupQuickSearch() {
@@ -603,6 +635,47 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
     }
+
+    function updateUserStatsInDashboard() {
+        if (!dashboardStats) return;
+
+        // Update user stats in the dashboard panel
+        const userStatsContainer = document.querySelector('#dashboard-panel div[style*="grid-template-columns"]');
+        if (userStatsContainer) {
+            const userBox = userStatsContainer.querySelector('div:nth-child(1)');
+            if (userBox) {
+                const countElem = userBox.querySelector('p:nth-child(2)');
+                const changeElem = userBox.querySelector('p:nth-child(3)');
+
+                if (countElem) {
+                    countElem.textContent = dashboardStats.userCount || '0';
+                }
+
+                if (changeElem) {
+                    const change = dashboardStats.userChange || 0;
+                    changeElem.textContent = `${change >= 0 ? '↑' : '↓'} ${Math.abs(change)}% from last month`;
+                }
+            }
+        }
+
+        // Update the user panel stats
+        const totalUsersCount = document.getElementById('total-users-count');
+        if (totalUsersCount) {
+            totalUsersCount.textContent = dashboardStats.userCount || '0';
+        }
+
+        const activeUsersCount = document.getElementById('active-users-count');
+        if (activeUsersCount) {
+            activeUsersCount.textContent = dashboardStats.activeUserCount || '0';
+        }
+
+        const newUsersCount = document.getElementById('new-users-count');
+        if (newUsersCount) {
+            newUsersCount.textContent = dashboardStats.newUsersThisMonth || '0';
+        }
+    }
+
+
 
 // Render businesses in the dashboard
     function renderBusinesses() {
@@ -1110,14 +1183,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Initialize the dashboard
     function init() {
-        // Show spinner while loading
         showSpinner();
 
-        // Check URL parameters
         handleUrlParams();
 
-        // Initialize with admin check
         checkAdminStatus();
+
+        enhancedDashboardInit();
+    }
+
+    function enhancedDashboardInit() {
+        // After loading dashboard stats, ensure user stats are updated
+        if (loadDashboardStats && typeof loadDashboardStats === 'function') {
+            const originalLoadDashboardStats = loadDashboardStats;
+            loadDashboardStats = async function () {
+                await originalLoadDashboardStats();
+                updateUserStatsInDashboard();
+            };
+        }
+        document.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const section = this.getAttribute('data-section');
+                if (section === 'users') {
+                    loadUsers();
+                }
+            });
+        });
     }
 
     // Check for admin status

@@ -116,34 +116,56 @@ DESCRIPTION:
     color: white;
 }
 
-.badge-admin {
-    background-color: #dc3545;
-    color: white;
-}
-
-.badge-user {
+.badge-veteran {
     background-color: #007bff;
     color: white;
 }
 
-.badge-vip {
-    background-color: #6f42c1;
-    color: white;
-}
-
-.badge-premium {
+.badge-first-responder {
     background-color: #fd7e14;
     color: white;
 }
 
-.badge-basic {
-    background-color: #17a2b8;
+.badge-spouse {
+    background-color: #20c997;
     color: white;
 }
 
-.badge-free {
+.badge-business-owner {
+    background-color: #6610f2;
+    color: white;
+}
+
+.badge-supporter {
     background-color: #6c757d;
     color: white;
+}
+
+/* Make sure these entries match exactly - override if they differ */
+.badge-free {
+    color: #212529;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+.badge-basic {
+    color: #fff;
+    background-color: #17a2b8;
+}
+
+.badge-premium {
+    color: #fff;
+    background-color: #6f42c1;
+}
+
+.badge-vip {
+    color: #fff;
+    background-color: #e83e8c;
+}
+
+.badge-admin {
+    color: #fff;
+    background-color: #dc3545;
 }
 
 .pagination {
