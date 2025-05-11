@@ -218,8 +218,70 @@
 <footer class = "footer_style"><br>
     <p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p>
 </footer>
-
 <style>
+    /* Additional styles for search results and business details */
+    .results-table {
+        width: 90%;
+        margin: 20px auto;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .results-table th, .results-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+    }
+
+    .results-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .results-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+
+    .results-table tr:hover {
+        background-color: #f1f1f1;
+    }
+
+    .select-business, .select-incentive {
+        background-color: #0000ff;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .select-business:hover, .select-incentive:hover {
+        background-color: #0000cc;
+    }
+
+    /* Business details styling */
+    .business-details {
+        margin: 10px 0 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+    }
+
+    .detail-row {
+        margin-bottom: 8px;
+    }
+
+    .detail-label {
+        font-weight: bold;
+        width: 150px;
+        display: inline-block;
+    }
+
+    .detail-value {
+        display: inline-block;
+    }
+
     /* Initially hide sections until needed */
     #business-info-section {
         display: none;
@@ -240,7 +302,35 @@
         text-align: center;
         margin: 10px 0;
     }
-</style>
 
+    /* Disabled field styling */
+    .disabled-field {
+        background-color: #f0f0f0;
+        color: #888;
+        cursor: not-allowed;
+    }
+
+    textarea.disabled-field {
+        resize: none;
+    }
+
+    /* Force display for edit section */
+    :not(.form-group).force-display {
+        display: block !important;
+    }
+
+    /* Use flex for form-group elements */
+    .form-group.force-display {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+
+    /* Special handling for other type container */
+    #otherTypeContainer.force-display,
+    #otherTypeContainer[style*="display: block"] {
+        display: flex !important;
+    }
+</style>
 </body>
 </html>
