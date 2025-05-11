@@ -869,7 +869,7 @@ async function handleDashboardStats(req, res) {
         // Get count of users created last month
         const lastMonthUsers = await User.countDocuments({
             created_at: {
-                $get: lastMonthStart,
+                $gte: lastMonthStart,
                 $lte: lastMonthEnd
             }
         });
