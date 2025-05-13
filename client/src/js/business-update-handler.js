@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 : window.location.origin;
 
             // Use the API endpoint with the baseURL
-            const apiURL = `${baseURL}/api/business.js?operation=admin-update-business`;
+            const apiURL = `${baseURL}/api/business.js?operation=update-business`;
             console.log("Submitting to API at:", apiURL);
 
             const token = getAuthToken();

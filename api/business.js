@@ -25,6 +25,8 @@ module.exports = async (req, res) => {
                 return await handleBusinessSearch(req, res);
             case 'register':
                 return await handleBusinessRegister(req, res);
+            case 'update-business':
+                return await handleUpdateBusinessNoAdmin(req, res);
 
             // Chain operations
             case 'get_chains':
@@ -790,6 +792,125 @@ async function handleUpdateBusiness(req, res) {
     } catch (error) {
         console.error('Error updating business:', error);
         return res.status(500).json({ message: 'Error updating business', error: error.message });
+    }
+}
+
+/**
+ * Handle business updates without requiring admin privileges
+ */
+async function handleUpdateBusinessNoAdmin(req, res) {
+    // Only allow PUT requests
+    if (req.method !== 'PUT') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    try {
+        // Get business data from request
+        const businessData = req.body;
+        const businessId = businessData.businessId;
+
+        // Validate business ID
+        if (!businessId) {
+            return res.status(400).json({ message: 'Business ID is required' });
+        }
+
+        // Remove businessId from update data
+        delete businessData.businessId;
+
+        // Connect to MongoDB
+        await connect;
+
+        // Check if business exists
+        const existingBusiness = await Business.findById(businessId);
+
+        if (!existingBusiness) {
+            return res.status(404).json({ message: 'Business not found' });
+        }
+
+        // Handle chain-specific updates
+        if (existingBusiness.is_chain || businessData.is_chain) {
+            // Ensure locations array exists
+            if (!businessData.locations && existingBusiness.locations) {
+                businessData.locations = existingBusiness.locations;
+            } else if (!businessData.locations) {
+                businessData.locations = [];
+            }
+        }
+        // Handle regular business updates (not a chain)
+        else {
+            // Add geospatial data if coordinates are provided
+            if (businessData.lat && businessData.lng) {
+                businessData.location = {
+                    type: 'Point',
+                    coordinates: [
+                        parseFloat(businessData.lng),
+                        parseFloat(businessData.lat)
+                    ]
+                };
+            } else if (businessData.address1 && businessData.city && businessData.state) {
+                // If coordinates weren't provided, geocode the address
+                try {
+                    // Import the geocoding function
+                    const { geocodeAddress } = require('../utils/geocoding');
+
+                    const address = `${businessData.address1}, ${businessData.city}, ${businessData.state} ${businessData.zip}`;
+                    const coordinates = await geocodeAddress(address);
+
+                    if (coordinates) {
+                        businessData.location = {
+                            type: 'Point',
+                            coordinates: [coordinates.lng, coordinates.lat]
+                        };
+                        console.log("Geocoded coordinates:", coordinates);
+                    } else {
+                        console.warn("Could not geocode address:", address);
+                    }
+                } catch (geocodeError) {
+                    console.error("Error geocoding address:", geocodeError);
+                }
+            }
+
+            // Check if another business has the same name and address
+            const duplicateBusiness = await Business.findOne({
+                _id: { $ne: businessId },
+                bname: businessData.bname,
+                address1: businessData.address1,
+                city: businessData.city,
+                state: businessData.state,
+                zip: businessData.zip
+            });
+
+            if (duplicateBusiness) {
+                return res.status(409).json({ message: 'Another business with this name and address already exists' });
+            }
+        }
+
+        // Update timestamp
+        businessData.updated_at = new Date();
+
+        // Update business
+        const result = await Business.findByIdAndUpdate(
+            businessId,
+            { $set: businessData },
+            { new: true }
+        );
+
+        // If this is a chain business and the name was updated, also update all locations
+        if (existingBusiness.is_chain && businessData.bname && businessData.bname !== existingBusiness.bname) {
+            // Update chain_name for all locations
+            await Business.updateMany(
+                { chain_id: businessId },
+                { $set: { chain_name: businessData.bname } }
+            );
+        }
+
+        return res.status(200).json({
+            message: existingBusiness.is_chain ? 'Chain updated successfully' : 'Business updated successfully',
+            businessId: result._id
+        });
+    } catch (error) {
+        console.error('Error updating business:', error);
+        return res.status(500).json({ message: 'Server error updating business: ' + error.message });
     }
 }
 

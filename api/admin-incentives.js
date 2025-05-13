@@ -26,25 +26,31 @@ module.exports = async (req, res) => {
         return res.status(500).json({ message: 'Database connection error', error: dbError.message });
     }
 
-    // Verify admin status for all requests
+    // Get the operation and method
+    const { operation } = req.query;
+    console.log(`Processing incentive operation: ${operation || 'no operation specified'}`);
+    console.log("Method:", req.method);
+    console.log("Query:", req.query);
+
     try {
-        const isAdmin = await verifyAdminAccess(req);
-        if (!isAdmin) {
-            return res.status(403).json({ message: 'Admin access required' });
+        // Special case for incentive updates - allow without admin check
+        if (req.method === 'PUT' && operation === 'update') {
+            // Handle incentive update without requiring admin status
+            return await handleUpdateIncentive(req, res);
         }
-    } catch (authError) {
-        console.error('Admin authentication error:', authError);
-        return res.status(401).json({ message: 'Authentication required' });
-    }
 
-    // Route based on operation parameter and HTTP method
-    try {
-        const { operation } = req.query;
+        // For all other operations, verify admin status
+        try {
+            const isAdmin = await verifyAdminAccess(req);
+            if (!isAdmin) {
+                return res.status(403).json({ message: 'Admin access required' });
+            }
+        } catch (authError) {
+            console.error('Admin authentication error:', authError);
+            return res.status(401).json({ message: 'Authentication required' });
+        }
 
-        console.log(`Processing admin incentive operation: ${operation || 'no operation specified'}`);
-        console.log("Method:", req.method);
-        console.log("Query:", req.query);
-
+        // Continue with admin-only operations
         if (req.method === 'GET') {
             // Handle various GET operations
             if (operation === 'admin-list-incentives') {
@@ -58,9 +64,6 @@ module.exports = async (req, res) => {
         } else if (req.method === 'POST') {
             // Handle new incentive creation
             return await handleCreateIncentive(req, res);
-        } else if (req.method === 'PUT' && operation === 'update') {
-            // Handle incentive update
-            return await handleUpdateIncentive(req, res);
         } else if (req.method === 'DELETE' && operation === 'delete') {
             // Handle incentive deletion
             return await handleDeleteIncentive(req, res);
@@ -282,10 +285,10 @@ async function handleGetIncentive(req, res) {
  * Handle updating an existing incentive
  */
 async function handleUpdateIncentive(req, res) {
-    console.log("Admin update incentive API hit");
+    console.log("Update incentive API hit");
 
     try {
-        const { incentiveId, business_id, is_available, type, amount, information, other_description, updated_by } = req.body;
+        const { incentiveId, business_id, is_available, type, amount, information, other_description, updated_by, discount_type } = req.body;
 
         if (!incentiveId) {
             return res.status(400).json({ message: 'Incentive ID is required' });
@@ -300,6 +303,7 @@ async function handleUpdateIncentive(req, res) {
         if (amount !== undefined) updateData.amount = parseFloat(amount) || 0;
         if (information !== undefined) updateData.information = information;
         if (updated_by !== undefined) updateData.updated_by = updated_by;
+        if (discount_type !== undefined) updateData.discount_type = discount_type;
 
         // Handle other_description field
         if (type === 'OT') {
