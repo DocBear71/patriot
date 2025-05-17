@@ -155,7 +155,44 @@
          </div>
          <br><br>
      </footer>
+     <button id="emergencyResetBtn" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+         Emergency Reset
+     </button>
 
+     <script>
+         // Add event listener for emergency reset button
+         document.getElementById('emergencyResetBtn').addEventListener('click', function() {
+             console.log("Emergency reset button clicked");
+
+             // Try calling the emergencyModalReset function
+             if (typeof emergencyModalReset === 'function') {
+                 emergencyModalReset();
+             } else {
+                 // Manual reset if function not available
+                 $('.modal-backdrop').remove();
+                 $('body').removeClass('modal-open');
+                 $('body').css('padding-right', '');
+                 $('#termsUpdateModal').modal('hide');
+                 $('#termsUpdateModal').hide();
+             }
+
+             // Hide the button
+             this.style.display = 'none';
+         });
+
+         // Show emergency button after a delay if modal is still visible
+         // This will automatically show the emergency button if the modal gets stuck
+         setTimeout(function() {
+             const modalVisible = $('#termsUpdateModal').is(':visible') ||
+                     $('.modal-backdrop').length > 0 ||
+                     $('body').hasClass('modal-open');
+
+             if (modalVisible) {
+                 console.log("Modal appears to be stuck - showing emergency reset button");
+                 document.getElementById('emergencyResetBtn').style.display = 'block';
+             }
+         }, 10000); // Show after 10 seconds if modal is still visible
+     </script>
 
      <script src="./js/popper.min.js"></script>
 

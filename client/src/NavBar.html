@@ -109,13 +109,12 @@
         </ul>
     </div>
     <!-- Terms Update Modal -->
-    <!-- Terms Update Modal -->
-    <div class="modal fade" id="termsUpdateModal" tabindex="-1" role="dialog" aria-labelledby="termsUpdateModalLabel" aria-hidden="true" data-keyboard="true">
+    <div class="modal fade" id="termsUpdateModal" tabindex="-1" role="dialog" aria-labelledby="termsUpdateModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="termsUpdateModalLabel">Terms of Use Update</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" aria-label="Close" onclick="emergencyModalReset()">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -128,7 +127,7 @@
                     </div>
 
                     <!-- Scrollable Summary Section -->
-                    <div class="terms-summary" id="termsSummary" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; margin: 10px 0; background-color: #f9f9f9;">
+                    <div class="terms-summary" id="termsSummary">
                         <h4>Summary of Key Terms</h4>
                         <p><strong>Effective Date:</strong> May 14, 2025</p>
 
@@ -177,13 +176,13 @@
                     <div class="form-check mt-3">
                         <input class="form-check-input" type="checkbox" id="acceptUpdatedTerms" disabled>
                         <label class="form-check-label" for="acceptUpdatedTerms">
-                            I have read and agree to the updated <a href="terms-of-use.html" target="_blank">Terms of Use</a> and <a href="privacy-policy.html" target="_blank">Privacy Policy</a>
+                            I have read and agree to the updated <a href="terms.html" target="_blank">Terms of Use</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>
                         </label>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="rejectUpdatedTerms">Decline</button>
-                    <button type="button" class="btn btn-primary" id="confirmUpdatedTerms" disabled>Accept Terms</button>
+                    <button type="button" class="btn btn-secondary" id="rejectUpdatedTerms" onclick="$('#rejectUpdatedTerms').trigger('click')">Decline</button>
+                    <button type="button" class="btn btn-primary" id="confirmUpdatedTerms" disabled onclick="$('#confirmUpdatedTerms').trigger('click')">Accept Terms</button>
                 </div>
             </div>
         </div>

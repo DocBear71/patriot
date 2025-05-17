@@ -6,32 +6,44 @@ VERSION: 1.0.1
 DESCRIPTION:
     Style Sheet for Patriot Thanks.
 */
-    /* Modal styling */
+/* Base modal z-index hierarchy */
 .modal-backdrop {
     z-index: 1040 !important;
+    opacity: 0.5 !important; /* Ensure backdrop is visible but not too dark */
 }
 
 .modal {
     z-index: 1050 !important;
+    overflow: hidden !important; /* Prevent scrolling issues */
+    padding-right: 0 !important; /* Fix padding issues on some browsers */
 }
 
 .modal-content {
     z-index: 1051 !important;
+    position: relative !important; /* Ensure proper stacking */
+    box-shadow: 0 5px 15px rgba(0,0,0,.5) !important; /* Better visibility */
 }
 
-/* Terms modal specific styling */
+/* Fix for modal dialog positioning */
+.modal-dialog {
+    margin: 30px auto !important; /* Consistent positioning */
+    position: relative !important;
+}
+
+/* Terms modal specific styling - keeping your existing styles */
 #termsUpdateModal .modal-dialog {
     max-width: 800px;
 }
 
 #termsUpdateModal .terms-summary {
     max-height: 300px;
-    overflow-y: auto;
+    overflow-y: auto !important; /* Force scroll */
     border: 1px solid #ddd;
     padding: 15px;
     margin: 10px 0;
     background-color: #f9f9f9;
     font-size: 14px;
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 #termsUpdateModal .terms-summary h4 {
@@ -61,6 +73,91 @@ DESCRIPTION:
     border-top: 1px dashed #ddd;
     text-align: center;
     font-weight: bold;
+}
+
+/* Additional fixes for modal functionality */
+
+/* Ensure modal body is scrollable */
+.modal-body {
+    overflow-y: auto !important;
+    max-height: calc(90vh - 150px) !important; /* Adjust based on screen size */
+    padding: 15px !important;
+    position: relative !important;
+}
+
+/* Fix modal footer button styling */
+.modal-footer {
+    display: flex !important;
+    justify-content: flex-end !important;
+    padding: 15px !important;
+    border-top: 1px solid #dee2e6 !important;
+    position: relative !important;
+}
+
+.modal-footer button {
+    min-width: 100px !important;
+    position: relative !important;
+    z-index: 1052 !important; /* Ensure buttons are clickable */
+    margin-left: 10px !important;
+}
+
+/* Fix for close button */
+.modal .close {
+    z-index: 1052 !important;
+    position: relative !important;
+    opacity: 0.8 !important;
+    font-size: 1.5rem !important;
+    padding: 0.5rem !important;
+}
+
+.modal .close:hover {
+    opacity: 1 !important;
+}
+
+/* Force modal open state */
+body.modal-open {
+    overflow: hidden !important;
+    padding-right: 15px !important; /* Prevent layout shift */
+}
+
+/* Emergency reset button styling */
+#emergencyResetBtn {
+    position: fixed !important;
+    bottom: 10px !important;
+    right: 10px !important;
+    z-index: 9999 !important;
+    background-color: #dc3545 !important;
+    color: white !important;
+    border: none !important;
+    padding: 8px 15px !important;
+    border-radius: 4px !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 768px) {
+    #termsUpdateModal .modal-dialog {
+        margin: 10px auto !important;
+        max-width: 95% !important;
+        width: 95% !important;
+    }
+
+    #termsUpdateModal .terms-summary {
+        max-height: 200px !important; /* Smaller for mobile */
+    }
+
+    .modal-body {
+        max-height: calc(80vh - 120px) !important; /* Smaller for mobile */
+        padding: 10px !important;
+    }
+
+    .modal-footer button {
+        min-width: 80px !important;
+        padding: 6px 12px !important;
+        font-size: 14px !important;
+    }
 }
 
 * {

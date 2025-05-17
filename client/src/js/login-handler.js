@@ -149,7 +149,7 @@ function updateUIAfterLogin(session) {
     checkTermsVersion(session);
 }
 
-// Function to check if user needs to accept new terms
+// Enhanced function to check terms version
 function checkTermsVersion(session) {
     if (!session || !session.user) return;
 
@@ -169,12 +169,24 @@ function checkTermsVersion(session) {
             backdrop: 'static', // Prevent closing by clicking outside
             keyboard: false     // Prevent closing with keyboard
         });
+
+        // Show emergency button after a delay in case modal gets stuck
+        setTimeout(function() {
+            const modalVisible = $('#termsUpdateModal').is(':visible');
+            const modalInteractive = $('#termsUpdateModal').find('.modal-content').is(':visible');
+
+            if (modalVisible && !modalInteractive) {
+                console.log("Modal may be stuck - showing emergency reset button");
+                showEmergencyButton();
+            }
+        }, 5000); // Check after 5 seconds
     }
 }
 
-// Function to update terms acceptance
+// Enhanced function to update terms acceptance with better error handling
 function updateTermsAcceptance(session) {
     const userId = session.user._id;
+    console.log("Updating terms acceptance for user:", userId);
 
     // determine the base URL
     const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
@@ -195,7 +207,12 @@ function updateTermsAcceptance(session) {
             termsVersion: "May 14, 2025"
         })
     })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 console.log("Terms acceptance updated successfully");
@@ -207,6 +224,15 @@ function updateTermsAcceptance(session) {
 
                 // Save updated session
                 localStorage.setItem('patriotThanksSession', JSON.stringify(session));
+
+                // Hide modal with special handling
+                try {
+                    $('#termsUpdateModal').modal('hide');
+                    removeAllBackdrops();
+                } catch (error) {
+                    console.error("Error hiding modal:", error);
+                    emergencyModalReset();
+                }
             } else {
                 console.error("Failed to update terms acceptance");
                 alert('Failed to update terms acceptance. Please try again.');
@@ -214,8 +240,27 @@ function updateTermsAcceptance(session) {
         })
         .catch(error => {
             console.error('Error updating terms acceptance:', error);
-            alert('An error occurred while updating terms acceptance.');
+            alert('An error occurred while updating terms acceptance. Please try again later.');
+
+            // Hide modal anyway to prevent user being stuck
+            try {
+                $('#termsUpdateModal').modal('hide');
+                removeAllBackdrops();
+            } catch (modalError) {
+                console.error("Error hiding modal after API error:", modalError);
+                emergencyModalReset();
+            }
         });
+}
+
+function showEmergencyButton() {
+    const emergencyBtn = document.getElementById('emergencyResetBtn');
+    if (emergencyBtn) {
+        emergencyBtn.style.display = 'block';
+        console.log("Emergency reset button shown");
+    } else {
+        console.error("Emergency reset button not found");
+    }
 }
 
 // Function to toggle admin elements visibility
@@ -562,17 +607,38 @@ function getAuthToken() {
     }
 }
 
-// Terms modal handlers
+// Improved Terms modal handlers
 function setupTermsModalHandlers() {
     console.log("Setting up terms modal handlers");
 
+    // Ensure we're working with the latest version of the DOM
+    const acceptCheckbox = document.getElementById('acceptUpdatedTerms');
+    const confirmButton = document.getElementById('confirmUpdatedTerms');
+    const rejectButton = document.getElementById('rejectUpdatedTerms');
+    const termsModal = document.getElementById('termsUpdateModal');
+
+    if (!termsModal) {
+        console.error("Terms modal not found in DOM");
+        return;
+    }
+
+    // Remove any existing event listeners to prevent duplicates
+    $(document).off('change', '#acceptUpdatedTerms');
+    $(document).off('click', '#confirmUpdatedTerms');
+    $(document).off('click', '#rejectUpdatedTerms');
+
     // Enable the Accept button only when checkbox is checked
     $(document).on('change', '#acceptUpdatedTerms', function() {
-        document.getElementById('confirmUpdatedTerms').disabled = !this.checked;
+        const confirmBtn = document.getElementById('confirmUpdatedTerms');
+        if (confirmBtn) {
+            confirmBtn.disabled = !this.checked;
+        }
     });
 
     // Handle terms acceptance
-    $(document).on('click', '#confirmUpdatedTerms', function() {
+    $(document).on('click', '#confirmUpdatedTerms', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
         console.log("Terms acceptance confirmed");
 
         // Get session data
@@ -580,69 +646,61 @@ function setupTermsModalHandlers() {
         if (!sessionData) {
             console.error("No session found");
             $('#termsUpdateModal').modal('hide');
+            removeAllBackdrops();
             return;
         }
 
         const session = JSON.parse(sessionData);
-        const userId = session.user._id;
-
-        // determine the base URL
-        const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
-            ? `http://${window.location.host}`
-            : window.location.origin;
-
-        // Update user's terms acceptance
-        fetch(`${baseURL}/api/auth.js?operation=update-terms-acceptance`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + session.token
-            },
-            body: JSON.stringify({
-                userId: userId,
-                termsAccepted: true,
-                termsAcceptedDate: new Date().toISOString(),
-                termsVersion: "May 14, 2025"
-            })
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    console.log("Terms acceptance updated successfully");
-
-                    // Update session data
-                    session.user.termsAccepted = true;
-                    session.user.termsAcceptedDate = new Date().toISOString();
-                    session.user.termsVersion = "May 14, 2025";
-
-                    // Save updated session
-                    localStorage.setItem('patriotThanksSession', JSON.stringify(session));
-
-                    // Hide modal
-                    $('#termsUpdateModal').modal('hide');
-                } else {
-                    console.error("Failed to update terms acceptance");
-                    alert('Failed to update terms acceptance. Please try again.');
-                }
-            })
-            .catch(error => {
-                console.error('Error updating terms acceptance:', error);
-                alert('An error occurred. Please try again.');
-            });
+        updateTermsAcceptance(session);
     });
 
     // Handle terms rejection
-    $(document).on('click', '#rejectUpdatedTerms', function() {
+    $(document).on('click', '#rejectUpdatedTerms', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
         console.log("Terms acceptance rejected");
 
         // Warn user about consequences
         if (confirm("If you do not accept the updated terms, you will be logged out and unable to use the service. Continue?")) {
             // Log out the user
             logoutUser();
+
+            // Properly hide modal
+            try {
+                $('#termsUpdateModal').modal('hide');
+                removeAllBackdrops();
+            } catch (error) {
+                console.error("Error hiding modal:", error);
+                emergencyModalReset();
+            }
+        }
+    });
+
+    // Add additional close handlers
+    $('.modal .close').on('click', function() {
+        console.log("Close button clicked");
+        $('#termsUpdateModal').modal('hide');
+        removeAllBackdrops();
+    });
+
+    // Add keyboard handler for escape key
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' && $('#termsUpdateModal').hasClass('show')) {
+            console.log("Escape key pressed, attempting to close modal");
             $('#termsUpdateModal').modal('hide');
+            removeAllBackdrops();
         }
     });
 }
+
+// Helper function to remove all modal backdrops
+function removeAllBackdrops() {
+    console.log("Removing all modal backdrops");
+    $('.modal-backdrop').remove();
+    $('body').removeClass('modal-open');
+    $('body').css('padding-right', '');
+}
+
 
 // Function to set up terms scroll tracking
 function setupTermsScrollTracking() {
@@ -659,56 +717,87 @@ function setupTermsScrollTracking() {
     let startTime = Date.now();
     const MINIMUM_READ_TIME = 5000; // 5 seconds minimum reading time
 
-    // Add scroll event listener
+    // In case this function runs multiple times, remove any existing listeners
     if (termsSummary) {
-        termsSummary.addEventListener('scroll', function() {
-            // Calculate scroll position
-            const scrollPosition = termsSummary.scrollTop + termsSummary.clientHeight;
-            const scrollHeight = termsSummary.scrollHeight;
-            const timeSpent = Date.now() - startTime;
-
-            // Calculate how far through the content the user has scrolled (as a percentage)
-            const scrollPercentage = (scrollPosition / scrollHeight) * 100;
-
-            // User must scroll at least 80% through the content
-            if (scrollPercentage >= 80 && timeSpent >= MINIMUM_READ_TIME) {
-                console.log("User has scrolled to near bottom of terms");
-                hasScrolledToBottom = true;
-
-                // Enable the checkbox
-                if (termsCheckbox) {
-                    termsCheckbox.disabled = false;
-                    console.log("Terms checkbox enabled");
-                }
-
-                // Show confirmation message
-                if (scrollMessage) {
-                    scrollMessage.style.display = 'block';
-                    scrollMessage.innerHTML = '<i class="fa fa-check-circle"></i> Thank you for reviewing the terms. Please check the box below to confirm your acceptance.';
-                    scrollMessage.style.color = 'green';
-                }
-            } else if (scrollPercentage >= 80 && timeSpent < MINIMUM_READ_TIME) {
-                // User scrolled quickly to bottom, but hasn't spent enough time
-                const remainingTime = Math.ceil((MINIMUM_READ_TIME - timeSpent) / 1000);
-                if (scrollMessage) {
-                    scrollMessage.style.display = 'block';
-                    scrollMessage.innerHTML = `Please continue reviewing for ${remainingTime} more seconds.`;
-                    scrollMessage.style.color = '#f57c00'; // Orange for warning
-                }
-            } else if (scrollPercentage >= 50) {
-                // User is making progress
-                if (scrollMessage) {
-                    scrollMessage.style.display = 'block';
-                    scrollMessage.innerHTML = 'Continue scrolling to review all terms.';
-                    scrollMessage.style.color = '#2196F3'; // Blue for info
-                }
-            }
-        });
-    } else {
-        console.error("Terms summary element not found");
+        const oldListener = termsSummary._scrollListener;
+        if (oldListener) {
+            termsSummary.removeEventListener('scroll', oldListener);
+        }
     }
 
+    // Check if elements exist
+    if (!termsSummary) {
+        console.error("Terms summary element not found");
+        return;
+    }
+
+    if (!termsCheckbox) {
+        console.error("Terms checkbox not found");
+        return;
+    }
+
+    if (!scrollMessage) {
+        console.error("Scroll message element not found");
+        return;
+    }
+
+    // Create scroll listener function
+    const scrollListener = function() {
+        // Calculate scroll position
+        const scrollPosition = termsSummary.scrollTop + termsSummary.clientHeight;
+        const scrollHeight = termsSummary.scrollHeight;
+        const timeSpent = Date.now() - startTime;
+
+        // Calculate how far through the content the user has scrolled (as a percentage)
+        const scrollPercentage = (scrollPosition / scrollHeight) * 100;
+        console.log(`Scroll position: ${scrollPosition}/${scrollHeight} (${scrollPercentage.toFixed(2)}%)`);
+
+        // User must scroll at least 80% through the content
+        if (scrollPercentage >= 80 && timeSpent >= MINIMUM_READ_TIME) {
+            console.log("User has scrolled to near bottom of terms");
+            hasScrolledToBottom = true;
+
+            // Enable the checkbox
+            if (termsCheckbox) {
+                termsCheckbox.disabled = false;
+                console.log("Terms checkbox enabled");
+            }
+
+            // Show confirmation message
+            if (scrollMessage) {
+                scrollMessage.style.display = 'block';
+                scrollMessage.innerHTML = '<i class="fa fa-check-circle"></i> Thank you for reviewing the terms. Please check the box below to confirm your acceptance.';
+                scrollMessage.style.color = 'green';
+            }
+        } else if (scrollPercentage >= 80 && timeSpent < MINIMUM_READ_TIME) {
+            // User scrolled quickly to bottom, but hasn't spent enough time
+            const remainingTime = Math.ceil((MINIMUM_READ_TIME - timeSpent) / 1000);
+            if (scrollMessage) {
+                scrollMessage.style.display = 'block';
+                scrollMessage.innerHTML = `Please continue reviewing for ${remainingTime} more seconds.`;
+                scrollMessage.style.color = '#f57c00'; // Orange for warning
+            }
+        } else if (scrollPercentage >= 50) {
+            // User is making progress
+            if (scrollMessage) {
+                scrollMessage.style.display = 'block';
+                scrollMessage.innerHTML = 'Continue scrolling to review all terms.';
+                scrollMessage.style.color = '#2196F3'; // Blue for info
+            }
+        }
+    };
+
+    // Store the listener reference for potential cleanup
+    termsSummary._scrollListener = scrollListener;
+
+    // Add scroll event listener
+    termsSummary.addEventListener('scroll', scrollListener);
+
+    // Trigger initial evaluation
+    setTimeout(scrollListener, 500);
+
     // Add checkbox change event handler
+    $(document).off('change', '#acceptUpdatedTerms'); // Remove any existing handlers
     $(document).on('change', '#acceptUpdatedTerms', function() {
         // Only allow checking if scrolled to bottom
         if (!hasScrolledToBottom && this.checked) {
@@ -723,34 +812,104 @@ function setupTermsScrollTracking() {
             console.log("Terms confirm button " + (this.checked ? "enabled" : "disabled"));
         }
     });
+
+    // For debugging, log element heights
+    console.log("Terms summary height:", termsSummary.clientHeight);
+    console.log("Terms summary scroll height:", termsSummary.scrollHeight);
 }
 
+// Enhanced modal backdrop fixer
 function fixModalBackdropIssue() {
-    // If there's a stuck backdrop, remove it
-    $('.modal-backdrop').remove();
+    console.log("Applying modal backdrop fixes");
 
-    // Fix modal opening issues
-    $('#termsUpdateModal').on('show.bs.modal', function () {
+    // Remove any existing event handlers
+    $('#termsUpdateModal').off('show.bs.modal');
+    $('#termsUpdateModal').off('shown.bs.modal');
+    $('#termsUpdateModal').off('hidden.bs.modal');
+
+    // Clean up any existing backdrop issues before showing modal
+    $('#termsUpdateModal').on('show.bs.modal', function() {
+        console.log("Modal show event triggered");
         // Make sure only one backdrop appears
         if ($('.modal-backdrop').length > 1) {
+            console.log("Multiple backdrops detected, cleaning up");
             $('.modal-backdrop').not(':first').remove();
         }
     });
 
-    // Ensure modal can be closed
-    $('#termsUpdateModal').on('hidden.bs.modal', function () {
-        $('body').removeClass('modal-open');
-        $('.modal-backdrop').remove();
+    // Verify the modal is accessible after it's shown
+    $('#termsUpdateModal').on('shown.bs.modal', function() {
+        console.log("Modal shown event triggered");
+        const modal = $(this);
+
+        // Ensure the modal is in front
+        modal.css('z-index', 1050);
+        $('.modal-backdrop').css('z-index', 1040);
+
+        // Force enable scrolling on the modal body
+        $('.modal-body').css('overflow-y', 'auto');
+
+        // Verify modal is accessible by adding a test click
+        setTimeout(function() {
+            modal.find('.modal-body').one('click', function() {
+                console.log("Modal body click detected - modal is interactive");
+            });
+        }, 500);
+    });
+
+    // Ensure modal can be closed and cleanup happens
+    $('#termsUpdateModal').on('hidden.bs.modal', function() {
+        console.log("Modal hidden event triggered");
+        removeAllBackdrops();
     });
 }
 
-// Emergency function to remove stuck modal/backdrop (can be called from console if needed)
+// Improved emergency reset function
 function emergencyModalReset() {
-    $('#termsUpdateModal').modal('hide');
-    $('.modal-backdrop').remove();
-    $('body').removeClass('modal-open');
-    $('body').css('padding-right', '');
-    console.log('Emergency modal reset performed');
+    console.log('Emergency modal reset initiated');
+
+    // Try standard Bootstrap modal hiding first
+    try {
+        $('#termsUpdateModal').modal('hide');
+    } catch (e) {
+        console.error("Error in hiding modal:", e);
+    }
+
+    // Direct DOM manipulation as backup
+    try {
+        const modalElement = document.getElementById('termsUpdateModal');
+        if (modalElement) {
+            modalElement.style.display = 'none';
+            modalElement.classList.remove('show');
+            modalElement.setAttribute('aria-hidden', 'true');
+            modalElement.removeAttribute('aria-modal');
+        }
+    } catch (e) {
+        console.error("Error in direct modal manipulation:", e);
+    }
+
+    // Remove backdrop and reset body
+    removeAllBackdrops();
+
+    // Add a small delay and check if issues persist
+    setTimeout(function() {
+        if ($('.modal-backdrop').length > 0 || $('body').hasClass('modal-open')) {
+            console.log("Initial cleanup failed, performing aggressive reset");
+
+            // More aggressive cleanup
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open');
+            $('body').removeAttr('style');
+            $('body').css('overflow', 'auto');
+
+            // Reset all modal elements
+            $('.modal').removeClass('show');
+            $('.modal').css('display', 'none');
+        }
+        console.log('Emergency modal reset completed');
+    }, 100);
+
+    return true; // Return value to confirm function executed
 }
 
 // Make functions globally available
