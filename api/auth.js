@@ -205,7 +205,7 @@ module.exports = async (req, res) => {
                 return await handleForgotPassword(req, res);
             case 'reset-password':
                 return await handleResetPassword(req, res);
-            case 'update_terms_acceptance':
+            case 'update-terms-acceptance':
                 return await handleUpdateTermsAcceptance(req, res);
             default:
                 // Legacy path handling for direct URL access
