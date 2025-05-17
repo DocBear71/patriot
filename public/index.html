@@ -1,244 +1,250 @@
 <!doctype html><html lang="en"><head><title>Patriot Thanks</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="author" content="Edward G. McKeown"><meta name="date" content="2025/4/12"><meta name="description" content="Patriot Thanks application to find businesses that offer
                                           incentives and discounts to veterans, active duty, first
                                           responders, and their spouses."><meta name="keywords" content="business, incentives, discounts, veteran discounts, military discounts,
-                                       first responder discounts, veterans, active duty, first responders"><link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon"><link rel="stylesheet" href="./css/bootstrap-4.0.0.css"><link href="./css/normalize.css" rel="stylesheet"><link href="./css/style.css" rel="stylesheet"><link href="./css/figures.css" rel="stylesheet"><link href="./css/menu-auth.css" rel="stylesheet"><link href="./css/form-validation.css" rel="stylesheet"><script src="./js/jquery-3.7.1.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script><script src="./js/bootstrap-4.0.0.js"></script><script src="./js/popper.min.js"></script><script src="./js/jquery-3.2.1.min.js"></script><script src="./js/bootstrap.min.js"></script><script src="./js/fixed-terms-modal.js"></script><script src="./js/login-handler.js"></script><script>// Check jQuery and Bootstrap versions
-            $(document).ready(function() {
-                // Check jQuery version
-                const jQueryVersion = $.fn.jquery;
-                console.log("jQuery version:", jQueryVersion);
+                                       first responder discounts, veterans, active duty, first responders"><link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon"><link rel="stylesheet" href="./css/bootstrap-4.0.0.css"><link href="./css/normalize.css" rel="stylesheet"><link href="./css/style.css" rel="stylesheet"><link href="./css/figures.css" rel="stylesheet"><link href="./css/menu-auth.css" rel="stylesheet"><link href="./css/form-validation.css" rel="stylesheet"><script src="./js/jquery-3.7.1.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script><script src="./js/bootstrap-4.0.0.js"></script><script>// Check jQuery and Bootstrap versions
+        $(document).ready(function() {
+            // Check jQuery version
+            const jQueryVersion = $.fn.jquery;
+            console.log("jQuery version:", jQueryVersion);
 
-                let jQueryOk = false;
-                if (jQueryVersion) {
-                    const parts = jQueryVersion.split('.');
+            let jQueryOk = false;
+            if (jQueryVersion) {
+                const parts = jQueryVersion.split('.');
+                const major = parseInt(parts[0]);
+                const minor = parseInt(parts[1]);
+
+                // jQuery should be 1.9.1+ for Bootstrap 4
+                jQueryOk = (major > 1) || (major === 1 && minor >= 9);
+            }
+
+            // Check Bootstrap version
+            let bootstrapVersion = "unknown";
+            let bootstrapOk = false;
+
+            if (typeof $.fn.modal !== 'undefined' && $.fn.modal.Constructor) {
+                bootstrapVersion = $.fn.modal.Constructor.VERSION || "unknown";
+                console.log("Bootstrap version:", bootstrapVersion);
+
+                if (bootstrapVersion !== "unknown") {
+                    const parts = bootstrapVersion.split('.');
                     const major = parseInt(parts[0]);
-                    const minor = parseInt(parts[1]);
 
-                    // jQuery should be 1.9.1+ for Bootstrap 4
-                    jQueryOk = (major > 1) || (major === 1 && minor >= 9);
+                    // Bootstrap should be version 4.x
+                    bootstrapOk = (major === 4);
                 }
+            } else {
+                console.error("Bootstrap modal not loaded!");
+            }
 
-                // Check Bootstrap version
-                let bootstrapVersion = "unknown";
-                let bootstrapOk = false;
+            // Log compatibility status
+            if (!jQueryOk) {
+                console.error("jQuery version compatibility issue! Current:", jQueryVersion, "Recommended: 3.5.1+");
+            }
 
-                if (typeof $.fn.modal !== 'undefined' && $.fn.modal.Constructor) {
-                    bootstrapVersion = $.fn.modal.Constructor.VERSION || "unknown";
-                    console.log("Bootstrap version:", bootstrapVersion);
+            if (!bootstrapOk) {
+                console.error("Bootstrap version compatibility issue! Current:", bootstrapVersion, "Recommended: 4.5.0+");
+            }
 
-                    if (bootstrapVersion !== "unknown") {
-                        const parts = bootstrapVersion.split('.');
-                        const major = parseInt(parts[0]);
+            // If there are compatibility issues, add jQuery and Bootstrap polyfills
+            if (!jQueryOk || !bootstrapOk) {
+                console.warn("Attempting to add compatibility fixes for modal functionality");
 
-                        // Bootstrap should be version 4.x
-                        bootstrapOk = (major === 4);
-                    }
-                } else {
-                    console.error("Bootstrap modal not loaded!");
-                }
+                // Add polyfill for modal functionality
+                if (typeof $.fn.modal === 'undefined' || !$.fn.modal.Constructor) {
+                    console.log("Adding modal polyfill");
 
-                // Log compatibility status
-                if (!jQueryOk) {
-                    console.error("jQuery version compatibility issue! Current:", jQueryVersion, "Recommended: 3.5.1+");
-                }
+                    // Simple modal polyfill
+                    $.fn.modal = function(option) {
+                        return this.each(function() {
+                            const $this = $(this);
 
-                if (!bootstrapOk) {
-                    console.error("Bootstrap version compatibility issue! Current:", bootstrapVersion, "Recommended: 4.5.0+");
-                }
+                            if (option === 'show') {
+                                $this.css('display', 'block');
+                                $this.addClass('show');
+                                $('body').addClass('modal-open');
 
-                // If there are compatibility issues, add jQuery and Bootstrap polyfills
-                if (!jQueryOk || !bootstrapOk) {
-                    console.warn("Attempting to add compatibility fixes for modal functionality");
-
-                    // Add polyfill for modal functionality
-                    if (typeof $.fn.modal === 'undefined' || !$.fn.modal.Constructor) {
-                        console.log("Adding modal polyfill");
-
-                        // Simple modal polyfill
-                        $.fn.modal = function(option) {
-                            return this.each(function() {
-                                const $this = $(this);
-
-                                if (option === 'show') {
+                                // Add backdrop if it doesn't exist
+                                if ($('.modal-backdrop').length === 0) {
+                                    $('body').append('<div class="modal-backdrop show"></div>');
+                                }
+                            }
+                            else if (option === 'hide') {
+                                $this.css('display', 'none');
+                                $this.removeClass('show');
+                                $('body').removeClass('modal-open');
+                                $('.modal-backdrop').remove();
+                            }
+                            else if (typeof option === 'object') {
+                                // Handle options object
+                                if (option.show === true) {
                                     $this.css('display', 'block');
                                     $this.addClass('show');
                                     $('body').addClass('modal-open');
 
-                                    // Add backdrop if it doesn't exist
-                                    if ($('.modal-backdrop').length === 0) {
+                                    // Add backdrop if it doesn't exist and is not disabled
+                                    if (option.backdrop !== false && $('.modal-backdrop').length === 0) {
                                         $('body').append('<div class="modal-backdrop show"></div>');
                                     }
                                 }
-                                else if (option === 'hide') {
-                                    $this.css('display', 'none');
-                                    $this.removeClass('show');
-                                    $('body').removeClass('modal-open');
-                                    $('.modal-backdrop').remove();
-                                }
-                                else if (typeof option === 'object') {
-                                    // Handle options object
-                                    if (option.show === true) {
-                                        $this.css('display', 'block');
-                                        $this.addClass('show');
-                                        $('body').addClass('modal-open');
+                            }
+                        });
+                    };
 
-                                        // Add backdrop if it doesn't exist and is not disabled
-                                        if (option.backdrop !== false && $('.modal-backdrop').length === 0) {
-                                            $('body').append('<div class="modal-backdrop show"></div>');
-                                        }
-                                    }
-                                }
-                            });
-                        };
-
-                        // Add constructor for version check
-                        $.fn.modal.Constructor = { VERSION: "4.0.0-polyfill" };
-                    }
+                    // Add constructor for version check
+                    $.fn.modal.Constructor = { VERSION: "4.0.0-polyfill" };
                 }
-            });</script><script defer="defer" src="bundle.js"></script></head><body style="padding-top: 70px" id="page_layout"><div id="nav-placeholder"></div><script>$(function(){
-             $("#nav-placeholder").load("NavBar.html", function() {
-                 console.log("NavBar loaded");
-                 // Load the login handler after the navbar is loaded
-                 $.getScript("./js/login-handler.js")
-                 .done(function() {
-                     console.log("Login handler script loaded successfully");
-                 })
-                 .fail(function() {
-                     console.error("Failed to load login-handler.js");
-                 });
-             });
-         });</script><header><br><div class="left-banner"><a href="index.html"><img src="./images/docbearlogov4.png" alt="DocBear logo"></a></div><div class="right-banner"><h1>Patriot Thanks</h1><hr class="horizontal-line"><h4>Welcome Home</h4></div><div style="clear:left;"></div></header><main><section id="section001"><h2>Patriot Thanks Information</h2></section><section id="section002"><h5>hidden</h5><p class="paragraph_style">Welcome to Patriot Thanks. This is a web application and phone app designed to help "active duty, veterans, first responders, and their spouses," locate local area businesses that offer discounts and/or incentives to patronize their businesses. It is hoped that local area businesses will also use this app to help increase business by showing their support for and to "active duty, veterans, first responders, and their spouses."</p></section><section id="section003"><h2 id="color_change">Support our military, veterans, and first responders here at home</h2></section><section id="section00"><h5>hidden</h5><h2>Flag Display Information</h2></section><section id="section01"><h5>hidden</h5><figure class="top_figure"><picture><source media="(min-width: 972px) and (orientation: portrait)" srcset="./images/military_flags_middle.png"><source media="(min-width: 648px) and  (orientation: portrait)" srcset="./images/military_flags_small.png"><source media="(min-width: 486px) and  (orientation:portrait)" srcset="./images/military_flags_smaller.png"><source media="(orientation:portrait)" srcset="./images/military_flags_smaller.png"><source media="(min-width: 1818px) and (orientation: landscape)" srcset="./images/military_flags_middle.png"><source media="(min-width: 1010px) and (orientation: landscape)" srcset="./images/military_flags_small.png"><source media="(min-width: 606px) and  (orientation:landscape)" srcset="./images/military_flags_smaller.png"><source media="(orientation:landscape)" srcset="./images/military_flags_smaller.png, ./images/military_flags_small.png 2x"><img src="./images/military_flags_middle.png" alt="set of military flags" style="max-width:100%; height:auto"></picture><figcaption class="dancing-script">A set of military flags on display</figcaption></figure></section><section id="section02"><h5>hidden</h5><p>A stunning display of military flags unfurls in the gentle breeze, each banner is a testament to valor and sacrifice. The vibrant colors—deep blues, rich reds, and striking whites—symbolize the diverse branches of the armed forces, from the resolute Army to the agile Air Force. Each flag tells a story, embroidered with emblems of honor, bravery, and commitment. As sunlight glints off the fabric, the flags stand tall, representing unity and pride, while their movement evokes a sense of reverence for those who have served. This solemn display not only commemorates the past but also inspires a deep appreciation for the freedoms fought for by countless individuals.</p></section><section id="section025"><h5>hidden</h5><h2>Military Coin Emblems Information</h2></section><section id="section03"><h5>hidden</h5><figure class="bottom_figure"><img srcset="./images/military_branches_smaller.jpg 256w, images/military_branches_small.jpg 512w, images/military_branches_middle.jpg 896w" sizes="(max-width: 400px) 256px, (max-width: 767px) 512px, 896px" src="./images/military_branches_middle.jpg" alt="set of military branch emblems"><figcaption class="caveat">A set of military coin emblems on display</figcaption></figure></section><section id="section04"><h5>hidden</h5><p>A captivating display of military coin emblems glimmers under the soft light, each coin is a unique emblem of service and dedication. Arranged meticulously in a glass case, the coins reflect the rich heritage of the armed forces, showcasing intricate designs that represent various branches and units. Some feature iconic symbols, such as eagles and anchors, while others commemorate specific missions or achievements, each carrying a story of courage and camaraderie. The coins' polished surfaces catch the eye, inviting viewers to explore the deep meanings behind each emblem. This striking collection not only serves as a reminder of the sacrifices made by soldiers and women but also fosters a profound respect for the enduring bonds forged in service to their country.</p></section><br><br></main><footer class="footer_style"><br><br><p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p><div class="footer-links"><a href="terms.html">Terms of Use</a> | <a href="privacy.html">Privacy Policy</a> | <a href="contact.html">Contact Us</a></div><br><br></footer><button id="emergencyResetBtn" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">Emergency Reset</button><script>// Add event listener for emergency reset button
-         document.getElementById('emergencyResetBtn').addEventListener('click', function() {
-             console.log("Emergency reset button clicked");
+            }
+        });</script><script defer="defer" src="bundle.js"></script></head><body style="padding-top: 70px" id="page_layout"><div id="nav-placeholder"></div><header><br><div class="left-banner"><a href="index.html"><img src="./images/docbearlogov4.png" alt="DocBear logo"></a></div><div class="right-banner"><h1>Patriot Thanks</h1><hr class="horizontal-line"><h4>Welcome Home</h4></div><div style="clear:left;"></div></header><main><section id="section001"><h2>Patriot Thanks Information</h2></section><section id="section002"><h5>hidden</h5><p class="paragraph_style">Welcome to Patriot Thanks. This is a web application and phone app designed to help "active duty, veterans, first responders, and their spouses," locate local area businesses that offer discounts and/or incentives to patronize their businesses. It is hoped that local area businesses will also use this app to help increase business by showing their support for and to "active duty, veterans, first responders, and their spouses."</p></section><section id="section003"><h2 id="color_change">Support our military, veterans, and first responders here at home</h2></section><section id="section00"><h5>hidden</h5><h2>Flag Display Information</h2></section><section id="section01"><h5>hidden</h5><figure class="top_figure"><picture><source media="(min-width: 972px) and (orientation: portrait)" srcset="./images/military_flags_middle.png"><source media="(min-width: 648px) and  (orientation: portrait)" srcset="./images/military_flags_small.png"><source media="(min-width: 486px) and  (orientation:portrait)" srcset="./images/military_flags_smaller.png"><source media="(orientation:portrait)" srcset="./images/military_flags_smaller.png"><source media="(min-width: 1818px) and (orientation: landscape)" srcset="./images/military_flags_middle.png"><source media="(min-width: 1010px) and (orientation: landscape)" srcset="./images/military_flags_small.png"><source media="(min-width: 606px) and  (orientation:landscape)" srcset="./images/military_flags_smaller.png"><source media="(orientation:landscape)" srcset="./images/military_flags_smaller.png, ./images/military_flags_small.png 2x"><img src="./images/military_flags_middle.png" alt="set of military flags" style="max-width:100%; height:auto"></picture><figcaption class="dancing-script">A set of military flags on display</figcaption></figure></section><section id="section02"><h5>hidden</h5><p>A stunning display of military flags unfurls in the gentle breeze, each banner is a testament to valor and sacrifice. The vibrant colors—deep blues, rich reds, and striking whites—symbolize the diverse branches of the armed forces, from the resolute Army to the agile Air Force. Each flag tells a story, embroidered with emblems of honor, bravery, and commitment. As sunlight glints off the fabric, the flags stand tall, representing unity and pride, while their movement evokes a sense of reverence for those who have served. This solemn display not only commemorates the past but also inspires a deep appreciation for the freedoms fought for by countless individuals.</p></section><section id="section025"><h5>hidden</h5><h2>Military Coin Emblems Information</h2></section><section id="section03"><h5>hidden</h5><figure class="bottom_figure"><img srcset="./images/military_branches_smaller.jpg 256w, images/military_branches_small.jpg 512w, images/military_branches_middle.jpg 896w" sizes="(max-width: 400px) 256px, (max-width: 767px) 512px, 896px" src="./images/military_branches_middle.jpg" alt="set of military branch emblems"><figcaption class="caveat">A set of military coin emblems on display</figcaption></figure></section><section id="section04"><h5>hidden</h5><p>A captivating display of military coin emblems glimmers under the soft light, each coin is a unique emblem of service and dedication. Arranged meticulously in a glass case, the coins reflect the rich heritage of the armed forces, showcasing intricate designs that represent various branches and units. Some feature iconic symbols, such as eagles and anchors, while others commemorate specific missions or achievements, each carrying a story of courage and camaraderie. The coins' polished surfaces catch the eye, inviting viewers to explore the deep meanings behind each emblem. This striking collection not only serves as a reminder of the sacrifices made by soldiers and women but also fosters a profound respect for the enduring bonds forged in service to their country.</p></section><br><br></main><footer class="footer_style"><br><br><p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p><div class="footer-links"><a href="terms.html">Terms of Use</a> | <a href="privacy.html">Privacy Policy</a> | <a href="contact.html">Contact Us</a></div><br><br></footer><button id="emergencyResetBtn" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">Emergency Reset</button><script>// Add event listener for emergency reset button
+    document.getElementById('emergencyResetBtn').addEventListener('click', function() {
+        console.log("Emergency reset button clicked");
 
-             // Try calling the emergencyModalReset function
-             if (typeof emergencyModalReset === 'function') {
-                 emergencyModalReset();
-             } else {
-                 // Manual reset if function not available
-                 $('.modal-backdrop').remove();
-                 $('body').removeClass('modal-open');
-                 $('body').css('padding-right', '');
-                 $('#termsUpdateModal').modal('hide');
-                 $('#termsUpdateModal').hide();
-             }
+        // Try calling the emergencyModalReset function
+        if (typeof emergencyModalReset === 'function') {
+            emergencyModalReset();
+        } else {
+            // Manual reset if function not available
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open');
+            $('body').css('padding-right', '');
+            $('#termsUpdateModal').modal('hide');
+            $('#termsUpdateModal').hide();
+        }
 
-             // Hide the button
-             this.style.display = 'none';
-         });
+        // Hide the button
+        this.style.display = 'none';
+    });
 
-         // Show emergency button after a delay if modal is still visible
-         // This will automatically show the emergency button if the modal gets stuck
-         setTimeout(function() {
-             const modalVisible = $('#termsUpdateModal').is(':visible') ||
-                     $('.modal-backdrop').length > 0 ||
-                     $('body').hasClass('modal-open');
+    // Show emergency button after a delay if modal is still visible
+    setTimeout(function() {
+        const modalVisible = $('#termsUpdateModal').is(':visible') ||
+                $('.modal-backdrop').length > 0 ||
+                $('body').hasClass('modal-open');
 
-             if (modalVisible) {
-                 console.log("Modal appears to be stuck - showing emergency reset button");
-                 document.getElementById('emergencyResetBtn').style.display = 'block';
-             }
-         }, 10000); // Show after 10 seconds if modal is still visible
+        if (modalVisible) {
+            console.log("Modal appears to be stuck - showing emergency reset button");
+            document.getElementById('emergencyResetBtn').style.display = 'block';
+        }
+    }, 10000); // Show after 10 seconds if modal is still visible</script><script>$(document).ready(function() {
+        // Direct modal control functions
+        window.directShowTermsModal = function() {
+            console.log("Direct show terms modal called");
 
-         $(document).ready(function() {
-             // Direct modal control functions
-             window.directShowTermsModal = function() {
-                 console.log("Direct show terms modal called");
+            // First clean up any existing modal state
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open');
+            $('body').css('padding-right', '');
 
-                 // First clean up any existing modal state
-                 $('.modal-backdrop').remove();
-                 $('body').removeClass('modal-open');
-                 $('body').css('padding-right', '');
+            try {
+                // Get the modal element
+                const modalEl = document.getElementById('termsUpdateModal');
+                const $modal = $('#termsUpdateModal');
 
-                 try {
-                     // Get the modal element
-                     const modalEl = document.getElementById('termsUpdateModal');
-                     const $modal = $('#termsUpdateModal');
+                // Reset modal state
+                $modal.removeClass('show');
+                $modal.css('display', 'none');
 
-                     // Reset modal state
-                     $modal.removeClass('show');
-                     $modal.css('display', 'none');
+                // Set timeout to ensure DOM is ready
+                setTimeout(function() {
+                    // Show modal with explicit settings
+                    $modal.modal({
+                        backdrop: 'static',
+                        keyboard: false,
+                        show: true
+                    });
 
-                     // Set timeout to ensure DOM is ready
-                     setTimeout(function() {
-                         // Show modal with explicit settings
-                         $modal.modal({
-                             backdrop: 'static',
-                             keyboard: false,
-                             show: true
-                         });
+                    // Force the modal to be visible and interactive after a slight delay
+                    setTimeout(function() {
+                        if (!$modal.hasClass('show')) {
+                            console.log("Modal not showing - forcing show state");
+                            $modal.addClass('show');
+                            $modal.css('display', 'block');
+                            $('.modal-backdrop').css('opacity', '0.5');
+                        }
 
-                         // Force the modal to be visible and interactive after a slight delay
-                         setTimeout(function() {
-                             if (!$modal.hasClass('show')) {
-                                 console.log("Modal not showing - forcing show state");
-                                 $modal.addClass('show');
-                                 $modal.css('display', 'block');
-                                 $('.modal-backdrop').css('opacity', '0.5');
-                             }
+                        // Force body to have modal-open class
+                        $('body').addClass('modal-open');
 
-                             // Force body to have modal-open class
-                             $('body').addClass('modal-open');
+                        // Test modal interactivity
+                        console.log("Testing modal interactivity");
+                        const isVisible = $modal.is(':visible');
+                        const isInteractive = $modal.find('.modal-body').length > 0;
+                        console.log("Modal visible:", isVisible, "Modal interactive:", isInteractive);
 
-                             // Test modal interactivity
-                             console.log("Testing modal interactivity");
-                             const isVisible = $modal.is(':visible');
-                             const isInteractive = $modal.find('.modal-body').length > 0;
-                             console.log("Modal visible:", isVisible, "Modal interactive:", isInteractive);
+                        // If modal is visible but not interactive, force reset
+                        if (isVisible && !isInteractive) {
+                            console.log("Modal detected as non-interactive - forcing reset");
+                            showEmergencyButton();
+                        }
+                    }, 500);
+                }, 100);
+            } catch (error) {
+                console.error("Error showing modal:", error);
+                // Show emergency button
+                showEmergencyButton();
+            }
+        };
 
-                             // If modal is visible but not interactive, force reset
-                             if (isVisible && !isInteractive) {
-                                 console.log("Modal detected as non-interactive - forcing reset");
-                                 showEmergencyButton();
-                             }
-                         }, 500);
-                     }, 100);
-                 } catch (error) {
-                     console.error("Error showing modal:", error);
-                     // Show emergency button
-                     showEmergencyButton();
-                 }
-             };
+        // Reinforce button click handlers after scripts loaded
+        $(document).on('click', '#confirmUpdatedTerms', function(e) {
+            console.log("Confirm button clicked");
+            e.preventDefault();
+            e.stopPropagation();
 
-             // Override the checkTermsVersion function with direct control
-             const originalCheckTermsVersion = window.checkTermsVersion;
-             window.checkTermsVersion = function(session) {
-                 if (!session || !session.user) return;
+            // Get session data
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (!sessionData) {
+                console.error("No session found");
+                $('#termsUpdateModal').modal('hide');
+                return;
+            }
 
-                 // Current version of terms
-                 const currentTermsVersion = "May 14, 2025";
+            const session = JSON.parse(sessionData);
+            if (typeof updateTermsAcceptance === 'function') {
+                updateTermsAcceptance(session);
+            } else {
+                console.error("updateTermsAcceptance function not available");
+                $('#termsUpdateModal').modal('hide');
+            }
+        });
+    });</script><script>$(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
 
-                 // Check if user has accepted current terms
-                 if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
-                     console.log("User needs to accept new terms");
+            // Load scripts AFTER the navbar (with modal) is loaded
+            $.getScript("./js/fixed-terms-modal.js")
+            .done(function() {
+                console.log("Fixed terms modal script loaded successfully");
 
-                     // Use direct control instead of Bootstrap's modal
-                     directShowTermsModal();
-                 }
-             };
+                // Load login handler after fixed-terms-modal
+                $.getScript("./js/login-handler.js")
+                .done(function() {
+                    console.log("Login handler script loaded successfully");
 
-             // Reinforce button click handlers
-             $(document).on('click', '#confirmUpdatedTerms', function(e) {
-                 console.log("Confirm button clicked");
-                 e.preventDefault();
-                 e.stopPropagation();
+                    // Check login status after both scripts are loaded
+                    setTimeout(function() {
+                        if (typeof checkLoginStatus === 'function') {
+                            console.log("Checking login status");
+                            checkLoginStatus();
+                        } else {
+                            console.error("checkLoginStatus function not available");
+                        }
+                    }, 500);
+                })
+                .fail(function() {
+                    console.error("Failed to load login-handler.js");
+                });
+            })
+            .fail(function() {
+                console.error("Failed to load fixed-terms-modal.js");
 
-                 // Get session data
-                 const sessionData = localStorage.getItem('patriotThanksSession');
-                 if (!sessionData) {
-                     console.error("No session found");
-                     $('#termsUpdateModal').modal('hide');
-                     return;
-                 }
-
-                 const session = JSON.parse(sessionData);
-                 updateTermsAcceptance(session);
-             });
-
-             // Make sure Bootstrap is fully loaded
-             if (typeof $.fn.modal === 'undefined') {
-                 console.error("Bootstrap modal not loaded! This will cause the modal to fail.");
-                 alert("Warning: Bootstrap modal not loaded. Please refresh the page.");
-             } else {
-                 console.log("Bootstrap modal loaded successfully. Version:", $.fn.modal.Constructor.VERSION);
-             }
-         });</script></body></html>
+                // Try to load login handler anyway
+                $.getScript("./js/login-handler.js")
+                .done(function() {
+                    console.log("Login handler script loaded successfully");
+                })
+                .fail(function() {
+                    console.error("Failed to load login-handler.js");
+                });
+            });
+        });
+    });</script></body></html>

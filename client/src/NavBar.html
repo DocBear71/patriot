@@ -212,3 +212,49 @@
         }
     }
 </style>
+<script>
+    // Signal that the navbar (with modal) has been loaded
+    $(document).ready(function() {
+        // Dispatch a custom event that other scripts can listen for
+        console.log("NavBar with modal HTML loaded - dispatching event");
+        document.dispatchEvent(new CustomEvent('navbarWithModalLoaded'));
+
+        // Force update on modal elements to ensure they're properly initialized
+        setTimeout(function() {
+            if (document.getElementById('termsUpdateModal')) {
+                console.log("Modal elements present, making sure initialization occurs");
+
+                // Check if login check needs to happen
+                const sessionData = localStorage.getItem('patriotThanksSession');
+                if (sessionData) {
+                    console.log("Session found, checking terms acceptance status");
+                    try {
+                        const session = JSON.parse(sessionData);
+
+                        // Check if we need to show the terms
+                        const currentTermsVersion = "May 14, 2025";
+                        if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
+                            console.log("Terms need acceptance - ensuring modal is ready");
+
+                            // Make sure fixed-terms-modal initializes
+                            if (typeof showFixedTermsModal === 'function') {
+                                console.log("Using fixed terms implementation");
+                            } else {
+                                console.log("Using standard implementation");
+                                // Initialize standard handlers
+                                if (typeof setupTermsModalHandlers === 'function') {
+                                    setupTermsModalHandlers();
+                                }
+                                if (typeof setupTermsScrollTracking === 'function') {
+                                    setupTermsScrollTracking();
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error("Error checking terms status:", error);
+                    }
+                }
+            }
+        }, 500);
+    });
+</script>
