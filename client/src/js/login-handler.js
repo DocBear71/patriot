@@ -159,9 +159,62 @@ function checkTermsVersion(session) {
     // Check if user has accepted current terms
     if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
         console.log("User needs to accept new terms");
-        // Show modal asking user to accept new terms
-        $('#termsUpdateModal').modal('show');
+        // Simple confirmation instead of modal
+        if (confirm("Our Terms of Use have been updated. Do you accept the new Terms of Use and Privacy Policy? You can review them at any time from the footer links.")) {
+            // User accepted terms
+            updateTermsAcceptance(session);
+        } else {
+            // User declined terms
+            alert("You must accept the Terms of Use to continue using the service. You will now be logged out.");
+            logoutUser();
+        }
     }
+}
+
+// Function to update terms acceptance
+function updateTermsAcceptance(session) {
+    const userId = session.user._id;
+
+    // determine the base URL
+    const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
+        ? `http://${window.location.host}`
+        : window.location.origin;
+
+    // Update user's terms acceptance
+    fetch(`${baseURL}/api/auth.js?operation=update-terms-acceptance`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + session.token
+        },
+        body: JSON.stringify({
+            userId: userId,
+            termsAccepted: true,
+            termsAcceptedDate: new Date().toISOString(),
+            termsVersion: "May 14, 2025"
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log("Terms acceptance updated successfully");
+
+                // Update session data
+                session.user.termsAccepted = true;
+                session.user.termsAcceptedDate = new Date().toISOString();
+                session.user.termsVersion = "May 14, 2025";
+
+                // Save updated session
+                localStorage.setItem('patriotThanksSession', JSON.stringify(session));
+            } else {
+                console.error("Failed to update terms acceptance");
+                alert('Failed to update terms acceptance. Please try again.');
+            }
+        })
+        .catch(error => {
+            console.error('Error updating terms acceptance:', error);
+            alert('An error occurred while updating terms acceptance.');
+        });
 }
 
 // Function to toggle admin elements visibility
