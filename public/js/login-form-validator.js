@@ -41,11 +41,11 @@
 //                 const password = passwordInput.value;
 //                 const rememberMe = document.getElementById('dropdownCheck')?.checked || false;
 //
-//                 // Use the login function from login-handler.js
+//                 // Use the login function from bootstrap5-login-handler.js
 //                 if (typeof loginUser === 'function') {
 //                     loginUser(email, password, rememberMe);
 //                 } else {
-//                     console.error("loginUser function not found. Make sure login-handler.js is loaded before this script.");
+//                     console.error("loginUser function not found. Make sure bootstrap5-login-handler.js is loaded before this script.");
 //                     alert("Login functionality is not available. Please try again later.");
 //                 }
 //             }

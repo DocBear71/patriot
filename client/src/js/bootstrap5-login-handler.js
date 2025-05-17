@@ -1,4 +1,4 @@
-// login-handler.js - Enhanced login handler with admin support and case-insensitive email
+// bootstrap5-login-handler.js - Enhanced login handler with admin support and case-insensitive email
 console.log("Login handler script loaded");
 
 // Function to handle login
@@ -548,7 +548,7 @@ function checkLoginStatus() {
     return false;
 }
 
-// Add this function to your login-handler.js file
+// Add this function to your bootstrap5-login-handler.js file
 function fixLoginMenuIssue() {
     const sessionData = localStorage.getItem('patriotThanksSession');
     if (sessionData) {
@@ -936,7 +936,7 @@ window.showEmergencyButton = showEmergencyButton;
 
 // Attach event listeners when jQuery is ready
 $(function() {
-    console.log("jQuery ready in login-handler.js");
+    console.log("jQuery ready in bootstrap5-login-handler.js");
     attachLoginListeners();
 
     // Check login status after a short delay to ensure the navbar is loaded

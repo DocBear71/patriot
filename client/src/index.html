@@ -7,24 +7,32 @@
     <meta name="author" content="Edward G. McKeown">
     <meta name="date" content="2025/4/12">
     <meta name="description" content="Patriot Thanks application to find businesses that offer
-                                          incentives and discounts to veterans, active duty, first
-                                          responders, and their spouses.">
+                                      incentives and discounts to veterans, active duty, first
+                                      responders, and their spouses.">
     <meta name="keywords" content="business, incentives, discounts, veteran discounts, military discounts,
-                                       first responder discounts, veterans, active duty, first responders">
+                                   first responder discounts, veterans, active duty, first responders">
     <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
-    <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css" >
+
+    <!-- Bootstrap 5 CSS - use the downloaded file -->
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons - either download or use CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <!-- Your custom CSS -->
     <link href="./css/normalize.css" rel="stylesheet">
     <link href="./css/style.css" rel="stylesheet">
     <link href="./css/figures.css" rel="stylesheet">
     <link href="./css/menu-auth.css" rel="stylesheet">
     <link href="./css/form-validation.css" rel="stylesheet">
-    <!-- Load jQuery and Bootstrap first -->
-    <script src="./js/jquery-3.7.1.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
-    <script src="./js/bootstrap-4.0.0.js"></script>
-    <!-- Note: You have multiple jQuery and Bootstrap versions loaded, which might cause conflicts -->
 
+    <!-- jQuery (still needed for your scripts) -->
+    <script src="./js/jquery-3.7.1.js"></script>
+
+    <!-- Modernizr if needed -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+
+    <!-- Bootstrap version check script -->
     <script>
         // Check jQuery and Bootstrap versions
         $(document).ready(function() {
@@ -32,99 +40,26 @@
             const jQueryVersion = $.fn.jquery;
             console.log("jQuery version:", jQueryVersion);
 
-            let jQueryOk = false;
-            if (jQueryVersion) {
-                const parts = jQueryVersion.split('.');
-                const major = parseInt(parts[0]);
-                const minor = parseInt(parts[1]);
+            // Wait for bootstrap to be defined (after it loads at end of body)
+            setTimeout(function() {
+                // Check Bootstrap version
+                if (typeof bootstrap !== 'undefined') {
+                    console.log("Bootstrap detected:", bootstrap.Tooltip.VERSION || "Unknown version");
+                    console.log("Bootstrap Modal available:", typeof bootstrap.Modal !== 'undefined');
 
-                // jQuery should be 1.9.1+ for Bootstrap 4
-                jQueryOk = (major > 1) || (major === 1 && minor >= 9);
-            }
-
-            // Check Bootstrap version
-            let bootstrapVersion = "unknown";
-            let bootstrapOk = false;
-
-            if (typeof $.fn.modal !== 'undefined' && $.fn.modal.Constructor) {
-                bootstrapVersion = $.fn.modal.Constructor.VERSION || "unknown";
-                console.log("Bootstrap version:", bootstrapVersion);
-
-                if (bootstrapVersion !== "unknown") {
-                    const parts = bootstrapVersion.split('.');
-                    const major = parseInt(parts[0]);
-
-                    // Bootstrap should be version 4.x
-                    bootstrapOk = (major === 4);
+                    // Log available bootstrap components
+                    console.log("Available Bootstrap components:",
+                            Object.keys(bootstrap).filter(key => typeof bootstrap[key] === 'function'));
+                } else {
+                    console.error("Bootstrap not detected! This will cause issues with modals and other components.");
                 }
-            } else {
-                console.error("Bootstrap modal not loaded!");
-            }
-
-            // Log compatibility status
-            if (!jQueryOk) {
-                console.error("jQuery version compatibility issue! Current:", jQueryVersion, "Recommended: 3.5.1+");
-            }
-
-            if (!bootstrapOk) {
-                console.error("Bootstrap version compatibility issue! Current:", bootstrapVersion, "Recommended: 4.5.0+");
-            }
-
-            // If there are compatibility issues, add jQuery and Bootstrap polyfills
-            if (!jQueryOk || !bootstrapOk) {
-                console.warn("Attempting to add compatibility fixes for modal functionality");
-
-                // Add polyfill for modal functionality
-                if (typeof $.fn.modal === 'undefined' || !$.fn.modal.Constructor) {
-                    console.log("Adding modal polyfill");
-
-                    // Simple modal polyfill
-                    $.fn.modal = function(option) {
-                        return this.each(function() {
-                            const $this = $(this);
-
-                            if (option === 'show') {
-                                $this.css('display', 'block');
-                                $this.addClass('show');
-                                $('body').addClass('modal-open');
-
-                                // Add backdrop if it doesn't exist
-                                if ($('.modal-backdrop').length === 0) {
-                                    $('body').append('<div class="modal-backdrop show"></div>');
-                                }
-                            }
-                            else if (option === 'hide') {
-                                $this.css('display', 'none');
-                                $this.removeClass('show');
-                                $('body').removeClass('modal-open');
-                                $('.modal-backdrop').remove();
-                            }
-                            else if (typeof option === 'object') {
-                                // Handle options object
-                                if (option.show === true) {
-                                    $this.css('display', 'block');
-                                    $this.addClass('show');
-                                    $('body').addClass('modal-open');
-
-                                    // Add backdrop if it doesn't exist and is not disabled
-                                    if (option.backdrop !== false && $('.modal-backdrop').length === 0) {
-                                        $('body').append('<div class="modal-backdrop show"></div>');
-                                    }
-                                }
-                            }
-                        });
-                    };
-
-                    // Add constructor for version check
-                    $.fn.modal.Constructor = { VERSION: "4.0.0-polyfill" };
-                }
-            }
+            }, 500);
         });
     </script>
 </head>
 
 <body style="padding-top: 70px" id="page_layout">
-<!--Navigation bar-->
+<!-- Navigation bar -->
 <div id="nav-placeholder">
 </div>
 
@@ -256,8 +191,8 @@
             $('.modal-backdrop').remove();
             $('body').removeClass('modal-open');
             $('body').css('padding-right', '');
-            $('#termsUpdateModal').modal('hide');
             $('#termsUpdateModal').hide();
+            $('body').css('overflow', '');
         }
 
         // Hide the button
@@ -277,133 +212,125 @@
     }, 10000); // Show after 10 seconds if modal is still visible
 </script>
 
-<!-- Direct Modal Controls -->
+<!-- Bootstrap 5 Bundle JS (includes Popper) -->
+<script src="./js/bootstrap.bundle.min.js"></script>
+
+<!-- Bootstrap 5 Polyfill (in case Bootstrap doesn't load properly) -->
 <script>
-    $(document).ready(function() {
-        // Direct modal control functions
-        window.directShowTermsModal = function() {
-            console.log("Direct show terms modal called");
+    // Wait for document and Bootstrap to be fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM fully loaded");
 
-            // First clean up any existing modal state
-            $('.modal-backdrop').remove();
-            $('body').removeClass('modal-open');
-            $('body').css('padding-right', '');
+        // Verify Bootstrap 5 is loaded properly
+        setTimeout(function() {
+            if (typeof bootstrap === 'undefined') {
+                console.error("Bootstrap 5 not loaded correctly - adding polyfill");
 
-            try {
-                // Get the modal element
-                const modalEl = document.getElementById('termsUpdateModal');
-                const $modal = $('#termsUpdateModal');
+                // Create a minimal bootstrap object if missing
+                window.bootstrap = window.bootstrap || {};
 
-                // Reset modal state
-                $modal.removeClass('show');
-                $modal.css('display', 'none');
+                // Add minimal Modal implementation
+                window.bootstrap.Modal = window.bootstrap.Modal || {
+                    getInstance: function(element) {
+                        console.log("Using polyfill Modal.getInstance");
+                        return {
+                            hide: function() {
+                                console.log("Using polyfill hide method");
+                                $(element).removeClass('show');
+                                $(element).css('display', 'none');
+                                $('.modal-backdrop').remove();
+                                $('body').removeClass('modal-open');
+                                $('body').css('padding-right', '');
+                            },
+                            show: function() {
+                                console.log("Using polyfill show method");
+                                $(element).addClass('show');
+                                $(element).css('display', 'block');
+                                $('body').addClass('modal-open');
+                                if ($('.modal-backdrop').length === 0) {
+                                    $('body').append('<div class="modal-backdrop show"></div>');
+                                }
+                            }
+                        };
+                    }
+                };
 
-                // Set timeout to ensure DOM is ready
-                setTimeout(function() {
-                    // Show modal with explicit settings
-                    $modal.modal({
-                        backdrop: 'static',
-                        keyboard: false,
-                        show: true
-                    });
+                // Add constructor functionality
+                if (!window.bootstrap.Modal.prototype) {
+                    window.bootstrap.Modal = function(element, options) {
+                        this.element = element;
+                        this.options = options || {};
 
-                    // Force the modal to be visible and interactive after a slight delay
-                    setTimeout(function() {
-                        if (!$modal.hasClass('show')) {
-                            console.log("Modal not showing - forcing show state");
-                            $modal.addClass('show');
-                            $modal.css('display', 'block');
-                            $('.modal-backdrop').css('opacity', '0.5');
-                        }
+                        this.show = function() {
+                            console.log("Using polyfill Modal constructor show");
+                            $(element).addClass('show');
+                            $(element).css('display', 'block');
+                            $('body').addClass('modal-open');
+                            if ($('.modal-backdrop').length === 0) {
+                                $('body').append('<div class="modal-backdrop show"></div>');
+                            }
+                        };
 
-                        // Force body to have modal-open class
-                        $('body').addClass('modal-open');
+                        this.hide = function() {
+                            console.log("Using polyfill Modal constructor hide");
+                            $(element).removeClass('show');
+                            $(element).css('display', 'none');
+                            $('.modal-backdrop').remove();
+                            $('body').removeClass('modal-open');
+                            $('body').css('padding-right', '');
+                        };
+                    };
 
-                        // Test modal interactivity
-                        console.log("Testing modal interactivity");
-                        const isVisible = $modal.is(':visible');
-                        const isInteractive = $modal.find('.modal-body').length > 0;
-                        console.log("Modal visible:", isVisible, "Modal interactive:", isInteractive);
-
-                        // If modal is visible but not interactive, force reset
-                        if (isVisible && !isInteractive) {
-                            console.log("Modal detected as non-interactive - forcing reset");
-                            showEmergencyButton();
-                        }
-                    }, 500);
-                }, 100);
-            } catch (error) {
-                console.error("Error showing modal:", error);
-                // Show emergency button
-                showEmergencyButton();
-            }
-        };
-
-        // Reinforce button click handlers after scripts loaded
-        $(document).on('click', '#confirmUpdatedTerms', function(e) {
-            console.log("Confirm button clicked");
-            e.preventDefault();
-            e.stopPropagation();
-
-            // Get session data
-            const sessionData = localStorage.getItem('patriotThanksSession');
-            if (!sessionData) {
-                console.error("No session found");
-                $('#termsUpdateModal').modal('hide');
-                return;
-            }
-
-            const session = JSON.parse(sessionData);
-            if (typeof updateTermsAcceptance === 'function') {
-                updateTermsAcceptance(session);
+                    window.bootstrap.Modal.getInstance = function(element) {
+                        console.log("Using polyfill Modal.getInstance from constructor");
+                        return new window.bootstrap.Modal(element);
+                    };
+                }
             } else {
-                console.error("updateTermsAcceptance function not available");
-                $('#termsUpdateModal').modal('hide');
+                console.log("Bootstrap 5 loaded correctly");
             }
-        });
+        }, 1000);
     });
 </script>
 
-<!-- NavBar Loading with Proper Script Loading Sequence -->
+<!-- Load NavBar and custom scripts -->
 <script>
     $(function(){
         $("#nav-placeholder").load("NavBar.html", function() {
             console.log("NavBar loaded");
 
             // Load scripts AFTER the navbar (with modal) is loaded
-            $.getScript("./js/fixed-terms-modal.js")
+            $.getScript("./js/bootstrap5-terms-modal.js")
             .done(function() {
-                console.log("Fixed terms modal script loaded successfully");
+                console.log("Bootstrap 5 terms modal script loaded successfully");
 
-                // Load login handler after fixed-terms-modal
-                $.getScript("./js/login-handler.js")
+                // Load login handler after terms modal
+                $.getScript("./js/bootstrap5-login-handler.js")
                 .done(function() {
-                    console.log("Login handler script loaded successfully");
+                    console.log("Bootstrap 5 login handler script loaded successfully");
 
                     // Check login status after both scripts are loaded
                     setTimeout(function() {
                         if (typeof checkLoginStatus === 'function') {
                             console.log("Checking login status");
                             checkLoginStatus();
-                        } else {
-                            console.error("checkLoginStatus function not available");
                         }
                     }, 500);
                 })
                 .fail(function() {
-                    console.error("Failed to load login-handler.js");
+                    console.error("Failed to load bootstrap5-login-handler.js");
                 });
             })
             .fail(function() {
-                console.error("Failed to load fixed-terms-modal.js");
+                console.error("Failed to load bootstrap5-terms-modal.js");
 
                 // Try to load login handler anyway
-                $.getScript("./js/login-handler.js")
+                $.getScript("./js/bootstrap5-login-handler.js")
                 .done(function() {
                     console.log("Login handler script loaded successfully");
                 })
                 .fail(function() {
-                    console.error("Failed to load login-handler.js");
+                    console.error("Failed to load bootstrap5-login-handler.js");
                 });
             });
         });
