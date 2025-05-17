@@ -82,8 +82,17 @@ function handleLogin() {
                 // Close the dropdown
                 const dropdown = document.querySelector('.dropdown-menu');
                 if (dropdown) {
-                    $(dropdown).parent().removeClass('show');
-                    $(dropdown).removeClass('show');
+                    // Bootstrap 5 way - use bootstrap.Dropdown if available
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+                        const dropdownInstance = bootstrap.Dropdown.getInstance(dropdown.previousElementSibling);
+                        if (dropdownInstance) {
+                            dropdownInstance.hide();
+                        }
+                    } else {
+                        // Fallback for Bootstrap 4 or if bootstrap.Dropdown is not available
+                        $(dropdown).parent().removeClass('show');
+                        $(dropdown).removeClass('show');
+                    }
                 }
             })
             .catch (error => {
@@ -165,10 +174,25 @@ function checkTermsVersion(session) {
         $('body').removeClass('modal-open');
 
         // Show the modal for terms acceptance
-        $('#termsUpdateModal').modal({
-            backdrop: 'static', // Prevent closing by clicking outside
-            keyboard: false     // Prevent closing with keyboard
-        });
+        // Bootstrap 5 way
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const modalEl = document.getElementById('termsUpdateModal');
+            if (modalEl) {
+                const termsModal = new bootstrap.Modal(modalEl, {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+                termsModal.show();
+            } else {
+                console.error("Terms modal element not found");
+            }
+        } else {
+            // Fallback for Bootstrap 4
+            $('#termsUpdateModal').modal({
+                backdrop: 'static',
+                keyboard: false
+            });
+        }
 
         // Show emergency button after a delay in case modal gets stuck
         setTimeout(function() {
@@ -186,15 +210,14 @@ function checkTermsVersion(session) {
 // Enhanced function to update terms acceptance with better error handling
 function updateTermsAcceptance(session) {
     const userId = session.user._id;
-    console.log("Updating terms acceptance for user:", userId);
 
-    // First update the local session data immediately to prevent getting stuck
+    // Update session data locally first - this ensures user isn't stuck even if API fails
     session.user.termsAccepted = true;
     session.user.termsAcceptedDate = new Date().toISOString();
     session.user.termsVersion = "May 14, 2025";
     localStorage.setItem('patriotThanksSession', JSON.stringify(session));
 
-    // Then try to update on the server
+    // determine the base URL
     const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
         ? `http://${window.location.host}`
         : window.location.origin;
@@ -213,42 +236,107 @@ function updateTermsAcceptance(session) {
             termsVersion: "May 14, 2025"
         })
     })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log("Terms acceptance updated successfully on server");
+            if (data.success) {
+                console.log("Terms acceptance updated successfully");
+            } else {
+                console.error("Failed to update terms acceptance");
+                // No need to alert since we updated localStorage already
+            }
         })
         .catch(error => {
-            console.error('Error updating terms acceptance on server:', error);
-            // We don't show an error to the user since we've already updated locally
+            console.error('Error updating terms acceptance:', error);
+            // No need to alert since we updated localStorage already
         })
         .finally(() => {
-            // Hide modal regardless of server response
-            try {
-                $('#termsUpdateModal').modal('hide');
-                $('.modal-backdrop').remove();
-                $('body').removeClass('modal-open');
-                $('body').css('padding-right', '');
-            } catch (error) {
-                console.error("Error hiding modal:", error);
-                emergencyModalReset();
-            }
+            // Hide the modal regardless of API success
+            hideModal();
         });
 }
 
-function showEmergencyButton() {
-    const emergencyBtn = document.getElementById('emergencyResetBtn');
-    if (emergencyBtn) {
-        emergencyBtn.style.display = 'block';
-        console.log("Emergency reset button shown");
-    } else {
-        console.error("Emergency reset button not found");
+// Function to hide the modal with Bootstrap 5 compatibility
+function hideModal() {
+    console.log("Hiding modal (Bootstrap 5 compatible)");
+
+    try {
+        // Bootstrap 5 way to hide a modal
+        const modalEl = document.getElementById('termsUpdateModal');
+
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const bsModal = bootstrap.Modal.getInstance(modalEl);
+            if (bsModal) {
+                bsModal.hide();
+            } else {
+                // Fallback if no instance found
+                $(modalEl).modal('hide');
+            }
+        } else {
+            // Bootstrap 4 fallback
+            $(modalEl).modal('hide');
+        }
+    } catch (error) {
+        console.error("Error hiding modal:", error);
+
+        // Manual cleanup as a last resort
+        $('.modal-backdrop').remove();
+        $('body').removeClass('modal-open');
+        $('body').css('padding-right', '');
+        $('body').css('overflow', '');
+
+        const modal = document.getElementById('termsUpdateModal');
+        if (modal) {
+            modal.classList.remove('show');
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
+            modal.removeAttribute('aria-modal');
+        }
     }
 }
+
+
+// Helper function to show emergency button
+function showEmergencyButton() {
+    console.log("Showing emergency button");
+
+    // Check if button exists
+    let emergencyBtn = document.getElementById('emergencyResetBtn');
+
+    // Create button if it doesn't exist
+    if (!emergencyBtn) {
+        emergencyBtn = document.createElement('button');
+        emergencyBtn.id = 'emergencyResetBtn';
+        emergencyBtn.innerHTML = 'Emergency Reset';
+
+        // Style the button
+        emergencyBtn.style.position = 'fixed';
+        emergencyBtn.style.bottom = '10px';
+        emergencyBtn.style.right = '10px';
+        emergencyBtn.style.zIndex = '9999';
+        emergencyBtn.style.backgroundColor = '#dc3545';
+        emergencyBtn.style.color = 'white';
+        emergencyBtn.style.border = 'none';
+        emergencyBtn.style.padding = '8px 15px';
+        emergencyBtn.style.borderRadius = '4px';
+        emergencyBtn.style.fontWeight = 'bold';
+        emergencyBtn.style.cursor = 'pointer';
+        emergencyBtn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+
+        // Add event listener
+        emergencyBtn.addEventListener('click', function() {
+            console.log("Emergency reset button clicked");
+            emergencyModalReset();
+            this.style.display = 'none';
+        });
+
+        // Add to body
+        document.body.appendChild(emergencyBtn);
+    }
+
+    // Show the button
+    emergencyBtn.style.display = 'block';
+}
+
 
 // Function to toggle admin elements visibility
 function toggleAdminElements(isAdmin) {
@@ -286,9 +374,9 @@ function enableRestrictedLinks(user) {
         // Check if the item should be enabled based on path
         if ((item.href.includes('business-add.html') ||
                 item.href.includes('incentive-add.html')) ||
-            // ((user.isAdmin || user.level === 'Admin') &&
+            ((user.isAdmin || user.level === 'Admin') &&
                 (item.href.includes('business-update.html') ||
-                    item.href.includes('incentive-update.html'))) {
+                    item.href.includes('incentive-update.html')))) {
             console.log("Enabling restricted link:", item.href);
             item.classList.remove('disabled');
         }
@@ -356,9 +444,16 @@ function logoutUser() {
     updateLoginUI();
 }
 
+
 // Function to attach event listeners
 function attachLoginListeners() {
     console.log("Attaching login event listeners");
+
+    // Remove any existing event handlers to prevent duplicates
+    $(document).off('click', '#login-button, button.btn-primary');
+    $(document).off('submit', '#login-form, .dropdown-menu form');
+    $(document).off('keypress', '#DropdownFormPassword1');
+    $(document).off('click', '#logout-button, #logout-link');
 
     // Use event delegation to catch clicks on the login button
     $(document).on('click', '#login-button, button.btn-primary', function(e) {
@@ -371,7 +466,7 @@ function attachLoginListeners() {
     });
 
     // Also handle form submission
-    $(document).on('submit', '#login-form', '.dropdown-menu form', function(e) {
+    $(document).on('submit', '#login-form, .dropdown-menu form', function(e) {
         console.log("Login form submitted");
         e.preventDefault();
         handleLogin();
@@ -396,7 +491,7 @@ function attachLoginListeners() {
 function checkLoginStatus() {
     console.log("Checking login status");
 
-    // Check for session in the format expected by profile-manager.js
+    // Check for session in the newer format
     const sessionData = localStorage.getItem('patriotThanksSession');
 
     if (sessionData) {
@@ -427,76 +522,26 @@ function checkLoginStatus() {
         const email = localStorage.getItem('userEmail') ||
             sessionStorage.getItem('userEmail');
 
-        const userId = localStorage.getItem('userId') ||
-            sessionStorage.getItem('userId') || generateTempId();
+        // Create a basic session from old format data
+        const session = {
+            user: {
+                _id: localStorage.getItem('userId') || sessionStorage.getItem('userId') || 'temp_' + Math.random().toString(36).substr(2, 9),
+                email: email || 'unknown@example.com',
+                fname: localStorage.getItem('fname') || sessionStorage.getItem('fname') || '',
+                lname: localStorage.getItem('lname') || sessionStorage.getItem('lname') || '',
+                isAdmin: localStorage.getItem('isAdmin') === 'true' || sessionStorage.getItem('isAdmin') === 'true'
+            },
+            token: 'simulated-token',
+            timestamp: new Date().getTime(),
+            expiresIn: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+        };
 
-        const fname = localStorage.getItem('fname') ||
-            sessionStorage.getItem('fname') || '';
+        // Store the new session format
+        localStorage.setItem('patriotThanksSession', JSON.stringify(session));
 
-        const lname = localStorage.getItem('lname') ||
-            sessionStorage.getItem('lname') || '';
-
-        const address1 = localStorage.getItem('address1') ||
-            sessionStorage.getItem('address1') || '';
-
-        const address2 = localStorage.getItem('address2') ||
-            sessionStorage.getItem('address2') || '';
-
-        const city = localStorage.getItem('city') ||
-            sessionStorage.getItem('city') || '';
-
-        const state = localStorage.getItem('state') ||
-            sessionStorage.getItem('state') || '';
-
-        const zip = localStorage.getItem('zip') ||
-            sessionStorage.getItem('zip') || '';
-
-        const status = localStorage.getItem('status') ||
-            sessionStorage.getItem('status') || '';
-
-        const level = localStorage.getItem('level') ||
-            sessionStorage.getItem('level') || '';
-
-        const isAdmin = localStorage.getItem('isAdmin') === 'true' ||
-            sessionStorage.getItem('isAdmin') === 'true';
-
-        const created_at = localStorage.getItem('created_at') ||
-            sessionStorage.getItem('created_at') || new Date().toISOString();
-
-        const updated_at = localStorage.getItem('updated_at') ||
-            sessionStorage.getItem('updated_at') || new Date().toISOString();
-
-        if (email) {
-            // Create a new session object in the format expected by profile-manager.js
-            const session = {
-                user: {
-                    _id: userId,
-                    email: email,
-                    fname: fname,
-                    lname: lname,
-                    address1: address1,
-                    address2: address2,
-                    city: city,
-                    state: state,
-                    zip: zip,
-                    status: status,
-                    level: level,
-                    isAdmin: isAdmin,
-                    created_at: created_at,
-                    updated_at: updated_at,
-                },
-                token: 'simulated-token',
-                timestamp: new Date().getTime(),
-                expiresIn: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
-            };
-
-            // Store the new session format
-            localStorage.setItem('patriotThanksSession', JSON.stringify(session));
-
-            // Update UI with session data
-            updateUIAfterLogin(session);
-            return true;
-        }
+        // Update UI with session data
+        updateUIAfterLogin(session);
+        return true;
     }
 
     console.log("User is not logged in");
@@ -543,9 +588,11 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(updateLoginUI, 500); // to also update the login UI
 });
 
+// Function to fix login menu issues
 function updateLoginUI() {
     const sessionData = localStorage.getItem('patriotThanksSession');
-    const signInDropdown = document.querySelector('.navbar-nav.ml-auto li.dropdown:not(#user-dropdown)');
+    const signInDropdown = document.querySelector('.navbar-nav.ms-auto li.dropdown:not(#user-dropdown)') ||
+        document.querySelector('.navbar-nav.ml-auto li.dropdown:not(#user-dropdown)');
     const userDropdown = document.getElementById('user-dropdown');
 
     if (sessionData) {
@@ -851,52 +898,29 @@ function fixModalBackdropIssue() {
     });
 }
 
-// Improved emergency reset function
+// Emergency function to remove stuck modal/backdrop
 function emergencyModalReset() {
     console.log('Emergency modal reset initiated');
 
-    // Try standard Bootstrap modal hiding first
-    try {
-        $('#termsUpdateModal').modal('hide');
-    } catch (e) {
-        console.error("Error in hiding modal:", e);
+    // First try standard hide
+    hideModal();
+
+    // Then ensure everything is cleaned up
+    $('.modal-backdrop').remove();
+    $('body').removeClass('modal-open');
+    $('body').css('padding-right', '');
+    $('body').css('overflow', '');
+
+    const modal = document.getElementById('termsUpdateModal');
+    if (modal) {
+        modal.classList.remove('show');
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        modal.removeAttribute('aria-modal');
     }
 
-    // Direct DOM manipulation as backup
-    try {
-        const modalElement = document.getElementById('termsUpdateModal');
-        if (modalElement) {
-            modalElement.style.display = 'none';
-            modalElement.classList.remove('show');
-            modalElement.setAttribute('aria-hidden', 'true');
-            modalElement.removeAttribute('aria-modal');
-        }
-    } catch (e) {
-        console.error("Error in direct modal manipulation:", e);
-    }
-
-    // Remove backdrop and reset body
-    removeAllBackdrops();
-
-    // Add a small delay and check if issues persist
-    setTimeout(function() {
-        if ($('.modal-backdrop').length > 0 || $('body').hasClass('modal-open')) {
-            console.log("Initial cleanup failed, performing aggressive reset");
-
-            // More aggressive cleanup
-            $('.modal-backdrop').remove();
-            $('body').removeClass('modal-open');
-            $('body').removeAttr('style');
-            $('body').css('overflow', 'auto');
-
-            // Reset all modal elements
-            $('.modal').removeClass('show');
-            $('.modal').css('display', 'none');
-        }
-        console.log('Emergency modal reset completed');
-    }, 100);
-
-    return true; // Return value to confirm function executed
+    console.log('Emergency modal reset completed');
+    return true;
 }
 
 // Make functions globally available
@@ -905,15 +929,16 @@ window.logoutUser = logoutUser;
 window.checkLoginStatus = checkLoginStatus;
 window.getAuthToken = getAuthToken;
 window.toggleAdminElements = toggleAdminElements;
+window.updateTermsAcceptance = updateTermsAcceptance;
+window.hideModal = hideModal;
 window.emergencyModalReset = emergencyModalReset;
+window.showEmergencyButton = showEmergencyButton;
 
 // Attach event listeners when jQuery is ready
 $(function() {
     console.log("jQuery ready in login-handler.js");
     attachLoginListeners();
-    setupTermsModalHandlers();
-    setupTermsScrollTracking();
-    fixModalBackdropIssue();
+
     // Check login status after a short delay to ensure the navbar is loaded
     setTimeout(checkLoginStatus, 500);
     // also update the login UI
