@@ -205,6 +205,8 @@ module.exports = async (req, res) => {
                 return await handleForgotPassword(req, res);
             case 'reset-password':
                 return await handleResetPassword(req, res);
+            case 'update_terms_acceptance':
+                return await handleUpdateTermsAcceptance(req, res);
             default:
                 // Legacy path handling for direct URL access
                 const path = req.url.split('?')[0];
@@ -230,7 +232,8 @@ module.exports = async (req, res) => {
                             'delete-user',
                             'dashboard-stats',
                             'forgot-password',
-                            'reset-password'
+                            'reset-password',
+                            'update_terms_acceptance'
                         ]
                     });
                 }
@@ -365,6 +368,10 @@ async function handleRegister(req, res) {
             return res.status(400).json({message: 'Email and password are required'});
         }
 
+        if (userData.termsAccepted !== true) {
+            return res.status(400).json({ message: 'You must accept the Terms of Use to register' });
+        }
+
         // Normalize email to lowercase for case-insensitive matching
         userData.email = userData.email.toLowerCase();
         console.log("Normalized email for registration:", userData.email);
@@ -378,6 +385,9 @@ async function handleRegister(req, res) {
         // Add timestamp fields
         userData.created_at = new Date();
         userData.updated_at = new Date();
+        userData.termsAccepted = true;
+        userData.termsAcceptedDate = new Date();
+        userData.termsVersion = userData.termsVersion || "May 14, 2025";
 
         // Check if Admin level and set isAdmin flag
         if (userData.level === 'Admin') {
@@ -411,6 +421,62 @@ async function handleRegister(req, res) {
     } catch (error) {
         console.error('User creation failed:', error);
         return res.status(500).json({message: 'Server error during user creation: ' + error.message});
+    }
+}
+
+/**
+ * Handle updating terms acceptance
+ */
+async function handleUpdateTermsAcceptance(req, res) {
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Authorization required' });
+    }
+
+    try {
+        // Extract data from request body
+        const { userId, termsAccepted, termsAcceptedDate, termsVersion } = req.body;
+
+        // Basic validation
+        if (!userId || termsAccepted === undefined) {
+            return res.status(400).json({ message: 'User ID and terms acceptance are required' });
+        }
+
+        // Connect to database
+        const dbConnection = await connectDB();
+        if (!dbConnection.success) {
+            return res.status(500).json({
+                message: dbConnection.message,
+                error: dbConnection.error.message
+            });
+        }
+
+        // Update the user
+        const result = await User.updateOne(
+            { _id: new ObjectId(userId) },
+            {
+                $set: {
+                    termsAccepted: termsAccepted,
+                    termsAcceptedDate: termsAcceptedDate,
+                    termsVersion: termsVersion,
+                    updated_at: new Date()
+                }
+            }
+        );
+
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Return success response
+        return res.status(200).json({
+            message: 'Terms acceptance updated successfully',
+            success: true
+        });
+    } catch (error) {
+        console.error('Error updating terms acceptance:', error);
+        return res.status(500).json({ message: 'Server error: ' + error.message });
     }
 }
 

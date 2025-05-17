@@ -17,6 +17,9 @@ const userSchema = new mongoose.Schema({
     isAdmin: Boolean,
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
+    termsAccepted: { type: Boolean, default: false },
+    termsAcceptedDate: { type: Date },
+    termsVersion: { type: String, default: "May 14, 2025" },
 
     // New fields for password reset
     resetToken: String,

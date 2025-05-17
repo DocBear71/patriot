@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <title>Patriot Thanks - Terms of Use</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2025/5/14">
+    <meta name="description" content="Patriot Thanks application to find businesses that offer
+                                          incentives and discounts to veterans, active duty, first
+                                          responders, and their spouses.">
+    <meta name="keywords" content="business, incentives, discounts, veteran discounts, military discounts,
+                                       first responder discounts, veterans, active duty, first responders">
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css">
+
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/form-validation.css" rel="stylesheet">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="./js/terms-tracking.js"></script>
+</head>
+
+<body style="padding-top: 70px" id="page_layout">
+<!--Navigation bar-->
+<div id="nav-placeholder">
+</div>
+<script>
+    $(function() {
+        $('#nav-placeholder').load('NavBar.html', function() {
+            console.log('NavBar loaded');
+            // Load the login handler after the navbar is loaded
+            $.getScript('./js/login-handler.js').done(function() {
+                console.log('Login handler script loaded successfully');
+            }).fail(function() {
+                console.error('Failed to load login-handler.js');
+            });
+        });
+    });
+</script>
+<!--end of Navigation bar-->
+
+<style>
+    .section-anchor {
+        display: block;
+        position: relative;
+        top: -80px;
+        visibility: hidden;
+    }
+
+
+    .terms-container h2,
+    .terms-container h3 {
+        font-weight: bold !important;
+    }
+
+    .terms-container {
+        max-width: 900px; /* Controls the maximum width of the content */
+        margin: 0 auto; /* Centers the container horizontally */
+        padding: 20px 40px; /* Adds internal spacing inside the container */
+        line-height: 1.6; /* Improves readability */
+    }
+
+    /* Preserve your existing styles */
+    [data-custom-class='body'], [data-custom-class='body'] * {
+        background: transparent !important;
+    }
+
+    [data-custom-class='title'], [data-custom-class='title'] * {
+        font-family: Arial !important;
+        font-size: 26px !important;
+        color: #000000 !important;
+    }
+
+    /* Rest of your existing styles */
+    [data-custom-class='subtitle'], [data-custom-class='subtitle'] * {
+        font-family: Arial !important;
+        color: #595959 !important;
+        font-size: 14px !important;
+    }
+
+    [data-custom-class='heading_1'], [data-custom-class='heading_1'] * {
+        font-family: Arial !important;
+        font-size: 19px !important;
+        color: #000000 !important;
+    }
+
+    [data-custom-class='heading_2'], [data-custom-class='heading_2'] * {
+        font-family: Arial !important;
+        font-size: 17px !important;
+        color: #000000 !important;
+    }
+
+    [data-custom-class='body_text'], [data-custom-class='body_text'] * {
+        color: #595959 !important;
+        font-size: 14px !important;
+        font-family: Arial !important;
+    }
+
+    [data-custom-class='link'], [data-custom-class='link'] * {
+        color: #3030F1 !important;
+        font-size: 14px !important;
+        font-family: Arial !important;
+        word-break: break-word !important;
+    }
+</style>
+
+<div class="terms-container">
+    <span style="display: block;margin: 0 auto 3.125rem;width: 11.125rem;height: 2.375rem;background: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNzgiIGhlaWdodD0iMzgiIHZpZXdCb3g9IjAgMCAxNzggMzgiPgogICAgPGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIj4KICAgICAgICA8cGF0aCBmaWxsPSIjRDFEMUQxIiBkPSJNNC4yODMgMjQuMTA3Yy0uNzA1IDAtMS4yNTgtLjI1Ni0xLjY2LS43NjhoLS4wODVjLjA1Ny41MDIuMDg2Ljc5Mi4wODYuODd2Mi40MzRILjk4NXYtOC42NDhoMS4zMzJsLjIzMS43NzloLjA3NmMuMzgzLS41OTQuOTUtLjg5MiAxLjcwMi0uODkyLjcxIDAgMS4yNjQuMjc0IDEuNjY1LjgyMi40MDEuNTQ4LjYwMiAxLjMwOS42MDIgMi4yODMgMCAuNjQtLjA5NCAxLjE5OC0uMjgyIDEuNjctLjE4OC40NzMtLjQ1Ni44MzMtLjgwMyAxLjA4LS4zNDcuMjQ3LS43NTYuMzctMS4yMjUuMzd6TTMuOCAxOS4xOTNjLS40MDUgMC0uNy4xMjQtLjg4Ni4zNzMtLjE4Ny4yNDktLjI4My42Ni0uMjkgMS4yMzN2LjE3N2MwIC42NDUuMDk1IDEuMTA3LjI4NyAxLjM4Ni4xOTIuMjguNDk1LjQxOS45MS40MTkuNzM0IDAgMS4xMDEtLjYwNSAxLjEwMS0xLjgxNiAwLS41OS0uMDktMS4wMzQtLjI3LTEuMzI5LS4xODItLjI5NS0uNDY1LS40NDMtLjg1Mi0uNDQzem01LjU3IDEuNzk0YzAgLjU5NC4wOTggMS4wNDQuMjkzIDEuMzQ4LjE5Ni4zMDQuNTEzLjQ1Ny45NTQuNDU3LjQzNyAwIC43NS0uMTUyLjk0Mi0uNDU0LjE5Mi0uMzAzLjI4OC0uNzUzLjI4OC0xLjM1MSAwLS41OTUtLjA5Ny0xLjA0LS4yOS0xLjMzOC0uMTk0LS4yOTctLjUxLS40NDUtLjk1LS40NDUtLjQzOCAwLS43NTMuMTQ3LS45NDYuNDQzLS4xOTQuMjk1LS4yOS43NDItLjI5IDEuMzR6bTQuMTUzIDBjMCAuOTc3LS4yNTggMS43NDItLjc3NCAyLjI5My0uNTE1LjU1Mi0xLjIzMy44MjctMi4xNTQuODI3LS41NzYgMC0xLjA4NS0uMTI2LTEuNTI1LS4zNzhhMi41MiAyLjUyIDAgMCAxLTEuMDE1LTEuMDg4Yy0uMjM3LS40NzMtLjM1NS0xLjAyNC0uMzU1LTEuNjU0IDAtLjk4MS4yNTYtMS43NDQuNzY4LTIuMjg4LjUxMi0uNTQ1IDEuMjMyLS44MTcgMi4xNi0uODE3LjU3NiAwIDEuMDg1LjEyNiAxLjUyNS4zNzYuNDQuMjUxLjc3OS42MSAxLjAxNSAxLjA4LjIzNi40NjkuMzU1IDEuMDE5LjM1NSAxLjY0OXpNMTkuNzEgMjRsLS40NjItMi4xLS42MjMtMi42NTNoLS4wMzdMMTcuNDkzIDI0SDE1LjczbC0xLjcwOC02LjAwNWgxLjYzM2wuNjkzIDIuNjU5Yy4xMS40NzYuMjI0IDEuMTMzLjMzOCAxLjk3MWguMDMyYy4wMTUtLjI3Mi4wNzctLjcwNC4xODgtMS4yOTRsLjA4Ni0uNDU3Ljc0Mi0yLjg3OWgxLjgwNGwuNzA0IDIuODc5Yy4wMTQuMDc5LjAzNy4xOTUuMDY3LjM1YTIwLjk5OCAyMC45OTggMCAwIDEgLjE2NyAxLjAwMmMuMDIzLjE2NS4wMzYuMjk5LjA0LjM5OWguMDMyYy4wMzItLjI1OC4wOS0uNjExLjE3Mi0xLjA2LjA4Mi0uNDUuMTQxLS43NTQuMTc3LS45MTFsLjcyLTIuNjU5aDEuNjA2TDIxLjQ5NCAyNGgtMS43ODN6bTcuMDg2LTQuOTUyYy0uMzQ4IDAtLjYyLjExLS44MTcuMzMtLjE5Ny4yMi0uMzEuNTMzLS4zMzguOTM3aDIuMjk5Yy0uMDA4LS40MDQtLjExMy0uNzE3LS4zMTctLjkzNy0uMjA0LS4yMi0uNDgtLjMzLS44MjctLjMzem0uMjMgNS4wNmMtLjk2NiAwLTEuNzIyLS4yNjctMi4yNjYtLjgtLjU0NC0uNTM0LS44MTYtMS4yOS0uODE2LTIuMjY3IDAtMS4wMDcuMjUxLTEuNzg1Ljc1NC0yLjMzNC41MDMtLjU1IDEuMTk5LS44MjUgMi4wODctLjgyNS44NDggMCAxLjUxLjI0MiAxLjk4Mi43MjUuNDcyLjQ4NC43MDkgMS4xNTIuNzA5IDIuMDA0di43OTVoLTMuODczYy4wMTguNDY1LjE1Ni44MjkuNDE0IDEuMDkuMjU4LjI2MS42Mi4zOTIgMS4wODUuMzkyLjM2MSAwIC43MDMtLjAzNyAxLjAyNi0uMTEzYTUuMTMzIDUuMTMzIDAgMCAwIDEuMDEtLjM2djEuMjY4Yy0uMjg3LjE0My0uNTkzLjI1LS45Mi4zMmE1Ljc5IDUuNzkgMCAwIDEtMS4xOTEuMTA0em03LjI1My02LjIyNmMuMjIyIDAgLjQwNi4wMTYuNTUzLjA0OWwtLjEyNCAxLjUzNmExLjg3NyAxLjg3NyAwIDAgMC0uNDgzLS4wNTRjLS41MjMgMC0uOTMuMTM0LTEuMjIyLjQwMy0uMjkyLjI2OC0uNDM4LjY0NC0uNDM4IDEuMTI4VjI0aC0xLjYzOHYtNi4wMDVoMS4yNGwuMjQyIDEuMDFoLjA4Yy4xODctLjMzNy40MzktLjYwOC43NTYtLjgxNGExLjg2IDEuODYgMCAwIDEgMS4wMzQtLjMwOXptNC4wMjkgMS4xNjZjLS4zNDcgMC0uNjIuMTEtLjgxNy4zMy0uMTk3LjIyLS4zMS41MzMtLjMzOC45MzdoMi4yOTljLS4wMDctLjQwNC0uMTEzLS43MTctLjMxNy0uOTM3LS4yMDQtLjIyLS40OC0uMzMtLjgyNy0uMzN6bS4yMyA1LjA2Yy0uOTY2IDAtMS43MjItLjI2Ny0yLjI2Ni0uOC0uNTQ0LS41MzQtLjgxNi0xLjI5LS44MTYtMi4yNjcgMC0xLjAwNy4yNTEtMS43ODUuNzU0LTIuMzM0LjUwNC0uNTUgMS4yLS44MjUgMi4wODctLjgyNS44NDkgMCAxLjUxLjI0MiAxLjk4Mi43MjUuNDczLjQ4NC43MDkgMS4xNTIuNzA5IDIuMDA0di43OTVoLTMuODczYy4wMTguNDY1LjE1Ni44MjkuNDE0IDEuMDkuMjU4LjI2MS42Mi4zOTIgMS4wODUuMzkyLjM2MiAwIC43MDQtLjAzNyAxLjAyNi0uMTEzYTUuMTMzIDUuMTMzIDAgMCAwIDEuMDEtLjM2djEuMjY4Yy0uMjg3LjE0My0uNTkzLjI1LS45MTkuMzJhNS43OSA1Ljc5IDAgMCAxLTEuMTkyLjEwNHptNS44MDMgMGMtLjcwNiAwLTEuMjYtLjI3NS0xLjY2My0uODIyLS40MDMtLjU0OC0uNjA0LTEuMzA3LS42MDQtMi4yNzggMC0uOTg0LjIwNS0xLjc1Mi42MTUtMi4zMDEuNDEtLjU1Ljk3NS0uODI1IDEuNjk1LS44MjUuNzU1IDAgMS4zMzIuMjk0IDEuNzI5Ljg4MWguMDU0YTYuNjk3IDYuNjk3IDAgMCAxLS4xMjQtMS4xOTh2LTEuOTIyaDEuNjQ0VjI0SDQ2LjQzbC0uMzE3LS43NzloLS4wN2MtLjM3Mi41OTEtLjk0Ljg4Ni0xLjcwMi44ODZ6bS41NzQtMS4zMDZjLjQyIDAgLjcyNi0uMTIxLjkyMS0uMzY1LjE5Ni0uMjQzLjMwMi0uNjU3LjMyLTEuMjR2LS4xNzhjMC0uNjQ0LS4xLTEuMTA2LS4yOTgtMS4zODYtLjE5OS0uMjc5LS41MjItLjQxOS0uOTctLjQxOWEuOTYyLjk2MiAwIDAgMC0uODUuNDY1Yy0uMjAzLjMxLS4zMDQuNzYtLjMwNCAxLjM1IDAgLjU5Mi4xMDIgMS4wMzUuMzA2IDEuMzMuMjA0LjI5Ni40OTYuNDQzLjg3NS40NDN6bTEwLjkyMi00LjkyYy43MDkgMCAxLjI2NC4yNzcgMS42NjUuODMuNC41NTMuNjAxIDEuMzEyLjYwMSAyLjI3NSAwIC45OTItLjIwNiAxLjc2LS42MiAyLjMwNC0uNDE0LjU0NC0uOTc3LjgxNi0xLjY5LjgxNi0uNzA1IDAtMS4yNTgtLjI1Ni0xLjY1OS0uNzY4aC0uMTEzbC0uMjc0LjY2MWgtMS4yNTF2LTguMzU3aDEuNjM4djEuOTQ0YzAgLjI0Ny0uMDIxLjY0My0uMDY0IDEuMTg3aC4wNjRjLjM4My0uNTk0Ljk1LS44OTIgMS43MDMtLjg5MnptLS41MjcgMS4zMWMtLjQwNCAwLS43LjEyNS0uODg2LjM3NC0uMTg2LjI0OS0uMjgzLjY2LS4yOSAxLjIzM3YuMTc3YzAgLjY0NS4wOTYgMS4xMDcuMjg3IDEuMzg2LjE5Mi4yOC40OTUuNDE5LjkxLjQxOS4zMzcgMCAuNjA1LS4xNTUuODA0LS40NjUuMTk5LS4zMS4yOTgtLjc2LjI5OC0xLjM1IDAtLjU5MS0uMS0xLjAzNS0uMy0xLjMzYS45NDMuOTQzIDAgMCAwLS44MjMtLjQ0M3ptMy4xODYtMS4xOTdoMS43OTRsMS4xMzQgMy4zNzljLjA5Ni4yOTMuMTYzLjY0LjE5OCAxLjA0MmguMDMzYy4wMzktLjM3LjExNi0uNzE3LjIzLTEuMDQybDEuMTEyLTMuMzc5aDEuNzU3bC0yLjU0IDYuNzczYy0uMjM0LjYyNy0uNTY2IDEuMDk2LS45OTcgMS40MDctLjQzMi4zMTItLjkzNi40NjgtMS41MTIuNDY4LS4yODMgMC0uNTYtLjAzLS44MzMtLjA5MnYtMS4zYTIuOCAyLjggMCAwIDAgLjY0NS4wN2MuMjkgMCAuNTQzLS4wODguNzYtLjI2Ni4yMTctLjE3Ny4zODYtLjQ0NC41MDgtLjgwM2wuMDk2LS4yOTUtMi4zODUtNS45NjJ6Ii8+CiAgICAgICAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzMpIj4KICAgICAgICAgICAgPGNpcmNsZSBjeD0iMTkiIGN5PSIxOSIgcj0iMTkiIGZpbGw9IiNFMEUwRTAiLz4KICAgICAgICAgICAgPHBhdGggZmlsbD0iI0ZGRiIgZD0iTTIyLjQ3NCAxNS40NDNoNS4xNjJMMTIuNDM2IDMwLjRWMTAuMzYzaDE1LjJsLTUuMTYyIDUuMDh6Ii8+CiAgICAgICAgPC9nPgogICAgICAgIDxwYXRoIGZpbGw9IiNEMkQyRDIiIGQ9Ik0xMjEuNTQ0IDE0LjU2di0xLjcyOGg4LjI3MnYxLjcyOGgtMy4wMjRWMjRoLTIuMjR2LTkuNDRoLTMuMDA4em0xMy43NDQgOS41NjhjLTEuMjkgMC0yLjM0MS0uNDE5LTMuMTUyLTEuMjU2LS44MS0uODM3LTEuMjE2LTEuOTQ0LTEuMjE2LTMuMzJzLjQwOC0yLjQ3NyAxLjIyNC0zLjMwNGMuODE2LS44MjcgMS44NzItMS4yNCAzLjE2OC0xLjI0czIuMzYuNDAzIDMuMTkyIDEuMjA4Yy44MzIuODA1IDEuMjQ4IDEuODggMS4yNDggMy4yMjQgMCAuMzEtLjAyMS41OTctLjA2NC44NjRoLTYuNDY0Yy4wNTMuNTc2LjI2NyAxLjA0LjY0IDEuMzkyLjM3My4zNTIuODQ4LjUyOCAxLjQyNC41MjguNzc5IDAgMS4zNTUtLjMyIDEuNzI4LS45NmgyLjQzMmEzLjg5MSAzLjg5MSAwIDAgMS0xLjQ4OCAyLjA2NGMtLjczNi41MzMtMS42MjcuOC0yLjY3Mi44em0xLjQ4LTYuNjg4Yy0uNC0uMzUyLS44ODMtLjUyOC0xLjQ0OC0uNTI4cy0xLjAzNy4xNzYtMS40MTYuNTI4Yy0uMzc5LjM1Mi0uNjA1LjgyMS0uNjggMS40MDhoNC4xOTJjLS4wMzItLjU4Ny0uMjQ4LTEuMDU2LS42NDgtMS40MDh6bTcuMDE2LTIuMzA0djEuNTY4Yy41OTctMS4xMyAxLjQ2MS0xLjY5NiAyLjU5Mi0xLjY5NnYyLjMwNGgtLjU2Yy0uNjcyIDAtMS4xNzkuMTY4LTEuNTIuNTA0LS4zNDEuMzM2LS41MTIuOTE1LS41MTIgMS43MzZWMjRoLTIuMjU2di04Ljg2NGgyLjI1NnptNi40NDggMHYxLjMyOGMuNTY1LS45NyAxLjQ4My0xLjQ1NiAyLjc1Mi0xLjQ1Ni42NzIgMCAxLjI3Mi4xNTUgMS44LjQ2NC41MjguMzEuOTM2Ljc1MiAxLjIyNCAxLjMyOC4zMS0uNTU1LjczMy0uOTkyIDEuMjcyLTEuMzEyYTMuNDg4IDMuNDg4IDAgMCAxIDEuODE2LS40OGMxLjA1NiAwIDEuOTA3LjMzIDIuNTUyLjk5Mi42NDUuNjYxLjk2OCAxLjU5Ljk2OCAyLjc4NFYyNGgtMi4yNHYtNC44OTZjMC0uNjkzLS4xNzYtMS4yMjQtLjUyOC0xLjU5Mi0uMzUyLS4zNjgtLjgzMi0uNTUyLTEuNDQtLjU1MnMtMS4wOS4xODQtMS40NDguNTUyYy0uMzU3LjM2OC0uNTM2Ljg5OS0uNTM2IDEuNTkyVjI0aC0yLjI0di00Ljg5NmMwLS42OTMtLjE3Ni0xLjIyNC0uNTI4LTEuNTkyLS4zNTItLjM2OC0uODMyLS41NTItMS40NC0uNTUycy0xLjA5LjE4NC0xLjQ0OC41NTJjLS4zNTcuMzY4LS41MzYuODk5LS41MzYgMS41OTJWMjRoLTIuMjU2di04Ljg2NGgyLjI1NnpNMTY0LjkzNiAyNFYxMi4xNmgyLjI1NlYyNGgtMi4yNTZ6bTcuMDQtLjE2bC0zLjQ3Mi04LjcwNGgyLjUyOGwyLjI1NiA2LjMwNCAyLjM4NC02LjMwNGgyLjM1MmwtNS41MzYgMTMuMDU2aC0yLjM1MmwxLjg0LTQuMzUyeiIvPgogICAgPC9nPgo8L3N2Zz4K) center no-repeat;"></span>
+
+    <div data-custom-class="body">
+        <div><strong><span style="font-size: 26px;"><span data-custom-class="title"><h1>TERMS OF USE</h1></span></span></strong>
+        </div>
+        <div><span style="color: rgb(127, 127, 127);"><strong><span style="font-size: 15px;"><span
+                data-custom-class="subtitle">Last updated May 14, 2025</span></span></strong></span></div>
+
+
+        <div><br></div>
+        <div style="line-height: 1.5;"><span style="color: rgb(127, 127, 127);"><span
+                style="color: rgb(89, 89, 89); font-size: 15px;"><span data-custom-class="body_text">
+            <strong>AGREEMENT TO OUR LEGAL TERMS</strong>
+        </span></span></span>
+        </div>
+
+        <div style="line-height: 1.5;"><br></div>
+        <div style="line-height: 1.5;"><span style="color: rgb(89, 89, 89); font-size: 15px;"><span
+                data-custom-class="body_text">We are Doc Bear Enterprises, LLC. ("<strong>Company</strong>," "<strong>we</strong>," "<strong>us</strong>," or "<strong>our</strong>"). <br><br>We operate <a
+                href="https://www.patriotthanks.com" target="_blank">https://www.patriotthanks.com</a> (the "<strong>Site</strong>", as well as any other related products and services that refer or link to these legal terms (the "<strong>Legal Terms</strong>") (collectively, the "<strong>Services</strong>"). You can contact us by email at privacy@patriotthanks.com or by mail to 3920 Lennox Ave NE, Cedar Rapids, IA, 52402.</span></span></span>
+        </div>
+        <div style="line-height: 1.5;"><br></div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">These Legal Terms constitute a legally binding agreement made between you, whether personally or on behalf of an entity ("<strong>you</strong>"), and Doc Bear Enterprises, LLC., concerning your access to and use of the Services. You agree that by accessing the Services, you have read, understood, and agreed to be bound by all of these Legal Terms. IF YOU DO NOT AGREE WITH ALL OF THESE LEGAL TERMS, THEN YOU ARE EXPRESSLY PROHIBITED FROM USING THE SERVICES AND YOU MUST DISCONTINUE USE IMMEDIATELY.</span></span>
+        </div>
+        <div style="line-height: 1.5;"><br></div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Supplemental terms and conditions or documents that may be posted on the Services from time to time are hereby expressly incorporated herein by reference. We reserve the right, in our sole discretion, to make changes or modifications to these Legal Terms at any time and for any reason. We will alert you about any changes by updating the "Last updated" date of these Legal Terms, and you waive any right to receive specific notice of each such change. It is your responsibility to periodically review these Legal Terms to stay informed of updates. You will be subject to, and will be deemed to have been made aware of and to have accepted, the changes in any revised Legal Terms by your continued use of the Services after the date such revised Legal Terms are posted.</span></span>
+        </div>
+        <div style="line-height: 1.5;"><br></div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">We recommend that you print a copy of these Legal Terms for your records.</span></span>
+        </div>
+        <div style="line-height: 1.5;"><br></div>
+
+        <div style="line-height: 1.5;"><strong><span
+                data-custom-class="heading_1"><h2>TABLE OF CONTENTS</h2></span></strong></div>
+        <div style="line-height: 1.5;"><br></div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#services">1. OUR SERVICES</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#ip">2. INTELLECTUAL PROPERTY RIGHTS</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#userreps">3. USER REPRESENTATIONS</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#prohibited">4. PROHIBITED ACTIVITIES</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#ugc">5. USER GENERATED CONTRIBUTIONS</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#license">6. CONTRIBUTION LICENSE</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#management">7. SERVICES MANAGEMENT</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#terms">8. TERM AND TERMINATION</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#modifications">9. MODIFICATIONS AND INTERRUPTIONS</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#law">10. GOVERNING LAW</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#disputes">11. DISPUTE RESOLUTION</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#corrections">12. CORRECTIONS</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#disclaimer">13. DISCLAIMER</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#liability">14. LIMITATIONS OF LIABILITY</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link"
+                                                                         href="#indemnification">15. INDEMNIFICATION</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#userdata">16. USER DATA</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#electronic">17. ELECTRONIC COMMUNICATIONS, TRANSACTIONS, AND SIGNATURES</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#misc">18. MISCELLANEOUS</a></span>
+        </div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px;"><a data-custom-class="link" href="#contact">19. CONTACT US</a></span>
+        </div>
+        <div style="line-height: 1.5;"><br></div>
+
+        <span class="section-anchor" id="services"></span>
+        <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+                data-custom-class="heading_1"><h2>1. OUR SERVICES</h2></span></span></strong></span></div>
+
+        <div style="line-height: 1.5;"><br></div>
+        <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">The information provided when using the Services is not intended for distribution to or use by any person or entity in any jurisdiction or country where such distribution or use would be contrary to law or regulation or which would subject us to any registration requirement within such jurisdiction or country. Accordingly, those persons who choose to access the Services from other locations do so on their own initiative and are solely responsible for compliance with local laws, if and to the extent local laws are applicable.</span></span>
+        </div>
+        <div style="line-height: 1.5;"><br></div>
+
+        <span class="section-anchor" id="ip"></span>
+        <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+                data-custom-class="heading_1"><h2>2. INTELLECTUAL PROPERTY RIGHTS</h2></span></span></strong></span>
+        </div>
+
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="heading_2"><strong><h3>Our intellectual property</h3></strong></span></span></div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">We are the owner or the licensee of all intellectual property rights in our Services, including all source code, databases, functionality, software, website designs, audio, video, text, photographs, and graphics in the Services (collectively, the "Content"), as well as the trademarks, service marks, and logos contained therein (the "Marks"). Our Content and Marks are protected by copyright and trademark laws (and various other intellectual property rights and unfair competition laws) and treaties around the world. The Content and Marks are provided in or through the Services "AS IS" for your personal, non-commercial use or internal business purpose only.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="heading_2"><strong><h3>Your use of our Services</h3></strong></span></span></div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">Subject to your compliance with these Legal Terms, including the "<a href="#prohibited" style="color: rgb(89, 89, 89); text-decoration: underline;">PROHIBITED ACTIVITIES</a>" section below, we grant you a non-exclusive, non-transferable, revocable license to:</span></span>
+    </div>
+    <ul>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">access the Services; and</span></span></li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">download or print a copy of any portion of the Content to which you have properly gained access, solely for your personal, non-commercial use or internal business purpose.</span></span>
+        </li>
+    </ul>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">Except as set out in this section or elsewhere in our Legal Terms, no part of the Services and no Content or Marks may be copied, reproduced, aggregated, republished, uploaded, posted, publicly displayed, encoded, translated, transmitted, distributed, sold, licensed, or otherwise exploited for any commercial purpose whatsoever, without our express prior written permission.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">If you wish to make any use of the Services, Content, or Marks other than as set out in this section or elsewhere in our Legal Terms, please address your request to: privacy@patriotthanks.com. If we ever grant you the permission to post, reproduce, or publicly display any part of our Services or Content, you must identify us as the owners or licensors of the Services, Content, or Marks and ensure that any copyright or proprietary notice appears or is visible on posting, reproducing, or displaying our Content.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">We reserve all rights not expressly granted to you in and to the Services, Content, and Marks. Any breach of these Intellectual Property Rights will constitute a material breach of our Legal Terms and your right to use our Services will terminate immediately.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="heading_2"><strong><h3>Your submissions</h3></strong></span></span></div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">Please review this section and the "<a href="#prohibited" style="color: rgb(89, 89, 89); text-decoration: underline;">PROHIBITED ACTIVITIES</a>" section carefully prior to using our Services to understand the (a) rights you give us and (b) obligations you have when you post or upload any content through the Services.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text"><strong>Submissions:</strong> By directly sending us any question, comment, suggestion, idea, feedback, or other information about the Services ("Submissions"), you agree to assign to us all intellectual property rights in such Submission. You agree that we shall own this Submission and be entitled to its unrestricted use and dissemination for any lawful purpose, commercial or otherwise, without acknowledgment or compensation to you.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text"><strong>You are responsible for what you post or upload:</strong> By sending us Submissions through any part of the Services you:</span></span>
+    </div>
+    <ul>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">confirm that you have read and agree with our "<a href="#prohibited" style="color: rgb(89, 89, 89); text-decoration: underline;">PROHIBITED ACTIVITIES</a>" and will not post, send, publish, upload, or transmit through the Services any Submission that is illegal, harassing, hateful, harmful, defamatory, obscene, bullying, abusive, discriminatory, threatening to any person or group, sexually explicit, false, inaccurate, deceitful, or misleading;</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">to the extent permissible by applicable law, waive any and all moral rights to any such Submission;</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">warrant that any such Submission are original to you or that you have the necessary rights and licenses to submit such Submissions and that you have full authority to grant us the above-mentioned rights in relation to your Submissions; and</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">warrant and represent that your Submissions do not constitute confidential information.</span></span>
+        </li>
+    </ul>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">You are solely responsible for your Submissions and you expressly agree to reimburse us for any and all losses that we may suffer because of your breach of (a) this section, (b) any third party's intellectual property rights, or (c) applicable law.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="userreps"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>3. USER REPRESENTATIONS</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">By using the Services, you represent and warrant that: </span></span>
+    </div>
+    <ol>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">(1) you have the legal capacity and you agree to comply with these Legal Terms; </span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">(2) you are not a minor in the jurisdiction in which you reside; </span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">(3) you will not access the Services through automated or non-human means, whether through a bot, script or otherwise; </span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">(4) you will not use the Services for any illegal or unauthorized purpose; and </span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">(5) your use of the Services will not violate any applicable law or regulation.</span></span>
+        </li>
+    </ol>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">If you provide any information that is untrue, inaccurate, not current, or incomplete, we have the right to suspend or terminate your account and refuse any and all current or future use of the Services (or any portion thereof).</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="prohibited"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>4. PROHIBITED ACTIVITIES</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">You may not access or use the Services for any purpose other than that for which we make the Services available. The Services may not be used in connection with any commercial endeavors except those that are specifically endorsed or approved by us.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">As a user of the Services, you agree not to:</span></span></div>
+    <ul>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Systematically retrieve data or other content from the Services to create or compile, directly or indirectly, a collection, compilation, database, or directory without written permission from us.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Trick, defraud, or mislead us and other users, especially in any attempt to learn sensitive account information such as user passwords.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Circumvent, disable, or otherwise interfere with security-related features of the Services, including features that prevent or restrict the use or copying of any Content or enforce limitations on the use of the Services and/or the Content contained therein.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Disparage, tarnish, or otherwise harm, in our opinion, us and/or the Services.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Use any information obtained from the Services in order to harass, abuse, or harm another person.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Make improper use of our support services or submit false reports of abuse or misconduct.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Use the Services in a manner inconsistent with any applicable laws or regulations.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Engage in unauthorized framing of or linking to the Services.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Upload or transmit (or attempt to upload or to transmit) viruses, Trojan horses, or other material, including excessive use of capital letters and spamming (continuous posting of repetitive text), that interferes with any party's uninterrupted use and enjoyment of the Services or modifies, impairs, disrupts, alters, or interferes with the use, features, functions, operation, or maintenance of the Services.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Engage in any automated use of the system, such as using scripts to send comments or messages, or using any data mining, robots, or similar data gathering and extraction tools.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Delete the copyright or other proprietary rights notice from any Content.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Attempt to impersonate another user or person or use the username of another user.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Upload or transmit (or attempt to upload or to transmit) any material that acts as a passive or active information collection or transmission mechanism, including without limitation, clear graphics interchange formats ("gifs"), 1×1 pixels, web bugs, cookies, or other similar devices (sometimes referred to as "spyware" or "passive collection mechanisms" or "pcms").</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Interfere with, disrupt, or create an undue burden on the Services or the networks or services connected to the Services.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Harass, annoy, intimidate, or threaten any of our employees or agents engaged in providing any portion of the Services to you.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Attempt to bypass any measures of the Services designed to prevent or restrict access to the Services, or any portion of the Services.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Copy or adapt the Services' software, including but not limited to Flash, PHP, HTML, JavaScript, or other code.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Except as permitted by applicable law, decipher, decompile, disassemble, or reverse engineer any of the software comprising or in any way making up a part of the Services.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Except as may be the result of standard search engine or Internet browser usage, use, launch, develop, or distribute any automated system, including without limitation, any spider, robot, cheat utility, scraper, or offline reader that accesses the Services, or use or launch any unauthorized script or other software.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Use a buying agent or purchasing agent to make purchases on the Services.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Make any unauthorized use of the Services, including collecting usernames and/or email addresses of users by electronic or other means for the purpose of sending unsolicited email, or creating user accounts by automated means or under false pretenses.</span></span>
+        </li>
+        <li style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+                data-custom-class="body_text">Use the Services as part of any effort to compete with us or otherwise use the Services and/or the Content for any revenue-generating endeavor or commercial enterprise.</span></span>
+        </li>
+    </ul>
+    <div style="line-height: 1.5;"><br></div>
+    <span class="section-anchor" id="ugc"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>5. USER GENERATED CONTRIBUTIONS</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">The Services does not offer users to submit or post content. We may provide you with the opportunity to create, submit, post, display, transmit, perform, publish, distribute, or broadcast content and materials to us or on the Services, including but not limited to text, writings, video, audio, photographs, graphics, comments, suggestions, or personal information or other material (collectively, "Contributions"). Contributions may be viewable by other users of the Services and through third-party websites. When you create or make available any Contributions, you thereby represent and warrant that:</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+
+    <span class="section-anchor" id="license"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>6. CONTRIBUTION LICENSE</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">You and Services agree that we may access, store, process, and use any information and personal data that you provide and your choices (including settings).</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">By submitting suggestions or other feedback regarding the Services, you agree that we can use and share such feedback for any purpose without compensation to you.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">We do not assert any ownership over your Contributions. You retain full ownership of all of your Contributions and any intellectual property rights or other proprietary rights associated with your Contributions. We are not liable for any statements or representations in your Contributions provided by you in any area on the Services. You are solely responsible for your Contributions to the Services and you expressly agree to exonerate us from any and all responsibility and to refrain from any legal action against us regarding your Contributions.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="management"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>7. SERVICES MANAGEMENT</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">We reserve the right, but not the obligation, to: (1) monitor the Services for violations of these Legal Terms; (2) take appropriate legal action against anyone who, in our sole discretion, violates the law or these Legal Terms, including without limitation, reporting such user to law enforcement authorities; (3) in our sole discretion and without limitation, refuse, restrict access to, limit the availability of, or disable (to the extent technologically feasible) any of your Contributions or any portion thereof; (4) in our sole discretion and without limitation, notice, or liability, to remove from the Services or otherwise disable all files and content that are excessive in size or are in any way burdensome to our systems; and (5) otherwise manage the Services in a manner designed to protect our rights and property and to facilitate the proper functioning of the Services.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="terms"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>8. TERM AND TERMINATION</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">These Legal Terms shall remain in full force and effect while you use the Services. WITHOUT LIMITING ANY OTHER PROVISION OF THESE LEGAL TERMS, WE RESERVE THE RIGHT TO, IN OUR SOLE DISCRETION AND WITHOUT NOTICE OR LIABILITY, DENY ACCESS TO AND USE OF THE SERVICES (INCLUDING BLOCKING CERTAIN IP ADDRESSES), TO ANY PERSON FOR ANY REASON OR FOR NO REASON, INCLUDING WITHOUT LIMITATION FOR BREACH OF ANY REPRESENTATION, WARRANTY, OR COVENANT CONTAINED IN THESE LEGAL TERMS OR OF ANY APPLICABLE LAW OR REGULATION. WE MAY TERMINATE YOUR USE OR PARTICIPATION IN THE SERVICES OR DELETE ANY CONTENT OR INFORMATION THAT YOU POSTED AT ANY TIME, WITHOUT WARNING, IN OUR SOLE DISCRETION.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">If we terminate or suspend your account for any reason, you are prohibited from registering and creating a new account under your name, a fake or borrowed name, or the name of any third party, even if you may be acting on behalf of the third party. In addition to terminating or suspending your account, we reserve the right to take appropriate legal action, including without limitation pursuing civil, criminal, and injunctive redress.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="modifications"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>9. MODIFICATIONS AND INTERRUPTIONS</h2></span></span></strong></span>
+    </div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">We reserve the right to change, modify, or remove the contents of the Services at any time or for any reason at our sole discretion without notice. However, we have no obligation to update any information on our Services. We will not be liable to you or any third party for any modification, price change, suspension, or discontinuance of the Services.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">We cannot guarantee the Services will be available at all times. We may experience hardware, software, or other problems or need to perform maintenance related to the Services, resulting in interruptions, delays, or errors. We reserve the right to change, revise, update, suspend, discontinue, or otherwise modify the Services at any time or for any reason without notice to you. You agree that we have no liability whatsoever for any loss, damage, or inconvenience caused by your inability to access or use the Services during any downtime or discontinuance of the Services. Nothing in these Legal Terms will be construed to obligate us to maintain and support the Services or to supply any corrections, updates, or releases in connection therewith.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="law"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>10. GOVERNING LAW</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">These Legal Terms shall be governed by and defined following the laws of Iowa. Doc Bear Enterprises, LLC. and yourself irrevocably consent that the courts of Iowa shall have exclusive jurisdiction to resolve any dispute which may arise in connection with these Legal Terms.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="disputes"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>11. DISPUTE RESOLUTION</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="heading_2"><strong><h3>Informal Negotiations</h3></strong></span></span></div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">To expedite resolution and control the cost of any dispute, controversy, or claim related to these Legal Terms (each a "Dispute" and collectively, the "Disputes") brought by either you or us (individually, a "Party" and collectively, the "Parties"), the Parties agree to first attempt to negotiate any Dispute (except those Disputes expressly provided below) informally for at least thirty (30) days before initiating arbitration. Such informal negotiations commence upon written notice from one Party to the other Party.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="heading_2"><strong><h3>Binding Arbitration</h3></strong></span></span></div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">Any dispute arising out of or in connection with these Legal Terms, including any question regarding its existence, validity, or termination, shall be referred to and finally resolved by the International Commercial Arbitration Court under the European Arbitration Chamber (Belgium, Brussels, Avenue Louise, 146) according to the Rules of this ICAC, which, as a result of referring to it, is considered as the part of this clause. The number of arbitrators shall be one (1). The seat, or legal place, or arbitration shall be Cedar Rapids, Iowa. The language of the proceedings shall be English. The governing law of these Legal Terms shall be substantive law of Iowa.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="heading_2"><strong><h3>Restrictions</h3></strong></span></span></div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">The Parties agree that any arbitration shall be limited to the Dispute between the Parties individually. To the full extent permitted by law, (a) no arbitration shall be joined with any other proceeding; (b) there is no right or authority for any Dispute to be arbitrated on a class-action basis or to utilize class action procedures; and (c) there is no right or authority for any Dispute to be brought in a purported representative capacity on behalf of the general public or any other persons.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="heading_2"><strong><h3>Exceptions to Informal Negotiations and Arbitration</h3></strong></span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">The Parties agree that the following Disputes are not subject to the above provisions concerning informal negotiations binding arbitration: (a) any Disputes seeking to enforce or protect, or concerning the validity of, any of the intellectual property rights of a Party; (b) any Dispute related to, or arising from, allegations of theft, piracy, invasion of privacy, or unauthorized use; and (c) any claim for injunctive relief. If this provision is found to be illegal or unenforceable, then neither Party will elect to arbitrate any Dispute falling within that portion of this provision found to be illegal or unenforceable and such Dispute shall be decided by a court of competent jurisdiction within the courts listed for jurisdiction above, and the Parties agree to submit to the personal jurisdiction of that court.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="corrections"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>12. CORRECTIONS</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">There may be information on the Services that contains typographical errors, inaccuracies, or omissions, including descriptions, pricing, availability, and various other information. We reserve the right to correct any errors, inaccuracies, or omissions and to change or update the information on the Services at any time, without prior notice.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="disclaimer"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>13. DISCLAIMER</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">THE SERVICES ARE PROVIDED ON AN AS-IS AND AS-AVAILABLE BASIS. YOU AGREE THAT YOUR USE OF THE SERVICES WILL BE AT YOUR SOLE RISK. TO THE FULLEST EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, IN CONNECTION WITH THE SERVICES AND YOUR USE THEREOF, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. WE MAKE NO WARRANTIES OR REPRESENTATIONS ABOUT THE ACCURACY OR COMPLETENESS OF THE SERVICES' CONTENT OR THE CONTENT OF ANY WEBSITES OR MOBILE APPLICATIONS LINKED TO THE SERVICES AND WE WILL ASSUME NO LIABILITY OR RESPONSIBILITY FOR ANY (1) ERRORS, MISTAKES, OR INACCURACIES OF CONTENT AND MATERIALS, (2) PERSONAL INJURY OR PROPERTY DAMAGE, OF ANY NATURE WHATSOEVER, RESULTING FROM YOUR ACCESS TO AND USE OF THE SERVICES, (3) ANY UNAUTHORIZED ACCESS TO OR USE OF OUR SECURE SERVERS AND/OR ANY AND ALL PERSONAL INFORMATION AND/OR FINANCIAL INFORMATION STORED THEREIN, (4) ANY INTERRUPTION OR CESSATION OF TRANSMISSION TO OR FROM THE SERVICES, (5) ANY BUGS, VIRUSES, TROJAN HORSES, OR THE LIKE WHICH MAY BE TRANSMITTED TO OR THROUGH THE SERVICES BY ANY THIRD PARTY, AND/OR (6) ANY ERRORS OR OMISSIONS IN ANY CONTENT AND MATERIALS OR FOR ANY LOSS OR DAMAGE OF ANY KIND INCURRED AS A RESULT OF THE USE OF ANY CONTENT POSTED, TRANSMITTED, OR OTHERWISE MADE AVAILABLE VIA THE SERVICES. WE DO NOT WARRANT, ENDORSE, GUARANTEE, OR ASSUME RESPONSIBILITY FOR ANY PRODUCT OR SERVICE ADVERTISED OR OFFERED BY A THIRD PARTY THROUGH THE SERVICES, ANY HYPERLINKED WEBSITE, OR ANY WEBSITE OR MOBILE APPLICATION FEATURED IN ANY BANNER OR OTHER ADVERTISING, AND WE WILL NOT BE A PARTY TO OR IN ANY WAY BE RESPONSIBLE FOR MONITORING ANY TRANSACTION BETWEEN YOU AND ANY THIRD-PARTY PROVIDERS OF PRODUCTS OR SERVICES. AS WITH THE PURCHASE OF A PRODUCT OR SERVICE THROUGH ANY MEDIUM OR IN ANY ENVIRONMENT, YOU SHOULD USE YOUR BEST JUDGMENT AND EXERCISE CAUTION WHERE APPROPRIATE.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">The Services does not offer users to submit or post content. We may provide you with the opportunity to create, submit, post, display, transmit, perform, publish, distribute, or broadcast content and materials to us or on the Services, including but not limited to text, writings, video, audio, photographs, graphics, comments, suggestions, or personal information or other material (collectively, "Contributions"). Contributions may be viewable by other users of the Services and through third-party websites. When you create or make available any Contributions, you thereby represent and warrant that:</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <span class="section-anchor" id="liability"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>14. LIMITATIONS OF LIABILITY</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">IN NO EVENT WILL WE OR OUR DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE TO YOU OR ANY THIRD PARTY FOR ANY DIRECT, INDIRECT, CONSEQUENTIAL, EXEMPLARY, INCIDENTAL, SPECIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFIT, LOST REVENUE, LOSS OF DATA, OR OTHER DAMAGES ARISING FROM YOUR USE OF THE SERVICES, EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. NOTWITHSTANDING ANYTHING TO THE CONTRARY CONTAINED HEREIN, OUR LIABILITY TO YOU FOR ANY CAUSE WHATSOEVER AND REGARDLESS OF THE FORM OF THE ACTION, WILL AT ALL TIMES BE LIMITED TO THE AMOUNT PAID, IF ANY, BY YOU TO US. CERTAIN US STATE LAWS AND INTERNATIONAL LAWS DO NOT ALLOW LIMITATIONS ON IMPLIED WARRANTIES OR THE EXCLUSION OR LIMITATION OF CERTAIN DAMAGES. IF THESE LAWS APPLY TO YOU, SOME OR ALL OF THE ABOVE DISCLAIMERS OR LIMITATIONS MAY NOT APPLY TO YOU, AND YOU MAY HAVE ADDITIONAL RIGHTS.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="indemnification"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>15. INDEMNIFICATION</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">You agree to defend, indemnify, and hold us harmless, including our subsidiaries, affiliates, and all of our respective officers, agents, partners, and employees, from and against any loss, damage, liability, claim, or demand, including reasonable attorneys' fees and expenses, made by any third party due to or arising out of: (1) use of the Services; (2) breach of these Legal Terms; (3) any breach of your representations and warranties set forth in these Legal Terms; (4) your violation of the rights of a third party, including but not limited to intellectual property rights; or (5) any overt harmful act toward any other user of the Services with whom you connected via the Services. Notwithstanding the foregoing, we reserve the right, at your expense, to assume the exclusive defense and control of any matter for which you are required to indemnify us, and you agree to cooperate, at your expense, with our defense of such claims. We will use reasonable efforts to notify you of any such claim, action, or proceeding which is subject to this indemnification upon becoming aware of it.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="userdata"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>16. USER DATA</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">We will maintain certain data that you transmit to the Services for the purpose of managing the performance of the Services, as well as data relating to your use of the Services. Although we perform regular routine backups of data, you are solely responsible for all data that you transmit or that relates to any activity you have undertaken using the Services. You agree that we shall have no liability to you for any loss or corruption of any such data, and you hereby waive any right of action against us arising from any such loss or corruption of such data.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="electronic"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>17. ELECTRONIC COMMUNICATIONS, TRANSACTIONS, AND SIGNATURES</h2></span></span></strong></span>
+    </div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">Visiting the Services, sending us emails, and completing online forms constitute electronic communications. You consent to receive electronic communications, and you agree that all agreements, notices, disclosures, and other communications we provide to you electronically, via email and on the Services, satisfy any legal requirement that such communication be in writing. YOU HEREBY AGREE TO THE USE OF ELECTRONIC SIGNATURES, CONTRACTS, ORDERS, AND OTHER RECORDS, AND TO ELECTRONIC DELIVERY OF NOTICES, POLICIES, AND RECORDS OF TRANSACTIONS INITIATED OR COMPLETED BY US OR VIA THE SERVICES. You hereby waive any rights or requirements under any statutes, regulations, rules, ordinances, or other laws in any jurisdiction which require an original signature or delivery or retention of non-electronic records, or to payments or the granting of credits by any means other than electronic means.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="misc"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>18. MISCELLANEOUS</h2></span></span></strong></span></div>
+
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">These Legal Terms and any policies or operating rules posted by us on the Services or in respect to the Services constitute the entire agreement and understanding between you and us. Our failure to exercise or enforce any right or provision of these Legal Terms shall not operate as a waiver of such right or provision. These Legal Terms operate to the fullest extent permissible by law. We may assign any or all of our rights and obligations to others at any time. We shall not be responsible or liable for any loss, damage, delay, or failure to act caused by any cause beyond our reasonable control. If any provision or part of a provision of these Legal Terms is determined to be unlawful, void, or unenforceable, that provision or part of the provision is deemed severable from these Legal Terms and does not affect the validity and enforceability of any remaining provisions. There is no joint venture, partnership, employment or agency relationship created between you and us as a result of these Legal Terms or use of the Services. You agree that these Legal Terms will not be construed against us by virtue of having drafted them. You hereby waive any and all defenses you may have based on the electronic form of these Legal Terms and the lack of signing by the parties hereto to execute these Legal Terms.</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+
+    <span class="section-anchor" id="contact"></span>
+    <div style="line-height: 1.5;"><span style="color: rgb(0, 0, 0);"><strong><span style="font-size: 19px;"><span
+            data-custom-class="heading_1"><h2>19. CONTACT US</h2></span></span></strong></span></div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">In order to resolve a complaint regarding the Services or to receive further information regarding use of the Services, please contact us at:</span></span>
+    </div>
+    <div style="line-height: 1.5;"><br></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text"><strong>Doc Bear Enterprises, LLC.</strong></span></span></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">3920 Lennox Ave NE</span></span></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">Cedar Rapids, IA 52402</span></span></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">United States</span></span></div>
+    <div style="line-height: 1.5;"><span style="font-size: 15px; color: rgb(89, 89, 89);"><span
+            data-custom-class="body_text">privacy@patriotthanks.com</span></span></div>
+</div>
+</body>
+</html>

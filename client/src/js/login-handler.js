@@ -145,6 +145,23 @@ function updateUIAfterLogin(session) {
     enableRestrictedLinks(user);
 
     console.log("UI updated for logged in user:", displayName, "Admin:", isAdmin);
+
+    checkTermsVersion(session);
+}
+
+// Function to check if user needs to accept new terms
+function checkTermsVersion(session) {
+    if (!session || !session.user) return;
+
+    // Current version of terms
+    const currentTermsVersion = "May 14, 2025";
+
+    // Check if user has accepted current terms
+    if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
+        console.log("User needs to accept new terms");
+        // Show modal asking user to accept new terms
+        $('#termsUpdateModal').modal('show');
+    }
 }
 
 // Function to toggle admin elements visibility
@@ -491,6 +508,88 @@ function getAuthToken() {
     }
 }
 
+// Terms modal handlers
+function setupTermsModalHandlers() {
+    console.log("Setting up terms modal handlers");
+
+    // Enable the Accept button only when checkbox is checked
+    $(document).on('change', '#acceptUpdatedTerms', function() {
+        document.getElementById('confirmUpdatedTerms').disabled = !this.checked;
+    });
+
+    // Handle terms acceptance
+    $(document).on('click', '#confirmUpdatedTerms', function() {
+        console.log("Terms acceptance confirmed");
+
+        // Get session data
+        const sessionData = localStorage.getItem('patriotThanksSession');
+        if (!sessionData) {
+            console.error("No session found");
+            $('#termsUpdateModal').modal('hide');
+            return;
+        }
+
+        const session = JSON.parse(sessionData);
+        const userId = session.user._id;
+
+        // determine the base URL
+        const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
+            ? `http://${window.location.host}`
+            : window.location.origin;
+
+        // Update user's terms acceptance
+        fetch(`${baseURL}/api/auth.js?operation=update-terms-acceptance`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + session.token
+            },
+            body: JSON.stringify({
+                userId: userId,
+                termsAccepted: true,
+                termsAcceptedDate: new Date().toISOString(),
+                termsVersion: "May 14, 2025"
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log("Terms acceptance updated successfully");
+
+                    // Update session data
+                    session.user.termsAccepted = true;
+                    session.user.termsAcceptedDate = new Date().toISOString();
+                    session.user.termsVersion = "May 14, 2025";
+
+                    // Save updated session
+                    localStorage.setItem('patriotThanksSession', JSON.stringify(session));
+
+                    // Hide modal
+                    $('#termsUpdateModal').modal('hide');
+                } else {
+                    console.error("Failed to update terms acceptance");
+                    alert('Failed to update terms acceptance. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating terms acceptance:', error);
+                alert('An error occurred. Please try again.');
+            });
+    });
+
+    // Handle terms rejection
+    $(document).on('click', '#rejectUpdatedTerms', function() {
+        console.log("Terms acceptance rejected");
+
+        // Warn user about consequences
+        if (confirm("If you do not accept the updated terms, you will be logged out and unable to use the service. Continue?")) {
+            // Log out the user
+            logoutUser();
+            $('#termsUpdateModal').modal('hide');
+        }
+    });
+}
+
 // Make functions globally available
 window.loginUser = handleLogin;
 window.logoutUser = logoutUser;
@@ -502,6 +601,7 @@ window.toggleAdminElements = toggleAdminElements;
 $(function() {
     console.log("jQuery ready in login-handler.js");
     attachLoginListeners();
+    setupTermsModalHandlers();
     // Check login status after a short delay to ensure the navbar is loaded
     setTimeout(checkLoginStatus, 500);
     // also update the login UI

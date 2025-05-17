@@ -210,7 +210,13 @@
 						<label for="psw_repeat"><b>Confirm Password</b></label>
 						<input type="password" placeholder="Repeat Password" name="psw-repeat" id="psw_repeat" required>
 						<br>
-						<br>
+                        <div class="terms-agreement" style="margin: 20px 0;">
+                            <input type="checkbox" id="terms-checkbox" name="terms-checkbox" required>
+                            <label for="terms-checkbox">I have read and agree to the <a href="terms.html" target="_blank">Terms of Use</a> and <a href="privacy.html" target="_blank">Privacy Policy</a></label>
+                            <div id="terms-error" class="text-danger mt-2" style="display: none; color: red;">You must agree to the Terms of Use to register</div>
+                        </div>
+
+                        <br>
 						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 						<input type="submit" id="submit" value="Register">
@@ -241,8 +247,15 @@
                 </div>
             </div>
         </main>
-    <footer class = "footer_style"><br>
+    <footer class="footer_style">
+        <br><br>
         <p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p>
+        <div class="footer-links">
+            <a href="terms.html">Terms of Use</a> |
+            <a href="privacy.html">Privacy Policy</a> |
+            <a href="contact.html">Contact Us</a>
+        </div>
+        <br><br>
     </footer>
         <script src="./js/password-validation.js"></script>
     <script src="./js/pin-validation.js"></script>

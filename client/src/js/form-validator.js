@@ -13,7 +13,8 @@ document.addEventListener('DOMContentLoaded', function() {
         zip: document.getElementById("zip"),
         email: document.getElementById("email"),
         status: document.getElementById("status"),
-        level: document.getElementById("membership-level")
+        level: document.getElementById("membership-level"),
+        termsCheckbox: document.getElementById("terms-checkbox")
     };
 
     // Get the form element
@@ -36,6 +37,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!isValidEmail(form.email.value)) invalidFields.push("Email");
         if (!isNotEmpty(form.status.value)) invalidFields.push("Status");
         if (!isNotEmpty(form.level.value)) invalidFields.push("Membership Level");
+        if (!form.termsCheckbox.checked) {
+            invalidFields.push("Terms and Conditions agreement");
+            document.getElementById("terms-error").style.display = "block";
+        } else {
+            document.getElementById("terms-error").style.display = "none";
+        }
+
+        if (!validateTerms()) {
+            invalidFields.push("Terms and Conditions acceptance");
+        }
+
+
 
         // Check password validation
         const passwordMatch = document.getElementById("match");
@@ -54,7 +67,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // console.log("Admin verification passed, proceeding with registration");
         }
 
-        // console.log("Invalid fields:", invalidFields);
 
         // If there are invalid fields, show an alert
         if (invalidFields.length > 0) {
@@ -74,7 +86,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 level: form.level.value,
                 email: form.email.value.toLowerCase(),
                 password: document.getElementById("psw").value,
-                psw_repeat: document.getElementById("psw_repeat").value
+                psw_repeat: document.getElementById("psw_repeat").value,
+                termsAccepted: form.termsCheckbox ? form.termsCheckbox.checked : false,
+                termsAcceptedDate: new Date().toISOString(),
+                termsVersion: "May 14, 2025"
             };
 
             // console.log("Form data to submit:", formData);
@@ -84,6 +99,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    function validateTerms() {
+        if (form.termsCheckbox) {
+            if (form.termsCheckbox.checked) {
+                form.termsCheckbox.classList.remove('invalid-field');
+                form.termsCheckbox.classList.add('valid-field');
+                document.getElementById("terms-error").style.display = "none";
+                return true;
+            } else {
+                form.termsCheckbox.classList.remove('valid-field');
+                form.termsCheckbox.classList.add('invalid-field');
+                document.getElementById("terms-error").style.display = "block";
+                return false;
+            }
+        }
+        return true; // If checkbox doesn't exist, consider it valid
+    }
 
     async function submitToMongoDB(formData) {
         try {
