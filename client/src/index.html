@@ -21,6 +21,7 @@
     <link href="./css/form-validation.css" rel="stylesheet">
     <script src="./js/jquery-3.7.1.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="./js/simple-modal-checker.js"></script>
 
     <script>
         // Check jQuery and Bootstrap versions
@@ -321,6 +322,77 @@
                 });
             });
         });
+    });
+</script>
+<script>
+    $(document).ready(function() {
+        console.log("Ultra-simple modal acceptance script loaded");
+
+        // Add emergency button if not already present
+        if (!document.getElementById('emergencyResetBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'emergencyResetBtn';
+            btn.innerHTML = 'Accept Terms & Continue';
+            btn.style.position = 'fixed';
+            btn.style.bottom = '10px';
+            btn.style.right = '10px';
+            btn.style.zIndex = '9999';
+            btn.style.backgroundColor = '#28a745'; // Green for acceptance
+            btn.style.color = 'white';
+            btn.style.border = 'none';
+            btn.style.padding = '12px 20px';
+            btn.style.borderRadius = '4px';
+            btn.style.fontWeight = 'bold';
+            btn.style.cursor = 'pointer';
+            btn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+            document.body.appendChild(btn);
+
+            // Show it automatically after a short delay - for testing only
+            setTimeout(function() {
+                btn.style.display = 'block';
+            }, 1000);
+
+            // Add click handler
+            btn.addEventListener('click', function() {
+                console.log("Emergency accept clicked");
+
+                // 1. Get session data
+                const sessionData = localStorage.getItem('patriotThanksSession');
+                if (sessionData) {
+                    try {
+                        // 2. Parse and update session
+                        const session = JSON.parse(sessionData);
+                        session.user.termsAccepted = true;
+                        session.user.termsAcceptedDate = new Date().toISOString();
+                        session.user.termsVersion = "May 14, 2025";
+                        localStorage.setItem('patriotThanksSession', JSON.stringify(session));
+                        console.log("Terms directly accepted in localStorage");
+
+                        // 3. Clean up modal
+                        $('.modal-backdrop').remove();
+                        $('body').removeClass('modal-open');
+                        $('body').css('padding-right', '');
+
+                        const modalEl = document.getElementById('termsUpdateModal');
+                        if (modalEl) {
+                            modalEl.classList.remove('show');
+                            modalEl.style.display = 'none';
+                        }
+
+                        // 4. Hide the button
+                        this.style.display = 'none';
+
+                        // 5. Reload page
+                        location.reload();
+                    } catch (e) {
+                        console.error("Error updating session:", e);
+                        alert("Error updating session. Please try again.");
+                    }
+                } else {
+                    alert("No active session found. Please log in again.");
+                }
+            });
+        }
     });
 </script>
 </body>
