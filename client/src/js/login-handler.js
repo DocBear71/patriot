@@ -590,6 +590,25 @@ function setupTermsModalHandlers() {
     });
 }
 
+function fixModalBackdropIssue() {
+    // If there's a stuck backdrop, remove it
+    $('.modal-backdrop').remove();
+
+    // Fix modal opening issues
+    $('#termsUpdateModal').on('show.bs.modal', function () {
+        // Make sure only one backdrop appears
+        if ($('.modal-backdrop').length > 1) {
+            $('.modal-backdrop').not(':first').remove();
+        }
+    });
+
+    // Ensure modal can be closed
+    $('#termsUpdateModal').on('hidden.bs.modal', function () {
+        $('body').removeClass('modal-open');
+        $('.modal-backdrop').remove();
+    });
+}
+
 // Make functions globally available
 window.loginUser = handleLogin;
 window.logoutUser = logoutUser;
@@ -602,6 +621,7 @@ $(function() {
     console.log("jQuery ready in login-handler.js");
     attachLoginListeners();
     setupTermsModalHandlers();
+    fixModalBackdropIssue();
     // Check login status after a short delay to ensure the navbar is loaded
     setTimeout(checkLoginStatus, 500);
     // also update the login UI
