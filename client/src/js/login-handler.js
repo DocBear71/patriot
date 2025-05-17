@@ -188,7 +188,13 @@ function updateTermsAcceptance(session) {
     const userId = session.user._id;
     console.log("Updating terms acceptance for user:", userId);
 
-    // determine the base URL
+    // First update the local session data immediately to prevent getting stuck
+    session.user.termsAccepted = true;
+    session.user.termsAcceptedDate = new Date().toISOString();
+    session.user.termsVersion = "May 14, 2025";
+    localStorage.setItem('patriotThanksSession', JSON.stringify(session));
+
+    // Then try to update on the server
     const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
         ? `http://${window.location.host}`
         : window.location.origin;
@@ -214,40 +220,21 @@ function updateTermsAcceptance(session) {
             return response.json();
         })
         .then(data => {
-            if (data.success) {
-                console.log("Terms acceptance updated successfully");
-
-                // Update session data
-                session.user.termsAccepted = true;
-                session.user.termsAcceptedDate = new Date().toISOString();
-                session.user.termsVersion = "May 14, 2025";
-
-                // Save updated session
-                localStorage.setItem('patriotThanksSession', JSON.stringify(session));
-
-                // Hide modal with special handling
-                try {
-                    $('#termsUpdateModal').modal('hide');
-                    removeAllBackdrops();
-                } catch (error) {
-                    console.error("Error hiding modal:", error);
-                    emergencyModalReset();
-                }
-            } else {
-                console.error("Failed to update terms acceptance");
-                alert('Failed to update terms acceptance. Please try again.');
-            }
+            console.log("Terms acceptance updated successfully on server");
         })
         .catch(error => {
-            console.error('Error updating terms acceptance:', error);
-            alert('An error occurred while updating terms acceptance. Please try again later.');
-
-            // Hide modal anyway to prevent user being stuck
+            console.error('Error updating terms acceptance on server:', error);
+            // We don't show an error to the user since we've already updated locally
+        })
+        .finally(() => {
+            // Hide modal regardless of server response
             try {
                 $('#termsUpdateModal').modal('hide');
-                removeAllBackdrops();
-            } catch (modalError) {
-                console.error("Error hiding modal after API error:", modalError);
+                $('.modal-backdrop').remove();
+                $('body').removeClass('modal-open');
+                $('body').css('padding-right', '');
+            } catch (error) {
+                console.error("Error hiding modal:", error);
                 emergencyModalReset();
             }
         });

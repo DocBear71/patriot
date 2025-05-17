@@ -3,7 +3,100 @@
                                           responders, and their spouses."><meta name="keywords" content="business, incentives, discounts, veteran discounts, military discounts,
                                        first responder discounts, veterans, active duty, first responders"><link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon"><link rel="stylesheet" href="./css/bootstrap-4.0.0.css"><link href="./css/normalize.css" rel="stylesheet"><link href="./css/style.css" rel="stylesheet"><link href="./css/figures.css" rel="stylesheet"><link href="./css/menu-auth.css" rel="stylesheet"><link href="./css/form-validation.css" rel="stylesheet"><script src="./js/jquery-3.7.1.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script><script>window.ENV = {
                 GOOGLE_MAPS_API_KEY: 'YOUR_API_KEY_HERE'
-            };</script><script src="./js/bootstrap-4.0.0.js"></script><script defer="defer" src="bundle.js"></script></head><body style="padding-top: 70px" id="page_layout"><div id="nav-placeholder"></div><script>$(function(){
+            };</script><script src="./js/bootstrap-4.0.0.js"></script><script>// Check jQuery and Bootstrap versions
+            $(document).ready(function() {
+                // Check jQuery version
+                const jQueryVersion = $.fn.jquery;
+                console.log("jQuery version:", jQueryVersion);
+
+                let jQueryOk = false;
+                if (jQueryVersion) {
+                    const parts = jQueryVersion.split('.');
+                    const major = parseInt(parts[0]);
+                    const minor = parseInt(parts[1]);
+
+                    // jQuery should be 1.9.1+ for Bootstrap 4
+                    jQueryOk = (major > 1) || (major === 1 && minor >= 9);
+                }
+
+                // Check Bootstrap version
+                let bootstrapVersion = "unknown";
+                let bootstrapOk = false;
+
+                if (typeof $.fn.modal !== 'undefined' && $.fn.modal.Constructor) {
+                    bootstrapVersion = $.fn.modal.Constructor.VERSION || "unknown";
+                    console.log("Bootstrap version:", bootstrapVersion);
+
+                    if (bootstrapVersion !== "unknown") {
+                        const parts = bootstrapVersion.split('.');
+                        const major = parseInt(parts[0]);
+
+                        // Bootstrap should be version 4.x
+                        bootstrapOk = (major === 4);
+                    }
+                } else {
+                    console.error("Bootstrap modal not loaded!");
+                }
+
+                // Log compatibility status
+                if (!jQueryOk) {
+                    console.error("jQuery version compatibility issue! Current:", jQueryVersion, "Recommended: 3.5.1+");
+                }
+
+                if (!bootstrapOk) {
+                    console.error("Bootstrap version compatibility issue! Current:", bootstrapVersion, "Recommended: 4.5.0+");
+                }
+
+                // If there are compatibility issues, add jQuery and Bootstrap polyfills
+                if (!jQueryOk || !bootstrapOk) {
+                    console.warn("Attempting to add compatibility fixes for modal functionality");
+
+                    // Add polyfill for modal functionality
+                    if (typeof $.fn.modal === 'undefined' || !$.fn.modal.Constructor) {
+                        console.log("Adding modal polyfill");
+
+                        // Simple modal polyfill
+                        $.fn.modal = function(option) {
+                            return this.each(function() {
+                                const $this = $(this);
+
+                                if (option === 'show') {
+                                    $this.css('display', 'block');
+                                    $this.addClass('show');
+                                    $('body').addClass('modal-open');
+
+                                    // Add backdrop if it doesn't exist
+                                    if ($('.modal-backdrop').length === 0) {
+                                        $('body').append('<div class="modal-backdrop show"></div>');
+                                    }
+                                }
+                                else if (option === 'hide') {
+                                    $this.css('display', 'none');
+                                    $this.removeClass('show');
+                                    $('body').removeClass('modal-open');
+                                    $('.modal-backdrop').remove();
+                                }
+                                else if (typeof option === 'object') {
+                                    // Handle options object
+                                    if (option.show === true) {
+                                        $this.css('display', 'block');
+                                        $this.addClass('show');
+                                        $('body').addClass('modal-open');
+
+                                        // Add backdrop if it doesn't exist and is not disabled
+                                        if (option.backdrop !== false && $('.modal-backdrop').length === 0) {
+                                            $('body').append('<div class="modal-backdrop show"></div>');
+                                        }
+                                    }
+                                }
+                            });
+                        };
+
+                        // Add constructor for version check
+                        $.fn.modal.Constructor = { VERSION: "4.0.0-polyfill" };
+                    }
+                }
+            });</script><script defer="defer" src="bundle.js"></script></head><body style="padding-top: 70px" id="page_layout"><div id="nav-placeholder"></div><script>$(function(){
              $("#nav-placeholder").load("NavBar.html", function() {
                  console.log("NavBar loaded");
                  // Load the login handler after the navbar is loaded
@@ -46,4 +139,108 @@
                  console.log("Modal appears to be stuck - showing emergency reset button");
                  document.getElementById('emergencyResetBtn').style.display = 'block';
              }
-         }, 10000); // Show after 10 seconds if modal is still visible</script><script src="./js/popper.min.js"></script></body></html>
+         }, 10000); // Show after 10 seconds if modal is still visible
+
+         $(document).ready(function() {
+             // Direct modal control functions
+             window.directShowTermsModal = function() {
+                 console.log("Direct show terms modal called");
+
+                 // First clean up any existing modal state
+                 $('.modal-backdrop').remove();
+                 $('body').removeClass('modal-open');
+                 $('body').css('padding-right', '');
+
+                 try {
+                     // Get the modal element
+                     const modalEl = document.getElementById('termsUpdateModal');
+                     const $modal = $('#termsUpdateModal');
+
+                     // Reset modal state
+                     $modal.removeClass('show');
+                     $modal.css('display', 'none');
+
+                     // Set timeout to ensure DOM is ready
+                     setTimeout(function() {
+                         // Show modal with explicit settings
+                         $modal.modal({
+                             backdrop: 'static',
+                             keyboard: false,
+                             show: true
+                         });
+
+                         // Force the modal to be visible and interactive after a slight delay
+                         setTimeout(function() {
+                             if (!$modal.hasClass('show')) {
+                                 console.log("Modal not showing - forcing show state");
+                                 $modal.addClass('show');
+                                 $modal.css('display', 'block');
+                                 $('.modal-backdrop').css('opacity', '0.5');
+                             }
+
+                             // Force body to have modal-open class
+                             $('body').addClass('modal-open');
+
+                             // Test modal interactivity
+                             console.log("Testing modal interactivity");
+                             const isVisible = $modal.is(':visible');
+                             const isInteractive = $modal.find('.modal-body').length > 0;
+                             console.log("Modal visible:", isVisible, "Modal interactive:", isInteractive);
+
+                             // If modal is visible but not interactive, force reset
+                             if (isVisible && !isInteractive) {
+                                 console.log("Modal detected as non-interactive - forcing reset");
+                                 showEmergencyButton();
+                             }
+                         }, 500);
+                     }, 100);
+                 } catch (error) {
+                     console.error("Error showing modal:", error);
+                     // Show emergency button
+                     showEmergencyButton();
+                 }
+             };
+
+             // Override the checkTermsVersion function with direct control
+             const originalCheckTermsVersion = window.checkTermsVersion;
+             window.checkTermsVersion = function(session) {
+                 if (!session || !session.user) return;
+
+                 // Current version of terms
+                 const currentTermsVersion = "May 14, 2025";
+
+                 // Check if user has accepted current terms
+                 if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
+                     console.log("User needs to accept new terms");
+
+                     // Use direct control instead of Bootstrap's modal
+                     directShowTermsModal();
+                 }
+             };
+
+             // Reinforce button click handlers
+             $(document).on('click', '#confirmUpdatedTerms', function(e) {
+                 console.log("Confirm button clicked");
+                 e.preventDefault();
+                 e.stopPropagation();
+
+                 // Get session data
+                 const sessionData = localStorage.getItem('patriotThanksSession');
+                 if (!sessionData) {
+                     console.error("No session found");
+                     $('#termsUpdateModal').modal('hide');
+                     return;
+                 }
+
+                 const session = JSON.parse(sessionData);
+                 updateTermsAcceptance(session);
+             });
+
+             // Make sure Bootstrap is fully loaded
+             if (typeof $.fn.modal === 'undefined') {
+                 console.error("Bootstrap modal not loaded! This will cause the modal to fail.");
+                 alert("Warning: Bootstrap modal not loaded. Please refresh the page.");
+             } else {
+                 console.log("Bootstrap modal loaded successfully. Version:", $.fn.modal.Constructor.VERSION);
+             }
+         });</script><script src="./js/popper.min.js"></script></body></html>
