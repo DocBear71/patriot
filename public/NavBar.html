@@ -1,113 +1,119 @@
 <nav class="navbar fixed-top navbar-expand-lg navbar-light bg-light">
-    <a class="navbar-brand" href="/index.html">
-        <img src="./images/docbearlogov4.png" width="50" height="50" alt=""/>
-    </a>
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent1"
-            aria-controls="navbarSupportedContent1" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon">
-        </span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarSupportedContent1">
-        <ul id="menu" class="navbar-nav mr-auto">
-            <li class="nav-item"> <a class="nav-link" href="./index.html">Home </a> </li>
-            <li class="nav-item"> <a class="nav-link" href="./about.html">About</a> </li>
-            <li class="nav-item"> <a class="nav-link" href="./contact.html" >Contact Us </a></li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" id="navbarDropdownLegal" role="button"
-                   data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    Legal Menu </a>
-                <div class="dropdown-menu" aria-labelledby="navbarDropdownLegal">
-                    <a class="dropdown-item" href="./privacy.html">Privacy Policy</a>
-                    <a class="dropdown-item" href="./terms.html">Terms and Conditions</a>
-                </div>
-            </li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" id="navbarDropdown" role="button"
-                   data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    Business Menu </a>
-                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <!-- Add disabled class by default -->
-                    <a class="dropdown-item" href="./business-search.html">Search for a Business</a>
-                    <a class="dropdown-item disabled" href="./business-add.html">Add a Business</a>
-                    <a class="dropdown-item disabled" href="./business-update.html">Update a Business</a>
-
-                </div>
-            </li>
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" id="navbarDropdown2" role="button"
-                   data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    Incentives Menu </a>
-                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                    <!-- Add disabled class by default -->
-                    <a class="dropdown-item" href="./incentive-view.html">View an Incentive for a Business</a>
-                    <a class="dropdown-item disabled" href="./incentive-add.html">Add an Incentive for a Business</a>
-                    <a class="dropdown-item disabled" href="./incentive-update.html">Update an Incentive for a Business</a>
-
-                </div>
-            </li>
-            <li class="nav-item dropdown admin-only" style="display: none;">
-                <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button"
-                   data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    Admin Menu
-                </a>
-                <div class="dropdown-menu" aria-labelledby="adminDropdown">
-                    <a class="dropdown-item" href="./admin-dashboard.html">Admin Dashboard</a>
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="./admin-users.html">User Management</a>
-                    <a class="dropdown-item" href="./admin-business.html">Business Management</a>
-                    <a class="dropdown-item" href="./admin-incentives.html">Incentive Management</a>
-                    <a class="dropdown-item" href="./chain-management.html">Chain Management</a>
-                </div>
-            </li>
-        </ul>
-        <ul class="navbar-nav ml-auto">
-            <li class="nav-item dropdown">
-                <div class="btn-group">
-                    <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown"
-                            aria-haspopup="true" aria-expanded="false">
-                        Sign In
-                    </button>
-                    <div class="dropdown-menu dropdown-menu-right">
-                        <form class="px-4 py-3" id="login-form" onsubmit="handleLogin(); return false;">
-                            <div class="form-group">
-                                <label for="DropdownFormEmail1">Email address</label>
-                                <input type="email" class="form-control" id="DropdownFormEmail1" placeholder="email@example.com">
-                            </div>
-                            <div class="form-group">
-                                <label for="DropdownFormPassword1">Password</label>
-                                <input type="password" class="form-control" id="DropdownFormPassword1" placeholder="Password">
-                            </div>
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="dropdownCheck">
-                                <label class="form-check-label" for="dropdownCheck">
-                                    Remember me
-                                </label>
-                            </div>
-                            <button type="submit" id="login-button" class="btn btn-primary">Sign in</button>
-                        </form>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="./register.html">New around here? Sign up</a>
-                        <a class="dropdown-item" href="./forgot-password.html">Forgot password?</a>
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/index.html">
+            <img src="./images/docbearlogov4.png" width="50" height="50" alt=""/>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent1"
+                aria-controls="navbarSupportedContent1" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon">
+            </span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent1">
+            <ul id="menu" class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item"> <a class="nav-link" href="./index.html">Home </a> </li>
+                <li class="nav-item"> <a class="nav-link" href="./about.html">About</a> </li>
+                <li class="nav-item"> <a class="nav-link" href="./contact.html" >Contact Us </a></li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownLegal" role="button"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        Legal Menu </a>
+                    <ul class="dropdown-menu" aria-labelledby="navbarDropdownLegal">
+                        <li><a class="dropdown-item" href="./privacy.html">Privacy Policy</a></li>
+                        <li><a class="dropdown-item" href="./terms.html">Terms and Conditions</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        Business Menu </a>
+                    <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                        <!-- Add disabled class by default -->
+                        <li><a class="dropdown-item" href="./business-search.html">Search for a Business</a></li>
+                        <li><a class="dropdown-item disabled" href="./business-add.html">Add a Business</a></li>
+                        <li><a class="dropdown-item disabled" href="./business-update.html">Update a Business</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2" role="button"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        Incentives Menu </a>
+                    <ul class="dropdown-menu" aria-labelledby="navbarDropdown2">
+                        <!-- Add disabled class by default -->
+                        <li><a class="dropdown-item" href="./incentive-view.html">View an Incentive for a Business</a></li>
+                        <li><a class="dropdown-item disabled" href="./incentive-add.html">Add an Incentive for a Business</a></li>
+                        <li><a class="dropdown-item disabled" href="./incentive-update.html">Update an Incentive for a Business</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown admin-only" style="display: none;">
+                    <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        Admin Menu
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="adminDropdown">
+                        <li><a class="dropdown-item" href="./admin-dashboard.html">Admin Dashboard</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="./admin-users.html">User Management</a></li>
+                        <li><a class="dropdown-item" href="./admin-business.html">Business Management</a></li>
+                        <li><a class="dropdown-item" href="./admin-incentives.html">Incentive Management</a></li>
+                        <li><a class="dropdown-item" href="./chain-management.html">Chain Management</a></li>
+                    </ul>
+                </li>
+            </ul>
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                <!-- Login Dropdown - shown when not logged in -->
+                <li class="nav-item dropdown" id="login-dropdown-button">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown"
+                                aria-expanded="false">
+                            Sign In
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" id="login-dropdown-menu">
+                            <li>
+                                <form class="px-4 py-3" id="login-form">
+                                    <div class="mb-3">
+                                        <label for="DropdownFormEmail1" class="form-label">Email address</label>
+                                        <input type="email" class="form-control" id="DropdownFormEmail1" placeholder="email@example.com">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="DropdownFormPassword1" class="form-label">Password</label>
+                                        <input type="password" class="form-control" id="DropdownFormPassword1" placeholder="Password">
+                                    </div>
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input" id="dropdownCheck">
+                                            <label class="form-check-label" for="dropdownCheck">
+                                                Remember me
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <button type="submit" id="login-button" class="btn btn-primary">Sign in</button>
+                                </form>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="./register.html">New around here? Sign up</a></li>
+                            <li><a class="dropdown-item" href="./forgot-password.html">Forgot password?</a></li>
+                        </ul>
                     </div>
-                </div>
-            </li>
-            <!-- User Dropdown - will be shown when logged in -->
-            <li class="nav-item dropdown" id="user-dropdown" style="display: none;">
-                <div class="btn-group">
-                    <button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown"
-                            aria-haspopup="true" aria-expanded="false" id="userDisplayName">
-                        User
-                    </button>
-                    <div class="dropdown-menu dropdown-menu-right">
-                        <a class="dropdown-item" href="./profile.html">My Profile</a>
-                        <a class="dropdown-item admin-only" style="display: none;" href="./admin-dashboard.html">Admin Dashboard</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="#" id="logout-button">Logout</a>
+                </li>
+                <!-- User Dropdown - will be shown when logged in -->
+                <li class="nav-item dropdown" id="user-dropdown" style="display: none;">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown"
+                                aria-expanded="false" id="userDisplayName">
+                            User
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="./profile.html">My Profile</a></li>
+                            <li><a class="dropdown-item admin-only" style="display: none;" href="./admin-dashboard.html">Admin Dashboard</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="logout-button">Logout</a></li>
+                        </ul>
                     </div>
-                </div>
-            </li>
-        </ul>
+                </li>
+            </ul>
+        </div>
     </div>
+
     <!-- Terms Update Modal -->
     <div class="modal fade" id="termsUpdateModal" tabindex="-1" aria-labelledby="termsUpdateModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-lg">
@@ -185,77 +191,81 @@
             </div>
         </div>
     </div>
+</nav>
 
-    <!-- Bootstrap 5 Modal Initialization Script -->
-    <script>
-        $(document).ready(function() {
-            console.log("Bootstrap 5 Modal Initialization Script loaded");
+<!-- Bootstrap 5 Modal Initialization Script -->
+<script>
+    $(document).ready(function() {
+        console.log("Bootstrap 5 Modal Initialization Script loaded");
 
-            // Check if Bootstrap 5 is available
-            if (typeof bootstrap !== 'undefined') {
-                console.log("Bootstrap 5 detected");
-            } else {
-                console.error("Bootstrap 5 not detected - some features may not work");
-            }
+        // Check if Bootstrap 5 is available
+        if (typeof bootstrap !== 'undefined') {
+            console.log("Bootstrap 5 detected");
 
-            // Initialize any Bootstrap 5 tooltips and popovers
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl);
+            // Initialize all dropdowns
+            var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));
+            dropdownElementList.forEach(function(dropdownToggleEl) {
+                new bootstrap.Dropdown(dropdownToggleEl);
             });
+        } else {
+            console.error("Bootstrap 5 not detected - some features may not work");
+        }
 
-            // Add a custom close handler directly on the modal's close button
-            setTimeout(function() {
-                const closeButton = document.querySelector('#termsUpdateModal .btn-close');
-                if (closeButton) {
-                    closeButton.addEventListener('click', function(e) {
-                        console.log("Close button clicked directly");
+        // Add a custom close handler directly on the modal's close button
+        setTimeout(function() {
+            const closeButton = document.querySelector('#termsUpdateModal .btn-close');
+            if (closeButton) {
+                closeButton.addEventListener('click', function(e) {
+                    console.log("Close button clicked directly");
 
-                        try {
-                            const modalEl = document.getElementById('termsUpdateModal');
+                    try {
+                        const modalEl = document.getElementById('termsUpdateModal');
+                        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
                             const bsModal = bootstrap.Modal.getInstance(modalEl);
                             if (bsModal) {
                                 bsModal.hide();
                             }
-                        } catch (error) {
-                            console.error("Error hiding modal:", error);
-
+                        } else {
                             // Fallback direct DOM manipulation
                             const modalEl = document.getElementById('termsUpdateModal');
                             modalEl.classList.remove('show');
                             modalEl.style.display = 'none';
-                            const backdrop = document.querySelector('.modal-backdrop');
-                            if (backdrop) backdrop.remove();
                             document.body.classList.remove('modal-open');
                             document.body.style.overflow = '';
+                            const backdrop = document.querySelector('.modal-backdrop');
+                            if (backdrop) backdrop.remove();
                         }
-                    });
-                }
-            }, 600);
-        });
-    </script>
-</nav>
+                    } catch (error) {
+                        console.error("Error hiding modal:", error);
 
+                        // Manual reset if function not available
+                        $('.modal-backdrop').remove();
+                        $('body').removeClass('modal-open');
+                        $('body').css('padding-right', '');
+                        $('#termsUpdateModal').modal('hide');
+                        $('#termsUpdateModal').hide();
+                    }
+                });
+            }
+        }, 600);
 
+        // Make emergency reset available on all pages
+        window.emergencyModalReset = function() {
+            console.log("Emergency modal reset called from NavBar");
 
-<!-- Add custom styles for dropdown positioning -->
-<style>
-    /* Fix dropdown positioning for sign in menu */
-    .dropdown-menu-right {
-        right: 0;
-        left: auto !important;
-    }
+            // Remove backdrop and reset modal
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open');
+            $('body').css('padding-right', '');
 
-    /* Add a min-width to prevent the dropdown from being too narrow */
-    .navbar-nav .dropdown-menu {
-        min-width: 300px;
-    }
+            // Hide modal
+            const modalEl = document.getElementById('termsUpdateModal');
+            if (modalEl) {
+                modalEl.classList.remove('show');
+                modalEl.style.display = 'none';
+            }
 
-    /* Ensure the dropdown doesn't exceed viewport width on mobile */
-    @media (max-width: 576px) {
-        .navbar-nav .dropdown-menu {
-            min-width: 100%;
-            width: 100%;
-        }
-    }
-</style>
+            return true;
+        };
+    });
+</script>
