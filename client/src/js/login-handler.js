@@ -159,15 +159,16 @@ function checkTermsVersion(session) {
     // Check if user has accepted current terms
     if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
         console.log("User needs to accept new terms");
-        // Simple confirmation instead of modal
-        if (confirm("Our Terms of Use have been updated. Do you accept the new Terms of Use and Privacy Policy? You can review them at any time from the footer links.")) {
-            // User accepted terms
-            updateTermsAcceptance(session);
-        } else {
-            // User declined terms
-            alert("You must accept the Terms of Use to continue using the service. You will now be logged out.");
-            logoutUser();
-        }
+
+        // Remove any existing backdrop (helps prevent modal issues)
+        $('.modal-backdrop').remove();
+        $('body').removeClass('modal-open');
+
+        // Show the modal for terms acceptance
+        $('#termsUpdateModal').modal({
+            backdrop: 'static', // Prevent closing by clicking outside
+            keyboard: false     // Prevent closing with keyboard
+        });
     }
 }
 
@@ -662,12 +663,22 @@ function fixModalBackdropIssue() {
     });
 }
 
+// Emergency function to remove stuck modal/backdrop (can be called from console if needed)
+function emergencyModalReset() {
+    $('#termsUpdateModal').modal('hide');
+    $('.modal-backdrop').remove();
+    $('body').removeClass('modal-open');
+    $('body').css('padding-right', '');
+    console.log('Emergency modal reset performed');
+}
+
 // Make functions globally available
 window.loginUser = handleLogin;
 window.logoutUser = logoutUser;
 window.checkLoginStatus = checkLoginStatus;
 window.getAuthToken = getAuthToken;
 window.toggleAdminElements = toggleAdminElements;
+window.emergencyModalReset = emergencyModalReset;
 
 // Attach event listeners when jQuery is ready
 $(function() {
