@@ -6,8 +6,7 @@ VERSION: 1.0.1
 DESCRIPTION:
     Style Sheet for Patriot Thanks.
 */
-
-    /* Modal z-index fixes */
+    /* Modal styling */
 .modal-backdrop {
     z-index: 1040 !important;
 }
@@ -20,9 +19,9 @@ DESCRIPTION:
     z-index: 1051 !important;
 }
 
-/* Additional styling for terms modal */
+/* Terms modal specific styling */
 #termsUpdateModal .modal-dialog {
-    max-width: 700px;
+    max-width: 800px;
 }
 
 #termsUpdateModal .terms-summary {
@@ -32,16 +31,37 @@ DESCRIPTION:
     padding: 15px;
     margin: 10px 0;
     background-color: #f9f9f9;
+    font-size: 14px;
 }
 
-.admin-badge {
-    background-color: #dc3545;
-    color: white;
-    padding: 2px 6px;
+#termsUpdateModal .terms-summary h4 {
+    color: #333;
+    margin-bottom: 15px;
+}
+
+#termsUpdateModal .terms-summary h5 {
+    color: #555;
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+#termsUpdateModal .terms-summary p {
+    margin-bottom: 12px;
+}
+
+#scrollMessage {
+    padding: 8px;
     border-radius: 4px;
-    font-size: 0.8em;
+    background-color: #e8f5e9;
 }
 
+#termsScrollTarget {
+    padding-top: 15px;
+    margin-top: 15px;
+    border-top: 1px dashed #ddd;
+    text-align: center;
+    font-weight: bold;
+}
 
 * {
     font-family: Georgia, 'Times New Roman', Times, serif;

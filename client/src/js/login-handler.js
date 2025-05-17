@@ -644,6 +644,87 @@ function setupTermsModalHandlers() {
     });
 }
 
+// Function to set up terms scroll tracking
+function setupTermsScrollTracking() {
+    console.log("Setting up terms scroll tracking");
+
+    // Elements
+    const termsSummary = document.getElementById('termsSummary');
+    const termsCheckbox = document.getElementById('acceptUpdatedTerms');
+    const confirmButton = document.getElementById('confirmUpdatedTerms');
+    const scrollMessage = document.getElementById('scrollMessage');
+
+    // Initial state variables
+    let hasScrolledToBottom = false;
+    let startTime = Date.now();
+    const MINIMUM_READ_TIME = 5000; // 5 seconds minimum reading time
+
+    // Add scroll event listener
+    if (termsSummary) {
+        termsSummary.addEventListener('scroll', function() {
+            // Calculate scroll position
+            const scrollPosition = termsSummary.scrollTop + termsSummary.clientHeight;
+            const scrollHeight = termsSummary.scrollHeight;
+            const timeSpent = Date.now() - startTime;
+
+            // Calculate how far through the content the user has scrolled (as a percentage)
+            const scrollPercentage = (scrollPosition / scrollHeight) * 100;
+
+            // User must scroll at least 80% through the content
+            if (scrollPercentage >= 80 && timeSpent >= MINIMUM_READ_TIME) {
+                console.log("User has scrolled to near bottom of terms");
+                hasScrolledToBottom = true;
+
+                // Enable the checkbox
+                if (termsCheckbox) {
+                    termsCheckbox.disabled = false;
+                    console.log("Terms checkbox enabled");
+                }
+
+                // Show confirmation message
+                if (scrollMessage) {
+                    scrollMessage.style.display = 'block';
+                    scrollMessage.innerHTML = '<i class="fa fa-check-circle"></i> Thank you for reviewing the terms. Please check the box below to confirm your acceptance.';
+                    scrollMessage.style.color = 'green';
+                }
+            } else if (scrollPercentage >= 80 && timeSpent < MINIMUM_READ_TIME) {
+                // User scrolled quickly to bottom, but hasn't spent enough time
+                const remainingTime = Math.ceil((MINIMUM_READ_TIME - timeSpent) / 1000);
+                if (scrollMessage) {
+                    scrollMessage.style.display = 'block';
+                    scrollMessage.innerHTML = `Please continue reviewing for ${remainingTime} more seconds.`;
+                    scrollMessage.style.color = '#f57c00'; // Orange for warning
+                }
+            } else if (scrollPercentage >= 50) {
+                // User is making progress
+                if (scrollMessage) {
+                    scrollMessage.style.display = 'block';
+                    scrollMessage.innerHTML = 'Continue scrolling to review all terms.';
+                    scrollMessage.style.color = '#2196F3'; // Blue for info
+                }
+            }
+        });
+    } else {
+        console.error("Terms summary element not found");
+    }
+
+    // Add checkbox change event handler
+    $(document).on('change', '#acceptUpdatedTerms', function() {
+        // Only allow checking if scrolled to bottom
+        if (!hasScrolledToBottom && this.checked) {
+            alert('Please read the terms summary by scrolling to the bottom before accepting.');
+            this.checked = false;
+            return;
+        }
+
+        // Enable/disable the confirm button based on checkbox
+        if (confirmButton) {
+            confirmButton.disabled = !this.checked;
+            console.log("Terms confirm button " + (this.checked ? "enabled" : "disabled"));
+        }
+    });
+}
+
 function fixModalBackdropIssue() {
     // If there's a stuck backdrop, remove it
     $('.modal-backdrop').remove();
@@ -685,6 +766,7 @@ $(function() {
     console.log("jQuery ready in login-handler.js");
     attachLoginListeners();
     setupTermsModalHandlers();
+    setupTermsScrollTracking();
     fixModalBackdropIssue();
     // Check login status after a short delay to ensure the navbar is loaded
     setTimeout(checkLoginStatus, 500);
