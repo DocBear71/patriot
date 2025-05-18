@@ -1,9 +1,8 @@
-// terms-modal.js (Using ModalManager)
-
-document.addEventListener('DOMContentLoaded', function() {
+// Simple Terms Modal Control - terms-modal.js
+$(function() {
     console.log("Terms modal control loaded");
 
-    // Override the checkTermsVersion function
+    // Override the checkTermsVersion function with a cleaner implementation
     window.checkTermsVersion = function(session) {
         if (!session || !session.user) return;
 
@@ -14,13 +13,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
             console.log("User needs to accept terms");
 
-            // Show the modal using our manager
-            ModalManager.show('termsUpdateModal', {
-                backdrop: 'static',
-                keyboard: false,
-                emergencyReset: true,
-                resetDelay: 8000
-            });
+            // Show the modal using Bootstrap 5
+            try {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const modalEl = document.getElementById('termsUpdateModal');
+                    const modal = new bootstrap.Modal(modalEl);
+                    modal.show();
+                }
+            } catch (error) {
+                console.error("Error showing modal:", error);
+            }
         }
     };
 
@@ -58,65 +60,51 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error("Error updating terms on server:", error);
             });
 
-        // Hide modal
-        ModalManager.hide('termsUpdateModal');
+        // Hide modal if it's visible
+        try {
+            const modalEl = document.getElementById('termsUpdateModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        } catch (error) {
+            // Manual cleanup
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open');
+            $('body').css('padding-right', '');
+        }
     };
 
     // Set up button handlers
-    const setupButtonHandlers = function() {
+    $(document).ready(function() {
         // Confirm button
-        const confirmBtn = document.getElementById('confirmUpdatedTerms');
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', function() {
-                const sessionData = localStorage.getItem('patriotThanksSession');
-                if (sessionData) {
-                    const session = JSON.parse(sessionData);
-                    updateTermsAcceptance(session);
-                }
-            });
-        }
+        $('#confirmUpdatedTerms').on('click', function() {
+            const sessionData = localStorage.getItem('patriotThanksSession');
+            if (sessionData) {
+                const session = JSON.parse(sessionData);
+                updateTermsAcceptance(session);
+            }
+        });
 
         // Checkbox handler
-        const termsElement = document.getElementById('termsSummary');
-        if (termsElement) {
-            termsElement.addEventListener('scroll', function() {
-                if (this.scrollHeight - this.scrollTop <= this.clientHeight + 50) {
-                    const checkbox = document.getElementById('acceptUpdatedTerms');
-                    if (checkbox) checkbox.disabled = false;
-
-                    const scrollMsg = document.getElementById('scrollMessage');
-                    if (scrollMsg) {
-                        scrollMsg.style.display = 'block';
-                        scrollMsg.innerHTML = '<i class="bi bi-check-circle"></i> You\'ve reviewed the terms. Please check the box below to confirm your acceptance.';
-                        scrollMsg.style.color = 'green';
-                    }
-                }
-            });
-        }
+        $('#termsSummary').on('scroll', function() {
+            const elem = $(this)[0];
+            if (elem.scrollHeight - elem.scrollTop <= elem.clientHeight + 50) {
+                $('#acceptUpdatedTerms').prop('disabled', false);
+                $('#scrollMessage').css('display', 'block').html('<i class="bi bi-check-circle"></i> You\'ve reviewed the terms. Please check the box below to confirm your acceptance.').css('color', 'green');
+            }
+        });
 
         // Checkbox enables/disables confirm button
-        const termsCheckbox = document.getElementById('acceptUpdatedTerms');
-        if (termsCheckbox) {
-            termsCheckbox.addEventListener('change', function() {
-                const confirmBtn = document.getElementById('confirmUpdatedTerms');
-                if (confirmBtn) confirmBtn.disabled = !this.checked;
-            });
-        }
+        $('#acceptUpdatedTerms').on('change', function() {
+            $('#confirmUpdatedTerms').prop('disabled', !this.checked);
+        });
 
         // Reject button
-        const rejectBtn = document.getElementById('rejectUpdatedTerms');
-        if (rejectBtn) {
-            rejectBtn.addEventListener('click', function() {
-                if (confirm("If you do not accept the updated terms, you will be logged out and unable to use the service. Continue?")) {
-                    localStorage.removeItem('patriotThanksSession');
-                    localStorage.removeItem('isLoggedIn');
-                    location.reload();
-                }
-            });
-        }
-    };
-
-    // Run button handler setup after a slight delay
-    // This ensures the DOM is fully loaded
-    setTimeout(setupButtonHandlers, 500);
+        $('#rejectUpdatedTerms').on('click', function() {
+            if (confirm("If you do not accept the updated terms, you will be logged out and unable to use the service. Continue?")) {
+                localStorage.removeItem('patriotThanksSession');
+                localStorage.removeItem('isLoggedIn');
+                location.reload();
+            }
+        });
+    });
 });
