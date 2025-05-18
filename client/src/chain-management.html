@@ -410,6 +410,55 @@
     </div>
     <br><br>
 </footer>
+<button id="emergencyResetBtn" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    Emergency Reset
+</button>
+<script src="./js/bootstrap.bundle.min.js"></script>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
+
+            // Load terms modal script
+            $.getScript("./js/terms-modal.js")
+            .done(function() {
+                console.log("Terms modal script loaded successfully");
+
+                // Load login handler
+                $.getScript("./js/bootstrap5-login-handler.js")
+                .done(function() {
+                    console.log("Login handler script loaded successfully");
+
+                    // Check login status if function exists
+                    setTimeout(function() {
+                        if (typeof checkLoginStatus === 'function') {
+                            checkLoginStatus();
+                        }
+                    }, 500);
+                });
+            });
+        });
+    });
+    document.getElementById('emergencyResetBtn').addEventListener('click', function() {
+        console.log("Emergency reset button clicked");
+        $('.modal-backdrop').remove();
+        $('body').removeClass('modal-open');
+        $('body').css('padding-right', '');
+        $('.modal').hide();
+        $('body').css('overflow', '');
+        this.style.display = 'none';
+    });
+    setTimeout(function() {
+        const modalVisible = $('.modal').is(':visible') ||
+                $('.modal-backdrop').length > 0 ||
+                $('body').hasClass('modal-open');
+
+        if (modalVisible) {
+            console.log("Modal appears to be stuck - showing emergency reset button");
+            document.getElementById('emergencyResetBtn').style.display = 'block';
+        }
+    }, 10000);
+</script>
 <script>
     function checkAdminStatus() {
         try {
