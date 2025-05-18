@@ -1,110 +1,138 @@
 <!DOCTYPE html>
 <html lang='en'>
-    <head>
-        <title>Patriot Thanks: Contact Us</title>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <meta name="author" content="Edward G. McKeown">
-        <meta name="date" content="2024/09/27">
-        <meta name="description" content="Patriot Thanks application to find businesses that offer
+<head>
+    <title>Patriot Thanks: Contact Us</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2024/09/27">
+    <meta name="description" content="Patriot Thanks application to find businesses that offer
                                           incentives and discounts to veterans, active duty, first
                                           responders, and their spouses.">
-        <meta name="keywords" content="business, incentives, discounts, veteran discounts, military discounts,
+    <meta name="keywords" content="business, incentives, discounts, veteran discounts, military discounts,
                                        first responder discounts, veterans, active duty, first responders">
-        <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
-        <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css" >
-        <link href="./css/normalize.css" rel="stylesheet">
-        <link href="./css/style.css" rel="stylesheet">
-        <link href="./css/forms.css" rel="stylesheet">
-        <link href="./css/menu-auth.css" rel="stylesheet">
-        <link href="./css/form-validation.css" rel="stylesheet">
-        <script src="./js/jquery-3.7.1.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
-        <script src="./js/bootstrap-4.0.0.js"></script>
-        <script src="./js/contact-form-handler.js"></script>
-    </head>
-
-    <body style="padding-top: 70px" id="page_layout">
-    <!--Navigation bar-->
-    <div id="nav-placeholder">
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/figures.css" rel="stylesheet">
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/form-validation.css" rel="stylesheet">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+</head>
+<body style="padding-top: 70px" id="page_layout">
+<div id="nav-placeholder"></div>
+<header>
+    <br>
+    <div class="left-banner">
+        <a href="index.html">
+            <img src="./images/docbearlogov4.png" alt="DocBear logo">
+        </a>
     </div>
-    <script>
-        $(function(){
-            $("#nav-placeholder").load("NavBar.html", function() {
-                console.log("NavBar loaded");
-                // Load the login handler after the navbar is loaded
-                $.getScript("./js/login-handler.js")
-                .done(function() {
-                    console.log("Login handler script loaded successfully");
-                })
-                .fail(function() {
-                    console.error("Failed to load login-handler.js");
+    <div class="right-banner">
+        <h1>Patriot Thanks</h1>
+        <hr>
+        <h4>Contact Us</h4>
+    </div>
+    <div style="clear:left;"></div>
+</header>
+<main>
+    <p class="paragraph_style">Do you have questions, comments, or suggestions for us? Feel free to send us any of
+        those, plus any
+        other feedback you may have regarding our services and applications. Thank you very much for visiting
+        our site, and we will respond within two (2) business days.</p><br>
+    <div class="left_pane">
+        <fieldset>
+            <legend>
+                <h2 class="caveat">Contact Us</h2>
+            </legend>
+            <form id="contact-form" action="/thank-you.html" method="POST">
+                <label for="fname">First Name</label>
+                <input type="text" id="fname" name="firstname" placeholder="Your name..">
+                <br>
+                <label for="lname">Last Name&nbsp;</label>
+                <input type="text" id="lname" name="lastname" placeholder="Your last name..">
+                <br>
+                <label for="email">E-mail&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                <input type="email" id="email" name="email" placeholder="address@company.com">
+                <br>
+                <label for="subject">Subject&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                <input type="text" id="subject" name="subject" placeholder="Tells us why you are messaging...">
+                <br>
+                <label for="message">Message</label>
+                <textarea id="message" name="message" placeholder="Write something.."
+                          style="height:200px; width:100%; display:block;"></textarea>
+                <br><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <input type="submit" value="Submit">
+                <br>
+            </form>
+        </fieldset>
+    </div>
+    <div class="right_pane">
+        <img src="./images/military_flags_middle.png" alt="military flags" class="right">
+        <img src="./images/military_branches_middle.jpg" alt="coins displaying military branches" class="right">
+    </div>
+</main>
+<footer class="footer_style">
+    <br><br>
+    <p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p>
+    <div class="footer-links">
+        <a href="terms.html">Terms of Use</a> |
+        <a href="privacy.html">Privacy Policy</a> |
+        <a href="contact.html">Contact Us</a>
+    </div>
+    <br><br>
+</footer>
+<button id="emergencyResetBtn"
+        style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    Emergency Reset
+</button>
+<script src="./js/bootstrap.bundle.min.js"></script>
+<script>
+    $(function() {
+        $('#nav-placeholder').load('NavBar.html', function() {
+            console.log('NavBar loaded');
+
+            // Load terms modal script
+            $.getScript('./js/terms-modal.js').done(function() {
+                console.log('Terms modal script loaded successfully');
+
+                // Load login handler
+                $.getScript('./js/bootstrap5-login-handler.js').done(function() {
+                    console.log('Login handler script loaded successfully');
+
+                    // Check login status if function exists
+                    setTimeout(function() {
+                        if (typeof checkLoginStatus === 'function') {
+                            checkLoginStatus();
+                        }
+                    }, 500);
                 });
             });
         });
-    </script>
-    <!--end of Navigation bar-->
-        <header>
-            <br>
-            <div class="left-banner">
-                <a href="index.html">
-                    <img src="./images/docbearlogov4.png" alt="DocBear logo">
-                </a>
-            </div>
-            <div class="right-banner">
-                <h1>Patriot Thanks</h1>
-                <hr>
-                <h4>Contact Us</h4>
-                </div>
-                <div style="clear:left;"></div>
-        </header>
-        <main>
-            <p class="paragraph_style">Do you have questions, comments, or suggestions for us? Feel free to send us any of those, plus any 
-                other feedback you may have regarding our services and applications. Thank you very much for visiting 
-                our site, and we will respond within two (2) business days.</p><br>
-            <div class="left_pane">
-                <fieldset>
-                    <legend>
-                        <h2 class="caveat">Contact Us</h2>
-                    </legend>
-                    <form id="contact-form" action="/thank-you.html" method="POST">
-                        <label for="fname">First Name</label>
-                        <input type="text" id="fname" name="firstname" placeholder="Your name..">
-                        <br>
-                        <label for="lname">Last Name&nbsp;</label>
-                        <input type="text" id="lname" name="lastname" placeholder="Your last name..">
-                        <br>
-                        <label for="email">E-mail&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                        <input type="email" id="email" name="email" placeholder="address@company.com">
-                        <br>
-                        <label for="subject">Subject&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                        <input type="text" id="subject" name="subject" placeholder="Tells us why you are messaging...">
-                        <br>
-                        <label for="message">Message</label>
-                        <textarea id="message" name="message" placeholder="Write something.." style="height:200px; width:100%; display:block;"></textarea>
-                        <br><br>
-                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                        <input type="submit" value="Submit">
-                        <br>
-                    </form>
-                </fieldset>
-            </div>
-            <div class="right_pane"> 
-                <img src="./images/military_flags_middle.png" alt="military flags" class="right">
-                <img src="./images/military_branches_middle.jpg" alt="coins displaying military branches" class="right">
-            </div>
-        </main>
-    <footer class="footer_style">
-        <br><br>
-        <p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p>
-        <div class="footer-links">
-            <a href="terms.html">Terms of Use</a> |
-            <a href="privacy.html">Privacy Policy</a> |
-            <a href="contact.html">Contact Us</a>
-        </div>
-        <br><br>
-    </footer>
+    });
+    document.getElementById('emergencyResetBtn').addEventListener('click', function() {
+        console.log('Emergency reset button clicked');
+        $('.modal-backdrop').remove();
+        $('body').removeClass('modal-open');
+        $('body').css('padding-right', '');
+        $('.modal').hide();
+        $('body').css('overflow', '');
+        this.style.display = 'none';
+    });
+    setTimeout(function() {
+        const modalVisible = $('.modal').is(':visible') ||
+                $('.modal-backdrop').length > 0 ||
+                $('body').hasClass('modal-open');
 
-    </body>
+        if (modalVisible) {
+            console.log('Modal appears to be stuck - showing emergency reset button');
+            document.getElementById('emergencyResetBtn').style.display = 'block';
+        }
+    }, 10000);
+</script>
+</body>
 </html>

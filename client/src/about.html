@@ -11,35 +11,19 @@
                                           responders, and their spouses.">
     <meta name="keywords" content="business, incentives, discounts, veteran discounts, military discounts,
                                        first responder discounts, veterans, active duty, first responders">
-
-    <!-- Favicon -->
     <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
-
-    <!-- Bootstrap 5 CSS -->
     <link href="./css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
-    <!-- Custom CSS -->
     <link href="./css/normalize.css" rel="stylesheet">
     <link href="./css/style.css" rel="stylesheet">
     <link href="./css/figures.css" rel="stylesheet">
     <link href="./css/menu-auth.css" rel="stylesheet">
     <link href="./css/form-validation.css" rel="stylesheet">
-
-    <!-- jQuery -->
     <script src="./js/jquery-3.7.1.js"></script>
-
-    <!-- Modernizr -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
 </head>
-
 <body style="padding-top: 70px" id="page_layout">
-<!-- Navigation bar placeholder -->
 <div id="nav-placeholder"></div>
-
-<!-- Header section -->
 <header>
     <br>
     <div class="left-banner">
@@ -54,12 +38,7 @@
     </div>
     <div style="clear:left;"></div>
 </header>
-
-<!-- Main content -->
 <main>
-    <div>
-        <img src="./images/docbearlogov4.png" alt="DocBear Logo" class="float_left">
-    </div>
     <h2>About Us</h2>
     <p class="paragraph_style">Dr. Edward Mc Keown was born in Mexico, Missouri and is
         a veteran of the United States Marine Corps. He received his associate's degree
@@ -78,8 +57,6 @@
         for responsible alcohol service and the American Hotel & Lodging Education Institute
         Controlling Alcohol Risks Effectively® (CARE).</p>
 </main>
-
-<!-- Footer -->
 <footer class="footer_style">
     <br><br>
     <p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p>
@@ -90,16 +67,10 @@
     </div>
     <br><br>
 </footer>
-
-<!-- Emergency Reset Button -->
 <button id="emergencyResetBtn" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
     Emergency Reset
 </button>
-
-<!-- Bootstrap 5 JS Bundle (includes Popper) -->
 <script src="./js/bootstrap.bundle.min.js"></script>
-
-<!-- Load NavBar and other scripts -->
 <script>
     $(function(){
         $("#nav-placeholder").load("NavBar.html", function() {
@@ -125,23 +96,15 @@
             });
         });
     });
-
-    // Emergency reset functionality
     document.getElementById('emergencyResetBtn').addEventListener('click', function() {
         console.log("Emergency reset button clicked");
-
-        // Remove modal backdrop and reset body
         $('.modal-backdrop').remove();
         $('body').removeClass('modal-open');
         $('body').css('padding-right', '');
         $('.modal').hide();
         $('body').css('overflow', '');
-
-        // Hide this button
         this.style.display = 'none';
     });
-
-    // Show emergency button if modal appears stuck
     setTimeout(function() {
         const modalVisible = $('.modal').is(':visible') ||
                 $('.modal-backdrop').length > 0 ||

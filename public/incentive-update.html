@@ -9,16 +9,15 @@
     <meta name="description" content="Update Incentive Information in Patriot Thanks.">
     <meta name="keywords" content="Veterans, Discounts, Incentive Updates, Patriot Thanks">
     <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
-    <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css" >
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="./css/normalize.css" rel="stylesheet">
     <link href="./css/style.css" rel="stylesheet">
-    <link href="./css/forms.css" rel="stylesheet">
+    <link href="./css/figures.css" rel="stylesheet">
     <link href="./css/menu-auth.css" rel="stylesheet">
     <link href="./css/form-validation.css" rel="stylesheet">
     <script src="./js/jquery-3.7.1.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
-    <script src="./js/bootstrap-4.0.0.js"></script>
     <script src="./js/business-search.js"></script>
     <script src="./js/incentive-update-handler.js"></script>
     <script src="./js/discount-type-handler.js"></script>
@@ -26,27 +25,9 @@
     <script src="./js/boolean-incentive-fix.js"></script>
     <script src="./js/reset-functionality.js"></script>
 </head>
-
 <body style="padding-top: 70px" id="page_layout">
-<!--Navigation bar-->
-<div id="nav-placeholder">
-</div>
-<script>
-    $(function(){
-        $("#nav-placeholder").load("NavBar.html", function() {
-            console.log("NavBar loaded");
-            // Load the login handler after the navbar is loaded
-            $.getScript("./js/login-handler.js")
-            .done(function() {
-                console.log("Login handler script loaded successfully");
-            })
-            .fail(function() {
-                console.error("Failed to load login-handler.js");
-            });
-        });
-    });
-</script>
-<!--end of Navigation bar-->
+<div id="nav-placeholder"></div>
+
 <header>
     <br>
     <div class="left-banner">
@@ -213,7 +194,55 @@
     </div>
     <br><br>
 </footer>
+<button id="emergencyResetBtn" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    Emergency Reset
+</button>
+<script src="./js/bootstrap.bundle.min.js"></script>
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
 
+            // Load terms modal script
+            $.getScript("./js/terms-modal.js")
+            .done(function() {
+                console.log("Terms modal script loaded successfully");
+
+                // Load login handler
+                $.getScript("./js/bootstrap5-login-handler.js")
+                .done(function() {
+                    console.log("Login handler script loaded successfully");
+
+                    // Check login status if function exists
+                    setTimeout(function() {
+                        if (typeof checkLoginStatus === 'function') {
+                            checkLoginStatus();
+                        }
+                    }, 500);
+                });
+            });
+        });
+    });
+    document.getElementById('emergencyResetBtn').addEventListener('click', function() {
+        console.log("Emergency reset button clicked");
+        $('.modal-backdrop').remove();
+        $('body').removeClass('modal-open');
+        $('body').css('padding-right', '');
+        $('.modal').hide();
+        $('body').css('overflow', '');
+        this.style.display = 'none';
+    });
+    setTimeout(function() {
+        const modalVisible = $('.modal').is(':visible') ||
+                $('.modal-backdrop').length > 0 ||
+                $('body').hasClass('modal-open');
+
+        if (modalVisible) {
+            console.log("Modal appears to be stuck - showing emergency reset button");
+            document.getElementById('emergencyResetBtn').style.display = 'block';
+        }
+    }, 10000);
+</script>
 <style>
     /* Additional styles for search results and business details */
     .results-table {
