@@ -21,6 +21,7 @@
     <link href="./css/form-validation.css" rel="stylesheet">
     <script src="./js/jquery-3.7.1.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="./js/simple-terms-modal.js"></script>
 
     <script>
         // Check jQuery and Bootstrap versions
@@ -286,23 +287,17 @@
         $("#nav-placeholder").load("NavBar.html", function() {
             console.log("NavBar loaded");
 
-            // Load our simpler terms modal control script
-            $.getScript("./js/simple-modal-checker.js")
+            // Load our login handler
+            $.getScript("./js/bootstrap5-login-handler.js")
             .done(function() {
-                console.log("Simple terms modal script loaded successfully");
+                console.log("Login handler script loaded successfully");
 
-                // Then load login handler
-                $.getScript("./js/bootstrap5-login-handler.js")
-                .done(function() {
-                    console.log("Login handler script loaded successfully");
-
-                    // Check login status
-                    setTimeout(function() {
-                        if (typeof checkLoginStatus === 'function') {
-                            checkLoginStatus();
-                        }
-                    }, 500);
-                });
+                // Check login status
+                setTimeout(function() {
+                    if (typeof checkLoginStatus === 'function') {
+                        checkLoginStatus();
+                    }
+                }, 500);
             });
         });
     });

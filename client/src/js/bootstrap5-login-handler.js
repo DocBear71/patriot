@@ -177,59 +177,14 @@ function checkTermsVersion(session) {
 
     // Check if user has accepted current terms
     if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
-        console.log("User needs to accept new terms");
+        console.log("User needs to accept new terms - using SimpleTermsModal");
 
-        // Function to show modal once it's available
-        const showTermsModal = function() {
-            const modalEl = document.getElementById('termsUpdateModal');
-
-            if (!modalEl) {
-                console.log("Terms modal not found yet, waiting for NavBar to load...");
-                // Try again in 500ms
-                setTimeout(showTermsModal, 500);
-                return;
-            }
-
-            // Remove any existing backdrop (helps prevent modal issues)
-            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.paddingRight = '';
-
-            // Show the modal using Bootstrap 5
-            try {
-                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                    const termsModal = new bootstrap.Modal(modalEl, {
-                        backdrop: 'static',
-                        keyboard: false
-                    });
-                    termsModal.show();
-                    console.log("Terms modal shown successfully");
-                } else {
-                    // Fallback for Bootstrap 4
-                    $(modalEl).modal({
-                        backdrop: 'static',
-                        keyboard: false
-                    });
-                }
-
-                // Show emergency button after delay in case modal gets stuck
-                setTimeout(function() {
-                    const modalVisible = $(modalEl).is(':visible');
-                    const modalInteractive = $(modalEl).find('.modal-content').is(':visible');
-
-                    if (modalVisible && !modalInteractive) {
-                        console.log("Modal may be stuck - showing emergency reset button");
-                        showEmergencyButton();
-                    }
-                }, 5000);
-            } catch (error) {
-                console.error("Error showing modal:", error);
-                showEmergencyButton();
-            }
-        };
-
-        // Start the process
-        showTermsModal();
+        // Use the new modal system if available
+        if (window.SimpleTermsModal) {
+            window.SimpleTermsModal.show();
+        } else {
+            console.error("SimpleTermsModal not loaded yet");
+        }
     }
 }
 
