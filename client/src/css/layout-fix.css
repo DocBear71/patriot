@@ -1,0 +1,189 @@
+/*
+ * SECTION 1: Layout Classes
+ * Use these classes to control layout on specific pages
+ */
+
+/* Base reset for all pages - ensure proper box sizing */
+* {
+    box-sizing: border-box;
+}
+
+/* Grid layout pages - apply to body for pages that should use the grid layout */
+body.use-grid main {
+    display: grid !important;
+    width: 100%;
+    height: auto;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(8, .25fr);
+    grid-gap: 0;
+}
+
+/* Float layout pages - apply to body for pages that should use float layout */
+body.use-float main {
+    display: block !important; /* Override grid display */
+    width: 100%;
+    height: auto;
+}
+
+/* Ensure proper float behavior on float pages */
+body.use-float .left_pane {
+    float: left;
+    width: 50%;
+    padding: 0 2%;
+    box-sizing: border-box;
+}
+
+body.use-float .right_pane {
+    float: left;
+    width: 50%;
+    padding: 0 2%;
+    box-sizing: border-box;
+}
+
+/* Clear float after panes */
+body.use-float .spacer {
+    clear: both;
+    height: 20px;
+    width: 100%;
+}
+
+/* Standard layout - apply to body for pages that should use Bootstrap's default layout */
+body.use-standard main {
+    display: block !important;
+    width: 100%;
+    height: auto;
+}
+
+/*
+ * SECTION 2: Container Fixes
+ * Ensure containers work properly with Bootstrap 5
+ */
+
+/* Fix for Bootstrap 5 container conflicts */
+.container {
+    box-sizing: border-box;
+}
+
+/* Dashboard panel fixes for admin pages */
+.admin-container {
+    display: block !important;
+    width: 100%;
+    height: auto;
+}
+
+/* Map container fixes */
+#map-container {
+    clear: both;
+    width: 90%;
+    margin: 20px auto;
+}
+
+/* Search results container fixes */
+#business-search-results,
+#search_table {
+    clear: both;
+    width: 90%;
+    margin: 20px auto;
+}
+
+/*
+ * SECTION 3: Mobile Responsive Fixes
+ * Ensure proper display on mobile devices
+ */
+
+/* Mobile adjustments */
+@media screen and (max-width: 767px) {
+    /* Float-based layouts on mobile */
+    body.use-float .left_pane,
+    body.use-float .right_pane {
+        float: none;
+        width: 100%;
+        padding: 0 5%;
+    }
+
+    /* Center images in right pane */
+    body.use-float #home_free,
+    body.use-float .right_pane img {
+        width: 70%;
+        margin: 0 auto;
+        display: block;
+    }
+
+    /* Grid-based layouts on mobile */
+    body.use-grid main {
+        display: grid;
+        width: 100%;
+        height: auto;
+        grid-template-rows: repeat(10, auto);
+        grid-template-columns: 1fr;
+    }
+
+    /* Reset grid positioning on mobile */
+    body.use-grid #section001,
+    body.use-grid #section002,
+    body.use-grid #section003,
+    body.use-grid #section00,
+    body.use-grid #section01,
+    body.use-grid #section02,
+    body.use-grid #section025,
+    body.use-grid #section03,
+    body.use-grid #section04 {
+        grid-column: 1 / 2;
+    }
+
+    body.use-grid #section001 { grid-row: 1 / 2; }
+    body.use-grid #section002 { grid-row: 2 / 3; }
+    body.use-grid #section003 { grid-row: 3 / 4; }
+    body.use-grid #section00 { grid-row: 4 / 5; }
+    body.use-grid #section01 { grid-row: 5 / 6; }
+    body.use-grid #section02 { grid-row: 6 / 7; }
+    body.use-grid #section025 { grid-row: 7 / 8; }
+    body.use-grid #section03 { grid-row: 8 / 9; }
+    body.use-grid #section04 { grid-row: 9 / 10; }
+}
+
+/*
+ * SECTION 4: Bootstrap 5 Compatibility Tweaks
+ * Ensure compatibility with Bootstrap 5's changes
+ */
+
+/* Fix for modal dialog behavior in Bootstrap 5 */
+.modal-open {
+    overflow: hidden;
+    padding-right: 0 !important;
+}
+
+/* Prevent form control issues with Bootstrap 5 */
+input, select, textarea {
+    width: auto;
+    max-width: 100%;
+}
+
+/* Fix for button styling in Bootstrap 5 */
+.btn {
+    display: inline-block;
+    font-weight: 400;
+    text-align: center;
+    vertical-align: middle;
+    user-select: none;
+    border: 1px solid transparent;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    border-radius: 0.25rem;
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* Fix for card styling in Bootstrap 5 */
+.card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    word-wrap: break-word;
+    background-color: #fff;
+    background-clip: border-box;
+    border: 1px solid rgba(0, 0, 0, 0.125);
+    border-radius: 0.25rem;
+}
