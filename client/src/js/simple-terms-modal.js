@@ -3,6 +3,15 @@
 (function() {
     console.log("Simple Terms Modal System loaded");
 
+    // Skip showing modal on terms and privacy pages themselves
+    const currentPage = window.location.pathname;
+    const isTermsPage = currentPage.includes('terms.html') || currentPage.includes('privacy.html');
+
+    if (isTermsPage) {
+        console.log("On terms/privacy page - not showing acceptance modal");
+        return; // Exit early - don't set up modal on these pages
+    }
+
     // Modal HTML template - no dependencies on Bootstrap
     const modalTemplate = `
     <div id="simpleTermsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 9999; overflow: auto;">
@@ -11,33 +20,33 @@
         <p>Our Terms of Use have been updated. Please review and accept the new terms to continue using our services.</p>
         
         <div style="text-align: center; margin: 15px 0;">
-          <a href="terms.html" target="_blank" style="display: inline-block; background-color: #007bff; color: white; padding: 8px 16px; margin: 0 5px; text-decoration: none; border-radius: 4px;">Read Full Terms</a>
-          <a href="privacy.html" target="_blank" style="display: inline-block; background-color: #007bff; color: white; padding: 8px 16px; margin: 0 5px; text-decoration: none; border-radius: 4px;">Read Privacy Policy</a>
+          <a href="/terms.html" target="_blank" style="display: inline-block; background-color: #007bff; color: white; padding: 8px 16px; margin: 0 5px; text-decoration: none; border-radius: 4px;">Read Full Terms</a>
+          <a href="/privacy.html" target="_blank" style="display: inline-block; background-color: #007bff; color: white; padding: 8px 16px; margin: 0 5px; text-decoration: none; border-radius: 4px;">Read Privacy Policy</a>
         </div>
         
         <div id="simpleTermsSummary" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; margin: 15px 0; background-color: #f9f9f9;">
-          <h4>Summary of Key Terms</h4>
+          <h3>Summary of Key Terms</h3>
           <p><strong>Effective Date:</strong> May 14, 2025</p>
           
-          <h5 style="margin-top: 15px;">1. ACCEPTANCE OF TERMS</h5>
+          <h4 style="margin-top: 15px;">1. ACCEPTANCE OF TERMS</h4>
           <p>By accessing or using Patriot Thanks, you agree to be bound by these Terms of Use. If you do not agree to these terms, you must discontinue use immediately.</p>
           
-          <h5 style="margin-top: 15px;">2. INTELLECTUAL PROPERTY RIGHTS</h5>
+          <h4 style="margin-top: 15px;">2. INTELLECTUAL PROPERTY RIGHTS</h4>
           <p>All content, features, and functionality on Patriot Thanks are owned by Doc Bear Enterprises, LLC and are protected by copyright, trademark, and other intellectual property laws.</p>
           
-          <h5 style="margin-top: 15px;">3. USER RESPONSIBILITIES</h5>
+          <h4 style="margin-top: 15px;">3. USER RESPONSIBILITIES</h4>
           <p>Users are responsible for maintaining the confidentiality of their account information and for all activities that occur under their account.</p>
           
-          <h5 style="margin-top: 15px;">4. DATA COLLECTION AND PRIVACY</h5>
+          <h4 style="margin-top: 15px;">4. DATA COLLECTION AND PRIVACY</h4>
           <p>We collect certain personal information to provide our services. Your use of Patriot Thanks is also governed by our Privacy Policy.</p>
           
-          <h5 style="margin-top: 15px;">5. LIMITATION OF LIABILITY</h5>
+          <h4 style="margin-top: 15px;">5. LIMITATION OF LIABILITY</h4>
           <p>Patriot Thanks and its owners will not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of the service.</p>
           
-          <h5 style="margin-top: 15px;">6. DISPUTE RESOLUTION</h5>
+          <h4 style="margin-top: 15px;">6. DISPUTE RESOLUTION</h4>
           <p>Any disputes arising from your use of the service will be governed by the laws of Iowa.</p>
           
-          <h5 style="margin-top: 15px;">7. MODIFICATION OF TERMS</h5>
+          <h4 style="margin-top: 15px;">7. MODIFICATION OF TERMS</h4>
           <p>We reserve the right to modify these terms at any time. Continued use of Patriot Thanks after such modifications constitutes acceptance of the updated terms.</p>
           
           <div id="termsScrollTarget">
@@ -52,7 +61,7 @@
         <div style="margin: 15px 0;">
           <label style="display: flex; align-items: center; cursor: pointer;">
             <input type="checkbox" id="acceptTermsCheckbox" disabled style="margin-right: 10px;"> 
-            I have read and agree to the updated <a href="terms.html" target="_blank" style="margin: 0 5px;">Terms of Use</a> and <a href="privacy.html" target="_blank" style="margin: 0 5px;">Privacy Policy</a>
+            I have read and agree to the updated <a href="/terms.html" target="_blank" style="margin: 0 5px;">Terms of Use</a> and <a href="/privacy.html" target="_blank" style="margin: 0 5px;">Privacy Policy</a>
           </label>
         </div>
         
