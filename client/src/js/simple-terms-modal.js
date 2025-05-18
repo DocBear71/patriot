@@ -4,12 +4,34 @@
     console.log("Simple Terms Modal System loaded");
 
     // Skip showing modal on terms and privacy pages themselves
-    const currentPage = window.location.pathname;
-    const isTermsPage = currentPage.includes('terms.html') || currentPage.includes('privacy.html');
+    // Check if we're on a terms or privacy page
+    const currentPath = window.location.pathname.toLowerCase();
+    const isTermsPage = currentPath.includes('terms') || currentPath.includes('privacy');
 
+    // If on terms/privacy page, don't set up the modal
     if (isTermsPage) {
-        console.log("On terms/privacy page - not showing acceptance modal");
-        return; // Exit early - don't set up modal on these pages
+        console.log("On terms/privacy page - disabling terms modal");
+
+        // Override any existing modal functions to prevent them from running
+        window.checkTermsVersion = function() {
+            console.log("Terms check disabled on terms/privacy pages");
+        };
+
+        window.updateTermsAcceptance = function() {
+            console.log("Terms acceptance disabled on terms/privacy pages");
+        };
+
+        // Exit early - don't set up the modal
+        if (typeof window.SimpleTermsModal === 'undefined') {
+            window.SimpleTermsModal = {
+                show: function() { console.log("Modal disabled on terms pages"); },
+                hide: function() { console.log("Modal disabled on terms pages"); },
+                check: function() { console.log("Modal disabled on terms pages"); }
+            };
+        }
+
+        // Exit the script early
+        return;
     }
 
     // Modal HTML template - no dependencies on Bootstrap

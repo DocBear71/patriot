@@ -114,83 +114,7 @@
         </div>
     </div>
 
-    <!-- Terms Update Modal -->
-    <div class="modal fade" id="termsUpdateModal" tabindex="-1" aria-labelledby="termsUpdateModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="termsUpdateModalLabel">Terms of Use Update</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Our Terms of Use have been updated. Please review and accept the new terms to continue using our services.</p>
 
-                    <div class="text-center mb-3">
-                        <a href="terms.html" target="_blank" class="btn btn-info">Read Full Terms of Use</a>
-                        <a href="privacy.html" target="_blank" class="btn btn-info ms-2">Read Privacy Policy</a>
-                    </div>
-
-                    <!-- Scrollable Summary Section -->
-                    <div class="terms-summary" id="termsSummary" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; margin: 10px 0; background-color: #f9f9f9;">
-                        <h4>Summary of Key Terms</h4>
-                        <p><strong>Effective Date:</strong> May 14, 2025</p>
-
-                        <h5>1. ACCEPTANCE OF TERMS</h5>
-                        <p>By accessing or using Patriot Thanks, you agree to be bound by these Terms of Use. If you do not agree to these terms, you must discontinue use immediately.</p>
-
-                        <h5>2. INTELLECTUAL PROPERTY RIGHTS</h5>
-                        <p>All content, features, and functionality on Patriot Thanks are owned by Doc Bear Enterprises, LLC and are protected by copyright, trademark, and other intellectual property laws.</p>
-
-                        <h5>3. USER RESPONSIBILITIES</h5>
-                        <p>Users are responsible for maintaining the confidentiality of their account information and for all activities that occur under their account. Users must not engage in any prohibited activities as outlined in the full Terms of Use.</p>
-
-                        <h5>4. DATA COLLECTION AND PRIVACY</h5>
-                        <p>We collect certain personal information to provide our services. Your use of Patriot Thanks is also governed by our Privacy Policy, which describes how we collect, use, and protect your personal information.</p>
-
-                        <h5>5. LIMITATION OF LIABILITY</h5>
-                        <p>Patriot Thanks and its owners will not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of the service.</p>
-
-                        <h5>6. DISPUTE RESOLUTION</h5>
-                        <p>Any disputes arising from your use of the service will be governed by the laws of Iowa. Disputes shall be resolved through binding arbitration in Cedar Rapids, Iowa.</p>
-
-                        <h5>7. MODIFICATION OF TERMS</h5>
-                        <p>We reserve the right to modify these terms at any time. Continued use of Patriot Thanks after such modifications constitutes acceptance of the updated terms.</p>
-
-                        <h5>8. TERMINATION</h5>
-                        <p>We reserve the right to terminate or suspend your account and access to Patriot Thanks at our sole discretion, without notice, for conduct that we believe violates these Terms or is harmful to other users, us, or third parties.</p>
-
-                        <h5>9. PROHIBITED ACTIVITIES</h5>
-                        <p>Users are prohibited from using the service for any illegal purpose, attempting to gain unauthorized access, interfering with the proper working of the service, or engaging in any activity that could harm the service or other users.</p>
-
-                        <h5>10. CONTACT INFORMATION</h5>
-                        <p>For questions about these Terms, please contact us at privacy@patriotthanks.com.</p>
-
-                        <!-- This element serves as a scroll target -->
-                        <div id="termsScrollTarget">
-                            <p>Thank you for reviewing our Terms of Use summary. Please check the box below to indicate your acceptance.</p>
-                        </div>
-                    </div>
-
-                    <!-- Message that appears after scrolling -->
-                    <div id="scrollMessage" style="display: none; color: green; margin-top: 10px; text-align: center;">
-                        <i class="bi bi-check-circle"></i> You've reviewed the terms summary. Please check the box below to confirm your acceptance.
-                    </div>
-
-                    <!-- Checkbox area -->
-                    <div class="form-check mt-3">
-                        <input class="form-check-input" type="checkbox" id="acceptUpdatedTerms" disabled>
-                        <label class="form-check-label" for="acceptUpdatedTerms">
-                            I have read and agree to the updated <a href="terms.html" target="_blank">Terms of Use</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>
-                        </label>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="rejectUpdatedTerms">Decline</button>
-                    <button type="button" class="btn btn-primary" id="confirmUpdatedTerms" disabled>Accept Terms</button>
-                </div>
-            </div>
-        </div>
-    </div>
 </nav>
 
 <!-- Bootstrap 5 Modal Initialization Script -->
@@ -210,83 +134,9 @@
         } else {
             console.error("Bootstrap 5 not detected - some features may not work");
         }
-
-        // Add a custom close handler directly on the modal's close button
-        setTimeout(function() {
-            const closeButton = document.querySelector('#termsUpdateModal .btn-close');
-            if (closeButton) {
-                closeButton.addEventListener('click', function(e) {
-                    console.log("Close button clicked directly");
-
-                    try {
-                        const modalEl = document.getElementById('termsUpdateModal');
-                        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-                            const bsModal = bootstrap.Modal.getInstance(modalEl);
-                            if (bsModal) {
-                                bsModal.hide();
-                            }
-                        } else {
-                            // Fallback direct DOM manipulation
-                            const modalEl = document.getElementById('termsUpdateModal');
-                            modalEl.classList.remove('show');
-                            modalEl.style.display = 'none';
-                            document.body.classList.remove('modal-open');
-                            document.body.style.overflow = '';
-                            const backdrop = document.querySelector('.modal-backdrop');
-                            if (backdrop) backdrop.remove();
-                        }
-                    } catch (error) {
-                        console.error("Error hiding modal:", error);
-
-                        // Manual reset if function not available
-                        $('.modal-backdrop').remove();
-                        $('body').removeClass('modal-open');
-                        $('body').css('padding-right', '');
-                        $('#termsUpdateModal').modal('hide');
-                        $('#termsUpdateModal').hide();
-                    }
-                });
-            }
-        }, 600);
-
-        // Make emergency reset available on all pages
-        window.emergencyModalReset = function() {
-            console.log("Emergency modal reset called from NavBar");
-
-            // Remove backdrop and reset modal
-            $('.modal-backdrop').remove();
-            $('body').removeClass('modal-open');
-            $('body').css('padding-right', '');
-
-            // Hide modal
-            const modalEl = document.getElementById('termsUpdateModal');
-            if (modalEl) {
-                modalEl.classList.remove('show');
-                modalEl.style.display = 'none';
-            }
-
-            return true;
-        };
     });
 
-    document.addEventListener('DOMContentLoaded', function() {
-        // Signal that the NavBar (with modal) is loaded
-        setTimeout(function() {
-            if (document.getElementById('termsUpdateModal')) {
-                // Dispatch a custom event that other scripts can listen for
-                const event = new CustomEvent('termsModalReady');
-                document.dispatchEvent(event);
-                console.log("Terms modal is ready in the DOM");
 
-                // Try to initialize all event handlers for the modal
-                if (typeof setupTermsModalHandlers === 'function') {
-                    setupTermsModalHandlers();
-                }
 
-                if (typeof setupTermsScrollTracking === 'function') {
-                    setupTermsScrollTracking();
-                }
-            }
-        }, 200);
-    });
+
 </script>
