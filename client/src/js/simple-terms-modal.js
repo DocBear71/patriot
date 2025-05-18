@@ -84,7 +84,7 @@
           <div style="display: flex; align-items: flex-start;">
             <input type="checkbox" id="acceptTermsCheckbox" disabled style="margin-right: 10px; margin-top: 3px;"> 
             <label for="acceptTermsCheckbox" style="cursor: pointer; display: inline; line-height: 1.5;">
-              I have read and agree to the updated <a href="/terms.html" target="_blank">Terms of Use</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>
+              I have read and agree to the updated <a href="/terms.html" target="_blank" style="color: #0066cc; text-decoration: underline;">Terms of Use</a> and <a href="/privacy.html" target="_blank" style="color: #0066cc; text-decoration: underline;">Privacy Policy</a>
             </label>
           </div>
         </div>
