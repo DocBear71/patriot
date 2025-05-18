@@ -1,4 +1,4 @@
-// Add this to your form-validator.js or create a new admin-access.js file
+// client/src/js/admin-access.js
 document.addEventListener('DOMContentLoaded', function() {
     // Get the status dropdown
     const statusDropdown = document.getElementById('status');
