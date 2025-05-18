@@ -62,34 +62,27 @@
         </div>
         <div class="card-body">
             <form id="create-code-form">
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="form-group mb-3">
-                            <label for="accessCode" class="form-label">Access Code:</label>
-                            <input type="text" id="accessCode" class="form-control"
-                                   placeholder="Enter a unique code" required>
-                            <small class="text-muted">This is the code users will enter to get admin access</small>
-                        </div>
-                    </div>
-                    <br>
-                    <div class="col-md-5">
-                        <div class="form-group mb-3">
-                            <label for="codeDescription" class="form-label">Description:</label>
-                            <input type="text" id="codeDescription" class="form-control"
-                                   placeholder="What this code grants access to" required>
-                            <small class="text-muted">Describe what this code is for and who should use it</small>
-                        </div>
-                    </div>
-                    <br>
-                    <div class="col-md-3">
-                        <div class="form-group mb-3">
-                            <label for="expirationDate" class="form-label">Expiration Date:</label>
-                            <input type="date" id="expirationDate" class="form-control">
-                            <small class="text-muted">Leave blank for no expiration</small>
-                        </div>
-                    </div>
+                <!-- Modified layout to stack form groups -->
+                <div class="mb-4">
+                    <label for="accessCode" class="form-label">Access Code:</label>
+                    <input type="text" id="accessCode" class="form-control"
+                           placeholder="Enter a unique code" required>
+                    <small class="text-muted">This is the code users will enter to get admin access</small>
                 </div>
-                <br>
+
+                <div class="mb-4">
+                    <label for="codeDescription" class="form-label">Description:</label>
+                    <input type="text" id="codeDescription" class="form-control"
+                           placeholder="What this code grants access to" required>
+                    <small class="text-muted">Describe what this code is for and who should use it</small>
+                </div>
+
+                <div class="mb-4">
+                    <label for="expirationDate" class="form-label">Expiration Date:</label>
+                    <input type="date" id="expirationDate" class="form-control">
+                    <small class="text-muted">Leave blank for no expiration</small>
+                </div>
+
                 <div class="mt-3">
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-save"></i> Create Access Code
