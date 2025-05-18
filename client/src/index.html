@@ -21,7 +21,6 @@
     <link href="./css/form-validation.css" rel="stylesheet">
     <script src="./js/jquery-3.7.1.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
-    <script src="./js/simple-modal-checker.js"></script>
 
     <script>
         // Check jQuery and Bootstrap versions
@@ -202,8 +201,7 @@
     }, 10000); // Show after 10 seconds if modal is still visible
 </script>
 
-<script src="./js/bootstrap.bundle.min.js"></script>
-
+<!-- Bootstrap 5 Polyfill -->
 <script>
     // Wait for document and Bootstrap to be fully loaded
     document.addEventListener('DOMContentLoaded', function() {
@@ -282,117 +280,31 @@
 </script>
 
 <!-- Load NavBar and custom scripts -->
+<script src="./js/bootstrap.bundle.min.js"></script>
 <script>
     $(function(){
         $("#nav-placeholder").load("NavBar.html", function() {
             console.log("NavBar loaded");
 
-            // Load scripts AFTER the navbar (with modal) is loaded
-            $.getScript("./js/bootstrap5-terms-modal.js")
+            // Load our simpler terms modal control script
+            $.getScript("./js/terms-modal.js")
             .done(function() {
-                console.log("Bootstrap 5 terms modal script loaded successfully");
+                console.log("Terms modal script loaded successfully");
 
-                // Load login handler after terms modal
-                $.getScript("./js/bootstrap5-login-handler.js")
-                .done(function() {
-                    console.log("Bootstrap 5 login handler script loaded successfully");
-
-                    // Check login status after both scripts are loaded
-                    setTimeout(function() {
-                        if (typeof checkLoginStatus === 'function') {
-                            console.log("Checking login status");
-                            checkLoginStatus();
-                        }
-                    }, 500);
-                })
-                .fail(function() {
-                    console.error("Failed to load bootstrap5-login-handler.js");
-                });
-            })
-            .fail(function() {
-                console.error("Failed to load bootstrap5-terms-modal.js");
-
-                // Try to load login handler anyway
+                // Then load login handler
                 $.getScript("./js/bootstrap5-login-handler.js")
                 .done(function() {
                     console.log("Login handler script loaded successfully");
-                })
-                .fail(function() {
-                    console.error("Failed to load bootstrap5-login-handler.js");
+
+                    // Check login status
+                    setTimeout(function() {
+                        if (typeof checkLoginStatus === 'function') {
+                            checkLoginStatus();
+                        }
+                    }, 500);
                 });
             });
         });
-    });
-</script>
-<script>
-    $(document).ready(function() {
-        console.log("Ultra-simple modal acceptance script loaded");
-
-        // Add emergency button if not already present
-        if (!document.getElementById('emergencyResetBtn')) {
-            const btn = document.createElement('button');
-            btn.id = 'emergencyResetBtn';
-            btn.innerHTML = 'Accept Terms & Continue';
-            btn.style.position = 'fixed';
-            btn.style.bottom = '10px';
-            btn.style.right = '10px';
-            btn.style.zIndex = '9999';
-            btn.style.backgroundColor = '#28a745'; // Green for acceptance
-            btn.style.color = 'white';
-            btn.style.border = 'none';
-            btn.style.padding = '12px 20px';
-            btn.style.borderRadius = '4px';
-            btn.style.fontWeight = 'bold';
-            btn.style.cursor = 'pointer';
-            btn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
-            document.body.appendChild(btn);
-
-            // Show it automatically after a short delay - for testing only
-            setTimeout(function() {
-                btn.style.display = 'block';
-            }, 1000);
-
-            // Add click handler
-            btn.addEventListener('click', function() {
-                console.log("Emergency accept clicked");
-
-                // 1. Get session data
-                const sessionData = localStorage.getItem('patriotThanksSession');
-                if (sessionData) {
-                    try {
-                        // 2. Parse and update session
-                        const session = JSON.parse(sessionData);
-                        session.user.termsAccepted = true;
-                        session.user.termsAcceptedDate = new Date().toISOString();
-                        session.user.termsVersion = "May 14, 2025";
-                        localStorage.setItem('patriotThanksSession', JSON.stringify(session));
-                        console.log("Terms directly accepted in localStorage");
-
-                        // 3. Clean up modal
-                        $('.modal-backdrop').remove();
-                        $('body').removeClass('modal-open');
-                        $('body').css('padding-right', '');
-
-                        const modalEl = document.getElementById('termsUpdateModal');
-                        if (modalEl) {
-                            modalEl.classList.remove('show');
-                            modalEl.style.display = 'none';
-                        }
-
-                        // 4. Hide the button
-                        this.style.display = 'none';
-
-                        // 5. Reload page
-                        location.reload();
-                    } catch (e) {
-                        console.error("Error updating session:", e);
-                        alert("Error updating session. Please try again.");
-                    }
-                } else {
-                    alert("No active session found. Please log in again.");
-                }
-            });
-        }
     });
 </script>
 </body>

@@ -1,94 +1,157 @@
 <!DOCTYPE html>
 <html lang='en'>
-    <head>
-        <title>Patriot Thanks: About Us</title>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <meta name="author" content="Edward G. McKeown">
-        <meta name="date" content="2025/4/12">
-        <meta name="description" content="Patriot Thanks application to find businesses that offer
+<head>
+    <title>Patriot Thanks: About Us</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2025/4/12">
+    <meta name="description" content="Patriot Thanks application to find businesses that offer
                                           incentives and discounts to veterans, active duty, first
                                           responders, and their spouses.">
-        <meta name="keywords" content="business, incentives, discounts, veteran discounts, military discounts,
+    <meta name="keywords" content="business, incentives, discounts, veteran discounts, military discounts,
                                        first responder discounts, veterans, active duty, first responders">
-        <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
-        <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css" >
-        <link href="./css/normalize.css" rel="stylesheet">
-        <link href="./css/style.css" rel="stylesheet">
-        <link href="./css/menu-auth.css" rel="stylesheet">
-        <link href="./css/form-validation.css" rel="stylesheet">
-        <script src="./js/jquery-3.7.1.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
-        <script src="./js/bootstrap-4.0.0.js"></script>
-    </head>
 
-    <body style="padding-top: 70px" id="page_layout">
-    <!--Navigation bar-->
-    <div id="nav-placeholder">
+    <!-- Favicon -->
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <!-- Custom CSS -->
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/figures.css" rel="stylesheet">
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/form-validation.css" rel="stylesheet">
+
+    <!-- jQuery -->
+    <script src="./js/jquery-3.7.1.js"></script>
+
+    <!-- Modernizr -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+</head>
+
+<body style="padding-top: 70px" id="page_layout">
+<!-- Navigation bar placeholder -->
+<div id="nav-placeholder"></div>
+
+<!-- Header section -->
+<header>
+    <br>
+    <div class="left-banner">
+        <a href="index.html">
+            <img src="./images/docbearlogov4.png" alt="DocBear logo">
+        </a>
     </div>
-    <script>
-        $(function(){
-            $("#nav-placeholder").load("NavBar.html", function() {
-                console.log("NavBar loaded");
-                // Load the login handler after the navbar is loaded
-                $.getScript("./js/login-handler.js")
+    <div class="right-banner">
+        <h1>Patriot Thanks</h1>
+        <hr>
+        <h4>About Us</h4>
+    </div>
+    <div style="clear:left;"></div>
+</header>
+
+<!-- Main content -->
+<main>
+    <div>
+        <img src="./images/docbearlogov4.png" alt="DocBear Logo" class="float_left">
+    </div>
+    <h2>About Us</h2>
+    <p class="paragraph_style">Dr. Edward Mc Keown was born in Mexico, Missouri and is
+        a veteran of the United States Marine Corps. He received his associate's degree
+        in general studies (emphasis on culinary) & a certificate in Hotel Food & Beverage
+        Management from Pima Community College in 1996. He received his bachelor's degree
+        and master's degree in Hotel Administration from the University of Nevada, Las
+        Vegas (2006 & 2008, respectively). Dr. Mc Keown completed his Ph.D. in Hospitality
+        and Tourism Management in 2014 at Purdue University.</p>
+    <p>Dr. Mc Keown has had a career in hospitality, food safety, and management for over
+        30 years, working with companies such as Waffle House, Hilton Hotels, The Flamingo
+        Hotel and Casino, Burger King, Popeye's Chicken, and many more. He is a certified
+        ServSafe Food Protection Manager and ServSafe Food Safety Instructor and Proctor
+        for the National Restaurant Association Educational Foundation, and also a certified
+        trainer for the National Environmental Health Association's food safety training
+        program. Dr. Mc Keown is also a certified trainer for the ServSafe Alcohol program
+        for responsible alcohol service and the American Hotel & Lodging Education Institute
+        Controlling Alcohol Risks Effectively® (CARE).</p>
+</main>
+
+<!-- Footer -->
+<footer class="footer_style">
+    <br><br>
+    <p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p>
+    <div class="footer-links">
+        <a href="terms.html">Terms of Use</a> |
+        <a href="privacy.html">Privacy Policy</a> |
+        <a href="contact.html">Contact Us</a>
+    </div>
+    <br><br>
+</footer>
+
+<!-- Emergency Reset Button -->
+<button id="emergencyResetBtn" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    Emergency Reset
+</button>
+
+<!-- Bootstrap 5 JS Bundle (includes Popper) -->
+<script src="./js/bootstrap.bundle.min.js"></script>
+
+<!-- Load NavBar and other scripts -->
+<script>
+    $(function(){
+        $("#nav-placeholder").load("NavBar.html", function() {
+            console.log("NavBar loaded");
+
+            // Load terms modal script
+            $.getScript("./js/terms-modal.js")
+            .done(function() {
+                console.log("Terms modal script loaded successfully");
+
+                // Load login handler
+                $.getScript("./js/bootstrap5-login-handler.js")
                 .done(function() {
                     console.log("Login handler script loaded successfully");
-                })
-                .fail(function() {
-                    console.error("Failed to load login-handler.js");
+
+                    // Check login status if function exists
+                    setTimeout(function() {
+                        if (typeof checkLoginStatus === 'function') {
+                            checkLoginStatus();
+                        }
+                    }, 500);
                 });
             });
         });
-    </script>
-    <!--end of Navigation bar-->
-        <header>
-            <br>
-            <div class="left-banner">
-                <a href="index.html">
-                    <img src="./images/docbearlogov4.png" alt="DocBear logo">
-                </a>
-            </div>
-            <div class="right-banner">
-                <h1>Patriot Thanks</h1>
-                <hr>
-                <h4>About Us</h4>
-                </div>
-            <div style="clear:left;"></div>
-        </header>
-        <main>    
-            <div>
-                <img src="./images/docbearlogov4.png" alt="DocBear Logo" class="float_left">
-            </div>
-                <h2>About Us</h2>
-                <p class="paragraph_style">Dr. Edward Mc Keown was born in Mexico, Missouri and is
-                    a veteran of the United States Marine Corps. He received his associate's degree
-                    in general studies (emphasis on culinary) & a certificate in Hotel Food & Beverage 
-                    Management from Pima Community College in 1996. He received his bachelor’s degree 
-                    and master’s degree in Hotel Administration from the University of Nevada, Las 
-                    Vegas (2006 & 2008, respectively). Dr. Mc Keown completed his Ph.D. in Hospitality 
-                    and Tourism Management in 2014 at Purdue University.</p>
-                <p>Dr. Mc Keown has had a career in hospitality, food safety, and management for over 
-                    30 years, working with companies such as Waffle House, Hilton Hotels, The Flamingo 
-                    Hotel and Casino, Burger King, Popeye’s Chicken, and many more. He is a certified 
-                    ServSafe Food Protection Manager and ServSafe Food Safety Instructor and Proctor 
-                    for the National Restaurant Association Educational Foundation, and also a certified 
-                    trainer for the National Environmental Health Association’s food safety training 
-                    program. Dr. Mc Keown is also a certified trainer for the ServSafe Alcohol program 
-                    for responsible alcohol service and the American Hotel & Lodging Education Institute 
-                    Controlling Alcohol Risks Effectively® (CARE).</p>
-        </main>
-    <footer class="footer_style">
-        <br><br>
-        <p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p>
-        <div class="footer-links">
-            <a href="terms.html">Terms of Use</a> |
-            <a href="privacy.html">Privacy Policy</a> |
-            <a href="contact.html">Contact Us</a>
-        </div>
-        <br><br>
-    </footer>
+    });
 
-     </body>
+    // Emergency reset functionality
+    document.getElementById('emergencyResetBtn').addEventListener('click', function() {
+        console.log("Emergency reset button clicked");
+
+        // Remove modal backdrop and reset body
+        $('.modal-backdrop').remove();
+        $('body').removeClass('modal-open');
+        $('body').css('padding-right', '');
+        $('.modal').hide();
+        $('body').css('overflow', '');
+
+        // Hide this button
+        this.style.display = 'none';
+    });
+
+    // Show emergency button if modal appears stuck
+    setTimeout(function() {
+        const modalVisible = $('.modal').is(':visible') ||
+                $('.modal-backdrop').length > 0 ||
+                $('body').hasClass('modal-open');
+
+        if (modalVisible) {
+            console.log("Modal appears to be stuck - showing emergency reset button");
+            document.getElementById('emergencyResetBtn').style.display = 'block';
+        }
+    }, 10000);
+</script>
+</body>
 </html>
