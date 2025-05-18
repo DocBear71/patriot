@@ -3,33 +3,39 @@
 $(document).ready(function() {
     console.log("Simple Modal Checker loaded");
 
+    function shouldShowSimpleModal() {
+        // If Bootstrap modal exists and is visible, don't show simple modal
+        const bootstrapModal = document.getElementById('termsUpdateModal');
+        if (bootstrapModal &&
+            (bootstrapModal.classList.contains('show') ||
+                document.querySelector('.modal-backdrop'))) {
+            console.log("Bootstrap modal already active - not showing simple modal");
+            return false;
+        }
+        return true;
+    }
+
     // Wait a moment for everything to load
     setTimeout(function() {
         // Check if user is logged in
         const sessionData = localStorage.getItem('patriotThanksSession');
-        if (!sessionData) {
-            console.log("No session data - not checking terms");
-            return;
-        }
+        if (sessionData && shouldShowSimpleModal()) {
+            try {
+                const session = JSON.parse(sessionData);
+                if (!session.user.termsAccepted || session.user.termsVersion !== "May 14, 2025") {
+                    console.log("DIRECT CHECK: User needs to accept terms");
 
-        try {
-            // Parse session and check terms
-            const session = JSON.parse(sessionData);
-
-            // Current version of terms
-            const currentTermsVersion = "May 14, 2025";
-
-            // Check if user has accepted current terms
-            if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
-                console.log("DIRECT CHECK: User needs to accept terms");
-
-                // Show a simple dialog to accept terms - completely separate from Bootstrap Modal
-                showSimpleTermsDialog(session);
-            } else {
-                console.log("DIRECT CHECK: User has already accepted terms");
+                    // Slight delay to make sure bootstrap modal has a chance to show first
+                    setTimeout(function() {
+                        // Check again to be safe
+                        if (shouldShowSimpleModal()) {
+                            showSimpleTermsModal(session);
+                        }
+                    }, 300);
+                }
+            } catch (e) {
+                console.error("Error checking terms:", e);
             }
-        } catch (e) {
-            console.error("Error checking terms:", e);
         }
     }, 1000);
 
