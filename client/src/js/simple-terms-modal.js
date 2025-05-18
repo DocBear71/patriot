@@ -81,10 +81,12 @@
         </div>
         
         <div style="margin: 15px 0;">
-          <label style="display: flex; align-items: center; cursor: pointer;">
-            <input type="checkbox" id="acceptTermsCheckbox" disabled style="margin-right: 10px;"> 
-            I have read and agree to the updated <a href="/terms.html" target="_blank" style="margin: 0 5px;">Terms of Use</a> and <a href="/privacy.html" target="_blank" style="margin: 0 5px;">Privacy Policy</a>
-          </label>
+          <div style="display: flex; align-items: flex-start;">
+            <input type="checkbox" id="acceptTermsCheckbox" disabled style="margin-right: 10px; margin-top: 3px;"> 
+            <label for="acceptTermsCheckbox" style="cursor: pointer; display: inline; line-height: 1.5;">
+              I have read and agree to the updated <a href="/terms.html" target="_blank">Terms of Use</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>
+            </label>
+          </div>
         </div>
         
         <div style="display: flex; margin-top: 20px; justify-content: space-between;">
