@@ -154,8 +154,18 @@ function updateUIAfterLogin(session) {
     enableRestrictedLinks(user);
 
     console.log("UI updated for logged in user:", displayName, "Admin:", isAdmin);
-
-    checkTermsVersion(session);
+    setTimeout(function() {
+        if (document.getElementById('termsUpdateModal')) {
+            // Modal exists, safe to check terms
+            checkTermsVersion(session);
+        } else {
+            console.log("Modal not found yet, will retry in 500ms");
+            // Try again after another delay
+            setTimeout(function() {
+                checkTermsVersion(session);
+            }, 500);
+        }
+    }, 500);
 }
 
 // Enhanced function to check terms version
@@ -169,41 +179,57 @@ function checkTermsVersion(session) {
     if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
         console.log("User needs to accept new terms");
 
-        // Remove any existing backdrop (helps prevent modal issues)
-        $('.modal-backdrop').remove();
-        $('body').removeClass('modal-open');
-
-        // Show the modal for terms acceptance
-        // Bootstrap 5 way
-        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        // Function to show modal once it's available
+        const showTermsModal = function() {
             const modalEl = document.getElementById('termsUpdateModal');
-            if (modalEl) {
-                const termsModal = new bootstrap.Modal(modalEl, {
-                    backdrop: 'static',
-                    keyboard: false
-                });
-                termsModal.show();
-            } else {
-                console.error("Terms modal element not found");
+
+            if (!modalEl) {
+                console.log("Terms modal not found yet, waiting for NavBar to load...");
+                // Try again in 500ms
+                setTimeout(showTermsModal, 500);
+                return;
             }
-        } else {
-            // Fallback for Bootstrap 4
-            $('#termsUpdateModal').modal({
-                backdrop: 'static',
-                keyboard: false
-            });
-        }
 
-        // Show emergency button after a delay in case modal gets stuck
-        setTimeout(function() {
-            const modalVisible = $('#termsUpdateModal').is(':visible');
-            const modalInteractive = $('#termsUpdateModal').find('.modal-content').is(':visible');
+            // Remove any existing backdrop (helps prevent modal issues)
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.paddingRight = '';
 
-            if (modalVisible && !modalInteractive) {
-                console.log("Modal may be stuck - showing emergency reset button");
+            // Show the modal using Bootstrap 5
+            try {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const termsModal = new bootstrap.Modal(modalEl, {
+                        backdrop: 'static',
+                        keyboard: false
+                    });
+                    termsModal.show();
+                    console.log("Terms modal shown successfully");
+                } else {
+                    // Fallback for Bootstrap 4
+                    $(modalEl).modal({
+                        backdrop: 'static',
+                        keyboard: false
+                    });
+                }
+
+                // Show emergency button after delay in case modal gets stuck
+                setTimeout(function() {
+                    const modalVisible = $(modalEl).is(':visible');
+                    const modalInteractive = $(modalEl).find('.modal-content').is(':visible');
+
+                    if (modalVisible && !modalInteractive) {
+                        console.log("Modal may be stuck - showing emergency reset button");
+                        showEmergencyButton();
+                    }
+                }, 5000);
+            } catch (error) {
+                console.error("Error showing modal:", error);
                 showEmergencyButton();
             }
-        }, 5000); // Check after 5 seconds
+        };
+
+        // Start the process
+        showTermsModal();
     }
 }
 
@@ -217,12 +243,14 @@ function updateTermsAcceptance(session) {
     session.user.termsVersion = "May 14, 2025";
     localStorage.setItem('patriotThanksSession', JSON.stringify(session));
 
+    console.log("Session updated locally with terms acceptance");
+
     // determine the base URL
     const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
         ? `http://${window.location.host}`
         : window.location.origin;
 
-    // Update user's terms acceptance
+    // Update user's terms acceptance on server
     fetch(`${baseURL}/api/auth.js?operation=update-terms-acceptance`, {
         method: 'POST',
         headers: {
@@ -239,19 +267,22 @@ function updateTermsAcceptance(session) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                console.log("Terms acceptance updated successfully");
+                console.log("Terms acceptance updated successfully on server");
             } else {
-                console.error("Failed to update terms acceptance");
+                console.error("Failed to update terms acceptance on server");
                 // No need to alert since we updated localStorage already
             }
         })
         .catch(error => {
-            console.error('Error updating terms acceptance:', error);
+            console.error('Error updating terms acceptance on server:', error);
             // No need to alert since we updated localStorage already
         })
         .finally(() => {
             // Hide the modal regardless of API success
-            hideModal();
+            const modalEl = document.getElementById('termsUpdateModal');
+            if (modalEl) {
+                hideModal();
+            }
         });
 }
 
@@ -922,6 +953,29 @@ function emergencyModalReset() {
     console.log('Emergency modal reset completed');
     return true;
 }
+
+document.addEventListener('termsModalReady', function() {
+    console.log("Received terms modal ready event");
+
+    // Set up handlers if not already done
+    if (typeof setupTermsModalHandlers === 'function') {
+        setupTermsModalHandlers();
+    }
+
+    // Check if any session needs terms update
+    const sessionData = localStorage.getItem('patriotThanksSession');
+    if (sessionData) {
+        try {
+            const session = JSON.parse(sessionData);
+            // Check terms version after a brief delay
+            setTimeout(function() {
+                checkTermsVersion(session);
+            }, 100);
+        } catch (error) {
+            console.error("Error parsing session data:", error);
+        }
+    }
+});
 
 // Make functions globally available
 window.loginUser = handleLogin;
