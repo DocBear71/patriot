@@ -99,6 +99,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    function modifyMembershipOptions() {
+        const membershipSelect = document.getElementById('membership-level');
+
+        if (membershipSelect) {
+            // Get all options except "Free" and "Admin"
+            const options = membershipSelect.querySelectorAll('option:not([value="Free"]):not([value="Admin"]):not([value="Test"])');
+
+            // Add "Coming Soon" to premium options and disable them
+            options.forEach(option => {
+                option.textContent = option.textContent + ' (Coming Soon)';
+                option.disabled = true;
+                option.title = 'This membership level will be available soon';
+            });
+
+            // Add a note about premium options
+            const membershipField = membershipSelect.parentElement;
+            const premiumNote = document.createElement('div');
+            premiumNote.className = 'premium-note';
+            premiumNote.innerHTML = '<p><small>Premium access levels will be available soon. You can support the site through <a href="donate.html">donations</a>.</small></p>';
+            membershipField.appendChild(premiumNote);
+        }
+    }
+
+
     function validateTerms() {
         if (form.termsCheckbox) {
             if (form.termsCheckbox.checked) {
@@ -273,4 +297,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Call the function to add asterisks
     addAsterisksToRequiredFields();
+    modifyMembershipOptions();
 });

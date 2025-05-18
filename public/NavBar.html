@@ -136,8 +136,51 @@
             console.error("Bootstrap 5 not detected - some features may not work");
         }
     });
+</script>
+<script>
+    $(document).ready(function() {
+        // Function to update the navbar
+        function updateNavBar() {
+            // Check if the navbar has loaded
+            const navbar = document.querySelector('.navbar-nav');
+            if (!navbar) {
+                // If not loaded yet, wait and try again
+                setTimeout(updateNavBar, 100);
+                return;
+            }
 
+            // Create the donation button
+            const donateItem = document.createElement('li');
+            donateItem.className = 'nav-item';
+            donateItem.innerHTML = `
+            <a class="nav-link btn btn-outline-primary btn-sm donation-btn" href="donate.html">
+                <i class="bi bi-heart-fill text-danger"></i> Support Us
+            </a>
+        `;
 
+            // Style the donation button
+            const donateLink = donateItem.querySelector('.donation-btn');
+            donateLink.style.marginLeft = '10px';
+            donateLink.style.marginRight = '10px';
+            donateLink.style.padding = '5px 10px';
 
+            // Add the button to the navbar before the login/register buttons
+            const loginButton = document.querySelector('#loginButton');
+            if (loginButton) {
+                const loginItem = loginButton.closest('.nav-item');
+                if (loginItem) {
+                    navbar.insertBefore(donateItem, loginItem);
+                } else {
+                    navbar.appendChild(donateItem);
+                }
+            } else {
+                navbar.appendChild(donateItem);
+            }
 
+            console.log('Donation button added to navbar');
+        }
+
+        // Wait for the navbar to load
+        setTimeout(updateNavBar, 500);
+    });
 </script>

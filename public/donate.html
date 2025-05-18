@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <title>Patriot Thanks: Support Our Mission</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="Edward G. McKeown">
+    <meta name="date" content="2025/5/18">
+    <meta name="description" content="Support Patriot Thanks through donations to help us connect veterans, active duty military, and first responders with businesses that offer incentives and discounts.">
+    <meta name="keywords" content="donations, support, veteran discounts, military discounts, first responder discounts">
+    <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="./css/figures.css" rel="stylesheet">
+    <link href="./css/menu-auth.css" rel="stylesheet">
+    <script src="./js/jquery-3.7.1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <script src="./js/layout-manager.js"></script>
+</head>
+<body style="padding-top: 70px" id="page_layout">
+<div id="nav-placeholder"></div>
+<header>
+    <br>
+    <div class="left-banner">
+        <a href="./index.html">
+            <img src="./images/docbearlogov4.png" alt="DocBear logo">
+        </a>
+    </div>
+    <div class="right-banner">
+        <h1>Patriot Thanks</h1>
+        <hr>
+        <h4>Support Our Mission</h4>
+    </div>
+    <div style="clear:left;"></div>
+</header>
+<main class="container">
+    <div class="row my-5">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">Support Patriot Thanks</h2>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h3>Help Us Connect Heroes with Businesses</h3>
+                        <p>Patriot Thanks is dedicated to connecting veterans, active duty military, first responders, and their spouses with businesses that appreciate their service through special discounts and incentives. Your support helps us maintain and grow this valuable resource for our community.</p>
+                    </div>
+
+                    <div class="mb-4">
+                        <h4>Your Donation Helps Us:</h4>
+                        <ul>
+                            <li>Cover hosting and operational costs</li>
+                            <li>Develop enhanced features and tools</li>
+                            <li>Expand our database of participating businesses</li>
+                            <li>Improve the user experience for both heroes and businesses</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-4">
+                        <h4>Choose Your Donation Amount:</h4>
+                        <div class="row mb-3 text-center">
+                            <div class="col-6 col-md-3 mb-2">
+                                <button class="btn btn-outline-primary w-100 donation-btn" data-amount="5">$5</button>
+                            </div>
+                            <div class="col-6 col-md-3 mb-2">
+                                <button class="btn btn-outline-primary w-100 donation-btn" data-amount="10">$10</button>
+                            </div>
+                            <div class="col-6 col-md-3 mb-2">
+                                <button class="btn btn-outline-primary w-100 donation-btn" data-amount="25">$25</button>
+                            </div>
+                            <div class="col-6 col-md-3 mb-2">
+                                <button class="btn btn-outline-primary w-100 donation-btn" data-amount="50">$50</button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="custom-amount" class="form-label">Custom Amount ($):</label>
+                            <input type="number" id="custom-amount" class="form-control" min="1" placeholder="Enter custom amount">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h4>Donor Information:</h4>
+                        <form id="donation-form">
+                            <div class="mb-3">
+                                <label for="donor-name" class="form-label">Name</label>
+                                <input type="text" class="form-control" id="donor-name" placeholder="Your name">
+                            </div>
+                            <div class="mb-3">
+                                <label for="donor-email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="donor-email" placeholder="Your email">
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="anonymous-donation">
+                                <label class="form-check-label" for="anonymous-donation">Make my donation anonymous</label>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="recurring-donation">
+                                <label class="form-check-label" for="recurring-donation">Make this a monthly recurring donation</label>
+                            </div>
+                            <div class="mb-3">
+                                <label for="donor-message" class="form-label">Message (Optional)</label>
+                                <textarea class="form-control" id="donor-message" rows="3" placeholder="Share why you're supporting Patriot Thanks..."></textarea>
+                            </div>
+
+                            <div class="payment-section mb-4">
+                                <h4>Payment Method:</h4>
+                                <div class="payment-options d-flex flex-wrap gap-3 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="paymentMethod" id="payment-paypal" checked>
+                                        <label class="form-check-label" for="payment-paypal">
+                                            <i class="bi bi-paypal me-2"></i>PayPal
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="paymentMethod" id="payment-card">
+                                        <label class="form-check-label" for="payment-card">
+                                            <i class="bi bi-credit-card me-2"></i>Credit Card
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div id="card-payment-form" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="card-name" class="form-label">Name on Card</label>
+                                        <input type="text" class="form-control" id="card-name" placeholder="Name as it appears on card">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="card-number" class="form-label">Card Number</label>
+                                        <input type="text" class="form-control" id="card-number" placeholder="XXXX XXXX XXXX XXXX">
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="card-expiry" class="form-label">Expiration Date</label>
+                                            <input type="text" class="form-control" id="card-expiry" placeholder="MM/YY">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="card-cvc" class="form-label">CVC</label>
+                                            <input type="text" class="form-control" id="card-cvc" placeholder="123">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-center">
+                                <button type="submit" class="btn btn-primary btn-lg" id="donate-btn">Complete Donation</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top">
+                        <h5>Other Ways to Support Us:</h5>
+                        <p>If you'd prefer to support us through other means, please contact us at <a href="mailto:support@patriotthanks.com">support@patriotthanks.com</a> to discuss alternative donation methods.</p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <small class="text-muted">Patriot Thanks is operated by Doc Bear Enterprises, LLC. Donations are not tax-deductible as charitable contributions.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+<footer class="footer_style">
+    <br><br>
+    <p>&copy; Copyright 2024 Doc Bear Enterprises, LLC</p>
+    <div class="footer-links">
+        <a href="terms.html">Terms of Use</a> |
+        <a href="privacy.html">Privacy Policy</a> |
+        <a href="contact.html">Contact Us</a>
+    </div>
+    <br><br>
+</footer>
+<script src="./js/bootstrap.bundle.min.js"></script>
+<script src="./js/donation.js"></script>
+<script>
+    $(function() {
+        $('#nav-placeholder').load('NavBar.html', function() {
+            console.log('NavBar loaded');
+
+            // Load login handler
+            $.getScript('./js/bootstrap5-login-handler.js').done(function() {
+                console.log('Login handler script loaded successfully');
+
+                // Check login status if function exists
+                setTimeout(function() {
+                    if (typeof checkLoginStatus === 'function') {
+                        checkLoginStatus();
+                    }
+                }, 500);
+            });
+        });
+    });
+</script>
+</body>
+</html>

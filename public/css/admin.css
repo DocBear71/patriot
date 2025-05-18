@@ -1,0 +1,173 @@
+/* admin.css - Styles for the admin dashboard */
+
+/* Dashboard Statistics Cards */
+.card {
+    border-radius: 0.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+.card-title {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+/* Donation Growth Indicators */
+#donation-growth,
+#amount-growth {
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+    opacity: 0.9;
+}
+
+/* Table Styling */
+.table th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+    white-space: nowrap;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.no-data-row td,
+.loading-row td,
+.error-row td {
+    height: 100px;
+}
+
+/* Table Filters */
+.input-group .form-control:focus,
+.form-select:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Pagination Controls */
+.pagination-controls button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pagination-controls .btn:disabled {
+    opacity: 0.4;
+}
+
+/* Status Badges */
+.badge {
+    padding: 0.4em 0.6em;
+    font-weight: 500;
+}
+
+/* Modal Styling */
+.modal-content {
+    border-radius: 0.5rem;
+    border: none;
+}
+
+.modal-header {
+    border-bottom: 1px solid #e9ecef;
+    padding: 1rem 1.5rem;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    border-top: 1px solid #e9ecef;
+    padding: 1rem 1.5rem;
+}
+
+/* Chart Container */
+#donations-chart {
+    height: 300px !important;
+}
+
+/* Action Buttons */
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 767.98px) {
+    .card-title {
+        font-size: 0.9rem;
+    }
+
+    .card h2 {
+        font-size: 1.5rem;
+    }
+
+    .table-responsive {
+        border: none;
+    }
+
+    .pagination-controls {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        margin-top: 1rem;
+    }
+
+    .showing-text {
+        display: none;
+    }
+
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+}
+
+/* Unauthorized Message */
+#unauthorized-message {
+    max-width: 500px;
+    margin: 2rem auto;
+    text-align: center;
+    padding: 2rem;
+}
+
+#unauthorized-message h4 {
+    margin-bottom: 1rem;
+}
+
+#unauthorized-message .btn {
+    margin-top: 1rem;
+}
+
+/* Donor Message Box */
+#detail-message {
+    min-height: 60px;
+    font-style: italic;
+}
+
+/* Custom Animation for Loading */
+@keyframes pulse {
+    0% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.6;
+    }
+}
+
+.loading-row td {
+    animation: pulse 1.5s infinite ease-in-out;
+}
