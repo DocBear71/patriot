@@ -116,7 +116,7 @@ async function loadExistingCodes() {
         const token = getAuthToken();
         const baseURL = getBaseUrl();
 
-        const response = await fetch(`${baseURL}/api/combined-api/admin-codes.js?operation=list`, {
+        const response = await fetch(`${baseURL}/api/combined-api.js?operation=admin-codes&action=list`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -258,7 +258,7 @@ async function handleCreateCode(event) {
         const baseURL = getBaseUrl();
 
         // Send request to create code
-        const response = await fetch(`${baseURL}/api/combined-api/admin-codes.js?operation=create`, {
+        const response = await fetch(`${baseURL}/api/combined-api.js?operation=admin-codes&action=create`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -346,7 +346,7 @@ async function handleDeleteCode(event) {
         const baseURL = getBaseUrl();
 
         // Send request to delete code
-        const response = await fetch(`${baseURL}/api/combined-api/admin-codes.js?operation=delete`, {
+        const response = await fetch(`${baseURL}/api/combined-api.js?operation=admin-codes&action=delete`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${token}`,

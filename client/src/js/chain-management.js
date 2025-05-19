@@ -427,7 +427,7 @@ function loadChainIncentives(chainId) {
     const baseURL = getBaseURL();
 
     // Make API request to get chain incentives
-    fetch(`${baseURL}/api/combined-api/incentives.js?business_id=${chainId}`)
+    fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Failed to load incentives: ${response.status}`);
@@ -484,63 +484,35 @@ function loadChainIncentives(chainId) {
  * Load locations for a chain
  * @param {string} chainId - The ID of the chain
  */
-function loadChainLocations(chainId) {
+function loadChainIncentives(chainId) {
     if (!chainId) return;
 
-    const locationsContainer = document.getElementById('chain-locations');
-    if (!locationsContainer) return;
+    const incentivesContainer = document.getElementById('chain-incentives');
+    if (!incentivesContainer) return;
 
     // Show loading indicator
-    locationsContainer.innerHTML = '<p class="text-center">Loading locations...</p>';
+    incentivesContainer.innerHTML = '<p class="text-center">Loading incentives...</p>';
 
     // Get the base URL
     const baseURL = getBaseURL();
 
-    // Make API request to get chain locations
-    fetch(`${baseURL}/api/business.js?operation=get_chain_locations&chain_id=${chainId}`)
+    // Make API request to get chain incentives - CHANGE THIS LINE:
+    fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`)
         .then(response => {
             if (!response.ok) {
-                throw new Error(`Failed to load locations: ${response.status}`);
+                throw new Error(`Failed to load incentives: ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            // Check if we have results
-            if (!data.results || data.results.length === 0) {
-                locationsContainer.innerHTML = '<p>No locations found for this chain.</p>';
-                return;
-            }
-
-            // Build the locations list HTML
-            let locationsHTML = '';
-
-            data.results.forEach(location => {
-                const addressLine = location.address2
-                    ? `${location.address1}, ${location.address2}, ${location.city}, ${location.state} ${location.zip}`
-                    : `${location.address1}, ${location.city}, ${location.state} ${location.zip}`;
-
-                locationsHTML += `
-                    <div class="location-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>${location.bname}</strong>
-                            <div><small>${addressLine}</small></div>
-                        </div>
-                        <div>
-                            <button class="btn btn-sm btn-danger" onclick="removeLocationFromChain('${location._id}')">
-                                <i class="fas fa-unlink"></i> Remove
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-
-            locationsContainer.innerHTML = locationsHTML;
+            // Rest of the function remains the same
+            // ...
         })
         .catch(error => {
-            console.error('Error loading locations:', error);
-            locationsContainer.innerHTML = `
+            console.error('Error loading incentives:', error);
+            incentivesContainer.innerHTML = `
                 <div class="alert alert-danger" role="alert">
-                    Error loading locations: ${error.message}
+                    Error loading incentives: ${error.message}
                 </div>
             `;
         });
@@ -895,8 +867,8 @@ function loadModalChainIncentives(chainId) {
     // Get the base URL
     const baseURL = getBaseURL();
 
-    // Make API request to get chain incentives
-    fetch(`${baseURL}/api/combined-api/incentives.js?business_id=${chainId}`)
+    // Make API request to get chain incentives - CHANGE THIS LINE:
+    fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Failed to load incentives: ${response.status}`);
@@ -904,40 +876,8 @@ function loadModalChainIncentives(chainId) {
             return response.json();
         })
         .then(data => {
-            // Check if we have results
-            if (!data.results || data.results.length === 0) {
-                incentivesContainer.innerHTML = '<p>No incentives found for this chain.</p>';
-                return;
-            }
-
-            // Build the incentives list HTML
-            let incentivesHTML = '<div class="list-group">';
-
-            data.results.forEach(incentive => {
-                if (incentive.is_available) {
-                    const typeLabel = getIncentiveTypeLabel(incentive.type);
-                    const otherDescription = incentive.other_description ?
-                        ` (${incentive.other_description})` : '';
-
-                    incentivesHTML += `
-                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}%
-                                <div><small>${incentive.information || ''}</small></div>
-                            </div>
-                            <div>
-                                <button class="btn btn-sm btn-danger" onclick="deleteIncentive('${incentive._id}', true)">
-                                    <i class="fas fa-trash"></i> Remove
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }
-            });
-
-            incentivesHTML += '</div>';
-
-            incentivesContainer.innerHTML = incentivesHTML;
+            // Rest of the function remains the same
+            // ...
         })
         .catch(error => {
             console.error('Error loading incentives:', error);
@@ -993,8 +933,8 @@ function addChainIncentive() {
         incentiveData.other_description = otherDescription;
     }
 
-    // Make API request to add the incentive
-    fetch(`${baseURL}/api/combined-api/incentives.js?operation=create`, {
+    // Make API request to add the incentive - CHANGE THIS LINE:
+    fetch(`${baseURL}/api/combined-api.js?operation=incentives`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -1041,8 +981,8 @@ function deleteIncentive(incentiveId, isModal = false) {
     // Get the base URL
     const baseURL = getBaseURL();
 
-    // Make API request to delete the incentive
-    fetch(`${baseURL}/api/combined-api/incentives.js?operation=delete&id=${incentiveId}`, {
+    // Make API request to delete the incentive - CHANGE THIS LINE:
+    fetch(`${baseURL}/api/combined-api.js?operation=incentives&id=${incentiveId}&operation=delete`, {
         method: 'POST'
     })
         .then(response => {

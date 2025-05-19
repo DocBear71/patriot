@@ -222,7 +222,8 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log("Fetching profile data for user:", userId);
 
             const baseURL = window.location.origin;
-            const apiURL = `${baseURL}/api/user-donations/user.js?operation=profile${userId}`;
+            const apiURL = `${baseURL}/api/user-donations.js?operation=user&action=profile&userId=${userId}`;
+
 
             // Make API call to get complete profile
             const res = await fetch(apiURL, {
@@ -443,7 +444,8 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const baseURL = window.location.origin;
             // Use the absolute URL to your Vercel deployment
-            const apiUrl = `${baseURL}/api/user-donations/user.js?operation=update`;
+            const apiUrl = `${baseURL}/api/user-donations.js?operation=user&action=update`;
+
 
             const res = await fetch(apiUrl, {
                 method: "PUT",
@@ -501,7 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const baseURL = window.location.origin;
             // Use the absolute URL to your Vercel deployment
-            const apiUrl = `${baseURL}/api/user-donations/user.js?operation=password`;
+            const apiUrl = `${baseURL}/api/user-donations.js?operation=user&action=password`;
 
             const res = await fetch(apiUrl, {
                 method: "POST",

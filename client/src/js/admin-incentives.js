@@ -415,7 +415,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`Fetching incentives with query: ${queryParams}`);
 
             // Make API request
-            const response = await fetch(`${baseURL}/api/combined-api/admin-incentives.js?${queryParams}`, {
+            const response = await fetch(`${baseURL}/api/combined-api.js?operation=admin-incentives.js&action=${queryParams}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -807,7 +807,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = getIncentiveFormData();
 
             // Make API request - we'll use the existing incentives API endpoint
-            const response = await fetch(`${baseURL}/api/combined-api/incentives.js`, {
+            const response = await fetch(`${baseURL}/api/combined-api.js?operation=incentives`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -859,7 +859,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.incentiveId = document.getElementById('incentive-id').value;
 
             // Make API request - we'll use the admin endpoint for updates
-            const response = await fetch(`${baseURL}/api/combined-api/admin-incentives.js?operation=update`, {
+            const response = await fetch(`${baseURL}/api/combined-api.js?operation=admin-incentives&action=update`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -905,7 +905,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Make API request
-            const response = await fetch(`${baseURL}/api/combined-api/admin-incentives.js?operation=delete`, {
+            const response = await fetch(`${baseURL}/api/combined-api.js?operation=admin-incentives&action=delete`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -989,7 +989,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Make API request
-            const response = await fetch(`${baseURL}/api/combined-api/admin-incentives.js?operation=get&incentiveId=${incentiveId}`, {
+            const response = await fetch(`${baseURL}/api/combined-api.js?operation=admin-incentives&action=get&incentiveId=${incentiveId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,

@@ -151,7 +151,14 @@ app.all('/api/user-donations/*', (req, res) => {
 });
 
 // Mount auth-verify API
-app.all('/api/auth-verify', createApiHandler(authVerifyApi));
+app.all('/api/auth-verify', (req, res) => {
+    // For backward compatibility, keep the original operation if specified
+    if (!req.query.operation) {
+        // Default to verify-token if no operation is specified
+        req.query.operation = 'verify-token';
+    }
+    createApiHandler(authApi)(req, res);
+});
 
 // Mount Google Maps API endpoints
 app.get('/api/geocode', createApiHandler(geocodeApi));

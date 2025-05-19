@@ -132,9 +132,21 @@ module.exports = async (req, res) => {
     console.log(`Combined API hit: path=${pathParts.join('/')}, operation=${operation || 'none'}, method=${req.method}`);
 
     try {
-        // Branch based on the first path part
-        const mainPath = pathParts[0]?.toLowerCase();
+        // Branch based on the operation if specified
+        if (operation) {
+            switch (operation.toLowerCase()) {
+                case 'admin-codes':
+                    return await handleAdminCodes(req, res, req.query.action || 'list');
+                case 'admin-incentives':
+                    return await handleAdminIncentives(req, res, req.query.action);
+                case 'incentives':
+                    return await handleIncentives(req, res, req.query.action);
+                // Other operations as needed
+            }
+        }
 
+        // If no operation or unrecognized, try to determine from the path
+        const mainPath = pathParts[0]?.toLowerCase();
         switch (mainPath) {
             case 'admin-codes':
                 return await handleAdminCodes(req, res, operation);

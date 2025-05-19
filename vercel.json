@@ -29,6 +29,21 @@
   ],
   "routes": [
     {
+      "src": "/api/combined-api.js",
+      "methods": ["GET", "POST", "OPTIONS", "DELETE", "PUT"],
+      "dest": "/api/combined-api.js"
+    },
+    {
+      "src": "/api/auth-verify.js",
+      "methods": ["GET", "POST", "OPTIONS"],
+      "dest": "/api/auth-verify.js"
+    },
+    {
+      "src": "/api/user-donations.js",
+      "methods": ["GET", "POST", "OPTIONS", "DELETE", "PUT"],
+      "dest": "/api/user-donations.js"
+    },
+    {
       "src": "/api/geocode",
       "methods": ["GET"],
       "dest": "/api/geocode.js"

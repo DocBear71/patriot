@@ -143,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadDonationStats() {
         if (!isAuthenticated || !isAdmin) return;
 
-        fetch('/api/user-donations/donations.js?operation=stats', {
+        fetch('/api/user-donations.js?operation=donation-stats', {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${userToken}`
@@ -213,7 +213,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Fetch donations
-        fetch(`/api/user-donations/donations.js?${queryParams}`, {
+        fetch(`/api/user-donations.js?operation=donations&${queryParams}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${userToken}`
@@ -373,7 +373,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show donation details in modal
     function showDonationDetails(donationId) {
         // Fetch donation details
-        fetch(`/api/user-donations/donations.js?operation=get&id=${donationId}`, {
+        fetch(`/api/user-donations.js?operation=get&id=${donationId}`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${userToken}`
@@ -416,7 +416,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Send receipt email for a donation
     function sendReceiptEmail(donationId) {
-        fetch('/api/user-donations/donations.js?operation=send-receipt', {
+        fetch('/api/user-donations.js?operation=send-receipt', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${userToken}`,
@@ -454,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        fetch('/api/user-donations/donations.js?operation=cancel-recurring', {
+        fetch('/api/user-donations.js?operation=cancel-recurring', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${userToken}`,
@@ -501,7 +501,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Create a download link
-        const downloadUrl = `/api/user-donations/donations.js?${queryParams}`;
+        const downloadUrl = `/api/user-donations.js?${queryParams}`;
         const a = document.createElement('a');
         a.href = downloadUrl;
         a.setAttribute('download', `donations-export-${new Date().toISOString().slice(0, 10)}.csv`);

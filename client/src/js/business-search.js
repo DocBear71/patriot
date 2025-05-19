@@ -874,7 +874,7 @@ function fetchBusinessIncentivesForInfoWindow(businessId) {
     // Determine the base URL
     const baseURL = getBaseURL();
 
-    const apiURL = `${baseURL}/api/combined-api/incentives.js?business_id=${businessId}`;
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
 
     fetch(apiURL)
         .then(response => {
@@ -948,7 +948,7 @@ function fetchBusinessIncentives(businessId, chainId = null) {
     const baseURL = getBaseURL();
 
     // Build the API URL with optional chain_id
-    let apiURL = `${baseURL}/api/combined-api/incentives.js?business_id=${businessId}`;
+    let apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
     if (chainId) {
         apiURL += `&chain_id=${chainId}`;
     }
@@ -1027,7 +1027,7 @@ function fetchChainIncentivesForPlacesResult(placeId, chainId) {
     const baseURL = getBaseURL();
 
     // Build the API URL to fetch chain incentives for Places result
-    const apiURL = `${baseURL}/api/combined-api/incentives.js?business_id=${placeId}&chain_id=${chainId}`;
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${placeId}&chain_id=${chainId}`;
 
     console.log("Fetching chain incentives for Places result: ", apiURL);
 
