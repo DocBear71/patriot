@@ -1,32 +1,64 @@
-// api/donations.js - Handles donation processing
+// api/user-donations.js - PART 1: Initialization and helpers
 
 const connect = require('../config/db');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const { ObjectId } = mongoose.Types;
 
-// Define donation schema
-const donationSchema = new mongoose.Schema({
-    amount: { type: Number, required: true },
-    name: { type: String, required: true },
-    email: { type: String, required: true },
-    anonymous: { type: Boolean, default: false },
-    recurring: { type: Boolean, default: false },
-    message: String,
-    paymentMethod: { type: String, required: true },
-    paymentId: String,
-    transactionId: String,
-    status: { type: String, default: 'pending' },
-    cancelledAt: Date,
-    userId: mongoose.Schema.Types.ObjectId, // If the donor is a registered user
-    created_at: { type: Date, default: Date.now }
-});
+// Initialize models
+let User, Donation;
 
-// Initialize the Donation model
-let Donation;
 try {
+    // Try to get existing models
+    User = mongoose.model('User');
     Donation = mongoose.model('Donation');
 } catch (error) {
+    // Define schemas if models aren't registered yet
+
+    // User schema
+    const userSchema = new mongoose.Schema({
+        fname: String,
+        lname: String,
+        address1: String,
+        address2: String,
+        city: String,
+        state: String,
+        zip: String,
+        status: String,
+        level: String,
+        email: { type: String, required: true, unique: true },
+        password: { type: String, required: true },
+        isAdmin: Boolean,
+        created_at: { type: Date, default: Date.now },
+        updated_at: { type: Date, default: Date.now },
+        termsAccepted: { type: Boolean, default: false },
+        termsAcceptedDate: { type: Date },
+        termsVersion: { type: String, default: "May 14, 2025" },
+        resetToken: String,
+        resetTokenExpires: Date
+    });
+
+    // Donation schema
+    const donationSchema = new mongoose.Schema({
+        amount: { type: Number, required: true },
+        name: { type: String, required: true },
+        email: { type: String, required: true },
+        anonymous: { type: Boolean, default: false },
+        recurring: { type: Boolean, default: false },
+        message: String,
+        paymentMethod: { type: String, required: true },
+        paymentId: String,
+        transactionId: String,
+        status: { type: String, default: 'pending' },
+        cancelledAt: Date,
+        userId: mongoose.Schema.Types.ObjectId, // If the donor is a registered user
+        created_at: { type: Date, default: Date.now }
+    });
+
+    // Register models
+    User = mongoose.model('User', userSchema, 'users');
     Donation = mongoose.model('Donation', donationSchema, 'donations');
 }
 
@@ -54,6 +86,57 @@ transporter.verify(function (error, success) {
 });
 
 /**
+ * Helper to verify admin access
+ */
+async function verifyAdminAccess(req) {
+    // Get token from request headers
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return { success: false, status: 401, message: 'Authorization required' };
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    // Verify token and check admin status
+    let userId;
+    try {
+        // Using JWT
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'patriot-thanks-secret-key');
+        userId = decoded.userId;
+    } catch (error) {
+        console.error("Token verification error:", error);
+        return { success: false, status: 401, message: 'Invalid or expired token' };
+    }
+
+    // Connect to MongoDB
+    try {
+        await connect;
+    } catch (dbError) {
+        console.error("Database connection error:", dbError);
+        return {
+            success: false,
+            status: 500,
+            message: 'Database connection error',
+            error: dbError.message
+        };
+    }
+
+    // Check if user exists and is admin
+    const user = await User.findById(userId);
+
+    if (!user) {
+        return { success: false, status: 404, message: 'User not found' };
+    }
+
+    if (user.level !== 'Admin' && user.isAdmin !== true) {
+        return { success: false, status: 403, message: 'Admin access required' };
+    }
+
+    return { success: true, userId, user };
+}
+
+/**
  * Helper to establish DB connection
  */
 async function connectDB() {
@@ -72,7 +155,7 @@ async function connectDB() {
 }
 
 /**
- * Main API handler for donation endpoints
+ * Main API handler - route to either user or donation endpoints
  */
 module.exports = async (req, res) => {
     // Handle OPTIONS request for CORS
@@ -81,55 +164,313 @@ module.exports = async (req, res) => {
         return res.status(200).end();
     }
 
-    console.log("Donations API hit:", req.method, req.url);
-    console.log("Query params:", req.query);
+    console.log("User-Donations API hit:", req.method, req.url);
+
+    // Extract path components
+    const url = req.url || '';
+    const pathParts = url.split('?')[0].split('/').filter(Boolean);
 
     // Extract operation from query params
     const { operation } = req.query;
 
     try {
-        // Route based on operation parameter
-        switch (operation) {
-            case 'create':
-                return await handleCreateDonation(req, res);
-            case 'confirm':
-                return await handleConfirmDonation(req, res);
-            case 'list':
-                return await handleListDonations(req, res);
-            case 'stats':
-                return await handleDonationStats(req, res);
-            case 'cancel-recurring':
-                return await handleCancelRecurring(req, res);
-            case 'get':
-                return await handleGetDonation(req, res);
-            case 'send-receipt':
-                return await handleSendReceipt(req, res);
-            case 'export':
-                return await handleExportDonations(req, res);
+        // Route based on the first path part
+        const mainPath = pathParts[0]?.toLowerCase();
+
+        switch (mainPath) {
+            case 'user':
+                return await handleUserRequests(req, res, operation);
+            case 'donations':
+                return await handleDonationRequests(req, res, operation);
             default:
-                // Default information response for GET requests
-                if (req.method === 'GET') {
-                    return res.status(200).json({
-                        message: 'Donations API is available',
-                        operations: [
-                            'create',
-                            'confirm',
-                            'list',
-                            'stats',
-                            'cancel-recurring',
-                            'get',
-                            'send-receipt',
-                            'export'
-                        ]
-                    });
+                // If no specific path, use operation to determine
+                if (operation && operation.startsWith('don')) {
+                    // If operation starts with 'don', assume it's donation-related
+                    return await handleDonationRequests(req, res, operation);
+                } else {
+                    // Default to user operations
+                    return await handleUserRequests(req, res, operation);
                 }
-                return res.status(400).json({ message: 'Invalid operation' });
         }
     } catch (error) {
-        console.error(`Error in donations API:`, error);
+        console.error(`Error in user-donations API:`, error);
         return res.status(500).json({ message: 'Server error: ' + error.message });
     }
 };
+
+// api/user-donations.js - PART 2: User management functions
+
+/**
+ * Handle user-related requests
+ */
+async function handleUserRequests(req, res, operation) {
+    // Connect to database
+    const dbConnection = await connectDB();
+    if (!dbConnection.success) {
+        return res.status(500).json({
+            message: dbConnection.message,
+            error: dbConnection.error.message
+        });
+    }
+
+    // Route based on operation
+    switch (operation) {
+        case 'profile':
+            return await handleProfileGet(req, res);
+        case 'get':
+            return await handleUserGet(req, res);
+        case 'update':
+            return await handleUserUpdate(req, res);
+        case 'password':
+            return await handlePasswordUpdate(req, res);
+        default:
+            if (req.method === 'GET') {
+                return res.status(200).json({
+                    message: 'User API is available',
+                    operations: ['profile', 'get', 'update', 'password']
+                });
+            }
+            return res.status(400).json({ message: 'Invalid operation' });
+    }
+}
+
+/**
+ * Handle GET request for user profile
+ */
+async function handleProfileGet(req, res) {
+    // Only allow GET requests
+    if (req.method !== 'GET') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    const userId = req.query.userId;
+
+    if (!userId) {
+        return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    // Find the user
+    let user;
+    try {
+        user = await User.findOne({ _id: new ObjectId(userId) });
+    } catch (error) {
+        console.log("Error finding user:", error);
+        // Try with string ID if ObjectId fails
+        user = await User.findOne({ _id: userId });
+    }
+
+    if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Convert to plain object and remove password
+    const userData = user.toObject ? user.toObject() : { ...user };
+    delete userData.password;
+
+    console.log("Returning user data:", userData);
+
+    return res.status(200).json({
+        user: userData,
+        success: true
+    });
+}
+
+/**
+ * Handle GET request for user by ID
+ */
+async function handleUserGet(req, res) {
+    // Only allow GET requests
+    if (req.method !== 'GET') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    // Get user ID from query
+    const userId = req.query.id;
+
+    if (!userId) {
+        return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    // Find the user
+    const user = await User.findOne({ _id: new ObjectId(userId) });
+
+    if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Create a user object without the password
+    const userData = user.toObject();
+    delete userData.password;
+
+    // Return user data
+    return res.status(200).json({
+        user: userData,
+        success: true
+    });
+}
+
+/**
+ * Handle PUT request for updating user profile
+ */
+async function handleUserUpdate(req, res) {
+    // Handle GET request for testing
+    if (req.method === 'GET') {
+        return res.status(200).json({ message: 'User update API is available' });
+    }
+
+    // Only allow PUT requests for user updates
+    if (req.method !== 'PUT') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    // Extract user data from request body
+    const userData = req.body;
+
+    // Basic validation
+    if (!userData._id) {
+        return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    // Find the user by ID to verify it exists
+    const existingUser = await User.findOne({ _id: new ObjectId(userData._id) });
+
+    if (!existingUser) {
+        return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prepare data for update (exclude _id field)
+    const { _id, ...updateData } = userData;
+
+    // Add updated timestamp
+    updateData.updated_at = new Date();
+
+    // Update the user
+    const result = await User.updateOne(
+        { _id: new ObjectId(_id) },
+        { $set: updateData }
+    );
+
+    if (result.modifiedCount === 0) {
+        return res.status(200).json({
+            message: 'No changes were made to the user profile',
+            success: true
+        });
+    }
+
+    // Return success response
+    return res.status(200).json({
+        message: 'User profile updated successfully',
+        success: true
+    });
+}
+
+/**
+ * Handle POST request for updating user password
+ */
+async function handlePasswordUpdate(req, res) {
+    // Handle GET request for testing
+    if (req.method === 'GET') {
+        return res.status(200).json({ message: 'password update API is available' });
+    }
+
+    // Only allow POST requests for password updates
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    // Extract password data from request body
+    const { userId, currentPassword, newPassword } = req.body;
+
+    // Basic validation
+    if (!userId || !currentPassword || !newPassword) {
+        return res.status(400).json({
+            message: 'User ID, current password, and new password are required'
+        });
+    }
+
+    // Find the user
+    const userExists = await User.findOne({ _id: new ObjectId(userId) });
+
+    if (!userExists) {
+        return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, userExists.password);
+
+    if (!isPasswordValid) {
+        return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the password
+    const result = await User.updateOne(
+        { _id: new ObjectId(userId) },
+        { $set: { password: hashedPassword, updated_at: new Date() } }
+    );
+
+    // Return success response
+    return res.status(200).json({
+        message: 'Password updated successfully',
+        success: true
+    });
+}
+
+/**
+ * Handle donation-related requests
+ */
+async function handleDonationRequests(req, res, operation) {
+    // Connect to database
+    const dbConnection = await connectDB();
+    if (!dbConnection.success) {
+        return res.status(500).json({
+            message: dbConnection.message,
+            error: dbConnection.error.message
+        });
+    }
+
+    // Route based on operation
+    switch (operation) {
+        case 'create':
+            return await handleCreateDonation(req, res);
+        case 'confirm':
+            return await handleConfirmDonation(req, res);
+        case 'list':
+            return await handleListDonations(req, res);
+        case 'stats':
+            return await handleDonationStats(req, res);
+        case 'cancel-recurring':
+            return await handleCancelRecurring(req, res);
+        case 'get':
+            return await handleGetDonation(req, res);
+        case 'send-receipt':
+            return await handleSendReceipt(req, res);
+        case 'export':
+            return await handleExportDonations(req, res);
+        default:
+            // Default information response for GET requests
+            if (req.method === 'GET') {
+                return res.status(200).json({
+                    message: 'Donations API is available',
+                    operations: [
+                        'create',
+                        'confirm',
+                        'list',
+                        'stats',
+                        'cancel-recurring',
+                        'get',
+                        'send-receipt',
+                        'export'
+                    ]
+                });
+            }
+            return res.status(400).json({ message: 'Invalid operation' });
+    }
+}
+
+// api/user-donations.js - PART 3: Donation functions
 
 /**
  * Handle creating a new donation
@@ -141,15 +482,6 @@ async function handleCreateDonation(req, res) {
     }
 
     try {
-        // Connect to database
-        const dbConnection = await connectDB();
-        if (!dbConnection.success) {
-            return res.status(500).json({
-                message: dbConnection.message,
-                error: dbConnection.error.message
-            });
-        }
-
         // Extract donation data from request body
         const donationData = req.body;
 
@@ -253,15 +585,6 @@ async function handleConfirmDonation(req, res) {
     }
 
     try {
-        // Connect to database
-        const dbConnection = await connectDB();
-        if (!dbConnection.success) {
-            return res.status(500).json({
-                message: dbConnection.message,
-                error: dbConnection.error.message
-            });
-        }
-
         // Extract confirmation data from request body
         const { donationId, paymentId, paypalOrderId } = req.body;
 
@@ -309,22 +632,13 @@ async function handleConfirmDonation(req, res) {
  * Handle listing donations (admin feature)
  */
 async function handleListDonations(req, res) {
-    // Verify admin access (reusing from auth.js)
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Authorization required' });
+    // Verify admin access
+    const adminCheck = await verifyAdminAccess(req);
+    if (!adminCheck.success) {
+        return res.status(adminCheck.status).json({ message: adminCheck.message });
     }
 
     try {
-        // Connect to database
-        const dbConnection = await connectDB();
-        if (!dbConnection.success) {
-            return res.status(500).json({
-                message: dbConnection.message,
-                error: dbConnection.error.message
-            });
-        }
-
         // Parse query parameters
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
@@ -395,20 +709,13 @@ async function handleListDonations(req, res) {
     }
 }
 
+// api/user-donations.js - PART 4: Donation functions continued
+
 /**
  * Handle donation statistics
  */
 async function handleDonationStats(req, res) {
     try {
-        // Connect to database
-        const dbConnection = await connectDB();
-        if (!dbConnection.success) {
-            return res.status(500).json({
-                message: dbConnection.message,
-                error: dbConnection.error.message
-            });
-        }
-
         // Calculate date ranges
         const now = new Date();
         const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -521,15 +828,6 @@ async function handleCancelRecurring(req, res) {
     }
 
     try {
-        // Connect to database
-        const dbConnection = await connectDB();
-        if (!dbConnection.success) {
-            return res.status(500).json({
-                message: dbConnection.message,
-                error: dbConnection.error.message
-            });
-        }
-
         // Extract data from request body
         const { donationId, email } = req.body;
 
@@ -574,15 +872,6 @@ async function handleCancelRecurring(req, res) {
  */
 async function handleGetDonation(req, res) {
     try {
-        // Connect to database
-        const dbConnection = await connectDB();
-        if (!dbConnection.success) {
-            return res.status(500).json({
-                message: dbConnection.message,
-                error: dbConnection.error.message
-            });
-        }
-
         const { id } = req.query;
 
         if (!id) {
@@ -614,15 +903,6 @@ async function handleSendReceipt(req, res) {
     }
 
     try {
-        // Connect to database
-        const dbConnection = await connectDB();
-        if (!dbConnection.success) {
-            return res.status(500).json({
-                message: dbConnection.message,
-                error: dbConnection.error.message
-            });
-        }
-
         // Extract data from request body
         const { donationId } = req.body;
 
@@ -663,13 +943,10 @@ async function handleSendReceipt(req, res) {
  */
 async function handleExportDonations(req, res) {
     try {
-        // Connect to database
-        const dbConnection = await connectDB();
-        if (!dbConnection.success) {
-            return res.status(500).json({
-                message: dbConnection.message,
-                error: dbConnection.error.message
-            });
+        // Verify admin access
+        const adminCheck = await verifyAdminAccess(req);
+        if (!adminCheck.success) {
+            return res.status(adminCheck.status).json({ message: adminCheck.message });
         }
 
         // Build filter object (similar to handleListDonations)
@@ -733,6 +1010,8 @@ async function handleExportDonations(req, res) {
         return res.status(500).json({ message: 'Server error: ' + error.message });
     }
 }
+
+// api/user-donations.js - PART 5: Email function
 
 /**
  * Send confirmation email for donation

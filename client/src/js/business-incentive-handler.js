@@ -358,7 +358,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const baseURL = window.location.origin;
         // make the api call to the server
-        const apiURL = `${baseURL}/api/incentives.js`;
+        const apiURL = `${baseURL}/api/combined-api/incentives.js`;
         console.log("Attempting to submit to: ", apiURL);
 
         fetch(apiURL, {

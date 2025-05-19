@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // Fetch User count
                 try {
-                    const userResponse = await fetch(`${baseURL}/api/user.js?operation=admin-list-users&page=1&limit=1`, {
+                    const userResponse = await fetch(`${baseURL}/api/user-donations/user.js?operation=admin-list-users&page=1&limit=1`, {
                         method: 'GET',
                         headers: {
                             'Authorization': `Bearer ${token}`,
@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // Fetch incentive count
                 try {
-                    const incentiveResponse = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=1`, {
+                    const incentiveResponse = await fetch(`${baseURL}/api/combined-api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=1`, {
                         method: 'GET',
                         headers: {
                             'Authorization': `Bearer ${token}`,
@@ -845,7 +845,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             // First, fetch total count of all incentives
-            const totalResponse = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=1`, {
+            const totalResponse = await fetch(`${baseURL}/api/combined-api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=1`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -862,7 +862,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const totalCount = totalData.total || 0;
 
             // Next, fetch count of available incentives
-            const availableResponse = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&is_available=true&page=1&limit=1`, {
+            const availableResponse = await fetch(`${baseURL}/api/combined-api/admin-incentives.js?operation=admin-list-incentives&is_available=true&page=1&limit=1`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -879,7 +879,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const availableCount = availableData.total || 0;
 
             // Now, fetch the sample for display (limit 5)
-            const response = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=5`, {
+            const response = await fetch(`${baseURL}/api/combined-api/admin-incentives.js?operation=admin-list-incentives&page=1&limit=5`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -918,7 +918,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Format date for query: YYYY-MM
                 const yearMonthStr = `${thisYear}-${thisMonth.toString().padStart(2, '0')}`;
 
-                const newResponse = await fetch(`${baseURL}/api/admin-incentives.js?operation=admin-list-incentives&created_after=${yearMonthStr}-01&page=1&limit=1`, {
+                const newResponse = await fetch(`${baseURL}/api/combined-api/admin-incentives.js?operation=admin-list-incentives&created_after=${yearMonthStr}-01&page=1&limit=1`, {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,

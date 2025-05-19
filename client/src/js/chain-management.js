@@ -427,7 +427,7 @@ function loadChainIncentives(chainId) {
     const baseURL = getBaseURL();
 
     // Make API request to get chain incentives
-    fetch(`${baseURL}/api/incentives.js?business_id=${chainId}`)
+    fetch(`${baseURL}/api/combined-api/incentives.js?business_id=${chainId}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Failed to load incentives: ${response.status}`);
@@ -896,7 +896,7 @@ function loadModalChainIncentives(chainId) {
     const baseURL = getBaseURL();
 
     // Make API request to get chain incentives
-    fetch(`${baseURL}/api/incentives.js?business_id=${chainId}`)
+    fetch(`${baseURL}/api/combined-api/incentives.js?business_id=${chainId}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Failed to load incentives: ${response.status}`);
@@ -994,7 +994,7 @@ function addChainIncentive() {
     }
 
     // Make API request to add the incentive
-    fetch(`${baseURL}/api/incentives.js?operation=create`, {
+    fetch(`${baseURL}/api/combined-api/incentives.js?operation=create`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -1042,7 +1042,7 @@ function deleteIncentive(incentiveId, isModal = false) {
     const baseURL = getBaseURL();
 
     // Make API request to delete the incentive
-    fetch(`${baseURL}/api/incentives.js?operation=delete&id=${incentiveId}`, {
+    fetch(`${baseURL}/api/combined-api/incentives.js?operation=delete&id=${incentiveId}`, {
         method: 'POST'
     })
         .then(response => {

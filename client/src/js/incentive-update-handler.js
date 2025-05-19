@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 : window.location.origin;
 
             // Use the API endpoint for incentives
-            const apiURL = `${baseURL}/api/incentives.js?business_id=${businessId}`;
+            const apiURL = `${baseURL}/api/combined-api/incentives.js?business_id=${businessId}`;
             console.log("Fetching incentives from:", apiURL);
 
             const response = await fetch(apiURL);
@@ -499,7 +499,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 : window.location.origin;
 
             // Use the API endpoint
-            const apiURL = `${baseURL}/api/admin-incentives.js?operation=update`;
+            const apiURL = `${baseURL}/api/combined-api/admin-incentives.js?operation=update`;
             console.log("Submitting to API at:", apiURL);
             console.log("Incentive data:", incentiveData);
 
