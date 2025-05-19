@@ -261,7 +261,9 @@ async function handleBusinessSearch(req, res) {
 
         // Only use business name if a value is provided
         if (businessNameValue && businessNameValue.trim() !== '') {
-            query.bname = { $regex: businessNameValue.trim(), $options: 'i' };
+            // Use case-insensitive regex search with more flexible matching
+            const searchRegex = new RegExp(businessNameValue.trim().replace(/\s+/g, '.*'), 'i');
+            query.bname = searchRegex;
         }
 
         if (addressValue && addressValue.trim() !== '') {
@@ -1362,20 +1364,30 @@ async function handleFindMatchingChain(req, res) {
  * Calculate name similarity for chain matching
  */
 function calculateNameSimilarity(chainName, placeName) {
-    // Simple algorithm to check how well names match
-    // Convert both to lowercase for case-insensitive comparison
-    chainName = chainName.toLowerCase();
-    placeName = placeName.toLowerCase();
+    // Clean and normalize names for better matching
+    chainName = chainName.toLowerCase()
+        .replace(/^the\s+/, '') // Remove leading "The "
+        .replace(/\s+inc\.?$/, '') // Remove trailing Inc/Inc.
+        .replace(/\s+corp\.?$/, '') // Remove trailing Corp/Corp.
+        .replace(/\s+corporation$/, '') // Remove trailing Corporation
+        .replace(/[^\w\s]/g, '') // Remove punctuation
+        .trim();
 
-    // Check for exact match
+    placeName = placeName.toLowerCase()
+        .replace(/^the\s+/, '')
+        .replace(/\s+inc\.?$/, '')
+        .replace(/\s+corp\.?$/, '')
+        .replace(/\s+corporation$/, '')
+        .replace(/[^\w\s]/g, '')
+        .trim();
+
+    // Check for exact match after normalization
     if (chainName === placeName) return 1.0;
 
     // Check if one contains the other
-    if (chainName.includes(placeName)) return 0.9;
-    if (placeName.includes(chainName)) return 0.9;
+    if (chainName.includes(placeName) || placeName.includes(chainName)) return 0.9;
 
-    // Calculate similarity using Levenshtein distance or other method
-    // Here's a simple check - count matching words
+    // Calculate word similarity
     const chainWords = chainName.split(/\s+/);
     const placeWords = placeName.split(/\s+/);
 
@@ -1386,7 +1398,11 @@ function calculateNameSimilarity(chainName, placeName) {
         }
     }
 
-    return matchingWords / Math.max(chainWords.length, placeWords.length);
+    // Consider it a match if at least 50% of words match
+    const similarity = matchingWords / Math.max(chainWords.length, placeWords.length);
+    console.log(`Similarity between "${chainName}" and "${placeName}": ${similarity}`);
+
+    return similarity;
 }
 
 /**

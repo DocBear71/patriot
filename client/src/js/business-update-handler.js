@@ -29,6 +29,16 @@ document.addEventListener('DOMContentLoaded', function() {
             // Prevent the form from submitting immediately
             event.preventDefault();
 
+            const selectedBusiness = window.selectedBusinessData || {};
+            if (selectedBusiness.is_chain) {
+                // Check if user is admin
+                const isAdmin = checkIfUserIsAdmin();
+                if (!isAdmin) {
+                    showMessage('error', "Chain businesses can only be modified by administrators.");
+                    return; // Prevent form submission
+                }
+            }
+
             // Validate all fields
             const invalidFields = [];
 
@@ -93,6 +103,55 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Store the selected business data for later use
         window.selectedBusinessData = businessData;
+
+        if (businessData.is_chain) {
+            // Check if user is admin
+            const isAdmin = checkIfUserIsAdmin();
+
+            if (!isAdmin) {
+                // Show the business info section first
+                if (businessInfoSection) {
+                    businessInfoSection.style.display = 'block';
+                }
+
+                // For non-admins, show a message and prevent editing
+                showMessage('error', "This is a chain business that can only be modified by administrators.");
+
+                // Disable all form fields
+                const formFields = document.querySelectorAll('input, select, textarea');
+                formFields.forEach(field => {
+                    field.disabled = true;
+                });
+
+                // Hide or disable the update button
+                const updateButton = document.getElementById('update-submit');
+                if (updateButton) {
+                    updateButton.style.display = 'none';
+                }
+
+                // Show a view-only message
+                const viewOnlyMessage = document.createElement('div');
+                viewOnlyMessage.className = 'alert alert-info';
+                viewOnlyMessage.innerHTML = '<strong>View Only:</strong> Chain businesses can only be modified by administrators.';
+                businessInfoSection.prepend(viewOnlyMessage);
+
+                // Still populate the form but in read-only mode
+                populateField('bname', businessData.bname);
+                populateField('address1', businessData.address1);
+                populateField('address2', businessData.address2);
+                populateField('city', businessData.city);
+                populateField('zip', businessData.zip);
+                populateField('phone', businessData.phone);
+                populateSelectField('state', businessData.state);
+                populateSelectField('type', businessData.type);
+                populateSelectField('status', businessData.status || 'active');
+
+                // Scroll to the form
+                businessInfoSection.scrollIntoView({ behavior: 'smooth' });
+
+                return; // Exit early
+            }
+        }
 
         // Show the business info section
         if (businessInfoSection) {
@@ -389,3 +448,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 });
+
+/**
+ * Check if the current user is an admin
+ * @returns {boolean} True if user is admin
+ */
+function checkIfUserIsAdmin() {
+    try {
+        // Get session data from localStorage
+        const sessionData = localStorage.getItem('patriotThanksSession');
+        if (!sessionData) return false;
+
+        const session = JSON.parse(sessionData);
+
+        // Check if user has admin privileges
+        return (session.user && (session.user.isAdmin === true || session.user.level === 'Admin'));
+    } catch (error) {
+        console.error("Error checking admin status:", error);
+        return false;
+    }
+}
