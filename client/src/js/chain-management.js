@@ -484,35 +484,63 @@ function loadChainIncentives(chainId) {
  * Load locations for a chain
  * @param {string} chainId - The ID of the chain
  */
-function loadChainIncentives(chainId) {
+function loadChainLocations(chainId) {
     if (!chainId) return;
 
-    const incentivesContainer = document.getElementById('chain-incentives');
-    if (!incentivesContainer) return;
+    const locationsContainer = document.getElementById('chain-locations');
+    if (!locationsContainer) return;
 
     // Show loading indicator
-    incentivesContainer.innerHTML = '<p class="text-center">Loading incentives...</p>';
+    locationsContainer.innerHTML = '<p class="text-center">Loading locations...</p>';
 
     // Get the base URL
     const baseURL = getBaseURL();
 
-    // Make API request to get chain incentives - CHANGE THIS LINE:
-    fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`)
+    // Make API request to get chain locations
+    fetch(`${baseURL}/api/business.js?operation=get_chain_locations&chain_id=${chainId}`)
         .then(response => {
             if (!response.ok) {
-                throw new Error(`Failed to load incentives: ${response.status}`);
+                throw new Error(`Failed to load locations: ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            // Rest of the function remains the same
-            // ...
+            // Check if we have results
+            if (!data.results || data.results.length === 0) {
+                locationsContainer.innerHTML = '<p>No locations found for this chain.</p>';
+                return;
+            }
+
+            // Build the locations list HTML
+            let locationsHTML = '';
+
+            data.results.forEach(location => {
+                const addressLine = location.address2
+                    ? `${location.address1}, ${location.address2}, ${location.city}, ${location.state} ${location.zip}`
+                    : `${location.address1}, ${location.city}, ${location.state} ${location.zip}`;
+
+                locationsHTML += `
+                    <div class="location-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${location.bname}</strong>
+                            <div><small>${addressLine}</small></div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-danger" onclick="removeLocationFromChain('${location._id}')">
+                                <i class="fas fa-unlink"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            locationsContainer.innerHTML = locationsHTML;
         })
         .catch(error => {
-            console.error('Error loading incentives:', error);
-            incentivesContainer.innerHTML = `
+            console.error('Error loading locations:', error);
+            locationsContainer.innerHTML = `
                 <div class="alert alert-danger" role="alert">
-                    Error loading incentives: ${error.message}
+                    Error loading locations: ${error.message}
                 </div>
             `;
         });
