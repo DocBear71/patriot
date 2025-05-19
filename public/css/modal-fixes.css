@@ -1,0 +1,46 @@
+/* modal-fixes.css */
+
+/* Fix for radio buttons in incentive modal */
+.form-check {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.form-check-input[type="radio"] {
+    width: auto !important;
+    margin-right: 10px;
+    flex: 0 0 auto;
+}
+
+.form-check-label {
+    margin-bottom: 0;
+    flex: 0 1 auto;
+    width: auto !important;
+    text-align: left !important;
+}
+
+/* Override any general input styles for radio buttons */
+input[type="radio"] {
+    width: auto !important;
+    padding: 0 !important;
+}
+
+/* Ensure the radio button container doesn't interfere with layout */
+#incentiveModal .form-group:has(input[type="radio"]) {
+    display: block;
+}
+
+/* Fix for specific incentive availability section */
+#incentiveModal label[for="incentive-available"],
+#incentiveModal label[for="incentive-not-available"] {
+    width: auto !important;
+    margin-left: 5px;
+    margin-right: 20px;
+}
+
+#incentiveModal #incentive-available,
+#incentiveModal #incentive-not-available {
+    width: auto !important;
+}

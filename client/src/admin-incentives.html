@@ -20,6 +20,7 @@
     <link href="./css/dashboard.css" rel="stylesheet">
     <link href="./css/admin/admin-business.css" rel="stylesheet">
     <link href="./css/layout-fix.css" rel="stylesheet">
+    <link href="./css/modal-fixes.css" rel="stylesheet">
     <script src="./js/jquery-3.7.1.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
     <script src="./js/admin-incentives.js"></script>
@@ -137,17 +138,19 @@
 
                         <div class="form-group">
                             <label>Incentive Availability</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="is_available" id="incentive-available" value="true">
-                                <label class="form-check-label" for="incentive-available">
-                                    Incentive Available
-                                </label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="is_available" id="incentive-not-available" value="false">
-                                <label class="form-check-label" for="incentive-not-available">
-                                    Incentive NOT Available
-                                </label>
+                            <div class="form-check-group">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="is_available" id="incentive-available" value="true">
+                                    <label class="form-check-label" for="incentive-available">
+                                        Incentive Available
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="is_available" id="incentive-not-available" value="false">
+                                    <label class="form-check-label" for="incentive-not-available">
+                                        Incentive NOT Available
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
