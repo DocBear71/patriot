@@ -28,11 +28,121 @@ function initChainManagement() {
 
             // Set up search functionality
             setupSearchFunctionality();
+
+            setupModals();
         } else {
             console.error("Admin access denied");
         }
     });
 }
+
+/**
+ * Setup Bootstrap 5 modals
+ */
+function setupModals() {
+    // Add click handler for any data-bs-dismiss="modal" elements
+    document.querySelectorAll('[data-bs-dismiss="modal"]').forEach(button => {
+        button.addEventListener('click', function() {
+            const modalElement = this.closest('.modal');
+            if (modalElement) {
+                ModalHelper.hide(modalElement.id);
+            }
+        });
+    });
+
+    // Setup form submission for the incentive form
+    const addChainIncentiveForm = document.getElementById('add-chain-incentive-form');
+    if (addChainIncentiveForm) {
+        addChainIncentiveForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            addChainIncentive(event);
+        });
+    }
+}
+
+/**
+ * Bootstrap 5 Modal helper
+ */
+const ModalHelper = {
+    /**
+     * Get a Bootstrap 5 Modal instance
+     * @param {string} modalId - The ID of the modal
+     * @returns {Object|null} The Bootstrap Modal instance or null
+     */
+    getInstance: function(modalId) {
+        const modalElement = document.getElementById(modalId);
+        if (!modalElement) return null;
+
+        try {
+            return bootstrap.Modal.getInstance(modalElement);
+        } catch (error) {
+            console.warn(`Could not get modal instance for ${modalId}:`, error);
+            return null;
+        }
+    },
+
+    /**
+     * Create a new Bootstrap Modal instance
+     * @param {string} modalId - The ID of the modal
+     * @returns {Object|null} The Bootstrap Modal instance or null
+     */
+    createInstance: function(modalId) {
+        const modalElement = document.getElementById(modalId);
+        if (!modalElement) return null;
+
+        try {
+            return new bootstrap.Modal(modalElement);
+        } catch (error) {
+            console.warn(`Could not create modal instance for ${modalId}:`, error);
+            return null;
+        }
+    },
+
+    /**
+     * Show a modal
+     * @param {string} modalId - The ID of the modal to show
+     */
+    show: function(modalId) {
+        let modal = this.getInstance(modalId);
+        if (!modal) {
+            modal = this.createInstance(modalId);
+        }
+
+        if (modal) {
+            modal.show();
+        } else {
+            console.error(`Could not show modal: ${modalId}`);
+        }
+    },
+
+    /**
+     * Hide a modal
+     * @param {string} modalId - The ID of the modal to hide
+     */
+    hide: function(modalId) {
+        const modal = this.getInstance(modalId);
+        if (modal) {
+            modal.hide();
+        } else {
+            // Fallback for when the instance isn't available
+            const modalElement = document.getElementById(modalId);
+            if (modalElement) {
+                $(modalElement).removeClass('show');
+                $(modalElement).css('display', 'none');
+                $(modalElement).attr('aria-hidden', 'true');
+                $(modalElement).removeAttr('aria-modal');
+
+                // Remove backdrop
+                $('.modal-backdrop').remove();
+
+                // Remove modal-open class from body
+                $('body').removeClass('modal-open');
+                $('body').css('overflow', '');
+                $('body').css('padding-right', '');
+            }
+        }
+    }
+};
 
 /**
  * Check if the current user has admin access
@@ -171,12 +281,26 @@ function setupEventListeners() {
     }
 
     // Add chain incentive form
-    const addChainIncentiveForm = document.getElementById('add-chain-incentive-form');
-    if (addChainIncentiveForm) {
-        addChainIncentiveForm.addEventListener('submit', function(event) {
-            // Prevent default form submission behavior
+    // Add chain incentive form - just make sure it doesn't double-bind
+    if (!document.getElementById('add-chain-incentive-form').hasAttribute('data-event-bound')) {
+        document.getElementById('add-chain-incentive-form').setAttribute('data-event-bound', 'true');
+        document.getElementById('add-chain-incentive-form').addEventListener('submit', function(event) {
             event.preventDefault();
-            addChainIncentive();
+            addChainIncentive(event);
+        });
+    }
+
+    const modalCloseButtons = document.querySelectorAll('[data-dismiss="modal"]');
+    if (modalCloseButtons.length > 0) {
+        modalCloseButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const modalId = this.closest('.modal').id;
+                $(`#${modalId}`).modal('hide');
+
+                // Also clean up modal backdrop and body classes
+                $('body').removeClass('modal-open');
+                $('.modal-backdrop').remove();
+            });
         });
     }
 
@@ -876,9 +1000,10 @@ function openManageIncentivesModal() {
     // Hide the other description field
     document.getElementById('other-description-group').style.display = 'none';
 
-    // Show the modal
-    $('#manage-incentives-modal').modal('show');
+    // Show the modal using the helper
+    ModalHelper.show('manage-incentives-modal');
 }
+
 
 /**
  * Load chain incentives in the modal
@@ -921,7 +1046,12 @@ function loadModalChainIncentives(chainId) {
 /**
  * Add an incentive to a chain
  */
-function addChainIncentive() {
+function addChainIncentive(event) {
+    // Ensure we have the event
+    event = event || window.event;
+    // Prevent the default form submission
+    if (event) event.preventDefault();
+
     const chainId = currentChainId;
     if (!chainId) {
         alert('No chain selected.');
@@ -985,12 +1115,8 @@ function addChainIncentive() {
             // Reset the form
             document.getElementById('add-chain-incentive-form').reset();
 
-            // Properly close the modal using Bootstrap's method
-            $('#manage-incentives-modal').modal('hide');
-
-            // Remove any modal-related classes from body
-            $('body').removeClass('modal-open');
-            $('.modal-backdrop').remove();
+            // Close the modal using the helper
+            ModalHelper.hide('manage-incentives-modal');
 
             // Reload incentives in the main view
             loadChainIncentives(chainId);
