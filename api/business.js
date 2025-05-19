@@ -41,6 +41,8 @@ module.exports = async (req, res) => {
                 return await handleDeleteChain(req, res);
             case 'get':
                 return await handleGetBusiness(req, res);
+            case 'find_matching_chain':
+                return await handleFindMatchingChain(req, res);
 
             // Admin operations
             case 'admin-list-businesses':
@@ -1299,6 +1301,92 @@ async function handleAdminUpdateBusiness(req, res) {
         console.error('Error updating business:', error);
         return res.status(500).json({ message: 'Server error updating business: ' + error.message });
     }
+}
+
+/**
+ * Find matching chains for a place name
+ */
+async function handleFindMatchingChain(req, res) {
+    try {
+        const { place_name } = req.query;
+
+        if (!place_name) {
+            return res.status(400).json({ message: 'Place name is required' });
+        }
+
+        // Connect to MongoDB
+        await connect;
+
+        // Search for chains with similar names
+        // This uses a case-insensitive search with some tolerance for variations
+        const chains = await Business.find({
+            is_chain: true,
+            $or: [
+                // Exact match
+                { bname: new RegExp(`^${place_name}$`, 'i') },
+                // Partial match (place name contains chain name)
+                { bname: new RegExp(`${place_name}`, 'i') },
+                // Chain name contains place name
+                { bname: new RegExp(`.*${place_name}.*`, 'i') }
+            ]
+        }).lean();
+
+        // If there are multiple matches, find the best one
+        if (chains.length > 0) {
+            // Sort by name similarity (closest match first)
+            chains.sort((a, b) => {
+                const aSimilarity = calculateNameSimilarity(a.bname.toLowerCase(), place_name.toLowerCase());
+                const bSimilarity = calculateNameSimilarity(b.bname.toLowerCase(), place_name.toLowerCase());
+                return bSimilarity - aSimilarity; // Higher similarity first
+            });
+
+            // Return the best match
+            return res.status(200).json({
+                success: true,
+                chain: chains[0]
+            });
+        }
+
+        // No matches found
+        return res.status(404).json({
+            success: false,
+            message: 'No matching chain found'
+        });
+    } catch (error) {
+        console.error('Error finding matching chain:', error);
+        return res.status(500).json({ message: 'Server error: ' + error.message });
+    }
+}
+
+/**
+ * Calculate name similarity for chain matching
+ */
+function calculateNameSimilarity(chainName, placeName) {
+    // Simple algorithm to check how well names match
+    // Convert both to lowercase for case-insensitive comparison
+    chainName = chainName.toLowerCase();
+    placeName = placeName.toLowerCase();
+
+    // Check for exact match
+    if (chainName === placeName) return 1.0;
+
+    // Check if one contains the other
+    if (chainName.includes(placeName)) return 0.9;
+    if (placeName.includes(chainName)) return 0.9;
+
+    // Calculate similarity using Levenshtein distance or other method
+    // Here's a simple check - count matching words
+    const chainWords = chainName.split(/\s+/);
+    const placeWords = placeName.split(/\s+/);
+
+    let matchingWords = 0;
+    for (const word of chainWords) {
+        if (word.length > 2 && placeWords.includes(word)) {
+            matchingWords++;
+        }
+    }
+
+    return matchingWords / Math.max(chainWords.length, placeWords.length);
 }
 
 /**

@@ -647,30 +647,22 @@ async function handleIncentives(req, res, operation) {
 }
 
 /**
- * Handle GET request for retrieving incentives for a business with chain support
+ * Handle GET request for retrieving incentives for a business with chain support for Places results
  */
 async function handleGetUserIncentives(req, res) {
-    console.log("Get Incentives API hit:", req.method);
-    console.log("Full URL:", req.url);
-    console.log("Query parameters:", req.query);
-
     // Get the business ID from the query parameters
     const businessId = req.query.business_id;
+    const chainId = req.query.chain_id;
 
-    if (!businessId) {
-        return res.status(400).json({ message: 'Business ID is required as a query parameter' });
+    if (!businessId && !chainId) {
+        return res.status(400).json({ message: 'Business ID or Chain ID is required as a query parameter' });
     }
-
-    console.log("Business ID from query:", businessId);
 
     let incentives = [];
 
     // Check if this is a Google Places result (not in our database)
-    if (businessId.startsWith('place_')) {
-        // For Places API results, we need to check for chain incentives
-        // Extract chain_id if it was included in the request
-        const chainId = req.query.chain_id;
-
+    if (businessId.startsWith('google_') || businessId.startsWith('place_')) {
+        // For Places API results, we need chain ID to get incentives
         if (chainId) {
             // Get chain-wide incentives
             const chainIncentives = await Incentive.find({
@@ -694,11 +686,13 @@ async function handleGetUserIncentives(req, res) {
         });
     }
 
-    // First get incentives directly associated with this business
-    incentives = await Incentive.find({ business_id: businessId }).lean();
-    console.log(`Found ${incentives.length} incentives for business ${businessId}`);
-
     // For businesses in our database:
+    // First get incentives directly associated with this business
+    const businessIncentives = await Incentive.find({ business_id: businessId }).lean();
+
+    // Start with business-specific incentives
+    incentives = [...businessIncentives];
+
     // Check if this is a chain location
     const business = await Business.findById(businessId).lean();
 
@@ -707,14 +701,10 @@ async function handleGetUserIncentives(req, res) {
         const chainBusiness = await Business.findById(business.chain_id).lean();
 
         if (chainBusiness && chainBusiness.universal_incentives) {
-            console.log(`Business ${businessId} is part of chain ${business.chain_id}, fetching chain incentives`);
-
             const chainIncentives = await Incentive.find({
                 business_id: business.chain_id,
                 is_available: true
             }).lean();
-
-            console.log(`Found ${chainIncentives.length} chain incentives for chain ${business.chain_id}`);
 
             // Add chain incentives that don't conflict with location-specific ones
             if (chainIncentives.length > 0) {
