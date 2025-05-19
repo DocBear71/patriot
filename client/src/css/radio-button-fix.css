@@ -1,0 +1,56 @@
+/* radio-button-fix.css - Fix for radio buttons in modals */
+
+/* Reset radio button styling to browser defaults */
+input[type="radio"] {
+    /* Override any generic input styles */
+    width: auto !important;
+    height: auto !important;
+    -webkit-appearance: radio !important;
+    -moz-appearance: radio !important;
+    appearance: radio !important;
+    padding: 0 !important;
+    margin: 0 5px 0 0 !important;
+    border: initial !important;
+    border-radius: initial !important;
+    background-color: initial !important;
+    opacity: 1 !important;
+    display: inline-block !important;
+    position: relative !important;
+}
+
+/* Fix for radio button containers */
+.form-check {
+    display: flex !important;
+    align-items: center !important;
+    margin-bottom: 8px !important;
+    position: relative !important;
+}
+
+/* Fix for radio button labels */
+.form-check-label {
+    display: inline-block !important;
+    vertical-align: middle !important;
+    margin-left: 5px !important;
+    cursor: pointer !important;
+    flex: 1 !important;
+    text-align: left !important;
+}
+
+/* Parent container for radio group */
+#incentiveModal .form-group:has(input[type="radio"]) {
+    /* Use display block instead of flex for the container */
+    display: block !important;
+}
+
+/* Specific styling for radio container */
+#incentiveModal .form-check-group {
+    margin-top: 8px;
+    margin-left: 20px;
+}
+
+/* Make sure the label above the radio buttons is properly positioned */
+#incentiveModal .form-group > label:first-child {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
