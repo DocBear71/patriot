@@ -504,6 +504,12 @@ async function findMatchingChainForPlaceResult(placeName) {
         // Search for chains with similar names
         const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(placeName)}`);
 
+        // Check if the response is successful, but also handle 404 gracefully
+        if (response.status === 404) {
+            console.log("No matching chains found for", placeName);
+            return null;
+        }
+
         if (!response.ok) {
             console.error("Error searching for matching chains:", response.status);
             return null;
