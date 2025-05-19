@@ -290,7 +290,7 @@ function setupEventListeners() {
         });
     }
 
-    const modalCloseButtons = document.querySelectorAll('[data-dismiss="modal"]');
+    const modalCloseButtons = document.querySelectorAll('[data-bs-dismiss="modal""]');
     if (modalCloseButtons.length > 0) {
         modalCloseButtons.forEach(button => {
             button.addEventListener('click', function() {

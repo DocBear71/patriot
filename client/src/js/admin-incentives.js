@@ -198,13 +198,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 resetIncentiveForm();
                 actionType = 'create';
                 document.getElementById('incentiveModalLabel').textContent = 'Add New Incentive';
-                $('#incentiveModal').modal('show');
+                window.ModalHelper.show('incentiveModal');
             });
         }
 
         // Save incentive button
         if (saveIncentiveBtn) {
             saveIncentiveBtn.addEventListener('click', function() {
+                event.preventDefault();
                 if (validateIncentiveForm()) {
                     if (actionType === 'create') {
                         createIncentive();
@@ -824,7 +825,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
 
             // Hide modal
-            $('#incentiveModal').modal('hide');
+            window.ModalHelper.hide('incentiveModal');
 
             // Show success message
             showAlert('success', 'Incentive created successfully!');
@@ -876,7 +877,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
 
             // Hide modal
-            $('#incentiveModal').modal('hide');
+            window.ModalHelper.hide('incentiveModal');
 
             // Show success message
             showAlert('success', 'Incentive updated successfully!');
@@ -967,7 +968,7 @@ document.addEventListener('DOMContentLoaded', function() {
             populateIncentiveForm(incentive);
 
             // Show modal
-            $('#incentiveModal').modal('show');
+            window.ModalHelper.show('incentiveModal');
         } catch (error) {
             console.error('Error editing incentive:', error);
             showAlert('danger', 'Error loading incentive details. Please try again.');
@@ -1024,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', function() {
             populateIncentiveForm(incentive);
 
             // Show modal
-            $('#incentiveModal').modal('show');
+            window.ModalHelper.show('incentiveModal');
         } catch (error) {
             handleApiError(error, () => {
                 showAlert('danger', 'Error loading incentive details. Please try again.');

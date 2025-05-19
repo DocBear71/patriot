@@ -510,11 +510,12 @@ document.addEventListener('DOMContentLoaded', function () {
         // Add user button
         addUserBtn.addEventListener('click', function () {
             resetUserForm();
-            $('#userModal').modal('show');
+            window.ModalHelper.show('userModal');
         });
 
         // Save user button
         saveUserBtn.addEventListener('click', function () {
+            event.preventDefault();
             if (validateUserForm()) {
                 if (isApiIntegrationEnabled()) {
                     saveUser();
@@ -570,7 +571,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('userModalLabel').textContent = 'Edit User';
 
         // Show modal
-        $('#userModal').modal('show');
+        window.ModalHelper.show('userModal');
     }
 
     function resetUserForm() {
@@ -752,7 +753,7 @@ document.addEventListener('DOMContentLoaded', function () {
             console.log("Save user response:", result);
 
             // Hide modal
-            $('#userModal').modal('hide');
+            window.ModalHelper.hide('userModal');
 
             // Show a success message
             alert(isUpdate ? 'User updated successfully!' : 'User created successfully!');
@@ -1068,7 +1069,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             // Hide modal
-            $('#userModal').modal('hide');
+            window.ModalHelper.hide('userModal');
 
             // Reset editing state
             editingUserId = null;

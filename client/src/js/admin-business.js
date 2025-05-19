@@ -94,11 +94,12 @@ document.addEventListener('DOMContentLoaded', function() {
             resetBusinessForm();
             actionType = 'create';
             document.getElementById('businessModalLabel').textContent = 'Add New Business';
-            $('#businessModal').modal('show');
+            window.ModalHelper.show('businessModal');
         });
 
         // Save business button
         saveBusinessBtn?.addEventListener('click', function () {
+            event.preventDefault();
             if (validateBusinessForm()) {
                 if (actionType === 'create') {
                     createBusiness();
@@ -600,7 +601,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
 
             // Hide modal
-            $('#businessModal').modal('hide');
+            window.ModalHelper.hide('businessModal');
 
             // Show success message
             showAlert('success', 'Business created successfully!');
@@ -652,7 +653,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
 
             // Hide modal
-            $('#businessModal').modal('hide');
+            window.ModalHelper.hide('businessModal');
 
             // Show success message
             showAlert('success', 'Business updated successfully!');
@@ -740,7 +741,7 @@ document.addEventListener('DOMContentLoaded', function() {
             populateBusinessForm(business);
 
             // Show modal
-            $('#businessModal').modal('show');
+            window.ModalHelper.show('businessModal');
         } catch (error) {
             console.error('Error editing business:', error);
             showAlert('danger', 'Error loading business details. Please try again.');
@@ -794,7 +795,7 @@ document.addEventListener('DOMContentLoaded', function() {
             populateBusinessForm(business);
 
             // Show modal
-            $('#businessModal').modal('show');
+            window.ModalHelper.show('businessModal');
         } catch (error) {
             handleApiError(error, () => {
                 showAlert('danger', 'Error loading business details. Please try again.');
