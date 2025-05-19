@@ -174,6 +174,7 @@ function setupEventListeners() {
     const addChainIncentiveForm = document.getElementById('add-chain-incentive-form');
     if (addChainIncentiveForm) {
         addChainIncentiveForm.addEventListener('submit', function(event) {
+            // Prevent default form submission behavior
             event.preventDefault();
             addChainIncentive();
         });
@@ -961,7 +962,10 @@ function addChainIncentive() {
         incentiveData.other_description = otherDescription;
     }
 
-    // Make API request to add the incentive - CHANGE THIS LINE:
+    // Prevent the default form submission
+    event.preventDefault();
+
+    // Make API request to add the incentive
     fetch(`${baseURL}/api/combined-api.js?operation=incentives`, {
         method: 'POST',
         headers: {
@@ -981,8 +985,12 @@ function addChainIncentive() {
             // Reset the form
             document.getElementById('add-chain-incentive-form').reset();
 
-            // Reload incentives in the modal
-            loadModalChainIncentives(chainId);
+            // Properly close the modal using Bootstrap's method
+            $('#manage-incentives-modal').modal('hide');
+
+            // Remove any modal-related classes from body
+            $('body').removeClass('modal-open');
+            $('.modal-backdrop').remove();
 
             // Reload incentives in the main view
             loadChainIncentives(chainId);
