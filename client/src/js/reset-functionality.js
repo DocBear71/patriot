@@ -1,6 +1,7 @@
-// reset-functionality.js - Final version with fixes for specific page issues
+// Enhanced reset-functionality.js with fixes for accessibility issues
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Fixed Reset Functionality Loaded!");
+    console.log("Enhanced Reset Functionality Loaded!");
 
     // Determine which page we're on based on the HTML structure and URL
     const pagePath = window.location.pathname;
@@ -10,7 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const isViewPage = !isBusinessUpdatePage && (pagePath.includes('incentive-view.html') || document.getElementById('incentives-container') !== null);
 
     console.log("Page detection - Business Update:", isBusinessUpdatePage, "Add:", isAddPage, "Update:", isUpdatePage, "View:", isViewPage);
-
 
     // Create the reset button with appropriate styling
     function createResetButton() {
@@ -262,23 +262,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Function to reset the search form only
+    // Function to reset the search form only - FIXED to properly re-enable fields
     function resetSearchForm() {
         // Clear search fields
         const businessNameField = document.getElementById('business-name');
         if (businessNameField) {
             businessNameField.value = '';
+            businessNameField.disabled = false; // FIXED: Ensure field is enabled
         }
 
         const addressField = document.getElementById('address');
         if (addressField) {
             addressField.value = '';
+            addressField.disabled = false; // FIXED: Ensure field is enabled
         }
 
         // Clear search results
         const searchResults = document.getElementById('business-search-results');
         if (searchResults) {
             searchResults.innerHTML = '';
+        }
+
+        // FIXED: Re-enable the search button
+        const searchButton = document.querySelector('#business-search-form input[type="submit"]');
+        if (searchButton) {
+            searchButton.disabled = false;
+            searchButton.style.cursor = 'pointer';
         }
 
         // Focus on business name field
@@ -289,6 +298,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to reset the entire page
     function resetPage() {
+        console.log("Resetting page...");
+
         // First clear the search
         resetSearchForm();
 
@@ -386,6 +397,11 @@ document.addEventListener('DOMContentLoaded', function() {
             statusMessage.innerHTML = '';
         }
 
+        // FIXED: Clear any global variables that might affect state
+        if (typeof window.selectedBusinessData !== 'undefined') {
+            window.selectedBusinessData = null;
+        }
+
         // Scroll back to the top of the page
         window.scrollTo(0, 0);
 
@@ -404,6 +420,25 @@ document.addEventListener('DOMContentLoaded', function() {
         resetFormField('phone');
         resetFormField('type');
         resetFormField('status');
+
+        // FIXED: Remove any view-only messages for chain businesses
+        const viewOnlyMessage = document.querySelector('.alert.alert-info');
+        if (viewOnlyMessage) {
+            viewOnlyMessage.remove();
+        }
+
+        // FIXED: Re-enable all form fields that might have been disabled
+        const formFields = document.querySelectorAll('input, select, textarea');
+        formFields.forEach(field => {
+            field.disabled = false;
+            field.classList.remove('disabled-field');
+        });
+
+        // FIXED: Show the update button if it was hidden
+        const updateButton = document.getElementById('update-submit');
+        if (updateButton) {
+            updateButton.style.display = 'block';
+        }
     }
 
     // Function to reset the Add Incentive form
@@ -447,6 +482,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (discountTypeDollar) {
             discountTypeDollar.checked = false;
         }
+
+        // FIXED: Re-enable all form fields that might have been disabled
+        const formFields = document.querySelectorAll('input, select, textarea');
+        formFields.forEach(field => {
+            field.disabled = false;
+            field.classList.remove('disabled-field');
+        });
     }
 
     // Function to reset the Update Incentive form
@@ -498,6 +540,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 element.textContent = '';
             }
         });
+
+        // FIXED: Re-enable all form fields that might have been disabled
+        const formFields = document.querySelectorAll('input, select, textarea');
+        formFields.forEach(field => {
+            field.disabled = false;
+            field.classList.remove('disabled-field');
+        });
+
+        // FIXED: Remove any chain message or warning
+        const chainMessages = document.querySelectorAll('.alert.alert-info, .alert.alert-warning');
+        chainMessages.forEach(message => {
+            message.remove();
+        });
     }
 
     // Helper function to reset a form field
@@ -514,6 +569,9 @@ document.addEventListener('DOMContentLoaded', function() {
             field.classList.remove('valid-field');
             field.classList.remove('invalid-field');
             field.classList.remove('disabled-field');
+
+            // FIXED: Make sure the field is enabled
+            field.disabled = false;
         }
     }
 
@@ -525,6 +583,23 @@ document.addEventListener('DOMContentLoaded', function() {
         body #incentives-list-section.hidden-by-reset,
         body #business-info-section.hidden-by-reset {
             display: none !important;
+        }
+        
+        /* FIXED: Style to prevent overriding field state */
+        input:not([disabled]),
+        select:not([disabled]),
+        textarea:not([disabled]) {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+        
+        /* FIXED: Make sure buttons are always clickable */
+        #business-search-form input[type="submit"],
+        #reset-button,
+        .clear-button {
+            cursor: pointer !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
         }
     `;
     document.head.appendChild(overrideStyle);
@@ -624,7 +699,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             }
             
-            #floating-reset-button-container {
+             #floating-reset-button-container {
                 width: 80%;
                 left: 10%;
                 right: 10%;
@@ -668,5 +743,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    console.log("Fixed reset functionality setup complete");
+    console.log("Enhanced reset functionality setup complete");
 });

@@ -1,6 +1,7 @@
-// business-update-handler.js - Handles business search and update functionality
+// Enhanced business-update-handler.js with chain business protection
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Business Update Handler Loaded!");
+    console.log("Enhanced Business Update Handler Loaded!");
 
     // Initialize business info section display
     const businessInfoSection = document.getElementById('business-info-section');
@@ -93,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     formData.lat = selectedBusiness.location.coordinates[1];
                 }
                 // Otherwise, let the server geocode the address
-                
+
                 console.log("Form data to submit:", formData);
 
                 // Submit the data to update the business
@@ -111,52 +112,17 @@ document.addEventListener('DOMContentLoaded', function() {
         // Store the selected business data for later use
         window.selectedBusinessData = businessData;
 
+        // IMPROVED: Better handling for chain businesses
         if (businessData.is_chain) {
             // Check if user is admin
             const isAdmin = checkIfUserIsAdmin();
 
             if (!isAdmin) {
-                // Show the business info section first
-                if (businessInfoSection) {
-                    businessInfoSection.style.display = 'block';
-                }
+                // For non-admins, show a message and don't proceed with form display
+                showMessage('error', "Chain businesses can only be modified by administrators. Please select a regular business location instead.");
 
-                // For non-admins, show a message and prevent editing
-                showMessage('error', "This is a chain business that can only be modified by administrators.");
-
-                // Disable all form fields
-                const formFields = document.querySelectorAll('input, select, textarea');
-                formFields.forEach(field => {
-                    field.disabled = true;
-                });
-
-                // Hide or disable the update button
-                const updateButton = document.getElementById('update-submit');
-                if (updateButton) {
-                    updateButton.style.display = 'none';
-                }
-
-                // Show a view-only message
-                const viewOnlyMessage = document.createElement('div');
-                viewOnlyMessage.className = 'alert alert-info';
-                viewOnlyMessage.innerHTML = '<strong>View Only:</strong> Chain businesses can only be modified by administrators.';
-                businessInfoSection.prepend(viewOnlyMessage);
-
-                // Still populate the form but in read-only mode
-                populateField('bname', businessData.bname);
-                populateField('address1', businessData.address1);
-                populateField('address2', businessData.address2);
-                populateField('city', businessData.city);
-                populateField('zip', businessData.zip);
-                populateField('phone', businessData.phone);
-                populateSelectField('state', businessData.state);
-                populateSelectField('type', businessData.type);
-                populateSelectField('status', businessData.status || 'active');
-
-                // Scroll to the form
-                businessInfoSection.scrollIntoView({ behavior: 'smooth' });
-
-                return; // Exit early
+                // Don't display the business info section for non-admins selecting a chain
+                return;
             }
         }
 
@@ -190,7 +156,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Scroll to the form
         businessInfoSection.scrollIntoView({ behavior: 'smooth' });
     };
-
 
     // Function to update a business in the database
     async function updateBusiness(formData) {
@@ -258,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show success message
             showMessage('success', "Business updated successfully!");
 
-            // ADDED: Reset the form after successful update
+            // Reset the form after successful update
             resetFormAfterUpdate();
 
             // Reset button state
@@ -278,7 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Add this function to your business-update-handler.js file
+    // IMPROVED: Enhanced function with proper field re-enabling
     function resetBusinessSearchForm() {
         // Clear form values
         const businessNameField = document.getElementById('business-name');
@@ -322,6 +287,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formFields = document.querySelectorAll('input, select, textarea');
         formFields.forEach(field => {
             field.disabled = false;
+            field.classList.remove('disabled-field');
         });
 
         // Show the update button
@@ -334,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window.selectedBusinessData = null;
     }
 
-// Function to reset the form after successful update
+    // Function to reset the form after successful update
     function resetFormAfterUpdate() {
         console.log("Resetting business update form to initial state");
 
@@ -351,15 +317,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         formFields.forEach(fieldId => {
             const field = document.getElementById(fieldId);
-            if (field) field.value = '';
+            if (field) {
+                field.value = '';
+                field.disabled = false; // IMPROVED: Ensure fields are enabled
+                field.classList.remove('disabled-field');
+            }
         });
 
         // Reset select fields
         const stateSelect = document.getElementById('state');
-        if (stateSelect) stateSelect.selectedIndex = 0;
+        if (stateSelect) {
+            stateSelect.selectedIndex = 0;
+            stateSelect.disabled = false; // IMPROVED: Ensure select is enabled
+        }
 
         const typeSelect = document.getElementById('type');
-        if (typeSelect) typeSelect.selectedIndex = 0;
+        if (typeSelect) {
+            typeSelect.selectedIndex = 0;
+            typeSelect.disabled = false; // IMPROVED: Ensure select is enabled
+        }
 
         // Reset hidden field
         const selectedBusinessIdField = document.getElementById('selected-business-id');
@@ -367,10 +343,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Reset the business search form
         const businessNameField = document.getElementById('business-name');
-        if (businessNameField) businessNameField.value = '';
+        if (businessNameField) {
+            businessNameField.value = '';
+            businessNameField.disabled = false; // IMPROVED: Ensure field is enabled
+        }
 
         const addressField = document.getElementById('address');
-        if (addressField) addressField.value = '';
+        if (addressField) {
+            addressField.value = '';
+            addressField.disabled = false; // IMPROVED: Ensure field is enabled
+        }
 
         // Clear the business search results
         const resultsContainer = document.getElementById('business-search-results');
@@ -378,12 +360,21 @@ document.addEventListener('DOMContentLoaded', function() {
             resultsContainer.innerHTML = '';
         }
 
+        // Re-enable the search button
+        const searchButton = document.querySelector('#business-search-form input[type="submit"]');
+        if (searchButton) {
+            searchButton.disabled = false;
+            searchButton.style.cursor = 'pointer';
+        }
+
+        // Reset the window.selectedBusinessData
+        window.selectedBusinessData = null;
+
         // Scroll to the top of the page
         window.scrollTo(0, 0);
 
         console.log("Business form reset completed");
     }
-
 
     // Helper function to get auth token if available
     function getAuthToken() {
@@ -509,8 +500,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (form.type) form.type.addEventListener('change', function() { validateField(this, isNotEmpty); });
     if (form.status) form.status.addEventListener('change', function() { validateField(this, isNotEmpty); });
 
-    // FIXED: Properly set up the business selection handler for the update page
-    // We need to override the handler in business-search.js
+    // IMPROVED: Properly set up the business selection handler for the update page
+    // Override the handler in business-search.js
     window.handleBusinessSelection = function(selectedBusiness) {
         // Call our selectBusinessForUpdate function directly
         if (typeof window.selectBusinessForUpdate === 'function') {

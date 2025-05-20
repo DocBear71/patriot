@@ -1,0 +1,142 @@
+/* Chain Badge and permission styles */
+.chain-badge {
+    background-color: #4285F4;
+    color: white;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 12px;
+    display: inline-block;
+    font-weight: normal;
+}
+
+.chain-badge.small {
+    font-size: 10px;
+    padding: 2px 4px;
+}
+
+/* Styling for chain warning banners */
+.chain-incentive-warning,
+.chain-business-warning {
+    background-color: #FFF3CD;
+    color: #856404;
+    border: 1px solid #FFEEBA;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+
+/* Admin button styling */
+.select-incentive.admin-chain,
+.admin-action-btn {
+    background-color: #9C27B0;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.select-incentive.admin-chain:hover,
+.admin-action-btn:hover {
+    background-color: #7B1FA2;
+}
+
+/* View-only button for regular users */
+.view-chain-btn {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.view-chain-btn:hover {
+    background-color: #0D8AED;
+}
+
+/* Fix for form fields */
+input:not([disabled]),
+select:not([disabled]),
+textarea:not([disabled]) {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Make sure buttons are always clickable */
+#business-search-form input[type="submit"],
+#reset-button,
+.clear-button,
+.select-business,
+.select-incentive {
+    cursor: pointer !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Style for view-only indicators */
+.view-only-indicator {
+    color: #6c757d;
+    font-style: italic;
+    font-size: 0.9em;
+    display: block;
+    margin-top: 2px;
+}
+
+/* Error and success message styling */
+.alert {
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin: 15px 0;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+/* Ensure disabled fields have consistent styling */
+.disabled-field {
+    background-color: #e9ecef !important;
+    border-color: #ced4da !important;
+    color: #6c757d !important;
+    cursor: not-allowed !important;
+    opacity: 0.75 !important;
+}
+
+/* Special handling for disabled containers */
+.disabled-container {
+    opacity: 0.65 !important;
+    pointer-events: none !important;
+}
+
+/* Validation styling */
+.valid-field {
+    border-color: #28a745 !important;
+    background-color: #f0fff0 !important;
+}
+
+.invalid-field {
+    border-color: #dc3545 !important;
+    background-color: #fff0f0 !important;
+}

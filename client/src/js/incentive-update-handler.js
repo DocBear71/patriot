@@ -1,6 +1,7 @@
-// incentive-update-handler.js - Handles business search, incentive selection, and update
+// Enhanced incentive-update-handler.js
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Incentive Update Handler Loaded!");
+    console.log("Enhanced Incentive Update Handler Loaded!");
 
     // Initialize sections display
     const businessInfoSection = document.getElementById('business-info-section');
@@ -115,6 +116,15 @@ document.addEventListener('DOMContentLoaded', function() {
         incentiveUpdateForm.addEventListener('submit', function(e) {
             e.preventDefault();
 
+            // IMPROVED: Check if this is a chain incentive and the user is admin
+            const selectedBusiness = window.selectedBusinessData || {};
+            if (selectedBusiness.is_chain) {
+                const isAdmin = checkIfUserIsAdmin();
+                if (!isAdmin) {
+                    showMessage('error', "You don't have permission to update chain incentives.");
+                    return;
+                }
+            }
             // Get the incentive ID
             const incentiveId = document.getElementById('selected-incentive-id').value;
             if (!incentiveId) {
@@ -187,6 +197,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Common handler function to process business selection
     function handleBusinessForIncentives(businessData) {
+        // IMPROVED: Check if this is a chain business
+        if (businessData.is_chain) {
+            // Check if user is admin
+            const isAdmin = checkIfUserIsAdmin();
+
+            if (!isAdmin) {
+                // For non-admins, show an error message and don't proceed
+                showMessage('error', "Chain businesses can only be modified by administrators. Please select a regular business location instead.");
+                return; // Exit early - don't display sections or fetch incentives
+            }
+        }
+
+        // Store the selected business data for later reference
+        window.selectedBusinessData = businessData;
+
         // Store the business ID
         selectedBusinessId = businessData._id || '';
         console.log("Setting selected business ID to:", selectedBusinessId);
@@ -218,7 +243,6 @@ document.addEventListener('DOMContentLoaded', function() {
             businessInfoSection.style.display = 'block';
             console.log("Business info section display set to:", businessInfoSection.style.display);
         }
-
         // Populate business details
         const nameDisplay = document.getElementById('business-name-display');
         if (nameDisplay) nameDisplay.textContent = business.bname || '';
@@ -257,6 +281,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
+            // IMPROVED: Check if this is a chain business and user is not admin
+            const selectedBusiness = window.selectedBusinessData;
+            if (selectedBusiness && selectedBusiness.is_chain) {
+                // Double-check admin status before proceeding
+                const isAdmin = checkIfUserIsAdmin();
+                if (!isAdmin) {
+                    console.error("Non-admin attempting to fetch chain incentives");
+                    if (incentivesListSection) {
+                        incentivesListSection.style.display = 'none';
+                    }
+                    showMessage('error', "You don't have permission to view or modify chain incentives.");
+                    return;
+                }
+            }
+
             // Show loading state
             const incentivesTableContainer = document.getElementById('incentives-table-container');
             if (incentivesTableContainer) {
@@ -300,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Display incentives in a table
+    // Display incentives in a table - IMPROVED to handle chain incentives
     function displayIncentives(incentives) {
         const incentivesTableContainer = document.getElementById('incentives-table-container');
         if (!incentivesTableContainer) return;
@@ -323,7 +362,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 </thead>
                 <tbody>
         `;
-
         incentives.forEach(incentive => {
             const available = incentive.is_available ? 'Yes' : 'No';
             const typeLabel = getIncentiveTypeLabel(incentive.type);
@@ -342,17 +380,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
+            // IMPROVED: Check if this is a chain-wide incentive and the user is not admin
+            const isChainWide = incentive.is_chain_wide === true;
+            const isAdmin = checkIfUserIsAdmin();
+
+            // For chain-wide incentives, show appropriate badge/button based on user permissions
+            let actionButton;
+            if (isChainWide) {
+                if (isAdmin) {
+                    actionButton = `
+                        <button class="select-incentive admin-chain" data-incentive-id="${incentive._id}">
+                            Edit Chain Incentive
+                        </button>
+                    `;
+                } else {
+                    actionButton = `<span class="chain-badge">Chain-wide (admin only)</span>`;
+                }
+            } else {
+                actionButton = `
+                    <button class="select-incentive" data-incentive-id="${incentive._id}">
+                        Edit
+                    </button>
+                `;
+            }
+
+            // Add chain badge if this is a chain-wide incentive
+            const chainBadge = isChainWide ?
+                '<span class="chain-badge small">Chain-wide</span>' : '';
+
             html += `
                 <tr>
                     <td>${available}</td>
                     <td>${typeLabel}${otherDescription}</td>
-                    <td>${amountDisplay}</td>
+                    <td>${amountDisplay} ${chainBadge}</td>
                     <td>${incentive.information || ''}</td>
-                    <td>
-                        <button class="select-incentive" data-incentive-id="${incentive._id}">
-                            Edit
-                        </button>
-                    </td>
+                    <td>${actionButton}</td>
                 </tr>
             `;
         });
@@ -373,6 +435,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('selected-incentive-id').value = incentiveId;
                 console.log("Selected incentive ID:", incentiveId);
 
+                // Check if this is a chain incentive and user is not admin
+                const isChainButton = this.classList.contains('admin-chain');
+                if (isChainButton && !checkIfUserIsAdmin()) {
+                    showMessage('error', "You don't have permission to edit chain-wide incentives.");
+                    return;
+                }
+
                 // Find the selected incentive
                 const selectedIncentive = incentives.find(inc => inc._id === incentiveId);
                 if (selectedIncentive) {
@@ -385,14 +454,42 @@ document.addEventListener('DOMContentLoaded', function() {
         incentivesListSection.scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Load an incentive into the edit form
+    // Load an incentive into the edit form - IMPROVED to handle chain incentives
     function loadIncentiveForEditing(incentive) {
         console.log("Loading incentive for editing:", incentive);
+
+        // IMPROVED: Check if this is a chain-wide incentive and user is not admin
+        if (incentive.is_chain_wide && !checkIfUserIsAdmin()) {
+            showMessage('error', "Only administrators can edit chain-wide incentives.");
+            return;
+        }
 
         // Show the incentive edit section
         if (incentiveEditSection) {
             incentiveEditSection.style.display = 'block';
             console.log("Incentive edit section display set to:", incentiveEditSection.style.display);
+        }
+        // IMPROVED: Add a warning for chain incentives
+        if (incentive.is_chain_wide) {
+            // Add a warning banner for chain incentives
+            const warningBanner = document.createElement('div');
+            warningBanner.className = 'alert alert-warning chain-incentive-warning';
+            warningBanner.innerHTML = `
+                <strong>Warning:</strong> You are editing a chain-wide incentive. 
+                Changes will affect all locations of this chain nationwide.
+            `;
+
+            // Insert at the top of the edit section
+            const existingWarning = incentiveEditSection.querySelector('.chain-incentive-warning');
+            if (!existingWarning) {
+                incentiveEditSection.insertBefore(warningBanner, incentiveEditSection.firstChild);
+            }
+        } else {
+            // Remove any existing warnings
+            const existingWarning = incentiveEditSection.querySelector('.chain-incentive-warning');
+            if (existingWarning) {
+                existingWarning.remove();
+            }
         }
 
         // Set the availability radio button
@@ -474,10 +571,21 @@ document.addEventListener('DOMContentLoaded', function() {
         // Scroll to the incentive edit section
         incentiveEditSection.scrollIntoView({ behavior: 'smooth' });
     }
-
-    // Update an incentive in the database
+    // Update an incentive in the database - IMPROVED to handle chain permissions
     async function updateIncentive(incentiveData) {
         try {
+            // IMPROVED: Double check chain permissions
+            const selectedBusiness = window.selectedBusinessData;
+            const isChainBusiness = selectedBusiness && selectedBusiness.is_chain;
+
+            if (isChainBusiness) {
+                const isAdmin = checkIfUserIsAdmin();
+                if (!isAdmin) {
+                    showMessage('error', "You don't have permission to update chain incentives.");
+                    return;
+                }
+            }
+
             // Get user information from session
             const sessionData = localStorage.getItem('patriotThanksSession');
             if (sessionData) {
@@ -533,7 +641,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show success message
             showMessage('success', "Incentive updated successfully!");
 
-            // MODIFIED: Instead of refreshing the incentives list, reset the entire form
+            // IMPROVED: Reset the entire form instead of just refreshing incentives
             resetFormAfterUpdate();
 
             // Reset button state
@@ -553,18 +661,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Function to reset the form after successful update
+    // IMPROVED: Complete reset function for the entire form
     function resetFormAfterUpdate() {
         console.log("Resetting form to initial state");
 
         // Reset business info section
-        const businessInfoSection = document.getElementById('business-info-section');
         if (businessInfoSection) {
             businessInfoSection.style.display = 'none';
         }
 
         // Reset incentives list section
-        const incentivesListSection = document.getElementById('incentives-list-section');
         if (incentivesListSection) {
             incentivesListSection.style.display = 'none';
 
@@ -574,11 +680,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 incentivesTableContainer.innerHTML = '';
             }
         }
-
         // Reset incentive edit section
-        const incentiveEditSection = document.getElementById('incentive-edit-section');
         if (incentiveEditSection) {
             incentiveEditSection.style.display = 'none';
+
+            // Remove any chain warning banners
+            const chainWarning = incentiveEditSection.querySelector('.chain-incentive-warning');
+            if (chainWarning) {
+                chainWarning.remove();
+            }
         }
 
         // Reset business information displays
@@ -606,45 +716,78 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Reset form fields
         const incentiveTypeSelect = document.getElementById('incentiveType');
-        if (incentiveTypeSelect) incentiveTypeSelect.selectedIndex = 0;
+        if (incentiveTypeSelect) {
+            incentiveTypeSelect.selectedIndex = 0;
+            incentiveTypeSelect.disabled = false;
+        }
 
         const otherTypeDescription = document.getElementById('otherTypeDescription');
-        if (otherTypeDescription) otherTypeDescription.value = '';
+        if (otherTypeDescription) {
+            otherTypeDescription.value = '';
+            otherTypeDescription.disabled = false;
+        }
 
         const incentiveAmount = document.getElementById('incentiveAmount');
-        if (incentiveAmount) incentiveAmount.value = '';
+        if (incentiveAmount) {
+            incentiveAmount.value = '';
+            incentiveAmount.disabled = false;
+        }
 
         const incentiveInfo = document.getElementById('incentiveInfo');
-        if (incentiveInfo) incentiveInfo.value = '';
+        if (incentiveInfo) {
+            incentiveInfo.value = '';
+            incentiveInfo.disabled = false;
+        }
 
         // Reset discount type radio buttons
         const discountTypePercentage = document.getElementById('discountTypePercentage');
-        if (discountTypePercentage) discountTypePercentage.checked = true;
-
+        if (discountTypePercentage) {
+            discountTypePercentage.checked = true;
+            discountTypePercentage.disabled = false;
+        }
         const discountTypeDollar = document.getElementById('discountTypeDollar');
-        if (discountTypeDollar) discountTypeDollar.checked = false;
+        if (discountTypeDollar) {
+            discountTypeDollar.checked = false;
+            discountTypeDollar.disabled = false;
+        }
 
         // Reset amount label
         const amountLabel = document.getElementById('amountLabel');
         if (amountLabel) amountLabel.textContent = 'Incentive Amount as a %';
 
         // Reset otherTypeContainer display
-        const otherTypeContainer = document.getElementById('otherTypeContainer');
         if (otherTypeContainer) otherTypeContainer.style.display = 'none';
 
         // Reset radio buttons
-        const incentiveAvailable = document.getElementById('incentiveAvailable');
-        if (incentiveAvailable) incentiveAvailable.checked = false;
+        if (incentiveAvailable) {
+            incentiveAvailable.checked = false;
+            incentiveAvailable.disabled = false;
+        }
 
-        const incentiveNotAvailable = document.getElementById('incentiveNotAvailable');
-        if (incentiveNotAvailable) incentiveNotAvailable.checked = false;
+        if (incentiveNotAvailable) {
+            incentiveNotAvailable.checked = false;
+            incentiveNotAvailable.disabled = false;
+        }
 
         // Reset the business search form
         const businessNameField = document.getElementById('business-name');
-        if (businessNameField) businessNameField.value = '';
+        if (businessNameField) {
+            businessNameField.value = '';
+            businessNameField.disabled = false;
+        }
 
         const addressField = document.getElementById('address');
-        if (addressField) addressField.value = '';
+        if (addressField) {
+            addressField.value = '';
+            addressField.disabled = false;
+        }
+
+        // Re-enable search button
+        const searchButton = document.querySelector('#business-search-form input[type="submit"]');
+        if (searchButton) {
+            searchButton.disabled = false;
+            searchButton.style.cursor = 'pointer';
+        }
 
         // Clear the business search results
         const resultsContainer = document.getElementById('business-search-results');
@@ -655,13 +798,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset the global variables
         selectedBusinessId = '';
         selectedIncentiveId = '';
+        window.selectedBusinessData = null;
 
         // Scroll to the top of the page
         window.scrollTo(0, 0);
 
         console.log("Form reset completed");
     }
-
 
     // Helper function to get auth token if available
     function getAuthToken() {
@@ -678,7 +821,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return null;
         }
     }
-
     // Function to show status messages
     function showMessage(type, message) {
         const messageContainer = document.getElementById('status-message');
@@ -755,7 +897,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         return types[typeCode] || typeCode;
     }
-
     // FIXED: Update the global handler for all related pages
     // This helps business-search.js detect we're on the incentive update page
     window.handleBusinessSelection = function(selectedBusiness) {
@@ -846,7 +987,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 formIsValid = false;
                 showMessage('error', 'Please provide information about the incentive');
             }
-
             // Check for "Other" type description if needed
             if (typeField && typeField.value === 'OT') {
                 const otherDescField = document.getElementById('otherTypeDescription');
@@ -902,6 +1042,16 @@ document.addEventListener('DOMContentLoaded', function() {
         newUpdateForm.addEventListener('submit', function(e) {
             e.preventDefault();
 
+            // IMPROVED: Additional check for chain incentive permissions
+            const selectedBusiness = window.selectedBusinessData || {};
+            if (selectedBusiness.is_chain) {
+                const isAdmin = checkIfUserIsAdmin();
+                if (!isAdmin) {
+                    showMessage('error', "You don't have permission to update chain incentives.");
+                    return;
+                }
+            }
+
             // Validate the form before submission
             if (!validateUpdateForm()) {
                 return;
@@ -919,7 +1069,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 business_id: selectedBusinessId,
                 is_available: isAvailable
             };
-
             // Only include type, amount, and info if incentive is available
             if (isAvailable) {
                 const incentiveType = document.getElementById('incentiveType').value;
@@ -989,7 +1138,6 @@ document.addEventListener('DOMContentLoaded', function() {
             form.insertBefore(explanation, form.firstChild);
         }
     }
-
     // Add CSS styles for form validation
     const style = document.createElement('style');
     style.textContent += `
@@ -1017,9 +1165,60 @@ document.addEventListener('DOMContentLoaded', function() {
             opacity: 0.5;
             pointer-events: none;
         }
+        
+        /* IMPROVED: Add styles for the chain badges */
+        .chain-badge {
+            background-color: #4285F4;
+            color: white;
+            border-radius: 4px;
+            padding: 3px 6px;
+            font-size: 12px;
+            display: inline-block;
+        }
+        
+        .chain-badge.small {
+            font-size: 10px;
+            padding: 2px 4px;
+        }
+        
+        /* IMPROVED: Add styles for admin chain buttons */
+        .select-incentive.admin-chain {
+            background-color: #9C27B0;
+            color: white;
+        }
+        
+        /* IMPROVED: Warning banner for chain incentives */
+        .chain-incentive-warning {
+            background-color: #FFF3CD;
+            color: #856404;
+            border: 1px solid #FFEEBA;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
     `;
     document.head.appendChild(style);
 
     // Call the function to add asterisks
     addAsterisksToRequiredFields();
 });
+
+/**
+ * Check if the current user is an admin
+ * @returns {boolean} True if user is admin
+ */
+function checkIfUserIsAdmin() {
+    try {
+        // Get session data from localStorage
+        const sessionData = localStorage.getItem('patriotThanksSession');
+        if (!sessionData) return false;
+
+        const session = JSON.parse(sessionData);
+
+        // Check if user has admin privileges
+        return (session.user && (session.user.isAdmin === true || session.user.level === 'Admin'));
+    } catch (error) {
+        console.error("Error checking admin status:", error);
+        return false;
+    }
+}
