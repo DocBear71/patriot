@@ -548,6 +548,103 @@ async function findMatchingChainForPlaceResult(placeName) {
 }
 
 /**
+ * Helper function to normalize an address for comparison
+ * @param {string} address - Address string to normalize
+ * @returns {string} - Normalized address
+ */
+function normalizeAddress(address) {
+    if (!address) return '';
+
+    return address
+        .toLowerCase()
+        // Replace common abbreviations
+        .replace(/\bst\b/g, 'street')
+        .replace(/\be\b/g, 'east')
+        .replace(/\bw\b/g, 'west')
+        .replace(/\bn\b/g, 'north')
+        .replace(/\bs\b/g, 'south')
+        .replace(/\bave\b/g, 'avenue')
+        .replace(/\bblvd\b/g, 'boulevard')
+        .replace(/\brd\b/g, 'road')
+        .replace(/\bdr\b/g, 'drive')
+        // Remove all non-alphanumeric characters except spaces
+        .replace(/[^a-z0-9\s]/g, '')
+        // Replace multiple spaces with a single space
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
+ * Check if a Google Places result matches a business in our database
+ * @param {Object} place - Business object from Google Places
+ * @param {Array} databaseBusinesses - Array of businesses from database
+ * @returns {Object|null} - Matching database business or null if no match
+ */
+function findMatchingDatabaseBusiness(place, databaseBusinesses) {
+    if (!place || !Array.isArray(databaseBusinesses) || databaseBusinesses.length === 0) {
+        return null;
+    }
+
+    // First normalize the place's address for comparison
+    const placeAddress = normalizeAddress(place.address1 || '');
+    const placeName = (place.bname || '').toLowerCase();
+
+    // Log for debugging
+    console.log(`Checking if place matches database: ${placeName}, ${placeAddress}`);
+
+    // Check each database business
+    for (const dbBusiness of databaseBusinesses) {
+        // Skip if essential data is missing
+        if (!dbBusiness || !dbBusiness.bname) continue;
+
+        // Check for name match (case insensitive)
+        const nameMatch = placeName === (dbBusiness.bname || '').toLowerCase();
+
+        // Check for address match using normalized comparison
+        const dbAddress = normalizeAddress(dbBusiness.address1 || '');
+        const addressMatch = placeAddress && dbAddress && placeAddress === dbAddress;
+
+        // Handle the "New" vs "New York" city parsing issue
+        const cityMatch =
+            place.city &&
+            dbBusiness.city &&
+            (place.city.toLowerCase() === dbBusiness.city.toLowerCase() ||
+                (place.city.toLowerCase() === 'new' &&
+                    dbBusiness.city.toLowerCase().startsWith('new')));
+
+        // Check for coordinate proximity if both have coordinates
+        let coordinatesMatch = false;
+
+        if (place.lat && place.lng && dbBusiness.lat && dbBusiness.lng) {
+            const distance = Math.sqrt(
+                Math.pow(place.lat - dbBusiness.lat, 2) +
+                Math.pow(place.lng - dbBusiness.lng, 2)
+            );
+
+            // If coordinates are within ~100 meters (very rough estimation)
+            coordinatesMatch = distance < 0.001;
+        }
+
+        // Log the matching process for each field
+        console.log(`  Checking against: ${dbBusiness.bname}, ${dbAddress}`);
+        console.log(`  Name match: ${nameMatch}, Address match: ${addressMatch}, City match: ${cityMatch}, Coordinates match: ${coordinatesMatch}`);
+
+        // Consider it a match if:
+        // 1. Names match AND addresses match
+        // 2. OR Names match AND city matches AND coordinates match
+        if ((nameMatch && addressMatch) ||
+            (nameMatch && cityMatch && coordinatesMatch)) {
+            console.log(`  MATCH FOUND: ${dbBusiness._id}`);
+            return dbBusiness;
+        }
+    }
+
+    // No match found
+    console.log("  NO MATCH FOUND");
+    return null;
+}
+
+/**
  * Local fallback for chain matching when API is unavailable
  * Hardcoded for common chains until API is working
  * @param {string} placeName - Place name to match
@@ -1457,7 +1554,99 @@ function addBusinessRow(business, tableBody, isFromPlaces) {
     }
 }
 
+/**
+ * Modified displayBusinessesOnMap function that checks if Places results match database entries
+ * @param {Array} businesses - Array of business objects to display
+ */
+function displayBusinessesOnMap(businesses) {
+    // If map is not ready yet, store businesses for later display
+    if (!mapInitialized || !map) {
+        console.log("Map not initialized yet. Storing businesses for later display.");
+        pendingBusinessesToDisplay = businesses;
+        return;
+    }
 
+    console.log("Displaying businesses on map:", businesses.length);
+
+    if (!Array.isArray(businesses) || businesses.length === 0) {
+        console.log("No businesses to display on map");
+        // Center the map on the US and zoom out
+        map.setCenter(CONFIG.defaultCenter);
+        map.setZoom(CONFIG.defaultZoom);
+        return;
+    }
+
+    // Filter businesses to only show those near the search location
+    const filteredBusinesses = filterBusinessesBySearchLocation(businesses);
+    console.log(`Filtered to ${filteredBusinesses.length} businesses near search location`);
+
+    // Clear existing markers
+    clearMarkers();
+    bounds = new google.maps.LatLngBounds();
+
+    // Separate businesses into database and Places API results
+    const databaseBusinesses = filteredBusinesses.filter(business => !business.isGooglePlace);
+    let placesBusinesses = filteredBusinesses.filter(business => business.isGooglePlace);
+
+    console.log(`Found ${databaseBusinesses.length} database businesses and ${placesBusinesses.length} Places API businesses`);
+
+    // IMPORTANT: Check each Places business against database businesses to find matches
+    placesBusinesses = placesBusinesses.map(placesBusiness => {
+        // Check if this Places result matches any database business
+        const matchingDbBusiness = findMatchingDatabaseBusiness(placesBusiness, databaseBusinesses);
+
+        if (matchingDbBusiness) {
+            console.log(`Found matching database business for ${placesBusiness.bname} at ${placesBusiness.address1}`);
+            console.log(`Places ID: ${placesBusiness._id}, DB ID: ${matchingDbBusiness._id}`);
+
+            // Attach a reference to the matching database business
+            placesBusiness.matchingDbBusinessId = matchingDbBusiness._id;
+
+            // Explicitly set this flag to true - this is what showInfoWindow will check
+            placesBusiness.isInDatabase = true;
+
+            // Copy over incentives data if available
+            if (matchingDbBusiness.incentives) {
+                placesBusiness.incentives = matchingDbBusiness.incentives;
+            }
+        }
+
+        return placesBusiness;
+    });
+
+    // Process database businesses first (red markers)
+    databaseBusinesses.forEach((business, index) => {
+        // Make sure these are NOT marked as nearby
+        business.isNearby = false;
+
+        // Geocode the business address to get coordinates
+        geocodeBusinessAddress(business, index, databaseBusinesses.length);
+    });
+
+    // Process Places API businesses (blue markers)
+    placesBusinesses.forEach((business, index) => {
+        // Keep the isNearby flag (even if it matches a database business)
+        // This will maintain the blue marker color for display consistency
+        business.isNearby = true;
+
+        // Geocode the business address
+        geocodeBusinessAddress(business, index + databaseBusinesses.length,
+            databaseBusinesses.length + placesBusinesses.length);
+    });
+
+    ensureMapVisibility();
+
+    // If we have at least one business with coordinates, show the map
+    const hasCoordinates = filteredBusinesses.some(business =>
+        business.lat && business.lng ||
+        (business.location && business.location.coordinates &&
+            business.location.coordinates.length === 2)
+    );
+
+    if (hasCoordinates) {
+        document.getElementById('map-container').style.display = 'block';
+    }
+}
 
 
 /**
@@ -4541,77 +4730,6 @@ function createEnhancedInfoWindow() {
 }
 
 /**
- * Modified displayBusinessesOnMap to properly handle database vs Places API businesses
- * @param {Array} businesses - Array of business objects to display
- */
-function displayBusinessesOnMap(businesses) {
-    // If map is not ready yet, store businesses for later display
-    if (!mapInitialized || !map) {
-        console.log("Map not initialized yet. Storing businesses for later display.");
-        pendingBusinessesToDisplay = businesses;
-        return;
-    }
-
-    console.log("Displaying businesses on map:", businesses.length);
-
-    if (!Array.isArray(businesses) || businesses.length === 0) {
-        console.log("No businesses to display on map");
-        // Center the map on the US and zoom out
-        map.setCenter(CONFIG.defaultCenter);
-        map.setZoom(CONFIG.defaultZoom);
-        return;
-    }
-
-    // Filter businesses to only show those near the search location
-    const filteredBusinesses = filterBusinessesBySearchLocation(businesses);
-    console.log(`Filtered to ${filteredBusinesses.length} businesses near search location`);
-
-    // Clear existing markers
-    clearMarkers();
-    bounds = new google.maps.LatLngBounds();
-
-    // IMPORTANT: Identify which businesses are from the database
-    // These should be marked differently and added to the map first
-    const databaseBusinesses = filteredBusinesses.filter(business => !business.isGooglePlace);
-    const placesBusinesses = filteredBusinesses.filter(business => business.isGooglePlace);
-
-    console.log(`Found ${databaseBusinesses.length} database businesses and ${placesBusinesses.length} Places API businesses`);
-
-    // Process database businesses first (should appear with red markers)
-    databaseBusinesses.forEach((business, index) => {
-        // Make sure these are NOT marked as nearby
-        business.isNearby = false;
-
-        // Geocode the business address to get coordinates
-        geocodeBusinessAddress(business, index, databaseBusinesses.length);
-    });
-
-    // Process Places API businesses second (should appear with blue markers)
-    placesBusinesses.forEach((business, index) => {
-        // Make sure these ARE marked as nearby
-        business.isNearby = true;
-
-        // Geocode the business address to get coordinates
-        geocodeBusinessAddress(business, index + databaseBusinesses.length,
-            databaseBusinesses.length + placesBusinesses.length);
-    });
-
-    ensureMapVisibility();
-
-    // If we have at least one business with coordinates, show the map
-    const hasCoordinates = filteredBusinesses.some(business =>
-        business.lat && business.lng ||
-        (business.location && business.location.coordinates &&
-            business.location.coordinates.length === 2)
-    );
-
-    if (hasCoordinates) {
-        document.getElementById('map-container').style.display = 'block';
-    }
-}
-
-
-/**
  * Modified function to ensure markers have the right appearance
  * @param {Object} business - Business object
  * @param {Object} location - Google Maps location object
@@ -5147,16 +5265,11 @@ function showInfoWindow(marker) {
     // Check if this is a chain location or matched with a chain
     const isChainLocation = business.chain_id ? true : false;
 
-    // REFINED LOGIC: Create three distinct categories
-    // 1. Actually in database (not from Google Places)
-    const isInDatabase = !isGooglePlace;
+    // CRITICAL UPDATE: Check if this Places result matches a database business
+    // This is the flag we set in displayBusinessesOnMap
+    const isInDatabase = !isGooglePlace || business.isInDatabase === true;
 
-    // 2. Chain-matched from Places API
-    const isChainMatchedPlace = isGooglePlace && isChainLocation;
-
-    // 3. Regular Places result - just for clarity
-    const isRegularPlace = isGooglePlace && !isChainLocation;
-
+    // For debugging - log all the relevant flags
     console.log(`Info window for business: ${business.bname}`);
     console.log(`  Is Google Place: ${isGooglePlace}`);
     console.log(`  Is Nearby: ${isNearby}`);
@@ -5164,7 +5277,7 @@ function showInfoWindow(marker) {
     console.log(`  Chain ID: ${business.chain_id || 'None'}`);
     console.log(`  Chain Name: ${business.chain_name || 'None'}`);
     console.log(`  Is In Database: ${isInDatabase}`);
-    console.log(`  Is Chain-Matched Place: ${isChainMatchedPlace}`);
+    console.log(`  Matching DB Business ID: ${business.matchingDbBusinessId || 'None'}`);
 
     // Format address - handle both Google Places and database addresses
     let addressLine = '';
@@ -5213,42 +5326,53 @@ function showInfoWindow(marker) {
         `;
     }
 
-    // REFINED LOGIC: Customize footer button based on the three categories
+    // Customize footer button based on database status
     let actionButtons;
+
     if (isInDatabase) {
-        // Category 1: In database - show View Details button
+        // In database or matched - show View Details button
+        let viewDetailsId = business._id;
+
+        // If it's a Places result that matches a database business, use the database ID
+        if (isGooglePlace && business.matchingDbBusinessId) {
+            viewDetailsId = business.matchingDbBusinessId;
+        }
+
         actionButtons = `
-        <button class="view-details-btn" 
-                onclick="window.viewBusinessDetails('${business._id}')">
-            View Details
-        </button>`;
-    } else if (isChainMatchedPlace) {
-        // Category 2: Chain-matched Place - show Add Location button
+            <button class="view-details-btn" 
+                    onclick="window.viewBusinessDetails('${viewDetailsId}')">
+                View Details
+            </button>`;
+    } else if (isChainLocation) {
+        // Chain-matched place not in database - show Add Location button
         actionButtons = `
-        <button class="add-business-btn" 
-                onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id || ''}')">
-            Add to Database
-        </button>`;
+            <button class="add-business-btn" 
+                    onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id || ''}')">
+                Add to Database
+            </button>`;
     } else {
-        // Category 3: Regular Place - show Add to Database button
+        // Regular place not in database - show Add to Database button
         actionButtons = `
-        <button class="add-business-btn" 
-                onclick="window.addBusinessToDatabase('${business.placeId}')">
-            Add to Patriot Thanks
-        </button>`;
+            <button class="add-business-btn" 
+                    onclick="window.addBusinessToDatabase('${business.placeId}')">
+                Add to Patriot Thanks
+            </button>`;
     }
 
-    // REFINED LOGIC: Customize status message based on category
+    // Customize status message
     let statusMessage = '';
-    if (isChainMatchedPlace) {
-        // Chain-matched Place - show special message about chain
-        statusMessage = `<p>This location matches the <strong>${business.chain_name}</strong> chain in our database. Chain-wide incentives apply, but this specific location is not yet added to our database.</p>`;
-    } else if (isRegularPlace) {
-        // Regular Place - show not in database message
-        statusMessage = '<p>This business is not yet in the Patriot Thanks database.</p>';
+
+    if (isGooglePlace && !isInDatabase) {
+        if (isChainLocation) {
+            // Chain-matched place - show special chain message
+            statusMessage = `<p>This location matches the <strong>${business.chain_name}</strong> chain in our database. Chain-wide incentives apply, but this specific location is not yet added to our database.</p>`;
+        } else {
+            // Regular place - show not in database message
+            statusMessage = '<p>This business is not yet in the Patriot Thanks database.</p>';
+        }
     }
 
-    // Content for the info window with your existing CSS classes
+    // Content for the info window
     const contentString = `
     <div class="info-window">
         <h3>${business.bname}</h3>
@@ -5258,7 +5382,7 @@ function showInfoWindow(marker) {
         ${distanceDisplay}
         <p><strong>Type:</strong> ${businessType}</p>
         <div id="info-window-incentives-${business._id}" class="info-window-scrollable">
-            <p><strong>Incentives:</strong> <em>${isInDatabase || isChainMatchedPlace ? 'Loading...' : 'Not in database'}</em></p>
+            <p><strong>Incentives:</strong> <em>${isInDatabase || isChainLocation ? 'Loading...' : 'Not in database'}</em></p>
         </div>
         ${statusMessage}
         <div class="info-window-actions">
@@ -5323,19 +5447,22 @@ function showInfoWindow(marker) {
 
     console.log("Opened info window for marker");
 
-    // Fetch the right kind of incentives based on business type and category
+    // Load the appropriate incentives
     if (isInDatabase) {
-        // Category 1: Database business - load regular incentives
-        console.log(`Fetching incentives for database business: ${business._id}`);
-        fetchBusinessIncentivesForInfoWindow(business._id);
-    } else if (isChainMatchedPlace) {
-        // Category 2: Chain-matched Place - load chain incentives
-        console.log(`Fetching chain incentives for Google Place: ${business._id}, Chain: ${business.chain_id}`);
+        // For database businesses or place matches, load regular incentives
+        const businessId = isGooglePlace && business.matchingDbBusinessId ?
+            business.matchingDbBusinessId : business._id;
+
+        console.log(`Fetching incentives for database business: ${businessId}`);
+        fetchBusinessIncentivesForInfoWindow(businessId);
+    } else if (isChainLocation) {
+        // For chain-matched Places, load chain incentives
+        console.log(`Fetching chain incentives for Places result: ${business._id}, Chain: ${business.chain_id}`);
         fetchChainIncentivesForInfoWindow(business._id, business.chain_id);
     }
-    // Category 3: Regular Place - no incentives to load
+    // Otherwise no incentives to load (not in database)
 
-    // Add event listener to ensure scrollable styles are applied when the window opens
+    // Add event listener to ensure scrollable styles are applied
     google.maps.event.addListener(infoWindow, 'domready', function() {
         console.log("Info window DOM ready, forcing scrollable behavior");
 
