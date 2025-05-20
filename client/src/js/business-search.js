@@ -879,17 +879,29 @@ window.addBusinessToDatabase = async function(placeId) {
 };
 
 /**
- * Add a business to the database with chain support
+ * Modified addBusinessToDatabase function that checks if a business is already in database
+ * before redirecting to the add business page
  * @param {string} placeId - Google Place ID
  * @param {string} chainId - Optional chain ID if this place is part of a chain
  */
 window.addBusinessToDatabase = async function(placeId, chainId = null) {
     console.log("Adding place to database:", placeId, "Chain ID:", chainId);
 
+    // If this is a chain location, it's already "in the database" in a sense
+    if (chainId) {
+        // Instead of adding the business, just tell the user it's part of a chain
+        alert("This business is already part of a chain in our database. Chain-wide incentives apply to this location.");
+        return;
+    }
+
     try {
-        // Load the Places library if needed
-        if (!google.maps.places) {
-            await google.maps.importLibrary("places");
+        // If available, check if this place is already in the database
+        if (typeof isPlaceAlreadyInDatabase === 'function') {
+            const exists = await isPlaceAlreadyInDatabase(placeId);
+            if (exists) {
+                alert("This business is already in our database.");
+                return;
+            }
         }
 
         // Use the Places Service to get details
@@ -900,7 +912,7 @@ window.addBusinessToDatabase = async function(placeId, chainId = null) {
             fields: ['name', 'formatted_address', 'formatted_phone_number', 'geometry', 'address_components']
         };
 
-        service.getDetails(request, (place, status) => {
+        service.getDetails(request, async (place, status) => {
             if (status !== google.maps.places.PlacesServiceStatus.OK || !place) {
                 console.error("Error fetching place details:", status);
                 alert("Sorry, we couldn't retrieve the details for this business. Please try again or add it manually.");
@@ -928,6 +940,7 @@ window.addBusinessToDatabase = async function(placeId, chainId = null) {
                 zip: addressComponents.postal_code || '',
                 phone: place.formatted_phone_number || '',
                 placeId: place.place_id,
+                formattedAddress: place.formatted_address, // Save the full formatted address
 
                 // Store coordinates for later use
                 lat: place.geometry?.location.lat() || 0,
@@ -943,27 +956,11 @@ window.addBusinessToDatabase = async function(placeId, chainId = null) {
                 }
             };
 
-            // Add chain information if provided
-            if (chainId) {
-                businessData.chain_id = chainId;
+            // Store in sessionStorage for the add business page to use
+            sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
 
-                // Try to get chain name
-                getChainDetails(chainId).then(chainData => {
-                    if (chainData && chainData.bname) {
-                        businessData.chain_name = chainData.bname;
-                    }
-
-                    // Continue with storing and redirecting
-                    finishAddingBusiness(businessData);
-                }).catch(error => {
-                    console.error("Error getting chain details:", error);
-                    // Continue without chain name
-                    finishAddingBusiness(businessData);
-                });
-            } else {
-                // No chain, proceed directly
-                finishAddingBusiness(businessData);
-            }
+            // Redirect to add business page
+            window.location.href = 'business-add.html?prefill=true';
         });
     } catch (error) {
         console.error("Error in addBusinessToDatabase:", error);
@@ -4918,9 +4915,54 @@ function getDefaultBusinessIcon() {
 }
 
 /**
- * Fetch incentives for chain-matched Google Places results
+ * Enhanced function to check if a business from Google Places
+ * is already in the database by comparing address
+ * @param {Object} business - Business object from Google Places
+ * @returns {boolean} - True if business address is already in database
+ */
+async function isAddressInDatabase(business) {
+    try {
+        if (!business || !business.address1 || !business.city || !business.state || !business.zip) {
+            console.log("Can't check database: incomplete address information", business);
+            return false;
+        }
+
+        const addressString =
+            `${business.address1}, ${business.city}, ${business.state} ${business.zip}`.toLowerCase();
+        console.log("Checking if address exists in database:", addressString);
+
+        // Get the base URL
+        const baseURL = getBaseURL();
+
+        // Use the search operation to check if this address exists
+        const searchParams = new URLSearchParams({
+            address: addressString,
+            exact: 'true' // Add a parameter to indicate we want exact matches
+        }).toString();
+
+        const response = await fetch(`${baseURL}/api/business.js?operation=search&${searchParams}`);
+
+        if (!response.ok) {
+            console.warn("Error checking address in database:", response.status);
+            return false;
+        }
+
+        const data = await response.json();
+
+        // If we get results, the address is in the database
+        const exists = data.results && data.results.length > 0;
+        console.log(`Address exists in database: ${exists}`);
+        return exists;
+    } catch (error) {
+        console.error("Error checking if address is in database:", error);
+        return false;
+    }
+}
+
+/**
+ * Enhanced version of fetchChainIncentivesForInfoWindow that better handles the UI
  * @param {string} placeId - The Google Place ID
- * @param {string} chainId - The chain ID
+ * @param {string} chainId - The chain ID in your database
  */
 function fetchChainIncentivesForInfoWindow(placeId, chainId) {
     if (!placeId || !chainId) {
@@ -5000,8 +5042,40 @@ function fetchChainIncentivesForInfoWindow(placeId, chainId) {
 }
 
 /**
+ * Modified function to check if a business from Google Places API already exists in database
+ * This function helps prevent duplicate businesses from being added
+ * @param {string} placeId - The Google Place ID
+ * @returns {Promise<boolean>} - Promise resolving to true if business exists
+ */
+async function isPlaceAlreadyInDatabase(placeId) {
+    if (!placeId) return false;
+
+    try {
+        // Get the base URL
+        const baseURL = getBaseURL();
+
+        // Make API request to check if place exists
+        const response = await fetch(`${baseURL}/api/business.js?operation=check_place_exists&place_id=${placeId}`);
+
+        if (!response.ok) {
+            // If the endpoint doesn't exist yet, this will fail
+            // In that case, return false (not in database)
+            console.warn("Error checking if place exists:", response.status);
+            return false;
+        }
+
+        const data = await response.json();
+        return data.exists === true;
+    } catch (error) {
+        console.error("Error checking if place exists:", error);
+        return false;
+    }
+}
+
+
+/**
  * Enhanced showInfoWindow function that properly displays Google Places data
- * even when matched with chain information
+ * and correctly identifies chain-matched businesses as being in the database
  */
 function showInfoWindow(marker) {
     console.log("showInfoWindow called with marker:", marker);
@@ -5014,17 +5088,24 @@ function showInfoWindow(marker) {
     const business = marker.business;
     console.log("Business data for info window:", business);
 
-    // Check if this is a Google Places result not in our database
+    // Check if this is a Google Places result
     const isGooglePlace = business.isGooglePlace === true;
 
     // Check if this is a chain location or matched with a chain
     const isChainLocation = business.chain_id ? true : false;
+
+    // IMPORTANT FIX: Determine if the business should be considered "in database"
+    // A business is in the database if:
+    // 1. It's directly from the database (not from Google Places)
+    // 2. OR it's a Places result that matches a chain in our database
+    const isInDatabase = !isGooglePlace || (isGooglePlace && isChainLocation);
 
     console.log(`Info window for business: ${business.bname}`);
     console.log(`  Is Google Place: ${isGooglePlace}`);
     console.log(`  Is Chain Location: ${isChainLocation}`);
     console.log(`  Chain ID: ${business.chain_id || 'None'}`);
     console.log(`  Chain Name: ${business.chain_name || 'None'}`);
+    console.log(`  Is In Database: ${isInDatabase}`);
 
     // Format address - handle both Google Places and database addresses
     let addressLine = '';
@@ -5073,21 +5154,28 @@ function showInfoWindow(marker) {
         `;
     }
 
-    // Customize the footer button based on whether it's in our database
+    // IMPORTANT FIX: Customize the footer button based on whether it's in our database
     let actionButtons;
-    if (isGooglePlace) {
+    if (!isInDatabase) {
+        // Not in database - show Add to Database button
         actionButtons = `
         <button class="add-business-btn" 
                 onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id || ''}')">
             Add to Patriot Thanks
         </button>`;
     } else {
+        // In database (or chain matched) - show View Details button
         actionButtons = `
         <button class="view-details-btn" 
                 onclick="window.viewBusinessDetails('${business._id}')">
             View Details
         </button>`;
     }
+
+    // IMPORTANT FIX: Don't show "not in database" message for chain locations
+    const databaseStatusMessage = (!isInDatabase && !isChainLocation)
+        ? '<p>This business is not yet in the Patriot Thanks database.</p>'
+        : '';
 
     // Content for the info window with your existing CSS classes
     const contentString = `
@@ -5099,9 +5187,9 @@ function showInfoWindow(marker) {
         ${distanceDisplay}
         <p><strong>Type:</strong> ${businessType}</p>
         <div id="info-window-incentives-${business._id}" class="info-window-scrollable">
-            <p><strong>Incentives:</strong> <em>${isGooglePlace && !isChainLocation ? 'Not in database' : 'Loading...'}</em></p>
+            <p><strong>Incentives:</strong> <em>${isGooglePlace && !isInDatabase ? 'Not in database' : 'Loading...'}</em></p>
         </div>
-        ${isGooglePlace && !isChainLocation ? '<p>This business is not yet in the Patriot Thanks database.</p>' : ''}
+        ${databaseStatusMessage}
         <div class="info-window-actions">
             ${actionButtons}
         </div>
@@ -5164,7 +5252,7 @@ function showInfoWindow(marker) {
 
     console.log("Opened info window for marker");
 
-    // Fetch incentives based on business type
+    // IMPORTANT FIX: Fetch the right kind of incentives based on business type and database status
     if (isGooglePlace) {
         if (isChainLocation || business.chain_id) {
             // If it's a Google Place that matches a chain, load chain incentives
