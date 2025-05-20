@@ -8,6 +8,13 @@ document.addEventListener('DOMContentLoaded', function() {
         businessInfoSection.style.display = 'none';
     }
 
+    const resetButton = document.querySelector('.reset-button, #reset-button, button[type="reset"]');
+    if (resetButton) {
+        resetButton.addEventListener('click', function() {
+            resetBusinessSearchForm();
+        });
+    }
+
     // Get form elements for validation
     const form = {
         bname: document.getElementById("bname"),
@@ -188,6 +195,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to update a business in the database
     async function updateBusiness(formData) {
         try {
+            const selectedBusiness = window.selectedBusinessData || {};
+            if (selectedBusiness.is_chain) {
+                const isAdmin = checkIfUserIsAdmin();
+                if (!isAdmin) {
+                    showMessage('error', "Chain businesses can only be modified by administrators.");
+                    return; // Stop the update
+                }
+            }
+
             // Get user information from session
             const sessionData = localStorage.getItem('patriotThanksSession');
             if (sessionData) {
@@ -260,6 +276,62 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitButton.disabled = false;
             }
         }
+    }
+
+    // Add this function to your business-update-handler.js file
+    function resetBusinessSearchForm() {
+        // Clear form values
+        const businessNameField = document.getElementById('business-name');
+        if (businessNameField) {
+            businessNameField.value = '';
+            businessNameField.disabled = false;
+        }
+
+        const addressField = document.getElementById('address');
+        if (addressField) {
+            addressField.value = '';
+            addressField.disabled = false;
+        }
+
+        // Clear the business search results
+        const resultsContainer = document.getElementById('business-search-results');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '';
+        }
+
+        // Re-enable the search button
+        const searchButton = document.querySelector('#business-search-form input[type="submit"]');
+        if (searchButton) {
+            searchButton.disabled = false;
+            searchButton.style.cursor = 'pointer';
+        }
+
+        // Reset business info section
+        const businessInfoSection = document.getElementById('business-info-section');
+        if (businessInfoSection) {
+            businessInfoSection.style.display = 'none';
+
+            // Remove any view-only message
+            const viewOnlyMessage = businessInfoSection.querySelector('.alert.alert-info');
+            if (viewOnlyMessage) {
+                viewOnlyMessage.remove();
+            }
+        }
+
+        // Re-enable all form fields
+        const formFields = document.querySelectorAll('input, select, textarea');
+        formFields.forEach(field => {
+            field.disabled = false;
+        });
+
+        // Show the update button
+        const updateButton = document.getElementById('update-submit');
+        if (updateButton) {
+            updateButton.style.display = 'block';
+        }
+
+        // Reset the window.selectedBusinessData
+        window.selectedBusinessData = null;
     }
 
 // Function to reset the form after successful update

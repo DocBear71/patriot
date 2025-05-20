@@ -2181,8 +2181,36 @@ async function searchPlacesClientSide(query, location, radius = 50000) {
  * @param {number} total - Total number of businesses
  */
 function geocodeBusinessAddress(business, index, total) {
-    if (!business || !business.address1) {
-        console.error("Invalid business data for geocoding", business);
+    // Skip if business data is invalid or address is missing
+    if (!business) {
+        console.error("Invalid business data for geocoding");
+        return;
+    }
+
+    // Ensure business has complete address data
+    if (!business.address1 || !business.city || !business.state || !business.zip) {
+        console.error("Incomplete address data for geocoding business:", business.bname || "Unknown");
+
+        // If it's a chain business, they might not have an address - use default coordinates
+        if (business.is_chain) {
+            console.log("Chain business without address, using default center");
+
+            // Use default US center coordinates
+            business.lat = CONFIG.defaultCenter.lat;
+            business.lng = CONFIG.defaultCenter.lng;
+
+            // Create a position object
+            const position = new google.maps.LatLng(business.lat, business.lng);
+
+            // Add marker
+            addAdvancedMarker(business, position);
+
+            // Extend bounds
+            bounds.extend(position);
+
+            return;
+        }
+
         return;
     }
 
@@ -2734,56 +2762,99 @@ window.viewChainDetails = function(chainId) {
  * @param {Object} chainBusiness - Chain business object
  */
 function showChainInfoDialog(chainBusiness) {
-    // Create modal content
-    const modalContent = `
-        <div class="modal fade" id="chainInfoModal" tabindex="-1" role="dialog" aria-labelledby="chainInfoModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="chainInfoModalLabel">Chain Information: ${chainBusiness.bname}</h5>
-                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="alert alert-info">
-                            <p><strong>${chainBusiness.bname}</strong> is a national chain business in the Patriot Thanks database.</p>
-                            <p>Chain businesses can only be modified by administrators, but chain incentives apply to all locations nationwide.</p>
+    try {
+        console.log("Showing chain info dialog for:", chainBusiness.bname);
+
+        // Create modal content
+        const modalContent = `
+            <div class="modal fade" id="chainInfoModal" tabindex="-1" role="dialog" aria-labelledby="chainInfoModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="chainInfoModalLabel">Chain Information: ${chainBusiness.bname}</h5>
+                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
                         </div>
-                        <div class="business-details">
-                            <p><strong>Business Type:</strong> ${getBusinessTypeLabel(chainBusiness.type)}</p>
-                            <p>Chain incentives will be displayed for businesses that match this chain, even if they are not in the database.</p>
+                        <div class="modal-body">
+                            <div class="alert alert-info">
+                                <p><strong>${chainBusiness.bname}</strong> is a national chain business in the Patriot Thanks database.</p>
+                                <p>Chain businesses can only be modified by administrators, but chain incentives apply to all locations nationwide.</p>
+                            </div>
+                            <div class="business-details">
+                                <p><strong>Business Type:</strong> ${getBusinessTypeLabel(chainBusiness.type)}</p>
+                                <p>Chain incentives will be displayed for businesses that match this chain, even if they are not in the database.</p>
+                            </div>
+                            <div class="chain-incentives">
+                                <h4>Chain Incentives</h4>
+                                <div class="loading-incentives">Loading chain incentives...</div>
+                            </div>
                         </div>
-                        <div class="chain-incentives">
-                            <h4>Chain Incentives</h4>
-                            <div class="loading-incentives">Loading chain incentives...</div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
-        </div>
-    `;
+        `;
 
-    // Remove existing modal if present
-    const existingModal = document.getElementById('chainInfoModal');
-    if (existingModal) {
-        existingModal.remove();
+        // Remove existing modal if present
+        const existingModal = document.getElementById('chainInfoModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Append the modal to the body
+        const modalContainer = document.createElement('div');
+        modalContainer.innerHTML = modalContent;
+        document.body.appendChild(modalContainer.firstChild);
+
+        // Get the modal element
+        const modalElement = document.getElementById('chainInfoModal');
+
+        // Check if Bootstrap 5 is being used
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            // Bootstrap 5
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+        } else {
+            // Bootstrap 4 or jQuery fallback
+            try {
+                if (typeof $ !== 'undefined' && $.fn.modal) {
+                    $(modalElement).modal('show');
+                } else {
+                    // Manual fallback if jQuery/Bootstrap not available
+                    modalElement.style.display = 'block';
+                    modalElement.classList.add('show');
+
+                    // Add backdrop manually
+                    const backdrop = document.createElement('div');
+                    backdrop.className = 'modal-backdrop show';
+                    document.body.appendChild(backdrop);
+
+                    // Add close functionality to buttons
+                    const closeButtons = modalElement.querySelectorAll('[data-bs-dismiss="modal"]');
+                    closeButtons.forEach(button => {
+                        button.addEventListener('click', function() {
+                            modalElement.style.display = 'none';
+                            modalElement.classList.remove('show');
+                            document.body.removeChild(backdrop);
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error("Error showing modal with jQuery fallback:", error);
+                alert(`Chain Information: ${chainBusiness.bname} is a national chain business that can only be modified by administrators.`);
+            }
+        }
+
+        // Fetch and display chain incentives
+        fetchChainIncentives(chainBusiness._id);
+    } catch (error) {
+        console.error("Error in showChainInfoDialog:", error);
+        // Fallback to alert
+        alert(`Chain Information: ${chainBusiness.bname} is a national chain business that can only be modified by administrators.`);
     }
-
-    // Append the modal to the body
-    const modalContainer = document.createElement('div');
-    modalContainer.innerHTML = modalContent;
-    document.body.appendChild(modalContainer.firstChild);
-
-    // Show the modal
-    const modal = new bootstrap.Modal(document.getElementById('chainInfoModal'));
-    modal.show();
-
-    // Fetch and display chain incentives
-    fetchChainIncentives(chainBusiness._id);
 }
 
 /**
@@ -4675,6 +4746,14 @@ window.focusOnMapMarker = function(businessId) {
 
 // Initialize when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Check Bootstrap version
+    if (typeof bootstrap !== 'undefined') {
+        console.log("Bootstrap 5 detected:", bootstrap.Modal ? "Modal available" : "Modal not available");
+    } else if (typeof $ !== 'undefined' && $.fn.modal) {
+        console.log("Bootstrap 4 with jQuery detected");
+    } else {
+        console.warn("Bootstrap not detected - modals may not work properly");
+    }
     // Initialize business search functionality
     initBusinessSearch();
     addCustomMarkerStyles();

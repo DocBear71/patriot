@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     console.log("Page detection - Business Update:", isBusinessUpdatePage, "Add:", isAddPage, "Update:", isUpdatePage, "View:", isViewPage);
 
+
     // Create the reset button with appropriate styling
     function createResetButton() {
         const resetButton = document.createElement('button');
