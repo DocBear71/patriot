@@ -1,6 +1,24 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Form validator loaded!");
 
+    /**
+     * Redirects to the search page after adding a business
+     * This should be called in the success callback of your form submission
+     */
+    function redirectAfterAddingBusiness(businessName) {
+        // After successful business addition, redirect to the search page
+        // with parameters to indicate a new business was added
+        const searchPageUrl = new URL('business-search.html', window.location.origin);
+
+        // Add parameters
+        searchPageUrl.searchParams.append('business_added', 'true');
+        searchPageUrl.searchParams.append('business_name', businessName);
+        searchPageUrl.searchParams.append('ts', new Date().getTime()); // Cache-busting
+
+        // Redirect to the search page
+        window.location.href = searchPageUrl.toString();
+    }
+
     // Get form elements
     const form = {
         businessName: document.getElementById("bname"),
@@ -144,8 +162,14 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show success message to user
             alert("Submission successful! The business is now available in our database.");
 
+            // Get the business name for the redirect
+            const businessName = formData.bname;
+
+            // Redirect to the search page with parameters
+            redirectAfterAddingBusiness(businessName);
+
             // Optional: Clear form or redirect
-            resetForm();
+            // resetForm(); // Not needed anymore since we're redirecting
 
         } catch (error) {
             console.error("Error:", error);
@@ -279,6 +303,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-// Call the function to add asterisks
+    // Call the function to add asterisks
     addAsterisksToRequiredFields();
 });

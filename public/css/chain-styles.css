@@ -195,3 +195,59 @@ textarea:not([disabled]) {
     font-size: 14px;
     line-height: 1.4;
 }
+
+/* Add these styles to your CSS file */
+
+.refresh-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-left: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.refresh-btn:hover {
+    background-color: #218838;
+}
+
+.refresh-btn:active {
+    transform: scale(0.98);
+}
+
+.refresh-btn i {
+    margin-right: 5px;
+}
+
+.refresh-btn.refreshing {
+    background-color: #17a2b8;
+    pointer-events: none;
+}
+
+/* Animation for the spinning icon */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.fa-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Fix for field validation */
+.valid-field {
+    border-color: #28a745 !important;
+    background-color: #f0fff0 !important;
+}
+
+.invalid-field {
+    border-color: #dc3545 !important;
+    background-color: #fff0f0 !important;
+}

@@ -2060,165 +2060,183 @@ function initBusinessSearch() {
             }
         });
     }
+
+    // Add the refresh button
+    addRefreshButton();
 }
 
 /**
- * Enhanced retrieveFromMongoDB function that ensures geocoding works
+ * Add refresh button to the search form
+ * Place this code in your initBusinessSearch function after the form listeners
  */
-async function retrieveFromMongoDB(formData) {
-    try {
-        // Show a loading indicator
-        const resultsContainer = document.getElementById('business-search-results') ||
-            document.getElementById('search_table');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '<div class="loading-indicator">Searching for businesses...</div>';
-            resultsContainer.style.display = 'block';
+function addRefreshButton() {
+    // Get the form element
+    const searchForm = document.getElementById('business-search-form');
+    if (!searchForm) return;
+
+    // Check if the button already exists
+    if (document.getElementById('refresh-search-btn')) return;
+
+    // Create the refresh button
+    const refreshButton = document.createElement('button');
+    refreshButton.id = 'refresh-search-btn';
+    refreshButton.type = 'button'; // Not a submit button
+    refreshButton.className = 'refresh-btn';
+    refreshButton.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Results';
+
+    // Add some inline styles
+    refreshButton.style.marginLeft = '10px';
+    refreshButton.style.backgroundColor = '#28a745';
+    refreshButton.style.color = 'white';
+    refreshButton.style.border = 'none';
+    refreshButton.style.borderRadius = '4px';
+    refreshButton.style.padding = '8px 12px';
+    refreshButton.style.cursor = 'pointer';
+
+    // Add click handler
+    refreshButton.addEventListener('click', function() {
+        // Get current form data
+        const businessName = document.getElementById('business-name')?.value || '';
+        const address = document.getElementById('address')?.value || '';
+        const useMyLocation = document.getElementById('use-my-location')?.checked || false;
+
+        // Create form data object
+        const formData = {
+            businessName: businessName,
+            address: address
+        };
+
+        // Clear existing map markers
+        clearMarkers();
+
+        // Remove initial map message if it exists
+        const initialMessage = document.getElementById('initial-map-message');
+        if (initialMessage) {
+            initialMessage.remove();
         }
 
-        // If address is provided (like a ZIP code), geocode it first
-        let searchLocation = null;
+        // Add a small animation to the button
+        this.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Refreshing...';
 
-        // Check if we should use current location
-        const useMyLocation = document.getElementById('use-my-location') &&
-            document.getElementById('use-my-location').checked;
+        // Submit the data to MongoDB with cache-busting
+        retrieveFromMongoDB(formData);
 
-        if (useMyLocation) {
-            try {
-                console.log("Getting user's location for search...");
-                searchLocation = await getUserLocation();
-                console.log("User location for search:", searchLocation);
-            } catch (error) {
-                console.error("Error getting user location:", error);
-                // Continue without location - will fall back to address search
-            }
-        }
-        // If not using location but address is provided, geocode it
-        else if (formData.address && formData.address.trim() !== '') {
-            try {
-                console.log("Geocoding address for search:", formData.address);
-                // Try client-side geocoding first
-                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+        // Restore button text after a short delay
+        setTimeout(() => {
+            this.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Results';
+        }, 1000);
+    });
 
-                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
-                    searchLocation = geocodedLocation;
-                    console.log("Successfully geocoded address to:", searchLocation);
-                } else {
-                    console.warn("Client-side geocoding failed, trying server-side");
+    // Find the submit button
+    const submitButton = searchForm.querySelector('input[type="submit"]');
 
-                    // Try server-side as fallback
-                    const baseURL = getBaseURL();
-                    const geocodeUrl = `${baseURL}/api/geocode?address=${encodeURIComponent(formData.address)}`;
-
-                    const response = await fetch(geocodeUrl);
-                    const data = await response.json();
-
-                    if (data.success && data.location) {
-                        searchLocation = data.location;
-                        console.log("Server-side geocoded location:", searchLocation);
-                    } else {
-                        console.warn("Both client and server geocoding failed");
-                    }
-                }
-            } catch (error) {
-                console.error("Error geocoding address:", error);
-                // Continue without location - will search by business name only
-            }
-        }
-
-        // Only include non-empty parameters in the query
-        const params = {};
-        if (formData.businessName && formData.businessName.trim() !== '') {
-            params.business_name = formData.businessName;
-        }
-        if (formData.address && formData.address.trim() !== '') {
-            params.address = formData.address;
-        }
-
-        // Add location parameters if we have them
-        if (searchLocation && searchLocation.lat && searchLocation.lng) {
-            params.lat = searchLocation.lat;
-            params.lng = searchLocation.lng;
-            params.radius = 25; // Search radius in miles
-        }
-
-        const queryParams = new URLSearchParams(params).toString();
-
-        // Determine the base URL
-        const baseURL = getBaseURL();
-
-        // Use the API endpoint with the baseURL
-        const apiURL = `${baseURL}/api/business.js?operation=search&${queryParams}`;
-        console.log("Submitting search to API at: ", apiURL);
-
-        const res = await fetch(apiURL, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json; charset=UTF-8',
-            }
-        });
-
-        console.log("Response status: ", res.status);
-
-        if (!res.ok) {
-            const errorText = await res.text();
-            console.error("Error response: ", errorText);
-            throw new Error(`Failed to retrieve data from MongoDB: ${res.status} ${errorText}`);
-        }
-
-        const data = await res.json();
-        console.log("Search results from database:", data);
-
-        // Check if we got any results from our database
-        if (!data.results || data.results.length === 0) {
-            console.log("No results in our database, searching Google Places...");
-
-            // If no results, search Google Places API
-            await searchGooglePlaces(formData, searchLocation);
-        } else {
-            // We have results from our database, display them
-            // First display on map
-            displayBusinessesOnMap(data.results);
-
-            // Then in table/list
-            if (document.getElementById('search_table')) {
-                displaySearchResults(data.results);
-            } else {
-                const resultsContainer = document.getElementById('business-search-results');
-                if (resultsContainer) {
-                    displayBusinessSearchResults(data.results, resultsContainer);
-                }
-            }
-
-            // Also search for nearby similar businesses using Google Places
-            if (data.results.length > 0) {
-                // Use the first business location to find nearby similar businesses
-                const firstBusiness = data.results[0];
-                if (firstBusiness.lat && firstBusiness.lng) {
-                    // Create LatLng object for the search
-                    const center = new google.maps.LatLng(firstBusiness.lat, firstBusiness.lng);
-                    searchNearbyBusinesses(center, firstBusiness.type);
-                } else if (searchLocation) {
-                    // If business has no coordinates but we have search location
-                    const center = new google.maps.LatLng(
-                        searchLocation.lat,
-                        searchLocation.lng
-                    );
-                    searchNearbyBusinesses(center, firstBusiness.type);
-                }
-            }
-        }
-    } catch (error) {
-        console.error("Search error: ", error);
-        // Show error message
-        const resultsContainer = document.getElementById('business-search-results') ||
-            document.getElementById('search_table');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = `<div class="error-message">Error searching for businesses: ${error.message}</div>`;
-            resultsContainer.style.display = 'block';
-        } else {
-            alert(`Error searching for businesses: ${error.message}`);
-        }
+    // Insert the refresh button after the submit button
+    if (submitButton && submitButton.parentNode) {
+        submitButton.parentNode.insertBefore(refreshButton, submitButton.nextSibling);
+    } else {
+        // If submit button not found, append to the form
+        searchForm.appendChild(refreshButton);
     }
+}
+
+/**
+ * Check for newly added businesses when the page loads
+ * Add this to your DOMContentLoaded event handler
+ */
+function checkForNewlyAddedBusiness() {
+    // Check URL parameters for a newly added business
+    const urlParams = new URLSearchParams(window.location.search);
+    const newBusinessAdded = urlParams.get('business_added');
+    const businessName = urlParams.get('business_name');
+
+    if (newBusinessAdded === 'true' && businessName) {
+        // Show success message
+        showNewBusinessAlert(businessName);
+
+        // Pre-fill search form with the business name
+        const businessNameField = document.getElementById('business-name');
+        if (businessNameField) {
+            businessNameField.value = businessName;
+            validateField(businessNameField, isNotEmpty);
+        }
+
+        // Automatically trigger search after a short delay
+        setTimeout(() => {
+            const searchForm = document.getElementById('business-search-form');
+            if (searchForm) {
+                // Create and dispatch a submit event
+                const submitEvent = new Event('submit', { cancelable: true });
+                searchForm.dispatchEvent(submitEvent);
+            }
+        }, 500);
+    }
+}
+
+/**
+ * Show alert when a new business is added
+ * @param {string} businessName - Name of the newly added business
+ */
+function showNewBusinessAlert(businessName) {
+    // Create alert container
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success';
+    alertDiv.role = 'alert';
+    alertDiv.style.marginBottom = '20px';
+    alertDiv.style.animation = 'fadeIn 0.5s';
+
+    // Add alert content
+    alertDiv.innerHTML = `
+        <strong>Success!</strong> "${businessName}" has been added to the database. 
+        Searching for this business now...
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    `;
+
+    // Add inline styles if needed
+    alertDiv.style.backgroundColor = '#d4edda';
+    alertDiv.style.border = '1px solid #c3e6cb';
+    alertDiv.style.color = '#155724';
+    alertDiv.style.borderRadius = '4px';
+    alertDiv.style.padding = '12px 20px';
+
+    // Add close button functionality
+    const closeButton = alertDiv.querySelector('.close');
+    if (closeButton) {
+        closeButton.style.float = 'right';
+        closeButton.style.fontSize = '20px';
+        closeButton.style.fontWeight = 'bold';
+        closeButton.style.lineHeight = '20px';
+        closeButton.style.color = '#155724';
+        closeButton.style.opacity = '0.5';
+        closeButton.style.cursor = 'pointer';
+
+        closeButton.addEventListener('click', function() {
+            alertDiv.remove();
+        });
+    }
+
+    // Add animation styles
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Insert alert at the top of the main content
+    const mainContent = document.querySelector('main') || document.body;
+    mainContent.insertBefore(alertDiv, mainContent.firstChild);
+
+    // Auto-remove after 8 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.style.animation = 'fadeOut 0.5s';
+            setTimeout(() => alertDiv.remove(), 500);
+        }
+    }, 8000);
 }
 
 /**
@@ -2546,7 +2564,7 @@ function geocodeBusinessAddress(business, index, total) {
 }
 
 /**
- * Enhanced retrieveFromMongoDB function that properly filters locations
+ * Update retrieveFromMongoDB function to include cache-busting
  */
 async function retrieveFromMongoDB(formData) {
     try {
@@ -2558,7 +2576,7 @@ async function retrieveFromMongoDB(formData) {
             resultsContainer.style.display = 'block';
         }
 
-        // If address is provided (like a ZIP code), geocode it first
+        // Process search location as before...
         let searchLocation = null;
 
         // Check if we should use current location
@@ -2572,14 +2590,12 @@ async function retrieveFromMongoDB(formData) {
                 console.log("User location for search:", searchLocation);
             } catch (error) {
                 console.error("Error getting user location:", error);
-                // Continue without location - will fall back to address search
             }
         }
         // If not using location but address is provided, geocode it
         else if (formData.address && formData.address.trim() !== '') {
             try {
                 console.log("Geocoding address for search:", formData.address);
-                // Try client-side geocoding first
                 const geocodedLocation = await geocodeAddressClientSide(formData.address);
 
                 if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
@@ -2588,7 +2604,6 @@ async function retrieveFromMongoDB(formData) {
                 } else {
                     console.warn("Client-side geocoding failed, trying server-side");
 
-                    // Try server-side as fallback
                     const baseURL = getBaseURL();
                     const geocodeUrl = `${baseURL}/api/geocode?address=${encodeURIComponent(formData.address)}`;
 
@@ -2604,14 +2619,13 @@ async function retrieveFromMongoDB(formData) {
                 }
             } catch (error) {
                 console.error("Error geocoding address:", error);
-                // Continue without location - will search by business name only
             }
         }
 
         // Save the search location to a global variable so we can use it to filter results
         window.currentSearchLocation = searchLocation;
 
-        // Only include non-empty parameters in the query
+        // Build params as before
         const params = {};
         if (formData.businessName && formData.businessName.trim() !== '') {
             params.business_name = formData.businessName;
@@ -2627,6 +2641,9 @@ async function retrieveFromMongoDB(formData) {
             params.radius = 25; // Search radius in miles
         }
 
+        // Add a timestamp cache-busting parameter to ensure fresh results
+        params.ts = new Date().getTime();
+
         const queryParams = new URLSearchParams(params).toString();
 
         // Determine the base URL
@@ -2640,6 +2657,9 @@ async function retrieveFromMongoDB(formData) {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json; charset=UTF-8',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
             }
         });
 
@@ -2654,7 +2674,7 @@ async function retrieveFromMongoDB(formData) {
         const data = await res.json();
         console.log("Search results from database:", data);
 
-        // Check if we got any results from our database
+        // Process search results as before...
         if (!data.results || data.results.length === 0) {
             console.log("No results in our database, searching Google Places...");
 
@@ -5663,6 +5683,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize business search functionality
     initBusinessSearch();
+    // Check for newly added businesses
+    checkForNewlyAddedBusiness();
+
 
     // Check if Google Maps is already loaded
     if (window.google && window.google.maps) {
