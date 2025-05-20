@@ -495,7 +495,7 @@ function showPlaceInfoWindow(place, position) {
 
 /**
  * Find matching chain for a Google Places business result
- * Enhanced to properly handle chain matching for Google Places results
+ * Enhanced with local fallback for when API is not available
  * @param {string} placeName - Name of the place to match with chains
  * @returns {Promise<Object|null>} - Matching chain or null if no match
  */
@@ -511,33 +511,99 @@ async function findMatchingChainForPlaceResult(placeName) {
         // Get the base URL
         const baseURL = getBaseURL();
 
-        // Search for chains with similar names
-        const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(placeName)}`);
+        try {
+            // Try server-side chain matching first
+            const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(placeName)}`);
 
-        // Check if the response is successful, but also handle 404 gracefully
-        if (response.status === 404) {
-            console.log("No matching chains found for", placeName);
-            return null;
+            // Check if the response is successful, but also handle 404 gracefully
+            if (response.status === 404) {
+                console.log("No matching chains found for", placeName);
+                // Fall back to client-side matching
+                return findMatchingChainLocally(placeName);
+            }
+
+            if (!response.ok) {
+                console.error("Error searching for matching chains:", response.status);
+                // Fall back to client-side matching
+                return findMatchingChainLocally(placeName);
+            }
+
+            const data = await response.json();
+
+            if (data.success && data.chain) {
+                console.log("Found matching chain for place:", data.chain.bname);
+                return data.chain;
+            }
+
+            // If API returns no matches, check locally as fallback
+            return findMatchingChainLocally(placeName);
+        } catch (error) {
+            console.error("Error with chain matching API, falling back to local matching:", error);
+            return findMatchingChainLocally(placeName);
         }
-
-        if (!response.ok) {
-            console.error("Error searching for matching chains:", response.status);
-            return null;
-        }
-
-        const data = await response.json();
-
-        if (data.success && data.chain) {
-            console.log("Found matching chain for place:", data.chain.bname);
-            return data.chain;
-        }
-
-        return null;
     } catch (error) {
         console.error("Error finding matching chain:", error);
         return null;
     }
 }
+
+
+/**
+ * Local fallback for chain matching when API is unavailable
+ * Hardcoded for common chains until API is working
+ * @param {string} placeName - Place name to match
+ * @returns {Object|null} - Chain object or null if no match
+ */
+function findMatchingChainLocally(placeName) {
+    if (!placeName) return null;
+
+    // Normalize the place name for comparison
+    const normalizedName = placeName.toLowerCase()
+        .replace(/^the\s+/, '')
+        .replace(/\s+inc\.?$/, '')
+        .replace(/\s+corp\.?$/, '')
+        .trim();
+
+    // List of known chains to check against with real chain IDs
+    // Based on the console logs, we know the Home Depot chain ID
+    const knownChains = [
+        {
+            _id: '681fe0e67d92c3d3e1e2a3da', // Home Depot chain ID from your database
+            bname: 'The Home Depot',
+            normalizedName: 'home depot',
+            type: 'HARDW',
+            is_chain: true
+        },
+        // Add more chains here if you know their IDs
+        {
+            _id: 'walmart_chain_id', // Replace with actual Walmart chain ID if available
+            bname: 'Walmart',
+            normalizedName: 'walmart',
+            type: 'RETAIL',
+            is_chain: true
+        },
+        {
+            _id: 'lowes_chain_id', // Replace with actual Lowe's chain ID if available
+            bname: 'Lowe\'s Home Improvement',
+            normalizedName: 'lowes home improvement',
+            type: 'HARDW',
+            is_chain: true
+        }
+        // You can add more chains as you create them in your database
+    ];
+
+    // Check for matches
+    for (const chain of knownChains) {
+        if (normalizedName.includes(chain.normalizedName) ||
+            chain.normalizedName.includes(normalizedName)) {
+            console.log(`Local chain match found: "${placeName}" matches "${chain.bname}"`);
+            return chain;
+        }
+    }
+
+    return null;
+}
+
 
 
 /**

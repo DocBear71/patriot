@@ -1307,13 +1307,17 @@ async function handleAdminUpdateBusiness(req, res) {
 
 /**
  * Find matching chains for a place name
+ * Add this to your api/business.js file as a new operation handler
  */
 async function handleFindMatchingChain(req, res) {
     try {
         const { place_name } = req.query;
 
         if (!place_name) {
-            return res.status(400).json({ message: 'Place name is required' });
+            return res.status(400).json({
+                success: false,
+                message: 'Place name is required'
+            });
         }
 
         // Connect to MongoDB
@@ -1326,7 +1330,7 @@ async function handleFindMatchingChain(req, res) {
             $or: [
                 // Exact match
                 { bname: new RegExp(`^${place_name}$`, 'i') },
-                // Partial match (place name contains chain name)
+                // Partial match
                 { bname: new RegExp(`${place_name}`, 'i') },
                 // Chain name contains place name
                 { bname: new RegExp(`.*${place_name}.*`, 'i') }
@@ -1356,9 +1360,13 @@ async function handleFindMatchingChain(req, res) {
         });
     } catch (error) {
         console.error('Error finding matching chain:', error);
-        return res.status(500).json({ message: 'Server error: ' + error.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Server error: ' + error.message
+        });
     }
 }
+
 
 /**
  * Calculate name similarity for chain matching
