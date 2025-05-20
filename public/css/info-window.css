@@ -72,3 +72,125 @@
 .prefilled {
     border-color: #4285F4;
 }
+
+/* info-window.css - Add this CSS to your existing file or create a new one */
+
+.custom-info-window {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3);
+    width: 300px;
+    max-width: 90vw;
+    padding: 12px;
+    z-index: 999;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.info-window-content {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.info-window-content.scrollable {
+    overflow-y: auto;
+    padding-right: 8px; /* Space for scrollbar */
+}
+
+.info-window-title {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #212121;
+}
+
+.chain-badge {
+    display: inline-block;
+    background-color: #4285F4;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    margin-left: 5px;
+    font-weight: normal;
+}
+
+.chain-badge.small {
+    font-size: 0.7em;
+    padding: 1px 4px;
+}
+
+.business-address,
+.business-distance,
+.business-type {
+    margin: 6px 0;
+    font-size: 14px;
+}
+
+.info-window-incentives {
+    margin: 10px 0;
+}
+
+.loading-indicator {
+    color: #666;
+    font-style: italic;
+    margin: 8px 0;
+}
+
+.no-incentives-message {
+    color: #666;
+    font-style: italic;
+}
+
+.incentives-list {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.incentives-list li {
+    margin-bottom: 6px;
+}
+
+.incentive-info {
+    font-size: 13px;
+    color: #555;
+    margin-top: 2px;
+}
+
+.info-window-actions {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+    text-align: right;
+}
+
+.add-business-btn,
+.view-details-btn {
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: white;
+}
+
+.add-business-btn {
+    background-color: #EA4335;
+}
+
+.add-business-btn:hover {
+    background-color: #D32F2F;
+}
+
+.view-details-btn {
+    background-color: #4285F4;
+}
+
+.view-details-btn:hover {
+    background-color: #2A75F3;
+}
