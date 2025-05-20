@@ -4854,42 +4854,70 @@ function createEnhancedInfoWindow() {
 }
 
 /**
- * Modified function to ensure markers have the right appearance
+ * Corrected function to ensure proper coordinates for database businesses
  * @param {Object} business - Business object
- * @param {Object} location - Google Maps location object
+ * @param {Object} position - Map position
+ * @param {boolean} isNearby - Whether this is a nearby business
+ * @param {boolean} isFromDatabase - Whether this business is from the database
  */
-async function addAdvancedMarker(business, location) {
+function addAdvancedMarker(business, position, isNearby = false, isFromDatabase = false) {
     try {
         // Import the marker library
-        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+        const { AdvancedMarkerElement } = google.maps.importLibrary("marker");
 
-        // Create a position object from the location
-        let position;
-        if (location instanceof google.maps.LatLng) {
-            // It's already a LatLng object
-            position = location;
-        } else if (location.lat && typeof location.lat === 'function') {
-            // It's a LatLng-like object with lat() method
-            position = location;
-        } else if (typeof location.lat === 'number' && typeof location.lng === 'number') {
-            // It's a position object with numeric lat/lng
-            position = new google.maps.LatLng(location.lat, location.lng);
-        } else if (business.lat && business.lng) {
-            // Use the coordinates from the business object
-            position = new google.maps.LatLng(
-                parseFloat(business.lat),
-                parseFloat(business.lng)
-            );
+        // First, ensure we have valid coordinates
+        let validPosition;
+
+        // For database businesses, check for proper coordinate format
+        if (isFromDatabase && business.location && business.location.coordinates) {
+            // Make sure we're using lng, lat order for GeoJSON (MongoDB uses this format)
+            if (business.location.coordinates.length >= 2) {
+                console.log(`Database business coordinates: [${business.location.coordinates[0]}, ${business.location.coordinates[1]}]`);
+
+                // Create position using correct order - MongoDB stores as [lng, lat]
+                validPosition = new google.maps.LatLng(
+                    business.location.coordinates[1], // Latitude is second in GeoJSON
+                    business.location.coordinates[0]  // Longitude is first in GeoJSON
+                );
+            } else {
+                console.error("Invalid coordinates array in business location:", business.location);
+                return null;
+            }
+        }
+        // For non-database businesses or if location.coordinates isn't available
+        else if (position) {
+            if (position instanceof google.maps.LatLng) {
+                // It's already a LatLng object
+                validPosition = position;
+            } else if (position.lat && typeof position.lat === 'function') {
+                // It's a LatLng-like object with lat() method
+                validPosition = position;
+            } else if (typeof position.lat === 'number' && typeof position.lng === 'number') {
+                // It's a position object with numeric lat/lng
+                validPosition = new google.maps.LatLng(position.lat, position.lng);
+            } else if (business.lat && business.lng) {
+                // Use the coordinates from the business object
+                validPosition = new google.maps.LatLng(
+                    parseFloat(business.lat),
+                    parseFloat(business.lng)
+                );
+            } else {
+                console.error("Invalid position for marker:", position);
+                return null;
+            }
         } else {
-            console.error("Invalid position for marker:", location);
+            console.error("No valid position found for marker");
             return null;
         }
 
         // Validate position has real coordinates
-        if (isNaN(position.lat()) || isNaN(position.lng())) {
-            console.error("Position has NaN coordinates:", position);
+        if (!validPosition || isNaN(validPosition.lat()) || isNaN(validPosition.lng())) {
+            console.error("Position has NaN coordinates:", validPosition);
             return null;
         }
+
+        // Log the final position being used
+        console.log(`Creating marker for ${business.bname} at [${validPosition.lat()}, ${validPosition.lng()}]`);
 
         // Ensure business name is a string
         const businessTitle = typeof business.bname === 'string' ? business.bname : String(business.bname || 'Business');
@@ -4897,15 +4925,11 @@ async function addAdvancedMarker(business, location) {
         // IMPORTANT FIX: Determine marker color based on whether it's in the database
         // Database businesses = red (primary)
         // Places API businesses = blue (nearby)
-        const isNearby = business.isGooglePlace === true; // Places API results are "nearby"
         const pinClass = isNearby ? "nearby" : "primary";
         const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
 
-        // Get business type icon - try alternative text icon if Font Awesome issues
-        const useTextIcons = true; // Set to true to use emoji icons instead of Font Awesome
-        const businessIcon = useTextIcons ?
-            getBusinessTypeTextIcon(business.type) :
-            getBusinessTypeIconHTML(business.type);
+        // Get business type icon - use text icons for reliability
+        const businessIcon = getBusinessTypeTextIcon(business.type);
 
         // Create a pin element
         const pinElement = document.createElement('div');
@@ -4927,7 +4951,7 @@ async function addAdvancedMarker(business, location) {
 
         // Create the advanced marker
         const marker = new AdvancedMarkerElement({
-            position: position,
+            position: validPosition,
             map: map,
             title: businessTitle,
             content: pinElement,
@@ -4937,7 +4961,7 @@ async function addAdvancedMarker(business, location) {
         // Store the business data with the marker
         marker.business = business;
         marker.isNearby = isNearby;
-        marker.position = position;
+        marker.position = validPosition;
 
         // Add click event listener
         pinElement.addEventListener('click', function(e) {
@@ -4953,12 +4977,9 @@ async function addAdvancedMarker(business, location) {
         return marker;
     } catch (error) {
         console.error("Error creating advanced marker:", error);
-
-        // Fall back to standard marker if advanced marker fails
-        return createFallbackMarker(business, location);
+        return null;
     }
 }
-
 
 /**
  * Create a fallback standard marker if advanced marker fails
@@ -5970,16 +5991,24 @@ function geocodeNearbyBusiness(business, centerLocation) {
 }
 
 /**
- * Position info window relative to marker
+ * Simplified function to position info window relative to marker
  * @param {Object} marker - The marker object
  */
 function positionInfoWindow(marker) {
     // Get the info window element
     const infoWindow = document.getElementById('info-window');
-    if (!infoWindow) return;
+    if (!infoWindow) {
+        console.error("Info window element not found!");
+        return;
+    }
 
     // Get map container position
     const mapContainer = document.getElementById('map');
+    if (!mapContainer) {
+        console.error("Map container not found!");
+        return;
+    }
+
     const mapRect = mapContainer.getBoundingClientRect();
 
     // Get position from marker
@@ -5998,35 +6027,29 @@ function positionInfoWindow(marker) {
         return;
     }
 
-    // Convert marker position to pixel coordinates
-    const projection = map.getProjection();
-    if (!projection) return;
+    try {
+        // Simple positioning logic - set it in the middle of the map
+        const infoWindowWidth = 300;
+        const infoWindowHeight = 300;
 
-    const scale = Math.pow(2, map.getZoom());
-    const worldPoint = projection.fromLatLngToPoint(position);
-    const topRight = projection.fromLatLngToPoint(map.getBounds().getNorthEast());
-    const bottomLeft = projection.fromLatLngToPoint(map.getBounds().getSouthWest());
-    const p = new google.maps.Point(
-        (worldPoint.x - bottomLeft.x) * scale,
-        (worldPoint.y - topRight.y) * scale
-    );
+        // Position in the center of the map, a bit to the top
+        infoWindow.style.left = Math.max((mapRect.width - infoWindowWidth) / 2, 0) + "px";
+        infoWindow.style.top = Math.max((mapRect.height - infoWindowHeight) / 3, 0) + "px";
 
-    // Calculate position for info window (centered above marker)
-    const infoWindowWidth = 300; // Approximate width of info window
-    const infoWindowHeight = 200; // Approximate height of info window
-    const markerHeight = 40; // Approximate height of marker
+        // Make sure the info window is visible
+        infoWindow.style.display = 'block';
+        infoWindow.style.opacity = '1';
 
-    // Center the info window horizontally above the marker
-    const left = p.x - (infoWindowWidth / 2) + mapRect.left;
-    // Position the info window above the marker with some padding
-    const top = p.y - infoWindowHeight - markerHeight + mapRect.top - 20;
+        console.log("Info window positioned at:", infoWindow.style.left, infoWindow.style.top);
+    } catch (error) {
+        console.error("Error positioning info window:", error);
 
-    // Apply position to info window
-    infoWindow.style.left = `${left}px`;
-    infoWindow.style.top = `${top}px`;
-
-    // Ensure the info window is visible
-    infoWindow.style.opacity = '1';
+        // Fallback positioning
+        infoWindow.style.left = "50px";
+        infoWindow.style.top = "50px";
+        infoWindow.style.display = 'block';
+        infoWindow.style.opacity = '1';
+    }
 }
 
 /**
@@ -6222,7 +6245,6 @@ function updateMapBounds() {
         console.error("Error updating map bounds:", error);
     }
 }
-
 
 /**
  * Focus on map marker with proper handling for both marker types
