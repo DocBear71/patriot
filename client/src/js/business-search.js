@@ -1618,125 +1618,6 @@ function addBusinessRow(business, tableBody, isFromPlaces) {
 }
 
 /**
- * Modified displayBusinessesOnMap function that checks if Places results match database entries
- * @param {Array} businesses - Array of business objects to display
- */
-function displayBusinessesOnMap(businesses) {
-    // If map is not ready yet, store businesses for later
-    if (!map) {
-        businessesToDisplayOnMap = businesses;
-        console.log("Map not ready, storing businesses for later display");
-        return;
-    }
-
-    console.log("Displaying businesses on map:", businesses.length);
-
-    // Clear existing markers
-    clearMarkers();
-
-    // Filter out inactive businesses
-    const filteredBusinesses = businesses.filter(business => !business.status || business.status === 'active');
-
-    // IMPORTANT: Identify which businesses are from the database vs Places API
-    const databaseBusinesses = filteredBusinesses.filter(business => !business.isGooglePlace);
-    let placesBusinesses = filteredBusinesses.filter(business => business.isGooglePlace);
-
-    console.log(`Found ${databaseBusinesses.length} database businesses and ${placesBusinesses.length} Places API businesses`);
-
-    // NEW CODE: Check each Places business against database businesses to find matches
-    placesBusinesses = placesBusinesses.map(placesBusiness => {
-        // Check if this Places result matches any database business
-        const matchingDbBusiness = findMatchingDatabaseBusiness(placesBusiness, databaseBusinesses);
-
-        if (matchingDbBusiness) {
-            console.log(`Found matching database business for ${placesBusiness.bname} at ${placesBusiness.address1}`);
-            console.log(`Matching business ID: ${matchingDbBusiness._id}`);
-
-            // Attach a reference to the matching database business
-            placesBusiness.matchingDbBusinessId = matchingDbBusiness._id;
-
-            // This is a key flag we'll check in showInfoWindow
-            placesBusiness.isInDatabase = true;
-
-            // Optionally, you can copy incentives from the matching business
-            if (matchingDbBusiness.incentives) {
-                placesBusiness.incentives = matchingDbBusiness.incentives;
-            }
-        }
-
-        return placesBusiness;
-    });
-
-    // Separate businesses by type for display order
-    const chainMatchedPlaces = placesBusinesses.filter(business => business.chain_id && !business.isInDatabase);
-    const regularPlaces = placesBusinesses.filter(business => !business.chain_id && !business.isInDatabase);
-    const databaseMatchedPlaces = placesBusinesses.filter(business => business.isInDatabase);
-
-    console.log(`Businesses to display: ${databaseBusinesses.length} from database, ${chainMatchedPlaces.length} chain-matched Places, ${regularPlaces.length} regular Places, ${databaseMatchedPlaces.length} database-matched Places`);
-
-    // Process database businesses first (red markers)
-    databaseBusinesses.forEach(business => {
-        // Check if the business has location data
-        if (business.location && business.location.coordinates) {
-            const position = {
-                lat: business.location.coordinates[1],
-                lng: business.location.coordinates[0]
-            };
-
-            // Add the business to the map with a red marker (database business)
-            addAdvancedMarker(business, position, false, true);
-        }
-    });
-
-    // Then process database-matched Places businesses (blue markers but in database)
-    databaseMatchedPlaces.forEach(business => {
-        if (business.lat && business.lng) {
-            const position = {
-                lat: business.lat,
-                lng: business.lng
-            };
-
-            // Add as a Google Place (blue marker) but marked as in database
-            addAdvancedMarker(business, position, true, false);
-        }
-    });
-
-    // Then process chain-matched Places businesses (blue markers)
-    chainMatchedPlaces.forEach(business => {
-        if (business.lat && business.lng) {
-            const position = {
-                lat: business.lat,
-                lng: business.lng
-            };
-
-            // Add as a Google Place (blue marker)
-            addAdvancedMarker(business, position, true, false);
-        }
-    });
-
-    // Finally process regular Places businesses (blue markers)
-    regularPlaces.forEach(business => {
-        if (business.lat && business.lng) {
-            const position = {
-                lat: business.lat,
-                lng: business.lng
-            };
-
-            // Add as a Google Place (blue marker)
-            addAdvancedMarker(business, position, true, false);
-        }
-    });
-
-    // Fit map to bounds if there are markers
-    if (markers.length > 0) {
-        updateMapBounds();
-    }
-
-    // Update the search results display
-    displaySearchResults(filteredBusinesses);
-}
-
-/**
  * Display business search results for other pages
  * @param {Array} businesses - Array of business objects
  * @param {HTMLElement} resultsContainer - Container for results
@@ -4854,6 +4735,537 @@ function createEnhancedInfoWindow() {
 }
 
 /**
+ * Fixed createMarker function that handles both advanced and standard markers
+ * @param {Object} business - Business object
+ * @param {Object} position - Position object with lat/lng
+ * @param {boolean} isNearby - Whether this is a nearby business
+ * @param {boolean} isPlaceResult - Whether this is from Places API
+ * @returns {Object} - The created marker
+ */
+function createMarker(business, position, isNearby = false, isPlaceResult = false) {
+    console.log(`Creating marker for ${business.bname} at [${position.lat}, ${position.lng}]`);
+
+    try {
+        // Try advanced marker first with proper error handling
+        try {
+            if (typeof google.maps.marker === 'undefined' ||
+                typeof google.maps.marker.AdvancedMarkerElement === 'undefined') {
+                throw new Error("Advanced Markers API not available");
+            }
+
+            // Create pin element
+            const pinElement = document.createElement('div');
+            pinElement.className = 'custom-marker';
+
+            // Determine marker color based on whether it's nearby
+            const pinClass = isNearby ? "nearby" : "primary";
+            const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
+
+            // Use text icons for reliability
+            const businessIcon = getBusinessTypeTextIcon(business.type || 'store');
+
+            // Set HTML content for marker
+            pinElement.innerHTML = `
+                <div class="marker-container">
+                    <div class="marker-pin ${pinClass}" style="background-color: ${pinColor};">
+                        <div class="marker-icon">
+                            ${businessIcon}
+                        </div>
+                    </div>
+                    <div class="marker-shadow"></div>
+                </div>
+            `;
+
+            // Create the advanced marker
+            const marker = new google.maps.marker.AdvancedMarkerElement({
+                position: position,
+                map: map,
+                title: business.bname || 'Business',
+                content: pinElement
+            });
+
+            // Attach business data and click event
+            marker.business = business;
+            marker.isNearby = isNearby;
+            marker.position = position;
+
+            // Add click event manually since AdvancedMarkerElement handles events differently
+            pinElement.addEventListener('click', function() {
+                showInfoWindow(marker);
+            });
+
+            return marker;
+        } catch (error) {
+            console.log("Advanced marker creation failed, falling back to standard marker:", error);
+            // Fall through to standard marker creation
+        }
+
+        // Create a standard marker as fallback
+        const marker = new google.maps.Marker({
+            position: position,
+            map: map,
+            title: business.bname || 'Business',
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary,
+                fillOpacity: 1,
+                strokeWeight: 1,
+                strokeColor: '#FFFFFF',
+                scale: 10
+            }
+        });
+
+        // Attach business data
+        marker.business = business;
+        marker.isNearby = isNearby;
+
+        // Add click event
+        marker.addListener('click', function() {
+            showInfoWindow(marker);
+        });
+
+        return marker;
+    } catch (error) {
+        console.error("Error creating marker:", error);
+        return null;
+    }
+}
+
+/**
+ * Get text icon for business type - emoji-based for reliability
+ * @param {string} businessType - Business type code
+ * @returns {string} - Text/emoji icon HTML
+ */
+function getBusinessTypeTextIcon(businessType) {
+    // Map business types to emoji or text symbols
+    const iconMap = {
+        'AUTO': '🚗',
+        'BEAU': '💇',
+        'BOOK': '📚',
+        'CLTH': '👕',
+        'CONV': '🏪',
+        'DEPT': '🛍️',
+        'ELEC': '⚡',
+        'ENTR': '🎬',
+        'FURN': '🪑',
+        'FUEL': '⛽',
+        'GIFT': '🎁',
+        'GROC': '🛒',
+        'HARDW': '🔨',
+        'HEAL': '❤️',
+        'JEWL': '💎',
+        'OTHER': '🏬',
+        'RX': '💊',
+        'REST': '🍽️',
+        'RETAIL': '🛍️',
+        'SERV': '🔧',
+        'SPEC': '⭐',
+        'SPRT': '🏈',
+        'TECH': '💻',
+        'TOYS': '🎮'
+    };
+
+    // Return with styling
+    return `<span style="font-size: 14px; color: white;">${iconMap[businessType] || '🏬'}</span>`;
+}
+
+/**
+ * Modified displayBusinessesOnMap function to properly handle coordinates
+ * @param {Array} businesses - Array of business objects to display
+ */
+function displayBusinessesOnMap(businesses) {
+    // If map is not ready yet, store businesses for later
+    if (!map) {
+        businessesToDisplayOnMap = businesses;
+        console.log("Map not ready, storing businesses for later display");
+        return;
+    }
+
+    console.log("Displaying businesses on map:", businesses.length);
+
+    // Clear existing markers
+    clearMarkers();
+
+    // Count types of businesses
+    const databaseBusinesses = businesses.filter(b => !b.isGooglePlace);
+    const placesBusinesses = businesses.filter(b => b.isGooglePlace);
+
+    console.log(`Found ${databaseBusinesses.length} database businesses and ${placesBusinesses.length} Places API businesses`);
+
+    // Add businesses to map
+    businesses.forEach(business => {
+        try {
+            // Check for needed properties
+            if (!business) {
+                console.error("Invalid business object");
+                return;
+            }
+
+            // Get coordinates based on business source
+            let position;
+            if (!business.isGooglePlace && business.location && business.location.coordinates) {
+                // Database businesses use GeoJSON format (lng, lat)
+                const coords = business.location.coordinates;
+                console.log("Database business coordinates:", coords);
+
+                // MongoDB uses [longitude, latitude] format
+                // Google Maps uses {lat, lng} format
+                if (Array.isArray(coords) && coords.length === 2) {
+                    position = {
+                        lat: coords[1], // Second element is latitude
+                        lng: coords[0]  // First element is longitude
+                    };
+                } else if (business.lat && business.lng) {
+                    position = {
+                        lat: parseFloat(business.lat),
+                        lng: parseFloat(business.lng)
+                    };
+                }
+            } else if (business.isGooglePlace) {
+                // Places API businesses use standard format
+                if (business.lat && business.lng) {
+                    position = {
+                        lat: parseFloat(business.lat),
+                        lng: parseFloat(business.lng)
+                    };
+                }
+            }
+
+            if (!position) {
+                console.error("Missing coordinates for business:", business);
+                return;
+            }
+
+            console.log(`Creating marker for ${business.bname} at [${position.lat}, ${position.lng}]`);
+
+            // Create marker with our fixed function
+            const marker = createMarker(
+                business,
+                position,
+                business.isNearby,
+                business.isGooglePlace
+            );
+
+            if (marker) {
+                // Add to markers array
+                markers.push(marker);
+            }
+        } catch (error) {
+            console.error("Error processing business for map display:", error, business);
+        }
+    });
+
+    // Update map bounds to fit all markers
+    updateMapBounds();
+}
+
+/**
+ * Simplified showInfoWindow function
+ * @param {Object} marker - Marker object
+ */
+function showInfoWindow(marker) {
+    console.log("showInfoWindow called with marker:", marker);
+
+    if (!marker || !marker.business) {
+        console.error("Invalid marker or missing business data");
+        return;
+    }
+
+    // Get business data
+    const business = marker.business;
+    console.log("Business data for info window:", business);
+
+    // Get info window elements
+    const infoWindow = document.getElementById('info-window');
+    const infoWindowContent = document.getElementById('info-window-content');
+
+    if (!infoWindow || !infoWindowContent) {
+        console.error("Info window elements not found");
+        return;
+    }
+
+    // Check if this is a Google Places result
+    const isGooglePlace = business.isGooglePlace === true;
+
+    // Check if this is a chain location
+    const isChainLocation = business.chain_id ? true : false;
+
+    // Format distance
+    let distanceText = '';
+    if (business.distance) {
+        const distanceValue = typeof business.distance === 'number'
+            ? (business.distance / 1609.34).toFixed(1)
+            : business.distance;
+        distanceText = `<div class="business-distance">Distance: ${distanceValue} miles</div>`;
+    }
+
+    // Format address
+    const addressText = business.address1
+        ? `<div class="business-address">Address: ${business.address1} ${business.city || ''}</div>`
+        : '';
+
+    // Format business type
+    const typeText = business.type
+        ? `<div class="business-type">Type: ${formatBusinessType(business.type)}</div>`
+        : '';
+
+    // Create chain badge if applicable
+    const chainBadge = isChainLocation
+        ? `<div class="chain-badge">${business.chain_name || 'Chain Location'}</div>`
+        : '';
+
+    // Determine the action button
+    let actionButton = '';
+    if (isGooglePlace) {
+        // For Google Places results, show "Add to Database" button
+        if (isChainLocation) {
+            actionButton = `
+                <button class="add-business-btn" 
+                        onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
+                    Add to Database
+                </button>
+            `;
+        } else {
+            actionButton = `
+                <button class="add-business-btn" 
+                        onclick="window.addBusinessToDatabase('${business.placeId}')">
+                    Add to Patriot Thanks
+                </button>
+            `;
+        }
+    } else {
+        // For database businesses, show "View Details" button
+        actionButton = `
+            <button class="view-details-btn" 
+                    onclick="window.viewBusinessDetails('${business._id}')">
+                View Details
+            </button>
+        `;
+    }
+
+    // Build content HTML
+    const contentHTML = `
+        <div class="info-window-title">${business.bname}</div>
+        ${chainBadge}
+        ${addressText}
+        ${distanceText}
+        ${typeText}
+        <div class="info-window-incentives" id="info-window-incentives">
+            <div class="loading-indicator">Loading incentives...</div>
+        </div>
+        <div class="info-window-actions">
+            ${actionButton}
+        </div>
+    `;
+
+    // Set the content
+    infoWindowContent.innerHTML = contentHTML;
+
+    // Position the info window
+    positionInfoWindow(marker);
+
+    // Show info window
+    infoWindow.style.display = 'block';
+    infoWindow.style.opacity = '1';
+
+    console.log("Info window opened for business:", business.bname);
+
+    // Load incentives
+    if (isGooglePlace && isChainLocation) {
+        // For Google Places results that match chains, fetch chain incentives
+        fetchChainIncentivesForInfoWindow(business.placeId, business.chain_id);
+    } else if (!isGooglePlace) {
+        // For database businesses, fetch regular incentives
+        fetchIncentivesForInfoWindow(business._id, business.chain_id);
+    } else {
+        // For regular Google Places results, show "not in database" message
+        const incentivesDiv = document.getElementById('info-window-incentives');
+        if (incentivesDiv) {
+            incentivesDiv.innerHTML = `
+                <div class="no-incentives-message">
+                    This business is not yet in the Patriot Thanks database.
+                </div>
+            `;
+        }
+    }
+}
+
+/**
+ * Simple function to position info window relative to the map
+ * @param {Object} marker - The marker object
+ */
+function positionInfoWindow(marker) {
+    // Get the map container
+    const mapContainer = document.getElementById('map');
+    const infoWindow = document.getElementById('info-window');
+
+    if (!mapContainer || !infoWindow) {
+        console.error("Missing elements for positioning info window");
+        return;
+    }
+
+    // Get the map container dimensions
+    const mapRect = mapContainer.getBoundingClientRect();
+
+    // Simply position the info window in the center of the map
+    infoWindow.style.left = Math.max((mapRect.width - 300) / 2, 20) + 'px';
+    infoWindow.style.top = Math.max((mapRect.height - 350) / 2, 20) + 'px';
+}
+
+/**
+ * Close the info window
+ */
+function closeInfoWindow() {
+    const infoWindow = document.getElementById('info-window');
+    if (infoWindow) {
+        infoWindow.style.opacity = '0';
+        setTimeout(() => {
+            infoWindow.style.display = 'none';
+        }, 200);
+    }
+}
+
+/**
+ * Fetch incentives for info window
+ * @param {string} businessId - Business ID
+ * @param {string} chainId - Optional chain ID
+ */
+function fetchIncentivesForInfoWindow(businessId, chainId = null) {
+    // Get incentives container
+    const incentivesDiv = document.getElementById('info-window-incentives');
+    if (!incentivesDiv) {
+        console.error("Incentives container not found");
+        return;
+    }
+
+    if (!businessId) {
+        incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading incentives</p>';
+        return;
+    }
+
+    // Determine the base URL
+    const baseURL = getBaseURL();
+
+    // Build API URL
+    let apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+    if (chainId) {
+        apiURL += `&chain_id=${chainId}`;
+    }
+
+    console.log("Fetching incentives from: ", apiURL);
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch incentives: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`Incentives data for business ${businessId}:`, data);
+
+            // Check if there are any incentives
+            if (!data.results || data.results.length === 0) {
+                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No incentives found</p>';
+                return;
+            }
+
+            // Build HTML for incentives
+            let incentivesHTML = '<p><strong>Incentives:</strong></p><ul class="incentives-list">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ?
+                        ` (${incentive.other_description})` : '';
+
+                    // Add a badge for chain-wide incentives
+                    const chainBadge = incentive.is_chain_wide ?
+                        '<span class="chain-badge small">Chain-wide</span>' : '';
+
+                    incentivesHTML += `
+                        <li>
+                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
+                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                        </li>
+                    `;
+                }
+            });
+
+            incentivesHTML += '</ul>';
+
+            if (incentivesHTML === '<p><strong>Incentives:</strong></p><ul class="incentives-list"></ul>') {
+                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No active incentives found</p>';
+            } else {
+                incentivesDiv.innerHTML = incentivesHTML;
+            }
+        })
+        .catch(error => {
+            console.error(`Error fetching incentives: ${error}`);
+            incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading incentives</p>';
+        });
+}
+
+/**
+ * Update map bounds to fit all markers
+ */
+function updateMapBounds() {
+    if (!map || markers.length === 0) {
+        return;
+    }
+
+    try {
+        // Create new bounds
+        const bounds = new google.maps.LatLngBounds();
+
+        // Add each marker to bounds
+        markers.forEach(marker => {
+            // Get position from marker
+            let position;
+
+            if (marker.position && typeof marker.position.lat === 'function') {
+                // It's already a LatLng object
+                position = marker.position;
+            } else if (marker.position) {
+                // It's a position object with lat/lng properties
+                position = new google.maps.LatLng(
+                    marker.position.lat,
+                    marker.position.lng
+                );
+            } else if (marker.getPosition) {
+                // Standard marker
+                position = marker.getPosition();
+            } else if (marker.business && marker.business.lat && marker.business.lng) {
+                // Fallback to business coordinates
+                position = new google.maps.LatLng(
+                    parseFloat(marker.business.lat),
+                    parseFloat(marker.business.lng)
+                );
+            }
+
+            // Add to bounds if valid position
+            if (position && !isNaN(position.lat()) && !isNaN(position.lng())) {
+                bounds.extend(position);
+            }
+        });
+
+        // Only adjust bounds if not empty
+        if (!bounds.isEmpty()) {
+            map.fitBounds(bounds);
+
+            // Don't zoom in too close for single markers
+            if (markers.length === 1) {
+                google.maps.event.addListenerOnce(map, 'bounds_changed', function() {
+                    if (map.getZoom() > 15) map.setZoom(15);
+                });
+            }
+        }
+    } catch (error) {
+        console.error("Error updating map bounds:", error);
+    }
+}
+
+/**
  * Corrected function to ensure proper coordinates for database businesses
  * @param {Object} business - Business object
  * @param {Object} position - Map position
@@ -5138,43 +5550,6 @@ function getBusinessTypeIconHTML(businessType) {
 }
 
 /**
- * Alternative marker approach using text content instead of Font Awesome
- * Use this if Font Awesome icons aren't working
- */
-function getBusinessTypeTextIcon(businessType) {
-    // Map business types to emoji or text symbols
-    const iconMap = {
-        'AUTO': '🚗',
-        'BEAU': '💇',
-        'BOOK': '📚',
-        'CLTH': '👕',
-        'CONV': '🏪',
-        'DEPT': '🛍️',
-        'ELEC': '⚡',
-        'ENTR': '🎬',
-        'FURN': '🪑',
-        'FUEL': '⛽',
-        'GIFT': '🎁',
-        'GROC': '🛒',
-        'HARDW': '🔨',
-        'HEAL': '❤️',
-        'JEWL': '💎',
-        'OTHER': '🏬',
-        'RX': '💊',
-        'REST': '🍽️',
-        'RETAIL': '🛍️',
-        'SERV': '🔧',
-        'SPEC': '⭐',
-        'SPRT': '🏈',
-        'TECH': '💻',
-        'TOYS': '🎮'
-    };
-
-    // Return with styling
-    return `<span style="font-size: 16px; color: white;">${iconMap[businessType] || '🏬'}</span>`;
-}
-
-/**
  * Get an appropriate icon for a business type
  * @param {string} businessType - Business type code
  * @returns {string} Icon URL
@@ -5389,180 +5764,6 @@ async function isPlaceAlreadyInDatabase(placeId) {
         console.error("Error checking if place exists:", error);
         return false;
     }
-}
-
-/**
- * Close the custom info window
- */
-function closeInfoWindow() {
-    const infoWindow = document.getElementById('info-window');
-    if (infoWindow) {
-        infoWindow.style.display = 'none';
-    }
-}
-
-/**
- * Refined showInfoWindow function that properly handles three categories:
- * 1. Database businesses (stored directly in your database)
- * 2. Chain-matched businesses from Places API (not in DB but matched with chain)
- * 3. Regular Places API businesses (not in DB and not matched with chain)
- */
-/**
- * Updated showInfoWindow function that properly identifies database matches
- */
-function showInfoWindow(marker) {
-    console.log("showInfoWindow called with marker:", marker);
-
-    if (!marker || !marker.business) {
-        console.error("Invalid marker or missing business data");
-        return;
-    }
-
-    // Get the business data from the marker
-    const business = marker.business;
-    console.log("Business data for info window:", business);
-
-    // Get the info window
-    const infoWindow = document.getElementById('info-window');
-    const infoWindowContent = document.getElementById('info-window-content');
-
-    if (!infoWindow || !infoWindowContent) {
-        console.error("Info window elements not found in the DOM");
-        return;
-    }
-
-    // Check if this is a Google Places result
-    const isGooglePlace = business.isGooglePlace === true;
-
-    // Check if this is a nearby business
-    const isNearby = business.isNearby === true;
-
-    // Check if this is a chain location or matched with a chain
-    const isChainLocation = business.chain_id ? true : false;
-
-    // IMPORTANT NEW CHECK: Check if this is a Places result that matches a database business
-    const isInDatabase = !isGooglePlace || business.isInDatabase === true;
-
-    // Check if this is a chain-matched Places result (from Places API, matches a chain, not in database)
-    const isChainMatchedPlace = isGooglePlace && isChainLocation && !isInDatabase;
-
-    // Log all the state information for debugging
-    console.log("Info window for business:", business.bname);
-    console.log("  Is Google Place:", isGooglePlace);
-    console.log("  Is Nearby:", isNearby);
-    console.log("  Is Chain Location:", isChainLocation);
-    console.log("  Chain ID:", business.chain_id || "None");
-    console.log("  Chain Name:", business.chain_name || "None");
-    console.log("  Is In Database:", isInDatabase);
-    console.log("  Matching DB Business ID:", business.matchingDbBusinessId || "None");
-
-    // Format distance if available
-    let distanceText = '';
-    if (business.distance) {
-        // Format distance to one decimal place
-        let distanceValue = parseFloat(business.distance).toFixed(1);
-        distanceText = `<div class="business-distance">Distance: ${distanceValue} miles</div>`;
-    }
-
-    // Prepare the Chain badge if this is a chain location
-    let chainBadge = '';
-    if (isChainLocation) {
-        chainBadge = `<div class="chain-badge">Chain Business Part of: ${business.chain_name}</div>`;
-    }
-
-    // Prepare the action buttons based on business type
-    let actionButtons = '';
-
-    if (!isInDatabase) {
-        // This is a Google Places result not in our database
-        if (isChainMatchedPlace) {
-            // This is a chain-matched Places result
-            actionButtons = `
-            <button class="add-business-btn" 
-                    onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
-                Add to Database
-            </button>`;
-        } else {
-            // This is a regular Places result
-            actionButtons = `
-            <button class="add-business-btn" 
-                    onclick="window.addBusinessToDatabase('${business.placeId}', '')">
-                Add to Patriot Thanks
-            </button>`;
-        }
-    } else {
-        // This is a database business or a Places result that matches a database business
-        const businessId = isGooglePlace && business.matchingDbBusinessId ?
-            business.matchingDbBusinessId : business._id;
-
-        actionButtons = `
-        <button class="view-details-btn" 
-                onclick="window.viewBusinessDetails('${businessId}')">
-            View Details
-        </button>`;
-    }
-
-    // Format business type
-    let typeText = '';
-    if (business.type) {
-        typeText = `<div class="business-type">Type: ${formatBusinessType(business.type)}</div>`;
-    }
-
-    // Build the HTML content
-    let contentHTML = `
-        <div class="info-window-title">${business.bname}</div>
-        ${chainBadge}
-        <div class="business-address">Address: ${business.address1} ${business.city}</div>
-        ${distanceText}
-        ${typeText}
-        <div class="info-window-incentives" id="info-window-incentives">
-            <div class="loading-indicator">Loading incentives...</div>
-        </div>
-        <div class="info-window-actions">
-            ${actionButtons}
-        </div>
-    `;
-
-    // Set the content
-    infoWindowContent.innerHTML = contentHTML;
-
-    // Position and show the info window
-    positionInfoWindow(marker);
-    infoWindow.style.display = 'block';
-
-    console.log("Opened info window for marker");
-
-    // Load the appropriate incentives
-    if (isInDatabase) {
-        // For database businesses or place matches, load regular incentives
-        const businessId = isGooglePlace && business.matchingDbBusinessId ?
-            business.matchingDbBusinessId : business._id;
-
-        // Get incentives from the database or the matching database business
-        fetchIncentivesForInfoWindow(businessId, business.chain_id);
-    } else if (isChainMatchedPlace) {
-        // For chain-matched Places results, load chain incentives
-        fetchChainIncentivesForInfoWindow(business.placeId, business.chain_id);
-    } else {
-        // For regular Places results, show "not in database" message
-        const incentivesContainer = document.getElementById('info-window-incentives');
-        if (incentivesContainer) {
-            incentivesContainer.innerHTML = `
-                <div class="no-incentives-message">
-                    This business is not yet in the Patriot Thanks database.
-                </div>
-            `;
-        }
-    }
-
-    // Force info window to be scrollable if content is too tall
-    setTimeout(function() {
-        const infoWindowContent = document.getElementById('info-window-content');
-        if (infoWindowContent) {
-            infoWindowContent.classList.add('scrollable');
-            console.log("Info window DOM ready, forcing scrollable behavior");
-        }
-    }, 100);
 }
 
 /**
@@ -5991,156 +6192,6 @@ function geocodeNearbyBusiness(business, centerLocation) {
 }
 
 /**
- * Simplified function to position info window relative to marker
- * @param {Object} marker - The marker object
- */
-function positionInfoWindow(marker) {
-    // Get the info window element
-    const infoWindow = document.getElementById('info-window');
-    if (!infoWindow) {
-        console.error("Info window element not found!");
-        return;
-    }
-
-    // Get map container position
-    const mapContainer = document.getElementById('map');
-    if (!mapContainer) {
-        console.error("Map container not found!");
-        return;
-    }
-
-    const mapRect = mapContainer.getBoundingClientRect();
-
-    // Get position from marker
-    let position;
-    if (marker.position) {
-        position = marker.position;
-    } else if (marker.getPosition) {
-        position = marker.getPosition();
-    } else if (marker.business && marker.business.lat && marker.business.lng) {
-        position = new google.maps.LatLng(
-            parseFloat(marker.business.lat),
-            parseFloat(marker.business.lng)
-        );
-    } else {
-        console.error("Cannot determine marker position for info window");
-        return;
-    }
-
-    try {
-        // Simple positioning logic - set it in the middle of the map
-        const infoWindowWidth = 300;
-        const infoWindowHeight = 300;
-
-        // Position in the center of the map, a bit to the top
-        infoWindow.style.left = Math.max((mapRect.width - infoWindowWidth) / 2, 0) + "px";
-        infoWindow.style.top = Math.max((mapRect.height - infoWindowHeight) / 3, 0) + "px";
-
-        // Make sure the info window is visible
-        infoWindow.style.display = 'block';
-        infoWindow.style.opacity = '1';
-
-        console.log("Info window positioned at:", infoWindow.style.left, infoWindow.style.top);
-    } catch (error) {
-        console.error("Error positioning info window:", error);
-
-        // Fallback positioning
-        infoWindow.style.left = "50px";
-        infoWindow.style.top = "50px";
-        infoWindow.style.display = 'block';
-        infoWindow.style.opacity = '1';
-    }
-}
-
-/**
- * Fetch incentives for a specific business to show in info window
- * @param {string} businessId - Business ID
- * @param {string} chainId - Optional chain ID
- */
-function fetchIncentivesForInfoWindow(businessId, chainId = null) {
-    if (!businessId) {
-        console.error("No business ID provided for fetching incentives in info window");
-        return;
-    }
-
-    console.log(`Fetching incentives for info window - Business ID: ${businessId}, Chain ID: ${chainId || 'none'}`);
-
-    // Determine the base URL
-    const baseURL = getBaseURL();
-
-    // Build API URL with optional chain_id
-    let apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
-    if (chainId) {
-        apiURL += `&chain_id=${chainId}`;
-    }
-
-    console.log("Fetching incentives API URL:", apiURL);
-
-    fetch(apiURL)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to fetch incentives: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log(`Incentives data for info window (Business: ${businessId}):`, data);
-
-            // Find the incentives div in the info window
-            const incentivesDiv = document.getElementById('info-window-incentives');
-
-            if (!incentivesDiv) {
-                console.error(`Could not find incentives div for info window`);
-                return;
-            }
-
-            // Check if there are any incentives
-            if (!data.results || data.results.length === 0) {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No incentives found</p>';
-                return;
-            }
-
-            // Build HTML for incentives
-            let incentivesHTML = '<p><strong>Incentives:</strong></p><ul class="incentives-list">';
-
-            data.results.forEach(incentive => {
-                if (incentive.is_available) {
-                    const typeLabel = getIncentiveTypeLabel(incentive.type);
-                    const otherDescription = incentive.other_description ?
-                        ` (${incentive.other_description})` : '';
-
-                    // Add a badge for chain-wide incentives
-                    const chainBadge = incentive.is_chain_wide ?
-                        '<span class="chain-badge small">Chain-wide</span>' : '';
-
-                    incentivesHTML += `
-                        <li>
-                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
-                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
-                        </li>
-                    `;
-                }
-            });
-
-            incentivesHTML += '</ul>';
-
-            if (incentivesHTML === '<p><strong>Incentives:</strong></p><ul class="incentives-list"></ul>') {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No active incentives found</p>';
-            } else {
-                incentivesDiv.innerHTML = incentivesHTML;
-            }
-        })
-        .catch(error => {
-            console.error(`Error fetching incentives for info window: ${error}`);
-            const incentivesDiv = document.getElementById('info-window-incentives');
-
-            if (incentivesDiv) {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading incentives</p>';
-            }
-        });
-}
-
-/**
  * Format a business type code to a readable label
  * @param {string} type - Business type code
  * @returns {string} Readable business type label
@@ -6174,76 +6225,6 @@ function formatBusinessType(type) {
     };
 
     return types[type] || type;
-}
-
-/**
- * Update map bounds to fit all markers
- */
-function updateMapBounds() {
-    if (!map || !bounds || markers.length === 0) {
-        console.log("Cannot update map bounds - missing map, bounds, or markers");
-        return;
-    }
-
-    try {
-        // Reset bounds
-        bounds = new google.maps.LatLngBounds();
-
-        // Add each marker to bounds
-        markers.forEach(marker => {
-            let position;
-
-            // Handle different marker types
-            if (marker.position) {
-                if (typeof marker.position.lat === 'function') {
-                    // It's a LatLng object
-                    position = marker.position;
-                } else {
-                    // It's a position object with lat/lng properties
-                    position = new google.maps.LatLng(
-                        parseFloat(marker.position.lat),
-                        parseFloat(marker.position.lng)
-                    );
-                }
-            } else if (marker.getPosition) {
-                // Standard marker
-                position = marker.getPosition();
-            } else if (marker.business && marker.business.lat && marker.business.lng) {
-                // Fall back to business coordinates
-                position = new google.maps.LatLng(
-                    parseFloat(marker.business.lat),
-                    parseFloat(marker.business.lng)
-                );
-            } else {
-                console.warn("Cannot determine position for marker in bounds update");
-                return;
-            }
-
-            // Add to bounds if position is valid
-            if (position && !isNaN(position.lat()) && !isNaN(position.lng())) {
-                bounds.extend(position);
-            }
-        });
-
-        // Only fit bounds if we have valid bounds
-        if (!bounds.isEmpty()) {
-            map.fitBounds(bounds);
-
-            // Don't zoom in too much for single markers
-            if (markers.length === 1) {
-                map.setZoom(Math.min(map.getZoom(), 16));
-            }
-
-            // Don't zoom out too much for many markers
-            setTimeout(() => {
-                if (map.getZoom() < 9) {
-                    map.setZoom(9);
-                }
-            }, 100);
-        }
-    } catch (error) {
-        console.error("Error updating map bounds:", error);
-    }
 }
 
 /**
