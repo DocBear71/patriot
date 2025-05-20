@@ -27,6 +27,7 @@
     <script src="./js/boolean-incentive-fix.js"></script>
     <script src="./js/reset-functionality.js"></script>
     <script src="./js/layout-manager.js"></script>
+    <script src="./js/business-chain-handler.js"></script>
 </head>
 <body style="padding-top: 70px" id="page_layout">
 <div id="nav-placeholder"></div>
@@ -81,8 +82,11 @@
         </legend>
         <br>
 
-        <!-- Hidden field to store the selected business ID -->
-        <input type="hidden" id="selected-business-id">
+        <!-- Chain information banner - only shows for chain businesses -->
+        <div class="chain-business-warning" style="display: none;">
+            <p><strong>Business Name</strong> is part of a national chain.</p>
+            <p>This location may have chain-wide incentives that apply automatically.</p>
+        </div>
 
         <div class="business-details">
             <div class="detail-row">
@@ -361,6 +365,51 @@
     #otherTypeContainer.force-display,
     #otherTypeContainer[style*="display: block"] {
         display: flex !important;
+    }
+
+    /* Business details styling */
+    .business-details {
+        margin: 10px 0 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+    }
+
+    .detail-row {
+        margin-bottom: 8px;
+    }
+
+    .detail-label {
+        font-weight: bold;
+        width: 150px;
+        display: inline-block;
+    }
+
+    .detail-value {
+        display: inline-block;
+    }
+
+    /* Chain warning styling */
+    .chain-business-warning {
+        background-color: #FFF3CD;
+        color: #856404;
+        border: 1px solid #FFEEBA;
+        padding: 10px;
+        margin-bottom: 15px;
+        border-radius: 4px;
+    }
+
+    /* Chain badge styling */
+    .chain-badge {
+        background-color: #4285F4;
+        color: white;
+        border-radius: 4px;
+        padding: 3px 6px;
+        font-size: 12px;
+        display: inline-block;
+        margin-left: 5px;
+        font-weight: normal;
     }
 </style>
 
