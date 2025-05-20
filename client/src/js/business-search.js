@@ -604,8 +604,6 @@ function findMatchingChainLocally(placeName) {
     return null;
 }
 
-
-
 /**
  * Get the user's current location
  * @returns {Promise<{lat: number, lng: number}>} Location coordinates
