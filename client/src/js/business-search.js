@@ -879,31 +879,14 @@ window.addBusinessToDatabase = async function(placeId) {
 };
 
 /**
- * Modified addBusinessToDatabase function that checks if a business is already in database
- * before redirecting to the add business page
+ * Enhanced addBusinessToDatabase function that handles chain-matched places differently
  * @param {string} placeId - Google Place ID
  * @param {string} chainId - Optional chain ID if this place is part of a chain
  */
 window.addBusinessToDatabase = async function(placeId, chainId = null) {
     console.log("Adding place to database:", placeId, "Chain ID:", chainId);
 
-    // If this is a chain location, it's already "in the database" in a sense
-    if (chainId) {
-        // Instead of adding the business, just tell the user it's part of a chain
-        alert("This business is already part of a chain in our database. Chain-wide incentives apply to this location.");
-        return;
-    }
-
     try {
-        // If available, check if this place is already in the database
-        if (typeof isPlaceAlreadyInDatabase === 'function') {
-            const exists = await isPlaceAlreadyInDatabase(placeId);
-            if (exists) {
-                alert("This business is already in our database.");
-                return;
-            }
-        }
-
         // Use the Places Service to get details
         const service = new google.maps.places.PlacesService(map);
 
@@ -955,6 +938,16 @@ window.addBusinessToDatabase = async function(placeId, chainId = null) {
                     ]
                 }
             };
+
+            // If this is a chain location, add chain data
+            if (chainId) {
+                businessData.chain_id = chainId;
+
+                // Add extra message for chain location
+                alert("This business will be added as a location of " +
+                    (businessData.chain_name || "the chain") +
+                    ". Chain-wide incentives already apply to this location.");
+            }
 
             // Store in sessionStorage for the add business page to use
             sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
@@ -1294,7 +1287,7 @@ function fetchChainIncentivesForPlacesResult(placeId, chainId) {
 }
 
 /**
- * Display search results in the table
+ * Enhanced version of displaySearchResults to properly categorize businesses
  * @param {Array} businesses - Array of business objects
  */
 function displaySearchResults(businesses) {
@@ -1344,84 +1337,31 @@ function displaySearchResults(businesses) {
             return;
         }
 
-        // Add each business to the table
-        businesses.forEach(business => {
-            if (!business) return; // skip null or undefined entries
+        // IMPORTANT: Split businesses into three categories
+        // 1. Database businesses (not from Google Places)
+        const databaseBusinesses = businesses.filter(b => !b.isGooglePlace);
 
-            // Format the address line
-            const addressLine = business.address2
-                ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
-                : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
+        // 2. Chain-matched Places businesses
+        const chainMatchedPlaces = businesses.filter(b => b.isGooglePlace && b.chain_id);
 
-            // Convert the business type code to a readable label
-            const businessType = getBusinessTypeLabel(business.type);
+        // 3. Regular Places businesses
+        const regularPlaces = businesses.filter(b => b.isGooglePlace && !b.chain_id);
 
-            // Check if this is a chain or from Places API
-            const isChainLocation = business.chain_id ? true : false;
-            const isParentChain = business.is_chain ? true : false;
-            const isFromPlacesApi = business.is_from_places_api ? true : false;
-            const isGooglePlace = business.isGooglePlace ? true : false;
+        console.log(`Businesses to display: ${databaseBusinesses.length} from database, ${chainMatchedPlaces.length} chain-matched Places, ${regularPlaces.length} regular Places`);
 
-            // Create appropriate badge for chain businesses
-            let chainBadge = '';
-            if (isParentChain) {
-                chainBadge = '<span class="chain-badge">National Chain</span>';
-            } else if (isChainLocation) {
-                chainBadge = '<span class="chain-badge">Chain Location</span>';
-            } else if (isFromPlacesApi && business.chain_name) {
-                chainBadge = `<span class="chain-badge">Potential ${business.chain_name || 'Chain'} Location</span>`;
-            }
+        // Add database businesses first
+        databaseBusinesses.forEach(business => {
+            addBusinessRow(business, tableBody, false);
+        });
 
-            // Determine the business ID to use for incentives lookup
-            let businessIdForIncentives = business._id;
-            let chainIdForIncentives = business.chain_id || null;
+        // Add chain-matched Places businesses next
+        chainMatchedPlaces.forEach(business => {
+            addBusinessRow(business, tableBody, true);
+        });
 
-            // Create the appropriate button based on business type
-            let actionButton;
-
-            if (isParentChain) {
-                // For chain parent businesses, only allow admin access
-                const isAdmin = checkIfUserIsAdmin();
-
-                if (isAdmin) {
-                    actionButton = `<button class="admin-action-btn" onclick="handleChainBusinessAction('${business._id}', true)">Admin: Edit Chain</button>`;
-                } else {
-                    actionButton = `<button class="view-chain-btn" onclick="viewChainDetails('${business._id}')">View Chain Info</button>`;
-                }
-            } else if (isGooglePlace || isFromPlacesApi) {
-                // For Google Places results, offer to add to database
-                actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.place_data?.place_id || business.placeId || ''}', '${chainIdForIncentives || ''}')">Add to Database</button>`;
-            } else {
-                // For database businesses, show map view button
-                actionButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
-            }
-
-            // Create a new row
-            const row = document.createElement('tr');
-
-            // First populate with basic business info
-            row.innerHTML = `
-              <th class="left_table" data-business-id="${business._id}">
-                ${business.bname} ${chainBadge}
-              </th>
-              <th class="left_table">${addressLine}</th>
-              <th class="left_table">${businessType}</th>
-              <th class="right_table" id="incentives-for-${business._id}">
-                ${isFromPlacesApi ? 'Loading chain incentives...' : (isGooglePlace ? 'Not in database yet' : 'Loading incentives...')}
-              </th>
-              <th class="center_table">${actionButton}</th>
-            `;
-
-            tableBody.appendChild(row);
-
-            // Handle incentives lookup based on business type
-            if (isFromPlacesApi && chainIdForIncentives) {
-                // For Places API results with chain, get chain incentives
-                fetchChainIncentivesForPlacesResult(business._id, chainIdForIncentives);
-            } else if (!isGooglePlace) {
-                // For database businesses, fetch regular incentives
-                fetchBusinessIncentives(business._id, chainIdForIncentives);
-            }
+        // Add regular Places businesses last
+        regularPlaces.forEach(business => {
+            addBusinessRow(business, tableBody, true);
         });
 
         // Scroll to the results
@@ -1432,6 +1372,92 @@ function displaySearchResults(businesses) {
         alert("There was an error displaying the search results: " + error.message);
     }
 }
+
+/**
+ * Helper function to add a business row to the table
+ * @param {Object} business - Business object
+ * @param {Element} tableBody - Table body element
+ * @param {boolean} isFromPlaces - Whether this business is from Places API
+ */
+function addBusinessRow(business, tableBody, isFromPlaces) {
+    if (!business) return; // skip null or undefined entries
+
+    // Format the address line
+    const addressLine = business.address2
+        ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
+        : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
+
+    // Convert the business type code to a readable label
+    const businessType = getBusinessTypeLabel(business.type);
+
+    // Check if this is a chain or from Places API
+    const isChainLocation = business.chain_id ? true : false;
+    const isParentChain = business.is_chain ? true : false;
+    const isGooglePlace = business.isGooglePlace ? true : false;
+
+    // Create appropriate badge for chain businesses
+    let chainBadge = '';
+    if (isParentChain) {
+        chainBadge = '<span class="chain-badge">National Chain</span>';
+    } else if (isChainLocation) {
+        chainBadge = '<span class="chain-badge">Chain Location</span>';
+    } else if (isFromPlaces && business.chain_name) {
+        chainBadge = `<span class="chain-badge">Potential ${business.chain_name || 'Chain'} Location</span>`;
+    }
+
+    // Create the appropriate button based on business type
+    let actionButton;
+
+    if (isParentChain) {
+        // For chain parent businesses, only allow admin access
+        const isAdmin = checkIfUserIsAdmin();
+
+        if (isAdmin) {
+            actionButton = `<button class="admin-action-btn" onclick="handleChainBusinessAction('${business._id}', true)">Admin: Edit Chain</button>`;
+        } else {
+            actionButton = `<button class="view-chain-btn" onclick="viewChainDetails('${business._id}')">View Chain Info</button>`;
+        }
+    } else if (isGooglePlace) {
+        // For Google Places results, offer to add to database - with different text for chain matches
+        if (isChainLocation) {
+            actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.place_data?.place_id || business.placeId || ''}', '${business.chain_id || ''}')">Add Chain Location</button>`;
+        } else {
+            actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.place_data?.place_id || business.placeId || ''}')">Add to Database</button>`;
+        }
+    } else {
+        // For database businesses, show map view button
+        actionButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
+    }
+
+    // Create a new row
+    const row = document.createElement('tr');
+
+    // First populate with basic business info
+    row.innerHTML = `
+      <th class="left_table" data-business-id="${business._id}">
+        ${business.bname} ${chainBadge}
+      </th>
+      <th class="left_table">${addressLine}</th>
+      <th class="left_table">${businessType}</th>
+      <th class="right_table" id="incentives-for-${business._id}">
+        ${isFromPlaces && !isChainLocation ? 'Not in database yet' : 'Loading incentives...'}
+      </th>
+      <th class="center_table">${actionButton}</th>
+    `;
+
+    tableBody.appendChild(row);
+
+    // Handle incentives lookup based on business type
+    if (isFromPlaces && isChainLocation) {
+        // For Places API results with chain, get chain incentives
+        fetchChainIncentivesForPlacesResult(business._id, business.chain_id);
+    } else if (!isGooglePlace) {
+        // For database businesses, fetch regular incentives
+        fetchBusinessIncentives(business._id, business.chain_id);
+    }
+}
+
+
 
 
 /**
@@ -4515,7 +4541,7 @@ function createEnhancedInfoWindow() {
 }
 
 /**
- * Display businesses on the map
+ * Modified displayBusinessesOnMap to properly handle database vs Places API businesses
  * @param {Array} businesses - Array of business objects to display
  */
 function displayBusinessesOnMap(businesses) {
@@ -4544,10 +4570,30 @@ function displayBusinessesOnMap(businesses) {
     clearMarkers();
     bounds = new google.maps.LatLngBounds();
 
-    // Process each business
-    filteredBusinesses.forEach((business, index) => {
+    // IMPORTANT: Identify which businesses are from the database
+    // These should be marked differently and added to the map first
+    const databaseBusinesses = filteredBusinesses.filter(business => !business.isGooglePlace);
+    const placesBusinesses = filteredBusinesses.filter(business => business.isGooglePlace);
+
+    console.log(`Found ${databaseBusinesses.length} database businesses and ${placesBusinesses.length} Places API businesses`);
+
+    // Process database businesses first (should appear with red markers)
+    databaseBusinesses.forEach((business, index) => {
+        // Make sure these are NOT marked as nearby
+        business.isNearby = false;
+
         // Geocode the business address to get coordinates
-        geocodeBusinessAddress(business, index, filteredBusinesses.length);
+        geocodeBusinessAddress(business, index, databaseBusinesses.length);
+    });
+
+    // Process Places API businesses second (should appear with blue markers)
+    placesBusinesses.forEach((business, index) => {
+        // Make sure these ARE marked as nearby
+        business.isNearby = true;
+
+        // Geocode the business address to get coordinates
+        geocodeBusinessAddress(business, index + databaseBusinesses.length,
+            databaseBusinesses.length + placesBusinesses.length);
     });
 
     ensureMapVisibility();
@@ -4564,8 +4610,9 @@ function displayBusinessesOnMap(businesses) {
     }
 }
 
+
 /**
- * Add an advanced marker to the map with font/emoji fallbacks
+ * Modified function to ensure markers have the right appearance
  * @param {Object} business - Business object
  * @param {Object} location - Google Maps location object
  */
@@ -4605,8 +4652,10 @@ async function addAdvancedMarker(business, location) {
         // Ensure business name is a string
         const businessTitle = typeof business.bname === 'string' ? business.bname : String(business.bname || 'Business');
 
-        // Determine marker color
-        const isNearby = business.isNearby === true;
+        // IMPORTANT FIX: Determine marker color based on whether it's in the database
+        // Database businesses = red (primary)
+        // Places API businesses = blue (nearby)
+        const isNearby = business.isGooglePlace === true; // Places API results are "nearby"
         const pinClass = isNearby ? "nearby" : "primary";
         const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
 
@@ -4667,7 +4716,6 @@ async function addAdvancedMarker(business, location) {
         return createFallbackMarker(business, location);
     }
 }
-
 
 
 /**
@@ -5074,8 +5122,10 @@ async function isPlaceAlreadyInDatabase(placeId) {
 
 
 /**
- * Enhanced showInfoWindow function that properly displays Google Places data
- * and correctly identifies chain-matched businesses as being in the database
+ * Refined showInfoWindow function that properly handles three categories:
+ * 1. Database businesses (stored directly in your database)
+ * 2. Chain-matched businesses from Places API (not in DB but matched with chain)
+ * 3. Regular Places API businesses (not in DB and not matched with chain)
  */
 function showInfoWindow(marker) {
     console.log("showInfoWindow called with marker:", marker);
@@ -5091,21 +5141,30 @@ function showInfoWindow(marker) {
     // Check if this is a Google Places result
     const isGooglePlace = business.isGooglePlace === true;
 
+    // Check if this is a nearby business (shown with blue marker)
+    const isNearby = business.isNearby === true;
+
     // Check if this is a chain location or matched with a chain
     const isChainLocation = business.chain_id ? true : false;
 
-    // IMPORTANT FIX: Determine if the business should be considered "in database"
-    // A business is in the database if:
-    // 1. It's directly from the database (not from Google Places)
-    // 2. OR it's a Places result that matches a chain in our database
-    const isInDatabase = !isGooglePlace || (isGooglePlace && isChainLocation);
+    // REFINED LOGIC: Create three distinct categories
+    // 1. Actually in database (not from Google Places)
+    const isInDatabase = !isGooglePlace;
+
+    // 2. Chain-matched from Places API
+    const isChainMatchedPlace = isGooglePlace && isChainLocation;
+
+    // 3. Regular Places result - just for clarity
+    const isRegularPlace = isGooglePlace && !isChainLocation;
 
     console.log(`Info window for business: ${business.bname}`);
     console.log(`  Is Google Place: ${isGooglePlace}`);
+    console.log(`  Is Nearby: ${isNearby}`);
     console.log(`  Is Chain Location: ${isChainLocation}`);
     console.log(`  Chain ID: ${business.chain_id || 'None'}`);
     console.log(`  Chain Name: ${business.chain_name || 'None'}`);
     console.log(`  Is In Database: ${isInDatabase}`);
+    console.log(`  Is Chain-Matched Place: ${isChainMatchedPlace}`);
 
     // Format address - handle both Google Places and database addresses
     let addressLine = '';
@@ -5154,28 +5213,40 @@ function showInfoWindow(marker) {
         `;
     }
 
-    // IMPORTANT FIX: Customize the footer button based on whether it's in our database
+    // REFINED LOGIC: Customize footer button based on the three categories
     let actionButtons;
-    if (!isInDatabase) {
-        // Not in database - show Add to Database button
-        actionButtons = `
-        <button class="add-business-btn" 
-                onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id || ''}')">
-            Add to Patriot Thanks
-        </button>`;
-    } else {
-        // In database (or chain matched) - show View Details button
+    if (isInDatabase) {
+        // Category 1: In database - show View Details button
         actionButtons = `
         <button class="view-details-btn" 
                 onclick="window.viewBusinessDetails('${business._id}')">
             View Details
         </button>`;
+    } else if (isChainMatchedPlace) {
+        // Category 2: Chain-matched Place - show Add Location button
+        actionButtons = `
+        <button class="add-business-btn" 
+                onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id || ''}')">
+            Add to Database
+        </button>`;
+    } else {
+        // Category 3: Regular Place - show Add to Database button
+        actionButtons = `
+        <button class="add-business-btn" 
+                onclick="window.addBusinessToDatabase('${business.placeId}')">
+            Add to Patriot Thanks
+        </button>`;
     }
 
-    // IMPORTANT FIX: Don't show "not in database" message for chain locations
-    const databaseStatusMessage = (!isInDatabase && !isChainLocation)
-        ? '<p>This business is not yet in the Patriot Thanks database.</p>'
-        : '';
+    // REFINED LOGIC: Customize status message based on category
+    let statusMessage = '';
+    if (isChainMatchedPlace) {
+        // Chain-matched Place - show special message about chain
+        statusMessage = `<p>This location matches the <strong>${business.chain_name}</strong> chain in our database. Chain-wide incentives apply, but this specific location is not yet added to our database.</p>`;
+    } else if (isRegularPlace) {
+        // Regular Place - show not in database message
+        statusMessage = '<p>This business is not yet in the Patriot Thanks database.</p>';
+    }
 
     // Content for the info window with your existing CSS classes
     const contentString = `
@@ -5187,9 +5258,9 @@ function showInfoWindow(marker) {
         ${distanceDisplay}
         <p><strong>Type:</strong> ${businessType}</p>
         <div id="info-window-incentives-${business._id}" class="info-window-scrollable">
-            <p><strong>Incentives:</strong> <em>${isGooglePlace && !isInDatabase ? 'Not in database' : 'Loading...'}</em></p>
+            <p><strong>Incentives:</strong> <em>${isInDatabase || isChainMatchedPlace ? 'Loading...' : 'Not in database'}</em></p>
         </div>
-        ${databaseStatusMessage}
+        ${statusMessage}
         <div class="info-window-actions">
             ${actionButtons}
         </div>
@@ -5252,18 +5323,17 @@ function showInfoWindow(marker) {
 
     console.log("Opened info window for marker");
 
-    // IMPORTANT FIX: Fetch the right kind of incentives based on business type and database status
-    if (isGooglePlace) {
-        if (isChainLocation || business.chain_id) {
-            // If it's a Google Place that matches a chain, load chain incentives
-            console.log(`Fetching chain incentives for Google Place: ${business._id}, Chain: ${business.chain_id}`);
-            fetchChainIncentivesForInfoWindow(business._id, business.chain_id);
-        }
-    } else {
-        // If it's in our database, load regular incentives
+    // Fetch the right kind of incentives based on business type and category
+    if (isInDatabase) {
+        // Category 1: Database business - load regular incentives
         console.log(`Fetching incentives for database business: ${business._id}`);
         fetchBusinessIncentivesForInfoWindow(business._id);
+    } else if (isChainMatchedPlace) {
+        // Category 2: Chain-matched Place - load chain incentives
+        console.log(`Fetching chain incentives for Google Place: ${business._id}, Chain: ${business.chain_id}`);
+        fetchChainIncentivesForInfoWindow(business._id, business.chain_id);
     }
+    // Category 3: Regular Place - no incentives to load
 
     // Add event listener to ensure scrollable styles are applied when the window opens
     google.maps.event.addListener(infoWindow, 'domready', function() {

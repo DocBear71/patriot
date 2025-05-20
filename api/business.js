@@ -43,6 +43,8 @@ module.exports = async (req, res) => {
                 return await handleGetBusiness(req, res);
             case 'find_matching_chain':
                 return await handleFindMatchingChain(req, res);
+            case 'check_place_exists':
+                return await handleCheckPlaceExists(req, res);
 
             // Admin operations
             case 'admin-list-businesses':
@@ -1302,6 +1304,36 @@ async function handleAdminUpdateBusiness(req, res) {
     } catch (error) {
         console.error('Error updating business:', error);
         return res.status(500).json({ message: 'Server error updating business: ' + error.message });
+    }
+}
+
+async function handleCheckPlaceExists(req, res) {
+    try {
+        const { place_id } = req.query;
+
+        if (!place_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Place ID is required'
+            });
+        }
+
+        // Connect to MongoDB
+        await connect;
+
+        // Check if a business with this place ID exists
+        const business = await Business.findOne({ placeId: place_id }).lean();
+
+        return res.status(200).json({
+            success: true,
+            exists: !!business
+        });
+    } catch (error) {
+        console.error('Error checking if place exists:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Server error: ' + error.message
+        });
     }
 }
 
