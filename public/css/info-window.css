@@ -1,104 +1,61 @@
-/* CSS styles for map info windows */
-
-    /* Info window container */
-.info-window {
-    font-family: Arial, sans-serif;
-    min-width: 250px;
-    max-width: 350px;
-    padding: 5px;
-}
-
-/* Info window title */
-.info-window h3 {
-    margin-top: 0;
-    margin-bottom: 8px;
-    color: #333;
-    font-size: 16px;
-}
-
-/* Info window content */
-.info-window p {
-    margin: 6px 0;
-    font-size: 14px;
-    line-height: 1.4;
-}
-
-/* Incentives list */
-.incentives-list {
-    margin: 5px 0;
-    padding-left: 18px;
-    font-size: 13px;
-}
-
-.incentives-list li {
-    margin-bottom: 4px;
-}
-
-/* Button styling */
-.info-window-actions {
-    margin-top: 12px;
-    display: flex;
-    justify-content: space-between;
-}
-
-.view-details-btn, .add-business-btn {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 4px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-.view-details-btn {
-    background-color: #4285F4;
-    color: white;
-}
-
-.view-details-btn:hover {
-    background-color: #356ac3;
-}
-
-.add-business-btn {
-    background-color: #EA4335;
-    color: white;
-}
-
-.add-business-btn:hover {
-    background-color: #c53727;
-}
-
-/* Prefilled form fields */
-.prefilled {
-    border-color: #4285F4;
-}
-
-/* info-window.css - Add this CSS to your existing file or create a new one */
-
+/* Enhanced CSS for custom info windows */
 .custom-info-window {
     position: absolute;
     top: 0;
     left: 0;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
     width: 300px;
     max-width: 90vw;
     padding: 12px;
-    z-index: 999;
+    z-index: 9999;
     display: none;
     opacity: 0;
     transition: opacity 0.2s ease-in-out;
+    font-family: Arial, sans-serif;
+}
+
+.info-window-close {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #666;
+    width: 20px;
+    height: 20px;
+    text-align: center;
+    line-height: 20px;
+}
+
+.info-window-close:hover {
+    color: #333;
 }
 
 .info-window-content {
     max-height: 350px;
     overflow-y: auto;
+    padding-right: 5px;
 }
 
-.info-window-content.scrollable {
-    overflow-y: auto;
-    padding-right: 8px; /* Space for scrollbar */
+.info-window-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.info-window-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.info-window-content::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.info-window-content::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
 }
 
 .info-window-title {
@@ -106,6 +63,7 @@
     font-weight: bold;
     margin-bottom: 8px;
     color: #212121;
+    padding-right: 25px; /* Make room for close button */
 }
 
 .chain-badge {
@@ -129,6 +87,7 @@
 .business-type {
     margin: 6px 0;
     font-size: 14px;
+    color: #333;
 }
 
 .info-window-incentives {
@@ -149,6 +108,7 @@
 .incentives-list {
     margin: 8px 0;
     padding-left: 20px;
+    list-style-type: disc;
 }
 
 .incentives-list li {
@@ -161,6 +121,16 @@
     margin-top: 2px;
 }
 
+.chain-location-message {
+    margin-top: 10px;
+    font-style: italic;
+    color: #666;
+    font-size: 12px;
+    border-left: 3px solid #4285F4;
+    padding-left: 8px;
+    background-color: rgba(66, 133, 244, 0.05);
+}
+
 .info-window-actions {
     margin-top: 12px;
     padding-top: 8px;
@@ -170,6 +140,7 @@
 
 .add-business-btn,
 .view-details-btn {
+    display: inline-block;
     border: none;
     padding: 8px 12px;
     border-radius: 4px;
@@ -177,6 +148,7 @@
     font-size: 13px;
     font-weight: 500;
     color: white;
+    text-decoration: none;
 }
 
 .add-business-btn {
@@ -193,4 +165,77 @@
 
 .view-details-btn:hover {
     background-color: #2A75F3;
+}
+
+/* Enhanced marker styles */
+.custom-marker {
+    cursor: pointer;
+    width: 32px;
+    height: 40px;
+    position: relative;
+}
+
+.marker-container {
+    position: relative;
+    width: 32px;
+    height: 40px;
+}
+
+.marker-pin {
+    width: 32px;
+    height: 40px;
+    border-radius: 50% 50% 50% 0;
+    background-color: #EA4335;
+    transform: rotate(-45deg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.marker-pin.nearby {
+    background-color: #4285F4;
+}
+
+.marker-icon {
+    transform: rotate(45deg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 20px;
+    height: 20px;
+    color: white;
+}
+
+.marker-shadow {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    height: 14px;
+    width: 14px;
+    position: absolute;
+    bottom: -3px;
+    left: 9px;
+    filter: blur(2px);
+    z-index: -1;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 768px) {
+    .custom-info-window {
+        max-width: 250px;
+    }
+
+    .info-window-actions {
+        flex-direction: column;
+    }
+
+    .add-business-btn,
+    .view-details-btn {
+        margin-top: 5px;
+        width: 100%;
+        text-align: center;
+    }
 }
