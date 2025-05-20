@@ -2546,7 +2546,7 @@ function geocodeBusinessAddress(business, index, total) {
 }
 
 /**
- * Enhanced retrieveFromMongoDB function that ensures geocoding works
+ * Enhanced retrieveFromMongoDB function that properly filters locations
  */
 async function retrieveFromMongoDB(formData) {
     try {
@@ -2607,6 +2607,9 @@ async function retrieveFromMongoDB(formData) {
                 // Continue without location - will search by business name only
             }
         }
+
+        // Save the search location to a global variable so we can use it to filter results
+        window.currentSearchLocation = searchLocation;
 
         // Only include non-empty parameters in the query
         const params = {};
@@ -2672,21 +2675,18 @@ async function retrieveFromMongoDB(formData) {
                 }
             }
 
-            // Also search for nearby similar businesses using Google Places
-            if (data.results.length > 0) {
-                // Use the first business location to find nearby similar businesses
-                const firstBusiness = data.results[0];
-                if (firstBusiness.lat && firstBusiness.lng) {
-                    // Create LatLng object for the search
-                    const center = new google.maps.LatLng(firstBusiness.lat, firstBusiness.lng);
-                    searchNearbyBusinesses(center, firstBusiness.type);
-                } else if (searchLocation) {
-                    // If business has no coordinates but we have search location
-                    const center = new google.maps.LatLng(
-                        searchLocation.lat,
-                        searchLocation.lng
-                    );
-                    searchNearbyBusinesses(center, firstBusiness.type);
+            // Only search for nearby businesses if we have a search location
+            if (searchLocation && searchLocation.lat && searchLocation.lng) {
+                // Create Google Maps LatLng from search location
+                const searchLatLng = new google.maps.LatLng(
+                    searchLocation.lat,
+                    searchLocation.lng
+                );
+
+                // For nearby searches, use the business type from first result
+                if (data.results.length > 0) {
+                    const businessType = data.results[0].type;
+                    searchNearbyBusinesses(searchLatLng, businessType);
                 }
             }
         }
@@ -4519,20 +4519,24 @@ function displayBusinessesOnMap(businesses) {
         return;
     }
 
+    // Filter businesses to only show those near the search location
+    const filteredBusinesses = filterBusinessesBySearchLocation(businesses);
+    console.log(`Filtered to ${filteredBusinesses.length} businesses near search location`);
+
     // Clear existing markers
     clearMarkers();
     bounds = new google.maps.LatLngBounds();
 
     // Process each business
-    businesses.forEach((business, index) => {
+    filteredBusinesses.forEach((business, index) => {
         // Geocode the business address to get coordinates
-        geocodeBusinessAddress(business, index, businesses.length);
+        geocodeBusinessAddress(business, index, filteredBusinesses.length);
     });
 
     ensureMapVisibility();
 
     // If we have at least one business with coordinates, show the map
-    const hasCoordinates = businesses.some(business =>
+    const hasCoordinates = filteredBusinesses.some(business =>
         business.lat && business.lng ||
         (business.location && business.location.coordinates &&
             business.location.coordinates.length === 2)
@@ -5175,6 +5179,9 @@ function showInfoWindow(marker) {
  * @param {Object} location - Center location for the search
  * @param {string} businessType - Type of business to search for
  */
+/**
+ * Improved searchNearbyBusinesses to respect the current search location
+ */
 function searchNearbyBusinesses(location, businessType) {
     if (!location) {
         console.error("No location provided for nearby business search");
@@ -5194,11 +5201,66 @@ function searchNearbyBusinesses(location, businessType) {
 
     console.log(`Searching for nearby businesses near ${lat} ${lng}`);
 
-    // First search our database
-    searchNearbyBusinessesInDatabase(lat, lng, businessType);
+    // Only search if we have valid coordinates
+    if (!isNaN(lat) && !isNaN(lng)) {
+        // First search our database with the correct coordinates
+        searchNearbyBusinessesInDatabase(lat, lng, businessType);
 
-    // Then search Google Places for similar businesses
-    searchNearbyBusinessesWithPlaces(lat, lng, businessType);
+        // Then search Google Places with the correct coordinates
+        searchNearbyBusinessesWithPlaces(lat, lng, businessType);
+    } else {
+        console.warn("Invalid coordinates for nearby search:", lat, lng);
+    }
+}
+
+/**
+ * Filter nearby businesses to ensure they're only from the current search area
+ * @param {Array} businesses - Array of businesses to filter
+ * @returns {Array} - Filtered array of businesses
+ */
+function filterBusinessesBySearchLocation(businesses) {
+    // If we don't have a current search location, return all businesses
+    if (!window.currentSearchLocation) {
+        return businesses;
+    }
+
+    // Create a LatLng object from the current search location
+    const searchLatLng = new google.maps.LatLng(
+        window.currentSearchLocation.lat,
+        window.currentSearchLocation.lng
+    );
+
+    // Filter businesses that are too far from the search location
+    return businesses.filter(business => {
+        // Skip if missing coordinates
+        if (!business.lat || !business.lng) {
+            return false;
+        }
+
+        // Create a LatLng object from the business location
+        const businessLatLng = new google.maps.LatLng(
+            business.lat,
+            business.lng
+        );
+
+        // Calculate distance in meters
+        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+            searchLatLng,
+            businessLatLng
+        );
+
+        // Convert to miles
+        const distanceInMiles = distance / 1609.34;
+
+        // Keep businesses within 50 miles
+        const isNearby = distanceInMiles <= 50;
+
+        if (!isNearby) {
+            console.log(`Filtering out distant business: ${business.bname} - ${distanceInMiles.toFixed(1)} miles from search location`);
+        }
+
+        return isNearby;
+    });
 }
 
 /**

@@ -1324,7 +1324,6 @@ async function handleFindMatchingChain(req, res) {
         await connect;
 
         // Search for chains with similar names
-        // This uses a case-insensitive search with some tolerance for variations
         const chains = await Business.find({
             is_chain: true,
             $or: [
@@ -1367,10 +1366,6 @@ async function handleFindMatchingChain(req, res) {
     }
 }
 
-
-/**
- * Calculate name similarity for chain matching
- */
 function calculateNameSimilarity(chainName, placeName) {
     // Clean and normalize names for better matching
     chainName = chainName.toLowerCase()
@@ -1407,10 +1402,7 @@ function calculateNameSimilarity(chainName, placeName) {
     }
 
     // Consider it a match if at least 50% of words match
-    const similarity = matchingWords / Math.max(chainWords.length, placeWords.length);
-    console.log(`Similarity between "${chainName}" and "${placeName}": ${similarity}`);
-
-    return similarity;
+    return matchingWords / Math.max(chainWords.length, placeWords.length);
 }
 
 /**
