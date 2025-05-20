@@ -434,63 +434,64 @@ window.viewBusinessDetails = function(businessId) {
  * @param {Object} place - Google Place object
  * @param {Object} position - Position for the info window
  */
-function showPlaceInfoWindow(place, position) {
-    // Create info window if it doesn't exist
-    if (!infoWindow) {
-        infoWindow = new google.maps.InfoWindow({
-            maxWidth: 320,
-            disableAutoPan: false
+async function showPlaceInfoWindow(place, position) {
+    try {
+        // Extract business name
+        const businessName = place.displayName || place.name || 'Unnamed Place';
+
+        // Check if this place matches a chain in our database
+        let chainMatch = null;
+        try {
+            chainMatch = await findMatchingChainForPlaceResult(businessName);
+        } catch (error) {
+            console.error("Error checking chain match:", error);
+        }
+
+        // Create a business object
+        const business = {
+            _id: 'google_' + (place.place_id || place.id),
+            bname: businessName,
+            address1: place.formattedAddress || place.formatted_address || 'Address not available',
+            city: '',
+            state: '',
+            zip: '',
+            phone: place.nationalPhoneNumber || place.formatted_phone_number || '',
+            isGooglePlace: true,
+            placeId: place.place_id || place.id,
+            lat: position.lat(),
+            lng: position.lng()
+        };
+
+        // If the place matches a chain, add chain info
+        if (chainMatch) {
+            console.log(`Place "${businessName}" matches chain: ${chainMatch.bname}`);
+            business.chain_id = chainMatch._id;
+            business.chain_name = chainMatch.bname;
+            business.isChainLocation = true;
+        }
+
+        // Create a temporary marker object for the info window
+        const tempMarker = {
+            business: business,
+            position: position
+        };
+
+        // Show the custom info window with the business
+        showInfoWindow(tempMarker);
+    } catch (error) {
+        console.error("Error in showPlaceInfoWindow:", error);
+
+        // Fallback to standard info window
+        const infoWindow = new google.maps.InfoWindow({
+            content: `<div class="info-window">
+                        <h3>${place.displayName || place.name || 'Unnamed Place'}</h3>
+                        <p><strong>Address:</strong><br>${place.formattedAddress || place.formatted_address || 'Address not available'}</p>
+                        <p><strong>Status:</strong> Not in database</p>
+                      </div>`,
+            position: position
         });
+        infoWindow.open(map);
     }
-
-    // Get type label - place.types might be in different formats depending on API version
-    const placeTypeLabel = getPlaceTypeLabel(place.types);
-
-    // Extract display name based on which API was used
-    const displayName = place.displayName || place.name || 'Unnamed Place';
-
-    // Get address - different APIs provide different formats
-    const formattedAddress = place.formattedAddress || place.formatted_address || 'Address not available';
-
-    // Get phone number - different APIs provide different formats
-    const phoneNumber = place.nationalPhoneNumber || place.formatted_phone_number || '';
-
-    // Calculate distance if available
-    let distanceText = '';
-    if (place.distance) {
-        distanceText = `<p><strong>Distance:</strong> ${(place.distance / 1609.34).toFixed(1)} miles</p>`;
-    }
-
-    // Format the content with an "Add to Database" button and scrollable area - using your existing CSS classes
-    const contentString = `
-    <div class="info-window">
-        <h3>${displayName}</h3>
-        <p><strong>Address:</strong><br>${formattedAddress}</p>
-        ${phoneNumber ? `<p><strong>Phone:</strong> ${phoneNumber}</p>` : ''}
-        ${distanceText}
-        <p><strong>Type:</strong> ${placeTypeLabel}</p>
-        <p><strong>Incentives:</strong> <em>Not in database</em></p>
-        <p>This business is not yet in the Patriot Thanks database.</p>
-        <div class="info-window-actions">
-            <button class="add-business-btn" 
-                    onclick="window.addBusinessToDatabase('${place.place_id || place.id}')">
-                Add to Patriot Thanks
-            </button>
-        </div>
-    </div>
-  `;
-
-    // Set content and open the info window
-    infoWindow.setContent(contentString);
-
-    // Make sure we set the position properly
-    if (position.lat && typeof position.lat === 'function') {
-        infoWindow.setPosition(position);
-    } else {
-        infoWindow.setPosition(new google.maps.LatLng(position.lat, position.lng));
-    }
-
-    infoWindow.open(map);
 }
 
 /**
@@ -548,7 +549,30 @@ async function findMatchingChainForPlaceResult(placeName) {
 }
 
 /**
- * Helper function to normalize an address for comparison
+ * Extract just the street number and name for more lenient matching
+ * @param {string} address - Full address string
+ * @returns {string} - Just the street number and name
+ */
+function getStreetNumberAndName(address) {
+    if (!address) return '';
+
+    // Normalize first
+    const normalized = normalizeAddress(address);
+
+    // Try to extract just the street number and name
+    // This regex looks for a number followed by one or more words
+    const match = normalized.match(/(\d+)\s+([a-z]+(?:\s+[a-z]+)*)/i);
+
+    if (match && match.length >= 3) {
+        // Return the number and first word of street name
+        return `${match[1]} ${match[2].split(' ')[0]}`;
+    }
+
+    return normalized;
+}
+
+/**
+ * Enhanced normalizeAddress function with more abbreviation replacements
  * @param {string} address - Address string to normalize
  * @returns {string} - Normalized address
  */
@@ -567,13 +591,20 @@ function normalizeAddress(address) {
         .replace(/\bblvd\b/g, 'boulevard')
         .replace(/\brd\b/g, 'road')
         .replace(/\bdr\b/g, 'drive')
+        .replace(/\bln\b/g, 'lane')
+        .replace(/\bct\b/g, 'court')
+        .replace(/\bpkwy\b/g, 'parkway')
+        .replace(/\bpl\b/g, 'place')
+        .replace(/\bapt\b/g, '')
+        .replace(/\bste\b/g, '')
+        .replace(/\bunit\b/g, '')
+        .replace(/\b#\d+\b/g, '')
         // Remove all non-alphanumeric characters except spaces
         .replace(/[^a-z0-9\s]/g, '')
         // Replace multiple spaces with a single space
         .replace(/\s+/g, ' ')
         .trim();
 }
-
 
 /**
  * Check if a Google Places result matches a business in our database
@@ -586,12 +617,20 @@ function findMatchingDatabaseBusiness(place, databaseBusinesses) {
         return null;
     }
 
-    // First normalize the place's address for comparison
+    // First normalize the place's address and name for comparison
     const placeAddress = normalizeAddress(place.address1 || '');
     const placeName = (place.bname || '').toLowerCase();
 
+    // Extract just the street number and name for more lenient matching
+    const placeStreetMatch = getStreetNumberAndName(place.address1 || '');
+
     console.log(`Finding database match for place: ${place.bname}, address: ${place.address1}`);
     console.log(`Normalized place address: ${placeAddress}`);
+    console.log(`Street number and name: ${placeStreetMatch}`);
+
+    // Keep track of the best match
+    let bestMatch = null;
+    let bestMatchScore = 0;
 
     // Check each database business
     for (const dbBusiness of databaseBusinesses) {
@@ -599,16 +638,20 @@ function findMatchingDatabaseBusiness(place, databaseBusinesses) {
         if (!dbBusiness || !dbBusiness.bname) continue;
 
         // Check for name match (case insensitive)
-        const nameMatch =
-            placeName === (dbBusiness.bname || '').toLowerCase();
+        const nameMatch = placeName === (dbBusiness.bname || '').toLowerCase();
 
         // Check for address match using normalized comparison
         const dbAddress = normalizeAddress(dbBusiness.address1 || '');
         const addressMatch = placeAddress && dbAddress && placeAddress === dbAddress;
 
+        // Extract just the street number and name for more lenient matching
+        const dbStreetMatch = getStreetNumberAndName(dbBusiness.address1 || '');
+        const streetMatch = placeStreetMatch && dbStreetMatch && placeStreetMatch === dbStreetMatch;
+
         console.log(`Comparing with DB business: ${dbBusiness.bname}, address: ${dbBusiness.address1}`);
         console.log(`Normalized DB address: ${dbAddress}`);
-        console.log(`Name match: ${nameMatch}, Address match: ${addressMatch}`);
+        console.log(`Street number and name: ${dbStreetMatch}`);
+        console.log(`Name match: ${nameMatch}, Address match: ${addressMatch}, Street match: ${streetMatch}`);
 
         // Handle the "New" vs "New York" city parsing issue
         const cityMatch =
@@ -635,14 +678,28 @@ function findMatchingDatabaseBusiness(place, databaseBusinesses) {
             console.log(`Coordinates match: ${coordinatesMatch} (distance: ${distance})`);
         }
 
-        // Consider it a match if:
-        // 1. Names match AND addresses match
-        // 2. OR Names match AND city matches AND coordinates match
-        if ((nameMatch && addressMatch) ||
-            (nameMatch && cityMatch && coordinatesMatch)) {
-            console.log(`Found matching database business: ${dbBusiness._id}`);
-            return dbBusiness;
+        // Calculate a match score (higher is better)
+        let matchScore = 0;
+        if (nameMatch) matchScore += 50;
+        if (addressMatch) matchScore += 40;
+        if (streetMatch) matchScore += 30;
+        if (cityMatch) matchScore += 20;
+        if (coordinatesMatch) matchScore += 10;
+
+        console.log(`Match score: ${matchScore}`);
+
+        // Update best match if this is better
+        if (matchScore > bestMatchScore) {
+            bestMatch = dbBusiness;
+            bestMatchScore = matchScore;
         }
+    }
+
+    // Consider it a match if the score is high enough
+    // Name match + either address or street match should be enough
+    if (bestMatchScore >= 70) {
+        console.log(`Found matching database business: ${bestMatch._id} with score ${bestMatchScore}`);
+        return bestMatch;
     }
 
     // No match found
@@ -1593,6 +1650,7 @@ function displayBusinessesOnMap(businesses) {
 
         if (matchingDbBusiness) {
             console.log(`Found matching database business for ${placesBusiness.bname} at ${placesBusiness.address1}`);
+            console.log(`Matching business ID: ${matchingDbBusiness._id}`);
 
             // Attach a reference to the matching database business
             placesBusiness.matchingDbBusinessId = matchingDbBusiness._id;
@@ -1677,7 +1735,6 @@ function displayBusinessesOnMap(businesses) {
     // Update the search results display
     displaySearchResults(filteredBusinesses);
 }
-
 
 /**
  * Display business search results for other pages
@@ -3304,8 +3361,6 @@ async function findChainMatchesForResults(businesses) {
     return businesses;
 }
 
-
-
 /**
  * Enhanced function to properly preserve Place data when adding a business to database
  * @param {string} placeId - Google Place ID
@@ -3891,7 +3946,6 @@ function processPlaceResults(places, searchLocation) {
     return businessResults;
 }
 
-
 /**
  * Ensure map is visible and properly sized
  */
@@ -4017,8 +4071,6 @@ function showGooglePlaceInfoWindow(business, position) {
 
     console.log("Opened Google Place info window");
 }
-
-
 
 /**
  * Add a Google Place to our database
@@ -4387,19 +4439,63 @@ async function setupMapClickHandler() {
 
                     console.log("Place details:", place);
 
-                    // Calculate distance if possible
-                    if (place.location) {
-                        // Try to calculate distance from current center
-                        const center = map.getCenter();
-                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            center,
-                            place.location
-                        );
-                        place.distance = distance;
+                    // Extract business name
+                    const businessName = place.displayName || '';
+
+                    // Check if this business matches any chains before showing the info window
+                    let chainMatch = null;
+
+                    try {
+                        chainMatch = await findMatchingChainForPlaceResult(businessName);
+                    } catch (error) {
+                        console.error("Error checking for chain match:", error);
                     }
 
-                    // Show custom info window with "Add to Database" option
-                    showPlaceInfoWindow(place, event.latLng);
+                    // Create a business object from the place
+                    const business = {
+                        _id: 'google_' + place.id,
+                        bname: businessName,
+                        address1: place.formattedAddress || '',
+                        city: '',
+                        state: '',
+                        zip: '',
+                        isGooglePlace: true,
+                        placeId: place.id,
+                        lat: place.location?.lat || 0,
+                        lng: place.location?.lng || 0
+                    };
+
+                    // If it matches a chain, add the chain info
+                    if (chainMatch) {
+                        console.log(`POI "${businessName}" matches chain: ${chainMatch.bname}`);
+                        business.chain_id = chainMatch._id;
+                        business.chain_name = chainMatch.bname;
+                        business.isChainLocation = true;
+                    }
+
+                    // Calculate distance if possible
+                    if (place.location && window.currentSearchLocation) {
+                        // Try to calculate distance from current center
+                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            new google.maps.LatLng(place.location.lat, place.location.lng),
+                            new google.maps.LatLng(
+                                window.currentSearchLocation.lat,
+                                window.currentSearchLocation.lng
+                            )
+                        );
+                        business.distance = distance;
+                    }
+
+                    // Create a temporary marker object for the info window
+                    const tempMarker = {
+                        business: business,
+                        position: place.location ?
+                            new google.maps.LatLng(place.location.lat, place.location.lng) :
+                            event.latLng
+                    };
+
+                    // Show custom info window with chain matching
+                    showInfoWindow(tempMarker);
                 } catch (error) {
                     console.error("Error fetching place details:", error);
                     alert("Error loading place details. Please try again.");
@@ -4412,8 +4508,6 @@ async function setupMapClickHandler() {
         console.error("Error setting up map click handler:", error);
     }
 }
-
-
 
 /**
  * Add event listeners to prioritize marker clicks over POI clicks
@@ -5162,7 +5256,7 @@ async function isAddressInDatabase(business) {
  */
 function fetchChainIncentivesForInfoWindow(placeId, chainId) {
     if (!placeId || !chainId) {
-        console.error("Missing place ID or chain ID for incentives in info window");
+        console.error("Missing place ID or chain ID for fetching chain incentives");
         return;
     }
 
@@ -5171,7 +5265,7 @@ function fetchChainIncentivesForInfoWindow(placeId, chainId) {
     // Determine the base URL
     const baseURL = getBaseURL();
 
-    // Build API URL to fetch chain incentives - using the chain_id as the business_id
+    // Build API URL to fetch chain incentives
     const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
 
     console.log("Fetching chain incentives API URL:", apiURL);
@@ -5186,17 +5280,17 @@ function fetchChainIncentivesForInfoWindow(placeId, chainId) {
         .then(data => {
             console.log(`Chain incentives data for info window (Place: ${placeId}, Chain: ${chainId}):`, data);
 
-            // Find the incentives div in the info window
-            const incentivesDiv = document.getElementById(`info-window-incentives-${placeId}`);
+            // FIXED: Use the general incentives div instead of a place-specific one
+            const incentivesDiv = document.getElementById('info-window-incentives');
 
             if (!incentivesDiv) {
-                console.error(`Could not find incentives div for place ${placeId}`);
+                console.error(`Could not find incentives div for info window`);
                 return;
             }
 
             // Check if there are any incentives
             if (!data.results || data.results.length === 0) {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No chain incentives found</p>';
+                incentivesDiv.innerHTML = '<p><strong>Chain Incentives:</strong> No chain incentives found</p>';
                 return;
             }
 
@@ -5221,6 +5315,14 @@ function fetchChainIncentivesForInfoWindow(placeId, chainId) {
 
             incentivesHTML += '</ul>';
 
+            // Add a message explaining that this is a chain location
+            incentivesHTML += `
+                <div class="chain-location-message">
+                    This location matches the ${data.chain_info?.bname || 'The Home Depot'} chain in our database. 
+                    Chain-wide incentives apply, but this specific location is not yet added to our database.
+                </div>
+            `;
+
             if (incentivesHTML === '<p><strong>Chain Incentives:</strong></p><ul class="incentives-list"></ul>') {
                 incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No active chain incentives found</p>';
             } else {
@@ -5229,7 +5331,7 @@ function fetchChainIncentivesForInfoWindow(placeId, chainId) {
         })
         .catch(error => {
             console.error(`Error fetching chain incentives for info window: ${error}`);
-            const incentivesDiv = document.getElementById(`info-window-incentives-${placeId}`);
+            const incentivesDiv = document.getElementById('info-window-incentives');
 
             if (incentivesDiv) {
                 incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading incentives</p>';
@@ -5268,6 +5370,15 @@ async function isPlaceAlreadyInDatabase(placeId) {
     }
 }
 
+/**
+ * Close the custom info window
+ */
+function closeInfoWindow() {
+    const infoWindow = document.getElementById('info-window');
+    if (infoWindow) {
+        infoWindow.style.display = 'none';
+    }
+}
 
 /**
  * Refined showInfoWindow function that properly handles three categories:
@@ -5293,6 +5404,11 @@ function showInfoWindow(marker) {
     // Get the info window
     const infoWindow = document.getElementById('info-window');
     const infoWindowContent = document.getElementById('info-window-content');
+
+    if (!infoWindow || !infoWindowContent) {
+        console.error("Info window elements not found in the DOM");
+        return;
+    }
 
     // Check if this is a Google Places result
     const isGooglePlace = business.isGooglePlace === true;
@@ -5409,11 +5525,13 @@ function showInfoWindow(marker) {
     } else {
         // For regular Places results, show "not in database" message
         const incentivesContainer = document.getElementById('info-window-incentives');
-        incentivesContainer.innerHTML = `
-            <div class="no-incentives-message">
-                This business is not yet in the Patriot Thanks database.
-            </div>
-        `;
+        if (incentivesContainer) {
+            incentivesContainer.innerHTML = `
+                <div class="no-incentives-message">
+                    This business is not yet in the Patriot Thanks database.
+                </div>
+            `;
+        }
     }
 
     // Force info window to be scrollable if content is too tall
