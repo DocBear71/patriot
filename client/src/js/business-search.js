@@ -547,7 +547,6 @@ async function findMatchingChainForPlaceResult(placeName) {
     }
 }
 
-
 /**
  * Local fallback for chain matching when API is unavailable
  * Hardcoded for common chains until API is working
@@ -563,6 +562,14 @@ function findMatchingChainLocally(placeName) {
         .replace(/\s+inc\.?$/, '')
         .replace(/\s+corp\.?$/, '')
         .trim();
+
+    // Add special handling for Lowe's which might have a different format
+    const isLowes = normalizedName.includes('lowes') ||
+        normalizedName.includes('lowe\'s') ||
+        normalizedName.includes('lowes home') ||
+        normalizedName.includes('lowe\'s home');
+
+    console.log(`Normalized place name: "${normalizedName}", isLowes: ${isLowes}`);
 
     // List of known chains to check against with real chain IDs
     // Based on the console logs, we know the Home Depot chain ID
@@ -594,6 +601,13 @@ function findMatchingChainLocally(placeName) {
 
     // Check for matches
     for (const chain of knownChains) {
+        // Special handling for Lowe's
+        if (isLowes && chain.normalizedName.includes('lowes')) {
+            console.log(`Local chain match found: "${placeName}" matches "${chain.bname}" (via Lowe's special handling)`);
+            return chain;
+        }
+
+        // Normal matching logic
         if (normalizedName.includes(chain.normalizedName) ||
             chain.normalizedName.includes(normalizedName)) {
             console.log(`Local chain match found: "${placeName}" matches "${chain.bname}"`);
@@ -2079,7 +2093,9 @@ function initBusinessSearch() {
     }
 }
 
-// Updated retrieveFromMongoDB function to properly handle Google Places fallback
+/**
+ * Enhanced retrieveFromMongoDB function that ensures geocoding works
+ */
 async function retrieveFromMongoDB(formData) {
     try {
         // Show a loading indicator
@@ -2090,6 +2106,56 @@ async function retrieveFromMongoDB(formData) {
             resultsContainer.style.display = 'block';
         }
 
+        // If address is provided (like a ZIP code), geocode it first
+        let searchLocation = null;
+
+        // Check if we should use current location
+        const useMyLocation = document.getElementById('use-my-location') &&
+            document.getElementById('use-my-location').checked;
+
+        if (useMyLocation) {
+            try {
+                console.log("Getting user's location for search...");
+                searchLocation = await getUserLocation();
+                console.log("User location for search:", searchLocation);
+            } catch (error) {
+                console.error("Error getting user location:", error);
+                // Continue without location - will fall back to address search
+            }
+        }
+        // If not using location but address is provided, geocode it
+        else if (formData.address && formData.address.trim() !== '') {
+            try {
+                console.log("Geocoding address for search:", formData.address);
+                // Try client-side geocoding first
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    console.log("Successfully geocoded address to:", searchLocation);
+                } else {
+                    console.warn("Client-side geocoding failed, trying server-side");
+
+                    // Try server-side as fallback
+                    const baseURL = getBaseURL();
+                    const geocodeUrl = `${baseURL}/api/geocode?address=${encodeURIComponent(formData.address)}`;
+
+                    const response = await fetch(geocodeUrl);
+                    const data = await response.json();
+
+                    if (data.success && data.location) {
+                        searchLocation = data.location;
+                        console.log("Server-side geocoded location:", searchLocation);
+                    } else {
+                        console.warn("Both client and server geocoding failed");
+                    }
+                }
+            } catch (error) {
+                console.error("Error geocoding address:", error);
+                // Continue without location - will search by business name only
+            }
+        }
+
         // Only include non-empty parameters in the query
         const params = {};
         if (formData.businessName && formData.businessName.trim() !== '') {
@@ -2097,6 +2163,13 @@ async function retrieveFromMongoDB(formData) {
         }
         if (formData.address && formData.address.trim() !== '') {
             params.address = formData.address;
+        }
+
+        // Add location parameters if we have them
+        if (searchLocation && searchLocation.lat && searchLocation.lng) {
+            params.lat = searchLocation.lat;
+            params.lng = searchLocation.lng;
+            params.radius = 25; // Search radius in miles
         }
 
         const queryParams = new URLSearchParams(params).toString();
@@ -2131,7 +2204,7 @@ async function retrieveFromMongoDB(formData) {
             console.log("No results in our database, searching Google Places...");
 
             // If no results, search Google Places API
-            await searchGooglePlaces(formData);
+            await searchGooglePlaces(formData, searchLocation);
         } else {
             // We have results from our database, display them
             // First display on map
@@ -2148,16 +2221,20 @@ async function retrieveFromMongoDB(formData) {
             }
 
             // Also search for nearby similar businesses using Google Places
-            // This ensures we get both database and Google results
-            if (formData.businessName && formData.businessName.trim() !== '') {
-                // If we've got database results but the user is searching for a business name,
-                // also check Google Places to find additional locations that might not be in our database
-                if (data.results.length > 0) {
-                    const firstBusiness = data.results[0];
-                    if (firstBusiness.lat && firstBusiness.lng) {
-                        // Use the first business location to find nearby similar businesses
-                        searchNearbyBusinesses(new google.maps.LatLng(firstBusiness.lat, firstBusiness.lng), firstBusiness.type);
-                    }
+            if (data.results.length > 0) {
+                // Use the first business location to find nearby similar businesses
+                const firstBusiness = data.results[0];
+                if (firstBusiness.lat && firstBusiness.lng) {
+                    // Create LatLng object for the search
+                    const center = new google.maps.LatLng(firstBusiness.lat, firstBusiness.lng);
+                    searchNearbyBusinesses(center, firstBusiness.type);
+                } else if (searchLocation) {
+                    // If business has no coordinates but we have search location
+                    const center = new google.maps.LatLng(
+                        searchLocation.lat,
+                        searchLocation.lng
+                    );
+                    searchNearbyBusinesses(center, firstBusiness.type);
                 }
             }
         }
@@ -2172,28 +2249,6 @@ async function retrieveFromMongoDB(formData) {
         } else {
             alert(`Error searching for businesses: ${error.message}`);
         }
-    }
-}
-
-// Update the existing geocodeAddressServerSide function to always use the client-side fallback
-async function geocodeAddressServerSide(address) {
-    try {
-        // Always use client-side geocoding for now
-        return await geocodeAddressClientSide(address);
-    } catch (error) {
-        console.error("Geocoding fallback failed:", error);
-        return null;
-    }
-}
-
-// Update the existing searchPlacesServerSide function to always use the client-side fallback
-async function searchPlacesServerSide(query, location, radius = 50000) {
-    try {
-        // Always use client-side places search for now
-        return await searchPlacesClientSide(query, location, radius);
-    } catch (error) {
-        console.error("Places search fallback failed:", error);
-        return [];
     }
 }
 
@@ -2521,10 +2576,175 @@ function geocodeBusinessAddress(business, index, total) {
     }, index * CONFIG.geocodeDelay); // Stagger requests
 }
 
-// Updated searchGooglePlaces function to ensure proper Places API integration
-async function searchGooglePlaces(formData) {
+/**
+ * Enhanced retrieveFromMongoDB function that ensures geocoding works
+ */
+async function retrieveFromMongoDB(formData) {
+    try {
+        // Show a loading indicator
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<div class="loading-indicator">Searching for businesses...</div>';
+            resultsContainer.style.display = 'block';
+        }
+
+        // If address is provided (like a ZIP code), geocode it first
+        let searchLocation = null;
+
+        // Check if we should use current location
+        const useMyLocation = document.getElementById('use-my-location') &&
+            document.getElementById('use-my-location').checked;
+
+        if (useMyLocation) {
+            try {
+                console.log("Getting user's location for search...");
+                searchLocation = await getUserLocation();
+                console.log("User location for search:", searchLocation);
+            } catch (error) {
+                console.error("Error getting user location:", error);
+                // Continue without location - will fall back to address search
+            }
+        }
+        // If not using location but address is provided, geocode it
+        else if (formData.address && formData.address.trim() !== '') {
+            try {
+                console.log("Geocoding address for search:", formData.address);
+                // Try client-side geocoding first
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    console.log("Successfully geocoded address to:", searchLocation);
+                } else {
+                    console.warn("Client-side geocoding failed, trying server-side");
+
+                    // Try server-side as fallback
+                    const baseURL = getBaseURL();
+                    const geocodeUrl = `${baseURL}/api/geocode?address=${encodeURIComponent(formData.address)}`;
+
+                    const response = await fetch(geocodeUrl);
+                    const data = await response.json();
+
+                    if (data.success && data.location) {
+                        searchLocation = data.location;
+                        console.log("Server-side geocoded location:", searchLocation);
+                    } else {
+                        console.warn("Both client and server geocoding failed");
+                    }
+                }
+            } catch (error) {
+                console.error("Error geocoding address:", error);
+                // Continue without location - will search by business name only
+            }
+        }
+
+        // Only include non-empty parameters in the query
+        const params = {};
+        if (formData.businessName && formData.businessName.trim() !== '') {
+            params.business_name = formData.businessName;
+        }
+        if (formData.address && formData.address.trim() !== '') {
+            params.address = formData.address;
+        }
+
+        // Add location parameters if we have them
+        if (searchLocation && searchLocation.lat && searchLocation.lng) {
+            params.lat = searchLocation.lat;
+            params.lng = searchLocation.lng;
+            params.radius = 25; // Search radius in miles
+        }
+
+        const queryParams = new URLSearchParams(params).toString();
+
+        // Determine the base URL
+        const baseURL = getBaseURL();
+
+        // Use the API endpoint with the baseURL
+        const apiURL = `${baseURL}/api/business.js?operation=search&${queryParams}`;
+        console.log("Submitting search to API at: ", apiURL);
+
+        const res = await fetch(apiURL, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json; charset=UTF-8',
+            }
+        });
+
+        console.log("Response status: ", res.status);
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Error response: ", errorText);
+            throw new Error(`Failed to retrieve data from MongoDB: ${res.status} ${errorText}`);
+        }
+
+        const data = await res.json();
+        console.log("Search results from database:", data);
+
+        // Check if we got any results from our database
+        if (!data.results || data.results.length === 0) {
+            console.log("No results in our database, searching Google Places...");
+
+            // If no results, search Google Places API
+            await searchGooglePlaces(formData, searchLocation);
+        } else {
+            // We have results from our database, display them
+            // First display on map
+            displayBusinessesOnMap(data.results);
+
+            // Then in table/list
+            if (document.getElementById('search_table')) {
+                displaySearchResults(data.results);
+            } else {
+                const resultsContainer = document.getElementById('business-search-results');
+                if (resultsContainer) {
+                    displayBusinessSearchResults(data.results, resultsContainer);
+                }
+            }
+
+            // Also search for nearby similar businesses using Google Places
+            if (data.results.length > 0) {
+                // Use the first business location to find nearby similar businesses
+                const firstBusiness = data.results[0];
+                if (firstBusiness.lat && firstBusiness.lng) {
+                    // Create LatLng object for the search
+                    const center = new google.maps.LatLng(firstBusiness.lat, firstBusiness.lng);
+                    searchNearbyBusinesses(center, firstBusiness.type);
+                } else if (searchLocation) {
+                    // If business has no coordinates but we have search location
+                    const center = new google.maps.LatLng(
+                        searchLocation.lat,
+                        searchLocation.lng
+                    );
+                    searchNearbyBusinesses(center, firstBusiness.type);
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Search error: ", error);
+        // Show error message
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = `<div class="error-message">Error searching for businesses: ${error.message}</div>`;
+            resultsContainer.style.display = 'block';
+        } else {
+            alert(`Error searching for businesses: ${error.message}`);
+        }
+    }
+}
+
+/**
+ * Updated searchGooglePlaces to ensure it uses searchLocation
+ */
+async function searchGooglePlaces(formData, searchLocation = null) {
     try {
         console.log("Searching Google Places for:", formData);
+
+        if (searchLocation) {
+            console.log("Using provided search location:", searchLocation);
+        }
 
         // Make map visible
         const mapContainer = document.getElementById('map');
@@ -2552,71 +2772,39 @@ async function searchGooglePlaces(formData) {
         loadingDiv.innerHTML = 'Searching for businesses...';
         mapContainer.appendChild(loadingDiv);
 
-        // Geocode the address or use current location
-        let searchLocation;
-
-        // Check if user wants to use their location
-        const useMyLocation = document.getElementById('use-my-location') &&
-            document.getElementById('use-my-location').checked;
-
-        if (useMyLocation) {
+        // If we don't have a search location yet, try to geocode the address
+        if (!searchLocation && formData.address) {
             try {
-                const userLocation = await getUserLocation();
-                searchLocation = {
-                    latitude: userLocation.lat,
-                    longitude: userLocation.lng
-                };
-                console.log("Using user's current location for search:", searchLocation);
+                // Use client-side geocoding
+                const geocodeResult = await geocodeAddressClientSide(formData.address);
+
+                if (geocodeResult) {
+                    searchLocation = geocodeResult;
+                    console.log("Geocoded search center:", searchLocation);
+                }
             } catch (error) {
-                console.error("Error getting user location:", error);
-                let useLocationFailed = true;
+                console.error("Error geocoding address for Google Places search:", error);
             }
         }
 
-        if (!useMyLocation || typeof useLocationFailed !== 'undefined') {
-            try {
-                // Use client-side geocoding
-                const geocodeResult = await geocodeAddressClientSide(formData.address || searchQuery);
+        // Make sure searchLocation is in the correct format for Google Places API
+        let placesLocation = null;
+        if (searchLocation) {
+            placesLocation = new google.maps.LatLng(
+                searchLocation.lat || searchLocation.latitude,
+                searchLocation.lng || searchLocation.longitude
+            );
 
-                if (geocodeResult) {
-                    searchLocation = {
-                        latitude: geocodeResult.lat,
-                        longitude: geocodeResult.lng
-                    };
-
-                    // Create a Google Maps LatLng object for map operations
-                    const googleMapsLocation = new google.maps.LatLng(
-                        geocodeResult.lat,
-                        geocodeResult.lng
-                    );
-
-                    // Extend bounds
-                    bounds.extend(googleMapsLocation);
-
-                    console.log("Geocoded search center:", searchLocation);
-                } else {
-                    throw new Error(`Geocoding failed for address: ${formData.address || searchQuery}`);
-                }
-            } catch (error) {
-                console.error("Error geocoding address:", error);
-
-                // Fall back to default US center
-                searchLocation = {
-                    latitude: CONFIG.defaultCenter.lat,
-                    longitude: CONFIG.defaultCenter.lng
-                };
-
-                // Create a Google Maps LatLng object for map operations
-                const googleMapsLocation = new google.maps.LatLng(
-                    CONFIG.defaultCenter.lat,
-                    CONFIG.defaultCenter.lng
-                );
-
-                // Extend bounds
-                bounds.extend(googleMapsLocation);
-
-                console.log("Using default US center for search");
-            }
+            // Add location to bounds
+            bounds.extend(placesLocation);
+        } else {
+            // If no location found, use default US center
+            placesLocation = new google.maps.LatLng(
+                CONFIG.defaultCenter.lat,
+                CONFIG.defaultCenter.lng
+            );
+            bounds.extend(placesLocation);
+            console.log("Using default US center for search");
         }
 
         try {
@@ -2626,11 +2814,12 @@ async function searchGooglePlaces(formData) {
             // Create the request object
             const request = {
                 query: searchQuery,
-                location: new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude),
+                location: placesLocation,
                 radius: 50000 // 50km search radius
             };
 
-            // Execute the search
+            console.log("Places API request:", request);
+// Execute the search
             service.textSearch(request, (results, status) => {
                 // Remove loading indicator
                 const loadingElement = document.getElementById('map-loading');
@@ -2667,15 +2856,13 @@ async function searchGooglePlaces(formData) {
                         place.geometry.location.lng()
                     );
 
-                    const searchLatLng = new google.maps.LatLng(
-                        searchLocation.latitude,
-                        searchLocation.longitude
-                    );
-
-                    const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                        searchLatLng,
-                        placeLatLng
-                    );
+                    let distance = 0;
+                    if (placesLocation) {
+                        distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            placesLocation,
+                            placeLatLng
+                        );
+                    }
 
                     // Create business object
                     const business = {
@@ -2713,25 +2900,28 @@ async function searchGooglePlaces(formData) {
 
                     // Adjust map view
                     if (!bounds.isEmpty()) {
-                        map.fitBounds(bounds);
+                        try {
+                            map.fitBounds(bounds);
 
-                        // Set appropriate zoom level
-                        setTimeout(() => {
-                            if (businessResults.length === 1) {
-                                map.setZoom(15);
-                            } else if (businessResults.length > 10) {
-                                const currentZoom = map.getZoom();
-                                if (currentZoom < 10) {
-                                    map.setZoom(10);
+                            // Set appropriate zoom level
+                            setTimeout(() => {
+                                if (businessResults.length === 1) {
+                                    map.setZoom(15);
+                                } else if (businessResults.length > 10) {
+                                    const currentZoom = map.getZoom();
+                                    if (currentZoom < 10) {
+                                        map.setZoom(10);
+                                    }
                                 }
-                            }
-                        }, 100);
+                            }, 100);
+                        } catch (error) {
+                            console.error("Error fitting bounds:", error);
+                            map.setCenter(placesLocation);
+                            map.setZoom(10);
+                        }
                     } else {
-                        map.setCenter(new google.maps.LatLng(
-                            searchLocation.latitude,
-                            searchLocation.longitude
-                        ));
-                        map.setZoom(11);
+                        map.setCenter(placesLocation);
+                        map.setZoom(10);
                     }
                 });
             });
@@ -4681,10 +4871,88 @@ function getDefaultBusinessIcon() {
 }
 
 /**
- * Show info window for a marker with scrollable content
- * @param {Object} marker - Marker object
+ * Fetch incentives for chain-matched Google Places results
+ * @param {string} placeId - The Google Place ID
+ * @param {string} chainId - The chain ID
  */
-// Updated showInfoWindow function to properly display chain incentives
+function fetchChainIncentivesForInfoWindow(placeId, chainId) {
+    if (!placeId || !chainId) {
+        console.error("Missing place ID or chain ID for incentives in info window");
+        return;
+    }
+
+    console.log(`Fetching chain incentives for info window - Place ID: ${placeId}, Chain ID: ${chainId}`);
+
+    // Determine the base URL
+    const baseURL = getBaseURL();
+
+    // Build API URL to fetch chain incentives - using the chain_id as the business_id
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
+
+    console.log("Fetching chain incentives API URL:", apiURL);
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch chain incentives: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`Chain incentives data for info window (Place: ${placeId}, Chain: ${chainId}):`, data);
+
+            // Find the incentives div in the info window
+            const incentivesDiv = document.getElementById(`info-window-incentives-${placeId}`);
+
+            if (!incentivesDiv) {
+                console.error(`Could not find incentives div for place ${placeId}`);
+                return;
+            }
+
+            // Check if there are any incentives
+            if (!data.results || data.results.length === 0) {
+                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No chain incentives found</p>';
+                return;
+            }
+
+            // Build HTML for incentives
+            let incentivesHTML = '<p><strong>Chain Incentives:</strong></p><ul class="incentives-list">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ?
+                        ` (${incentive.other_description})` : '';
+
+                    incentivesHTML += `
+                        <li>
+                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}%
+                            <span class="chain-badge small">Chain-wide</span>
+                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                        </li>
+                    `;
+                }
+            });
+
+            incentivesHTML += '</ul>';
+
+            if (incentivesHTML === '<p><strong>Chain Incentives:</strong></p><ul class="incentives-list"></ul>') {
+                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No active chain incentives found</p>';
+            } else {
+                incentivesDiv.innerHTML = incentivesHTML;
+            }
+        })
+        .catch(error => {
+            console.error(`Error fetching chain incentives for info window: ${error}`);
+            const incentivesDiv = document.getElementById(`info-window-incentives-${placeId}`);
+
+            if (incentivesDiv) {
+                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading incentives</p>';
+            }
+        });
+}
+
+// Enhanced showInfoWindow function with better debugging
 function showInfoWindow(marker) {
     console.log("showInfoWindow called with marker:", marker);
 
@@ -4695,6 +4963,18 @@ function showInfoWindow(marker) {
 
     const business = marker.business;
     console.log("Business data for info window:", business);
+
+    // Check if this is a Google Places result not in our database
+    const isGooglePlace = business.isGooglePlace === true;
+
+    // Check if this is a chain location or matched with a chain
+    const isChainLocation = business.chain_id ? true : false;
+
+    console.log(`Info window for business: ${business.bname}`);
+    console.log(`  Is Google Place: ${isGooglePlace}`);
+    console.log(`  Is Chain Location: ${isChainLocation}`);
+    console.log(`  Chain ID: ${business.chain_id || 'None'}`);
+    console.log(`  Chain Name: ${business.chain_name || 'None'}`);
 
     // Format address
     const addressLine = business.address2
@@ -4713,12 +4993,6 @@ function showInfoWindow(marker) {
     const distanceDisplay = business.distance
         ? `<p><strong>Distance:</strong> ${(business.distance / 1609.34).toFixed(1)} miles</p>`
         : '';
-
-    // Check if this is a Google Places result not in our database
-    const isGooglePlace = business.isGooglePlace === true;
-
-    // Check if this is a chain location or matched with a chain
-    const isChainLocation = business.chain_id ? true : false;
 
     // Create chain badge if applicable
     let chainDisplay = '';
@@ -4828,10 +5102,12 @@ function showInfoWindow(marker) {
     if (isGooglePlace) {
         if (isChainLocation || business.chain_id) {
             // If it's a Google Place that matches a chain, load chain incentives
+            console.log(`Fetching chain incentives for Google Place: ${business._id}, Chain: ${business.chain_id}`);
             fetchChainIncentivesForInfoWindow(business._id, business.chain_id);
         }
     } else {
         // If it's in our database, load regular incentives
+        console.log(`Fetching incentives for database business: ${business._id}`);
         fetchBusinessIncentivesForInfoWindow(business._id);
     }
 
@@ -4850,84 +5126,6 @@ function showInfoWindow(marker) {
             }
         }
     });
-}
-
-/**
- * Fetch incentives specifically for Google Places results that match chains
- * @param {string} placeId - The Google Place ID
- * @param {string} chainId - The chain ID
- */
-function fetchChainIncentivesForInfoWindow(placeId, chainId) {
-    if (!placeId || !chainId) {
-        console.error("Missing place ID or chain ID for incentives");
-        return;
-    }
-
-    // Determine the base URL
-    const baseURL = getBaseURL();
-
-    // Build API URL to fetch chain incentives
-    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
-
-    console.log("Fetching chain incentives for info window:", apiURL);
-
-    fetch(apiURL)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to fetch chain incentives: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            // Find the incentives div in the info window
-            const incentivesDiv = document.getElementById(`info-window-incentives-${placeId}`);
-
-            if (!incentivesDiv) {
-                console.error(`Could not find incentives div for place ${placeId}`);
-                return;
-            }
-
-            // Check if there are any incentives
-            if (!data.results || data.results.length === 0) {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No chain incentives found</p>';
-                return;
-            }
-
-            // Build HTML for incentives
-            let incentivesHTML = '<p><strong>Chain Incentives:</strong></p><ul class="incentives-list">';
-
-            data.results.forEach(incentive => {
-                if (incentive.is_available) {
-                    const typeLabel = getIncentiveTypeLabel(incentive.type);
-                    const otherDescription = incentive.other_description ?
-                        ` (${incentive.other_description})` : '';
-
-                    incentivesHTML += `
-                        <li>
-                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}%
-                            <span class="chain-badge small">Chain-wide</span>
-                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
-                        </li>
-                    `;
-                }
-            });
-
-            incentivesHTML += '</ul>';
-
-            if (incentivesHTML === '<p><strong>Chain Incentives:</strong></p><ul class="incentives-list"></ul>') {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No active chain incentives found</p>';
-            } else {
-                incentivesDiv.innerHTML = incentivesHTML;
-            }
-        })
-        .catch(error => {
-            console.error(`Error fetching chain incentives for info window: ${error}`);
-            const incentivesDiv = document.getElementById(`info-window-incentives-${placeId}`);
-
-            if (incentivesDiv) {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading incentives</p>';
-            }
-        });
 }
 
 /**
