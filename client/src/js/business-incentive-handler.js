@@ -196,17 +196,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // helper function to safely populate all the fields
-    function populateField(fieldId, value) {
-        const field = document.getElementById(fieldId);
-        if (field) {
-            field.value = value || '';
-            console.log(`populated ${fieldId} with:`, value);
-        } else {
-            console.warn(`Field ${fieldId} not found.`);
-        }
-    }
-
     // now to safely populate the select fields
     function populateSelectField(fieldId, value) {
         const field = document.getElementById(fieldId);
@@ -812,4 +801,192 @@ document.addEventListener('DOMContentLoaded', function() {
         // Then also call our debug function to ensure the sections are displayed
         window.debugSelectBusiness(businessData);
     };
+});
+
+/**
+ * Override for selectBusinessForIncentive to handle chain businesses
+ * @param {Object} businessData - The selected business
+ */
+function enhancedSelectBusinessForIncentive(businessData) {
+    console.log("Enhanced selectBusinessForIncentive called with:", businessData);
+
+    // Check if this is a chain parent and user is not admin
+    const isChainParent = businessData.is_chain === true;
+    const isAdmin = checkIfUserIsAdmin();
+
+    if (isChainParent && !isAdmin) {
+        // Show warning and prevent selection
+        showChainParentWarning(businessData);
+        return;
+    }
+
+    // Store the selected business for later reference
+    window.selectedBusinessData = businessData;
+
+    // Show the business info section
+    const businessInfoSection = document.getElementById('business-info-section');
+    if (businessInfoSection) {
+        businessInfoSection.style.display = 'block';
+    } else {
+        console.error("business-info-section not found in the DOM");
+        return;
+    }
+
+    // Set the business ID in the hidden field
+    const businessIdField = document.getElementById('selected-business-id');
+    if (businessIdField) {
+        businessIdField.value = businessData._id || '';
+    }
+
+    // Populate business information fields
+    populateBusinessInfo(businessData);
+
+    // Add chain info banner if applicable
+    displayChainInfo(businessData);
+
+    // Show the incentive section
+    const incentiveSection = document.getElementById('incentive-section');
+    if (incentiveSection) {
+        incentiveSection.style.display = 'block';
+    }
+
+    // Scroll to the incentive section
+    if (incentiveSection) {
+        incentiveSection.scrollIntoView({behavior: 'smooth'});
+    }
+}
+
+/**
+ * Display chain information if applicable
+ * @param {Object} businessData - The business data
+ */
+function displayChainInfo(businessData) {
+    if (!businessData) return;
+
+    // Check if business is part of a chain
+    if (businessData.chain_id || businessData.is_chain) {
+        // Find or create a container for chain info
+        let chainInfoDiv = document.getElementById('chain-info-banner');
+
+        if (!chainInfoDiv) {
+            chainInfoDiv = document.createElement('div');
+            chainInfoDiv.id = 'chain-info-banner';
+            chainInfoDiv.className = 'chain-business-warning';
+
+            // Add to the beginning of the business info section
+            const businessInfoSection = document.getElementById('business-info-section');
+            if (businessInfoSection) {
+                businessInfoSection.insertBefore(chainInfoDiv, businessInfoSection.firstChild);
+            }
+        }
+
+        // Set content based on chain type
+        if (businessData.is_chain) {
+            // This is a chain parent
+            chainInfoDiv.innerHTML = `
+                <p><strong>${businessData.bname}</strong> is a national chain parent business.</p>
+                <p>Chain-wide incentives added here will apply to all locations nationwide.</p>
+                <p><strong>Note:</strong> Only administrators can add chain-wide incentives.</p>
+            `;
+        } else if (businessData.chain_id) {
+            // This is a chain location
+            chainInfoDiv.innerHTML = `
+                <p><strong>${businessData.bname}</strong> is part of the <strong>${businessData.chain_name || 'chain'}</strong> chain.</p>
+                <p>Incentives added here will only apply to this specific location.</p>
+                <p>Chain-wide incentives can only be managed by administrators.</p>
+            `;
+        }
+    }
+}
+
+/**
+ * Check if the current user is an admin
+ * @returns {boolean} True if user is admin
+ */
+function checkIfUserIsAdmin() {
+    try {
+        // First check if we have a global function
+        if (typeof window.chainHandler !== 'undefined' && typeof window.chainHandler.checkIfUserIsAdmin === 'function') {
+            return window.chainHandler.checkIfUserIsAdmin();
+        }
+
+        // Otherwise, implement it directly
+        const sessionData = localStorage.getItem('patriotThanksSession');
+        if (!sessionData) return false;
+
+        const session = JSON.parse(sessionData);
+
+        // Check if user has admin privileges
+        return (session.user && (session.user.isAdmin === true || session.user.level === 'Admin'));
+    } catch (error) {
+        console.error("Error checking admin status:", error);
+        return false;
+    }
+}
+
+/**
+ * Show warning for chain parent selection by non-admin users
+ * @param {Object} chainBusiness - The chain business data
+ */
+function showChainParentWarning(chainBusiness) {
+    // First check if we have a global function
+    if (typeof window.chainHandler !== 'undefined' && typeof window.chainHandler.showChainParentWarning === 'function') {
+        return window.chainHandler.showChainParentWarning(chainBusiness);
+    }
+
+    // Create an alert to show warning
+    alert(`${chainBusiness.bname} is a national chain business. Chain businesses can only be modified by administrators. Please select a specific location instead.`);
+}
+
+/**
+ * Add the necessary styles for chain display
+ */
+function addChainStyles() {
+    if (!document.getElementById('chain-incentive-styles')) {
+        const style = document.createElement('style');
+        style.id = 'chain-incentive-styles';
+        style.textContent = `
+            .chain-business-warning {
+                background-color: #FFF3CD;
+                color: #856404;
+                border: 1px solid #FFEEBA;
+                padding: 10px;
+                margin-bottom: 15px;
+                border-radius: 4px;
+            }
+            
+            .chain-badge {
+                background-color: #4285F4;
+                color: white;
+                border-radius: 4px;
+                padding: 3px 6px;
+                font-size: 12px;
+                display: inline-block;
+                margin-left: 5px;
+                font-weight: normal;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+/**
+ * Install the enhancement when the page loads
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("Installing business-incentive-handler enhancements");
+
+    // Add styles
+    addChainStyles();
+
+    // Override the selectBusinessForIncentive function if it exists
+    if (typeof window.selectBusinessForIncentive === 'function') {
+        console.log("Overriding selectBusinessForIncentive function");
+
+        // Save original function
+        window.originalSelectBusinessForIncentive = window.selectBusinessForIncentive;
+
+        // Replace with enhanced version
+        window.selectBusinessForIncentive = enhancedSelectBusinessForIncentive;
+    }
 });
