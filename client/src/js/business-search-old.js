@@ -493,41 +493,6 @@ function showPlaceInfoWindow(place, position) {
     infoWindow.open(map);
 }
 
-// Add this function to search for matching chains when showing Google Place results
-async function findMatchingChainForPlaceResult(placeName) {
-    try {
-        console.log("Checking if place matches a chain:", placeName);
-
-        // Get the base URL
-        const baseURL = getBaseURL();
-
-        // Search for chains with similar names
-        const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(placeName)}`);
-
-        // Check if the response is successful, but also handle 404 gracefully
-        if (response.status === 404) {
-            console.log("No matching chains found for", placeName);
-            return null;
-        }
-
-        if (!response.ok) {
-            console.error("Error searching for matching chains:", response.status);
-            return null;
-        }
-
-        const data = await response.json();
-
-        if (data.success && data.chain) {
-            console.log("Found matching chain for place:", data.chain.bname);
-            return data.chain;
-        }
-
-        return null;
-    } catch (error) {
-        console.error("Error finding matching chain:", error);
-        return null;
-    }
-}
 
 /**
  * Get the user's current location
@@ -561,6 +526,35 @@ function getUserLocation() {
         }
     });
 }
+
+// /**
+//  * Reverse geocode coordinates to get address
+//  * @param {Object} location - Object with lat and lng properties
+//  * @returns {Promise<string>} Formatted address
+//  */
+// async function reverseGeocode(location) {
+//     try {
+//         const geocoder = new google.maps.Geocoder();
+//
+//         return new Promise((resolve, reject) => {
+//             geocoder.geocode({ 'location': location }, (results, status) => {
+//                 if (status === google.maps.GeocoderStatus.OK) {
+//                     if (results[0]) {
+//                         console.log("Reverse geocoded address:", results[0].formatted_address);
+//                         resolve(results[0].formatted_address);
+//                     } else {
+//                         reject(new Error("No results found"));
+//                     }
+//                 } else {
+//                     reject(new Error(`Geocoder failed due to: ${status}`));
+//                 }
+//             });
+//         });
+//     } catch (error) {
+//         console.error("Error reverse geocoding:", error);
+//         return null;
+//     }
+// }
 
 /**
  * Add custom CSS to style the markers properly with explicit Font Awesome icon handling
@@ -880,7 +874,7 @@ function fetchBusinessIncentivesForInfoWindow(businessId) {
     // Determine the base URL
     const baseURL = getBaseURL();
 
-    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+    const apiURL = `${baseURL}/api/combined-api/incentives.js?business_id=${businessId}`;
 
     fetch(apiURL)
         .then(response => {
@@ -954,7 +948,7 @@ function fetchBusinessIncentives(businessId, chainId = null) {
     const baseURL = getBaseURL();
 
     // Build the API URL with optional chain_id
-    let apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+    let apiURL = `${baseURL}/api/combined-api/incentives.js?business_id=${businessId}`;
     if (chainId) {
         apiURL += `&chain_id=${chainId}`;
     }
@@ -1033,7 +1027,7 @@ function fetchChainIncentivesForPlacesResult(placeId, chainId) {
     const baseURL = getBaseURL();
 
     // Build the API URL to fetch chain incentives for Places result
-    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${placeId}&chain_id=${chainId}`;
+    const apiURL = `${baseURL}/api/combined-api/incentives.js?business_id=${placeId}&chain_id=${chainId}`;
 
     console.log("Fetching chain incentives for Places result: ", apiURL);
 
@@ -1159,11 +1153,10 @@ function displaySearchResults(businesses) {
             // Convert the business type code to a readable label
             const businessType = getBusinessTypeLabel(business.type);
 
-            // Check if this is a chain or from Places API
+            // Check if this is a chain location
             const isChainLocation = business.chain_id ? true : false;
             const isParentChain = business.is_chain ? true : false;
             const isFromPlacesApi = business.is_from_places_api ? true : false;
-            const isGooglePlace = business.isGooglePlace ? true : false;
 
             // Create appropriate badge for chain businesses
             let chainBadge = '';
@@ -1171,7 +1164,7 @@ function displaySearchResults(businesses) {
                 chainBadge = '<span class="chain-badge">National Chain</span>';
             } else if (isChainLocation) {
                 chainBadge = '<span class="chain-badge">Chain Location</span>';
-            } else if (isFromPlacesApi && business.chain_name) {
+            } else if (isFromPlacesApi) {
                 chainBadge = `<span class="chain-badge">Potential ${business.chain_name || 'Chain'} Location</span>`;
             }
 
@@ -1179,51 +1172,38 @@ function displaySearchResults(businesses) {
             let businessIdForIncentives = business._id;
             let chainIdForIncentives = business.chain_id || null;
 
-            // Create the appropriate button based on business type
-            let actionButton;
-
-            if (isParentChain) {
-                // For chain parent businesses, only allow admin access
-                const isAdmin = checkIfUserIsAdmin();
-
-                if (isAdmin) {
-                    actionButton = `<button class="admin-action-btn" onclick="handleChainBusinessAction('${business._id}', true)">Admin: Edit Chain</button>`;
-                } else {
-                    actionButton = `<button class="view-chain-btn" onclick="viewChainDetails('${business._id}')">View Chain Info</button>`;
-                }
-            } else if (isGooglePlace || isFromPlacesApi) {
-                // For Google Places results, offer to add to database
-                actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.place_data?.place_id || business.placeId || ''}', '${chainIdForIncentives || ''}')">Add to Database</button>`;
-            } else {
-                // For database businesses, show map view button
-                actionButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
-            }
-
             // Create a new row
             const row = document.createElement('tr');
 
+            // Create the appropriate button based on business type
+            let actionButton;
+            if (isFromPlacesApi) {
+                // For Google Places results, offer to add to database
+                actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.place_data?.place_id || ''}', '${chainIdForIncentives || ''}')">Add to Database</button>`;
+            } else {
+                // For database businesses, show map view
+                actionButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
+            }
+
             // First populate with basic business info
             row.innerHTML = `
-              <th class="left_table" data-business-id="${business._id}">
-                ${business.bname} ${chainBadge}
-              </th>
-              <th class="left_table">${addressLine}</th>
-              <th class="left_table">${businessType}</th>
-              <th class="right_table" id="incentives-for-${business._id}">
-                ${isFromPlacesApi ? 'Loading chain incentives...' : (isGooglePlace ? 'Not in database yet' : 'Loading incentives...')}
-              </th>
-              <th class="center_table">${actionButton}</th>
-            `;
+        <th class="left_table" data-business-id="${business._id}">
+          ${business.bname} ${chainBadge}
+        </th>
+        <th class="left_table">${addressLine}</th>
+        <th class="left_table">${businessType}</th>
+        <th class="right_table" id="incentives-for-${business._id}">${isFromPlacesApi ? 'Not in database yet' : 'Loading incentives...'}</th>
+        <th class="center_table">${actionButton}</th>
+      `;
 
             tableBody.appendChild(row);
 
-            // Handle incentives lookup based on business type
-            if (isFromPlacesApi && chainIdForIncentives) {
+            // Fetch incentives with chain support, except for Places API results
+            if (!isFromPlacesApi) {
+                fetchBusinessIncentives(business._id, chainIdForIncentives);
+            } else if (chainIdForIncentives) {
                 // For Places API results with chain, get chain incentives
                 fetchChainIncentivesForPlacesResult(business._id, chainIdForIncentives);
-            } else if (!isGooglePlace) {
-                // For database businesses, fetch regular incentives
-                fetchBusinessIncentives(business._id, chainIdForIncentives);
             }
         });
 
@@ -1296,32 +1276,6 @@ function displayBusinessSearchResults(businesses, resultsContainer) {
             if (!business) return; // again, skip null or undefined
 
             const row = document.createElement('tr');
-            // Check if this is a chain business
-            const isChainLocation = business.chain_id ? true : false;
-            const isParentChain = business.is_chain ? true : false;
-            // Create chain badge if needed
-            let chainBadge = '';
-            if (isParentChain) {
-                chainBadge = '<span class="chain-badge">National Chain</span>';
-            } else if (isChainLocation) {
-                chainBadge = '<span class="chain-badge">Chain Location</span>';
-            }
-
-            // Create select button based on if this is a chain parent
-            let selectButton;
-            if (isParentChain) {
-                // Special handling for chain parent - only allow admins
-                const isAdmin = checkIfUserIsAdmin(); // You'll need to implement this function
-
-                if (isAdmin) {
-                    selectButton = `<button class="select-business admin-only" data-business-id="${business._id}">Admin: Edit Chain</button>`;
-                } else {
-                    selectButton = `<button class="view-chain-button" data-business-id="${business._id}">View Chain Info</button>`;
-                }
-            } else {
-                // Regular business or chain location
-                selectButton = `<button class="select-business" data-business-id="${business._id}">Select</button>`;
-            }
 
             row.innerHTML = `
         <td data-title="${headers.name}">${business.bname}</td>
@@ -1338,7 +1292,34 @@ function displayBusinessSearchResults(businesses, resultsContainer) {
         resultsContainer.appendChild(table);
 
         // Add the responsive table CSS to the page if it doesn't exist yet
-        setupBusinessSelectionButtons(resultsContainer, businesses);
+        addResponsiveTableStyles();
+
+        // add the event listeners for the "select" buttons
+        const selectButtons = document.querySelectorAll('.select-business');
+        selectButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const businessId = this.getAttribute('data-business-id');
+                if (!businessId) {
+                    console.error("No business ID found on button");
+                    return;
+                }
+
+                // Now find the business object based on that ID
+                const selectedBusiness = businesses.find(bus => bus._id === businessId);
+                if (!selectedBusiness) {
+                    console.error("Could not find business with ID: " + businessId);
+                    return;
+                }
+
+                console.log("Selected business: ", selectedBusiness);
+
+                const currentPagePath = window.location.pathname;
+                console.log("Current page: ", currentPagePath);
+
+                // Handle selection based on current page
+                handleBusinessSelectionByPage(currentPagePath, selectedBusiness);
+            });
+        });
 
         // have the browser scroll to the results
         resultsContainer.scrollIntoView({behavior: 'smooth'});
@@ -1353,132 +1334,6 @@ function displayBusinessSearchResults(businesses, resultsContainer) {
         } else {
             alert("Error displaying search results: " + error.message);
         }
-    }
-}
-
-/**
- * Set up business selection buttons with proper handling for chain parents
- */
-function setupBusinessSelectionButtons(container, businesses) {
-    // Handle regular select buttons
-    const selectButtons = container.querySelectorAll('.select-business');
-    selectButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const businessId = this.getAttribute('data-business-id');
-            if (!businessId) {
-                console.error("No business ID found on button");
-                return;
-            }
-
-            // Find the business object
-            const selectedBusiness = businesses.find(bus => bus._id === businessId);
-            if (!selectedBusiness) {
-                console.error("Could not find business with ID: " + businessId);
-                return;
-            }
-
-            console.log("Selected business: ", selectedBusiness);
-
-            // Handle based on current page
-            const currentPagePath = window.location.pathname;
-            handleBusinessSelectionByPage(currentPagePath, selectedBusiness);
-        });
-    });
-
-    // Handle view chain buttons (for non-admin users on chain parents)
-    const viewChainButtons = container.querySelectorAll('.view-chain-button');
-    viewChainButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const businessId = this.getAttribute('data-business-id');
-            if (!businessId) return;
-
-            // Find the business object
-            const chainBusiness = businesses.find(bus => bus._id === businessId);
-            if (!chainBusiness) return;
-
-            // Show information about the chain
-            showChainInfoDialog(chainBusiness);
-        });
-    });
-}
-
-/**
- * Check if the current user is an admin
- */
-function checkIfUserIsAdmin() {
-    try {
-        // Get session data from localStorage
-        const sessionData = localStorage.getItem('patriotThanksSession');
-        if (!sessionData) return false;
-
-        const session = JSON.parse(sessionData);
-
-        // Check if user has admin privileges
-        return (session.user && (session.user.isAdmin === true || session.user.level === 'Admin'));
-    } catch (error) {
-        console.error("Error checking admin status:", error);
-        return false;
-    }
-}
-
-function addChainBadgeStyles() {
-    if (!document.getElementById('chain-badge-css')) {
-        const style = document.createElement('style');
-        style.id = 'chain-badge-css';
-        style.textContent = `
-            .chain-badge {
-                display: inline-block;
-                background-color: #4285F4;
-                color: white;
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 0.8em;
-                margin-left: 5px;
-                font-weight: normal;
-            }
-
-            .chain-badge.small {
-                font-size: 0.7em;
-                padding: 1px 4px;
-            }
-            
-            .admin-action-btn {
-                background-color: #673AB7;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 4px;
-                cursor: pointer;
-            }
-            
-            .view-chain-btn {
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 4px;
-                cursor: pointer;
-            }
-            
-            .add-to-db-btn {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 4px;
-                cursor: pointer;
-            }
-            
-            .view-map-btn {
-                background-color: #FF9800;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 4px;
-                cursor: pointer;
-            }
-        `;
-        document.head.appendChild(style);
     }
 }
 
@@ -1761,6 +1616,28 @@ function getBaseURL() {
         : window.location.origin;
 }
 
+// /**
+//  * Load Google Maps script with API key
+//  */
+// function loadGoogleMapsScript() {
+//     // Get API key
+//     const apiKey = 'AIzaSyCHKhYZwQR37M_0QctXUQe6VFRFrlhaYj8';
+//     const mapId = CONFIG.mapId;
+//
+//     console.log("Loading Google Maps with Map ID:", mapId);
+//
+//     // Create and insert the Google Maps script with all recommended parameters
+//     const script = document.createElement('script');
+//     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMap&loading=async`;
+//     script.async = true;
+//     script.defer = true;
+//     script.onerror = function() {
+//         console.error('Google Maps API failed to load. Check your API key.');
+//         alert('Error loading Google Maps. Please try again later.');
+//     };
+//     document.head.appendChild(script);
+// }
+
 /**
  * Initialize business search functionality
  */
@@ -1932,6 +1809,339 @@ async function retrieveFromMongoDB(formData) {
         // ...your existing error handling code
     }
 }
+
+// /**
+//  * Search Google Places when no results found in our database
+//  * Using the completely new Places API (v1) to avoid deprecation warnings
+//  * @param {Object} formData - Form data with search criteria
+//  */
+// async function searchGooglePlaces(formData) {
+//     try {
+//         console.log("Searching Google Places for:", formData);
+//
+//         // Make map visible
+//         const mapContainer = document.getElementById('map');
+//         if (mapContainer) {
+//             mapContainer.style.display = 'block';
+//             mapContainer.style.height = '400px';
+//         }
+//
+//         // Clear existing markers
+//         clearMarkers();
+//
+//         // Build search query
+//         let searchQuery = '';
+//         if (formData.businessName) searchQuery += formData.businessName;
+//         if (formData.address) searchQuery += ' ' + formData.address;
+//         searchQuery = searchQuery.trim();
+//
+//         // Show loading indicator
+//         const loadingDiv = document.createElement('div');
+//         loadingDiv.id = 'map-loading';
+//         loadingDiv.innerHTML = 'Searching for businesses...';
+//         loadingDiv.style.position = 'absolute';
+//         loadingDiv.style.top = '50%';
+//         loadingDiv.style.left = '50%';
+//         loadingDiv.style.transform = 'translate(-50%, -50%)';
+//         loadingDiv.style.backgroundColor = 'white';
+//         loadingDiv.style.padding = '10px';
+//         loadingDiv.style.borderRadius = '5px';
+//         loadingDiv.style.zIndex = '1000';
+//         mapContainer.appendChild(loadingDiv);
+//
+//         // Geocode the address or use the current location
+//         let searchLocation;
+//
+//         // Check if user wants to use their location
+//         const useMyLocation = document.getElementById('use-my-location') &&
+//             document.getElementById('use-my-location').checked;
+//
+//         if (useMyLocation) {
+//             try {
+//                 const userLocation = await getUserLocation();
+//                 searchLocation = {
+//                     latitude: userLocation.lat,
+//                     longitude: userLocation.lng
+//                 };
+//                 console.log("Using user's current location for search:", searchLocation);
+//             } catch (error) {
+//                 console.error("Error getting user location:", error);
+//                 // Fall back to geocoding the address
+//                 let useLocationFailed = true;
+//             }
+//         }
+//
+//         if (!useMyLocation || typeof useLocationFailed !== 'undefined') {
+//             try {
+//                 // Geocode address using Geocoding API directly
+//                 const geocodeApiUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(formData.address || searchQuery)}&key=${getGoogleMapsApiKey()}`;
+//
+//                 const response = await fetch(geocodeApiUrl);
+//                 const geocodeData = await response.json();
+//
+//                 if (geocodeData.status === 'OK' && geocodeData.results && geocodeData.results.length > 0) {
+//                     const location = geocodeData.results[0].geometry.location;
+//                     searchLocation = {
+//                         latitude: location.lat,
+//                         longitude: location.lng
+//                     };
+//
+//                     // Create a Google Maps LatLng object for map operations
+//                     const googleMapsLocation = new google.maps.LatLng(location.lat, location.lng);
+//
+//                     // Create new bounds
+//                     bounds = new google.maps.LatLngBounds();
+//                     bounds.extend(googleMapsLocation);
+//
+//                     console.log("Geocoded search center:", searchLocation);
+//                 } else {
+//                     throw new Error(`Geocoding failed: ${geocodeData.status}`);
+//                 }
+//             } catch (error) {
+//                 console.error("Error geocoding address:", error);
+//
+//                 // Fall back to default US center
+//                 searchLocation = {
+//                     latitude: CONFIG.defaultCenter.lat,
+//                     longitude: CONFIG.defaultCenter.lng
+//                 };
+//
+//                 // Create a Google Maps LatLng object for map operations
+//                 const googleMapsLocation = new google.maps.LatLng(
+//                     CONFIG.defaultCenter.lat,
+//                     CONFIG.defaultCenter.lng
+//                 );
+//
+//                 // Create new bounds
+//                 bounds = new google.maps.LatLngBounds();
+//                 bounds.extend(googleMapsLocation);
+//
+//                 console.log("Using default US center for search");
+//             }
+//         }
+//
+//         try {
+//             // Search radius - 80km is about 50 miles
+//             const searchRadius = 50000;
+//
+//             // Use the modern Places API - Text Search
+//             const placeResults = await searchPlacesWithTextSearch(searchQuery, searchLocation, searchRadius);
+//
+//             // Remove loading indicator
+//             const loadingElement = document.getElementById('map-loading');
+//             if (loadingElement) loadingElement.remove();
+//
+//             if (!placeResults || placeResults.length === 0) {
+//                 console.log("No places found");
+//                 // Show no results message
+//                 const searchTableContainer = document.getElementById('search_table');
+//                 if (searchTableContainer) {
+//                     const tableBody = searchTableContainer.querySelector('tbody');
+//                     if (tableBody) {
+//                         tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria within 50 miles.</td></tr>';
+//                     }
+//                     searchTableContainer.style.display = 'block';
+//                 }
+//                 return;
+//             }
+//
+//             console.log("Found places:", placeResults.length);
+//
+//             // Process places into business objects and add markers
+//             const businessResults = processPlaceResults(placeResults, searchLocation);
+//
+//             if (businessResults.length === 0) {
+//                 // Show no results message
+//                 const searchTableContainer = document.getElementById('search_table');
+//                 if (searchTableContainer) {
+//                     const tableBody = searchTableContainer.querySelector('tbody');
+//                     if (tableBody) {
+//                         tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria within 50 miles.</td></tr>';
+//                     }
+//                     searchTableContainer.style.display = 'block';
+//                 }
+//                 return;
+//             }
+//
+//             // Sort by distance
+//             businessResults.sort((a, b) => a.distance - b.distance);
+//
+//             // Display results
+//             displaySearchResults(businessResults);
+//
+//             // Fit map to bounds
+//             if (bounds && !bounds.isEmpty()) {
+//                 map.fitBounds(bounds);
+//
+//                 // Adjust zoom level
+//                 setTimeout(() => {
+//                     if (businessResults.length <= 2) {
+//                         const currentZoom = map.getZoom();
+//                         if (currentZoom > 14) {
+//                             map.setZoom(14);
+//                         }
+//                     } else if (businessResults.length > 10) {
+//                         const currentZoom = map.getZoom();
+//                         if (currentZoom < 10) {
+//                             map.setZoom(10);
+//                         }
+//                     }
+//                 }, 100);
+//             } else {
+//                 // If bounds are empty, center on search location
+//                 map.setCenter(new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude));
+//                 map.setZoom(11);
+//             }
+//
+//         } catch (error) {
+//             console.error("Error searching places:", error);
+//
+//             // Remove loading indicator
+//             const loadingElement = document.getElementById('map-loading');
+//             if (loadingElement) loadingElement.remove();
+//
+//             // Show error in search results
+//             const searchTableContainer = document.getElementById('search_table');
+//             if (searchTableContainer) {
+//                 const tableBody = searchTableContainer.querySelector('tbody');
+//                 if (tableBody) {
+//                     tableBody.innerHTML = `<tr><td colspan="5" class="text-center">Error searching for businesses: ${error.message}</td></tr>`;
+//                 }
+//                 searchTableContainer.style.display = 'block';
+//             }
+//
+//             // Center map on search location if possible
+//             if (searchLocation) {
+//                 map.setCenter(new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude));
+//                 map.setZoom(11);
+//             }
+//         }
+//     } catch (error) {
+//         console.error("Error in searchGooglePlaces:", error);
+//
+//         // Remove loading indicator if it exists
+//         const loadingElement = document.getElementById('map-loading');
+//         if (loadingElement) loadingElement.remove();
+//
+//         // Show error message
+//         const searchTableContainer = document.getElementById('search_table');
+//         if (searchTableContainer) {
+//             searchTableContainer.style.display = 'block';
+//             const tableBody = searchTableContainer.querySelector('tbody');
+//             if (tableBody) {
+//                 tableBody.innerHTML = `<tr><td colspan="5" class="text-center">Error searching for businesses: ${error.message}</td></tr>`;
+//             }
+//         }
+//     }
+// }
+
+// Add these functions to your business-search.js file to use the server-side endpoints
+
+// /**
+//  * Geocode an address using the server-side endpoint
+//  * @param {string} address - Address to geocode
+//  * @returns {Promise<{lat: number, lng: number} | null>} Location coordinates or null
+//  */
+// async function geocodeAddressServerSide(address) {
+//     try {
+//         console.log(`Geocoding address via server: ${address}`);
+//
+//         if (!address) {
+//             console.error("No address provided for geocoding");
+//             return null;
+//         }
+//
+//         // Get the base URL
+//         const baseURL = getBaseURL();
+//         const url = `${baseURL}/api/geocode?address=${encodeURIComponent(address)}`;
+//
+//         console.log("Calling geocode API:", url);
+//         const response = await fetch(url);
+//
+//         if (!response.ok) {
+//             const errorText = await response.text();
+//             console.error(`Geocoding failed with status ${response.status}:`, errorText);
+//             throw new Error(`Geocoding failed: ${response.status}`);
+//         }
+//
+//         const data = await response.json();
+//         if (!data.success || !data.location) {
+//             console.error("Geocoding returned no results:", data);
+//             throw new Error('Geocoding returned no results');
+//         }
+//
+//         console.log(`Geocoding result:`, data.location);
+//         return data.location;
+//     } catch (error) {
+//         console.error("Error geocoding address:", error);
+//
+//         // Fallback to client-side geocoding
+//         try {
+//             console.log("Falling back to client-side geocoding");
+//             const geocoder = new google.maps.Geocoder();
+//             return new Promise((resolve, reject) => {
+//                 geocoder.geocode({'address': address}, function(results, status) {
+//                     if (status === google.maps.GeocoderStatus.OK && results[0]) {
+//                         const location = results[0].geometry.location;
+//                         const result = {
+//                             lat: location.lat(),
+//                             lng: location.lng()
+//                         };
+//                         console.log("Client-side geocoding result:", result);
+//                         resolve(result);
+//                     } else {
+//                         console.error("Client-side geocoding failed:", status);
+//                         reject(new Error(`Client-side geocoding failed: ${status}`));
+//                     }
+//                 });
+//             });
+//         } catch (fallbackError) {
+//             console.error("Client-side geocoding fallback also failed:", fallbackError);
+//             return null;
+//         }
+//     }
+// }
+//
+// /**
+//  * Search for places via the server-side endpoint
+//  * @param {string} query - Search query
+//  * @param {Object} location - Location with latitude and longitude
+//  * @param {number} radius - Search radius in meters
+//  * @returns {Promise<Array>} Places search results
+//  */
+// async function searchPlacesServerSide(query, location, radius = 50000) {
+//     try {
+//         console.log(`Searching places via server: ${query}`);
+//
+//         // Get the base URL
+//         const baseURL = getBaseURL();
+//
+//         // Build the URL with query parameters
+//         let url = `${baseURL}/api/places/search?query=${encodeURIComponent(query)}`;
+//
+//         // Add location params if available
+//         if (location && location.latitude && location.longitude) {
+//             url += `&latitude=${location.latitude}&longitude=${location.longitude}&radius=${radius}`;
+//         }
+//
+//         const response = await fetch(url);
+//         if (!response.ok) {
+//             const errorData = await response.json();
+//             throw new Error(errorData.message || `Places search failed: ${response.status}`);
+//         }
+//
+//         const data = await response.json();
+//         if (!data.success) {
+//             throw new Error('Places search returned an error');
+//         }
+//
+//         console.log(`Found ${data.results.length} places`);
+//         return data.results;
+//     } catch (error) {
+//         console.error("Error searching places:", error);
+//         return [];
+//     }
+// }
 
 // Update the existing geocodeAddressServerSide function to always use the client-side fallback
 async function geocodeAddressServerSide(address) {
@@ -2181,36 +2391,8 @@ async function searchPlacesClientSide(query, location, radius = 50000) {
  * @param {number} total - Total number of businesses
  */
 function geocodeBusinessAddress(business, index, total) {
-    // Skip if business data is invalid or address is missing
-    if (!business) {
-        console.error("Invalid business data for geocoding");
-        return;
-    }
-
-    // Ensure business has complete address data
-    if (!business.address1 || !business.city || !business.state || !business.zip) {
-        console.error("Incomplete address data for geocoding business:", business.bname || "Unknown");
-
-        // If it's a chain business, they might not have an address - use default coordinates
-        if (business.is_chain) {
-            console.log("Chain business without address, using default center");
-
-            // Use default US center coordinates
-            business.lat = CONFIG.defaultCenter.lat;
-            business.lng = CONFIG.defaultCenter.lng;
-
-            // Create a position object
-            const position = new google.maps.LatLng(business.lat, business.lng);
-
-            // Add marker
-            addAdvancedMarker(business, position);
-
-            // Extend bounds
-            bounds.extend(position);
-
-            return;
-        }
-
+    if (!business || !business.address1) {
+        console.error("Invalid business data for geocoding", business);
         return;
     }
 
@@ -2713,225 +2895,7 @@ function showErrorMessage(message, container) {
     }
 }
 
-/**
- * Handle actions for chain businesses
- * @param {string} businessId - Business ID
- * @param {boolean} isAdmin - Whether the current user is an admin
- */
-window.handleChainBusinessAction = function(businessId, isAdmin) {
-    if (isAdmin) {
-        // For admins, redirect to the chain management page
-        window.location.href = `manage-chains.html?chain_id=${businessId}`;
-    } else {
-        // For regular users, show chain info
-        viewChainDetails(businessId);
-    }
-};
 
-/**
- * View chain details for regular users
- * @param {string} chainId - Chain business ID
- */
-window.viewChainDetails = function(chainId) {
-    // Fetch chain details
-    const baseURL = getBaseURL();
-
-    fetch(`${baseURL}/api/business.js?operation=get&id=${chainId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to fetch chain details: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!data.result) {
-                throw new Error('Chain not found');
-            }
-
-            // Show chain info dialog
-            showChainInfoDialog(data.result);
-        })
-        .catch(error => {
-            console.error("Error fetching chain details:", error);
-            alert(`Error: ${error.message}`);
-        });
-};
-
-/**
- * Show a dialog with chain information
- * @param {Object} chainBusiness - Chain business object
- */
-function showChainInfoDialog(chainBusiness) {
-    try {
-        console.log("Showing chain info dialog for:", chainBusiness.bname);
-
-        // Create modal content
-        const modalContent = `
-            <div class="modal fade" id="chainInfoModal" tabindex="-1" role="dialog" aria-labelledby="chainInfoModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-lg" role="document">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="chainInfoModalLabel">Chain Information: ${chainBusiness.bname}</h5>
-                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="alert alert-info">
-                                <p><strong>${chainBusiness.bname}</strong> is a national chain business in the Patriot Thanks database.</p>
-                                <p>Chain businesses can only be modified by administrators, but chain incentives apply to all locations nationwide.</p>
-                            </div>
-                            <div class="business-details">
-                                <p><strong>Business Type:</strong> ${getBusinessTypeLabel(chainBusiness.type)}</p>
-                                <p>Chain incentives will be displayed for businesses that match this chain, even if they are not in the database.</p>
-                            </div>
-                            <div class="chain-incentives">
-                                <h4>Chain Incentives</h4>
-                                <div class="loading-incentives">Loading chain incentives...</div>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Remove existing modal if present
-        const existingModal = document.getElementById('chainInfoModal');
-        if (existingModal) {
-            existingModal.remove();
-        }
-
-        // Append the modal to the body
-        const modalContainer = document.createElement('div');
-        modalContainer.innerHTML = modalContent;
-        document.body.appendChild(modalContainer.firstChild);
-
-        // Get the modal element
-        const modalElement = document.getElementById('chainInfoModal');
-
-        // Check if Bootstrap 5 is being used
-        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-            // Bootstrap 5
-            const modal = new bootstrap.Modal(modalElement);
-            modal.show();
-        } else {
-            // Bootstrap 4 or jQuery fallback
-            try {
-                if (typeof $ !== 'undefined' && $.fn.modal) {
-                    $(modalElement).modal('show');
-                } else {
-                    // Manual fallback if jQuery/Bootstrap not available
-                    modalElement.style.display = 'block';
-                    modalElement.classList.add('show');
-
-                    // Add backdrop manually
-                    const backdrop = document.createElement('div');
-                    backdrop.className = 'modal-backdrop show';
-                    document.body.appendChild(backdrop);
-
-                    // Add close functionality to buttons
-                    const closeButtons = modalElement.querySelectorAll('[data-bs-dismiss="modal"]');
-                    closeButtons.forEach(button => {
-                        button.addEventListener('click', function() {
-                            modalElement.style.display = 'none';
-                            modalElement.classList.remove('show');
-                            document.body.removeChild(backdrop);
-                        });
-                    });
-                }
-            } catch (error) {
-                console.error("Error showing modal with jQuery fallback:", error);
-                alert(`Chain Information: ${chainBusiness.bname} is a national chain business that can only be modified by administrators.`);
-            }
-        }
-
-        // Fetch and display chain incentives
-        fetchChainIncentives(chainBusiness._id);
-    } catch (error) {
-        console.error("Error in showChainInfoDialog:", error);
-        // Fallback to alert
-        alert(`Chain Information: ${chainBusiness.bname} is a national chain business that can only be modified by administrators.`);
-    }
-}
-
-/**
- * Fetch incentives for a chain and display them in the modal
- * @param {string} chainId - Chain business ID
- */
-function fetchChainIncentives(chainId) {
-    // Get the base URL
-    const baseURL = getBaseURL();
-
-    // Use the API endpoint for incentives
-    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
-
-    fetch(apiURL)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to fetch incentives: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            // Get the container
-            const container = document.querySelector('.chain-incentives');
-            if (!container) return;
-
-            // Remove loading indicator
-            const loadingElement = container.querySelector('.loading-incentives');
-            if (loadingElement) {
-                loadingElement.remove();
-            }
-
-            // If there are no incentives
-            if (!data.results || data.results.length === 0) {
-                container.innerHTML += '<div class="alert alert-warning">No chain-wide incentives found.</div>';
-                return;
-            }
-
-            // Build HTML for the incentives
-            let incentivesHTML = '<div class="list-group">';
-
-            data.results.forEach(incentive => {
-                if (incentive.is_available) {
-                    const typeLabel = getIncentiveTypeLabel(incentive.type);
-                    const otherDescription = incentive.other_description ?
-                        ` (${incentive.other_description})` : '';
-
-                    // Format amount based on discount_type
-                    let amountDisplay = incentive.amount + '%';
-                    if (incentive.discount_type === 'dollar') {
-                        amountDisplay = '$' + incentive.amount.toFixed(2);
-                    }
-
-                    incentivesHTML += `
-                        <div class="list-group-item">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h5 class="mb-1">${typeLabel}${otherDescription}</h5>
-                                <span class="badge bg-primary">${amountDisplay}</span>
-                            </div>
-                            <p class="mb-1">${incentive.information || 'No additional information available.'}</p>
-                        </div>
-                    `;
-                }
-            });
-
-            incentivesHTML += '</div>';
-
-            // Append to the container
-            container.innerHTML += incentivesHTML;
-        })
-        .catch(error => {
-            console.error(`Error fetching chain incentives:`, error);
-            const container = document.querySelector('.chain-incentives');
-            if (container) {
-                container.innerHTML += `<div class="alert alert-danger">Error loading chain incentives: ${error.message}</div>`;
-            }
-        });
-}
 
 /**
  * Process place results into business objects and add markers
@@ -2940,6 +2904,8 @@ function fetchChainIncentives(chainId) {
  * @returns {Array} Array of business objects
  */
 function processPlaceResults(places, searchLocation) {
+    const businessResults = [];
+
     // Create the search location as LatLng for distance calculations
     const searchLatLng = new google.maps.LatLng(searchLocation.latitude, searchLocation.longitude);
 
@@ -2949,14 +2915,7 @@ function processPlaceResults(places, searchLocation) {
     // Extend bounds with the search center location
     bounds.extend(searchLatLng);
 
-    // Process each place and add markers immediately
-    const businessResults = [];
-
-    // Keep track of chain matching promises
-    const chainMatchPromises = [];
-
-    // First process all places and create basic business objects
-    places.forEach((place, index) => {
+    places.forEach(place => {
         try {
             // Skip if no location
             if (!place.location) return;
@@ -3066,58 +3025,274 @@ function processPlaceResults(places, searchLocation) {
 
             // Add to results
             businessResults.push(business);
-
-            // Start chain matching for this business
-            const placeName = place.displayName || place.name;
-            const chainMatchPromise = findMatchingChainForPlaceResult(placeName)
-                .then(matchingChain => {
-                    if (matchingChain) {
-                        console.log(`Found matching chain for ${placeName}:`, matchingChain.bname);
-                        // Update the business object with chain info
-                        business.chain_id = matchingChain._id;
-                        business.chain_name = matchingChain.bname;
-                        business.is_from_places_api = true;
-                    }
-                    return business;
-                })
-                .catch(error => {
-                    console.error(`Error matching chain for ${placeName}:`, error);
-                    return business;
-                });
-
-            chainMatchPromises.push(chainMatchPromise);
         } catch (error) {
             console.error("Error processing place:", error);
             // Skip this place and continue with others
         }
     });
 
-    // Wait for all chain matching to complete, then display results
-    Promise.all(chainMatchPromises)
-        .then(() => {
-            // Sort by distance
-            businessResults.sort((a, b) => a.distance - b.distance);
-
-            // Now display the results with updated chain info
-            displaySearchResults(businessResults);
-
-            // Fit bounds if needed
-            if (!bounds.isEmpty()) {
-                try {
-                    map.fitBounds(bounds);
-                } catch (error) {
-                    console.error("Error fitting bounds:", error);
-                }
-            }
-        })
-        .catch(error => {
-            console.error("Error during chain matching:", error);
-            // Still display results even if chain matching had issues
-            displaySearchResults(businessResults);
-        });
-
     return businessResults;
 }
+
+
+// /**
+//  * Get the Google Maps API key from the app configuration
+//  * @returns {string} API key
+//  */
+// function getGoogleMapsApiKey() {
+//     // Try to get API key from window.appConfig
+//     if (window.appConfig && window.appConfig.googleMapsApiKey) {
+//         return window.appConfig.googleMapsApiKey;
+//     }
+//
+//     // As a fallback, look for a meta tag with the API key
+//     const metaTag = document.querySelector('meta[name="google-maps-api-key"]');
+//     if (metaTag) {
+//         return metaTag.content;
+//     }
+//
+//     // Another option - check if there's a global API key variable
+//     if (typeof GOOGLE_MAPS_API_KEY !== 'undefined') {
+//         return GOOGLE_MAPS_API_KEY;
+//     }
+//
+//     // Final fallback - look for an API key in any script tags
+//     const scriptTags = document.querySelectorAll('script[src*="maps.googleapis.com"]');
+//     for (const script of scriptTags) {
+//         const src = script.getAttribute('src');
+//         const keyMatch = src.match(/[?&]key=([^&]+)/);
+//         if (keyMatch && keyMatch[1]) {
+//             return keyMatch[1];
+//         }
+//     }
+//
+//     console.error("Could not find Google Maps API key");
+//     return '';
+// }
+
+// /**
+//  * Perform a custom place search using the Geocoding API
+//  * This avoids the need for PlacesService
+//  * @param {string} query - Search query
+//  * @param {Object} location - Center location
+//  * @param {number} radius - Search radius in meters
+//  * @returns {Promise<Array>} Array of place IDs
+//  */
+// async function performCustomPlaceSearch(query, location, radius) {
+//     try {
+//         // For simplicity, use a predefined set of common business types
+//         const commonBusinessTypes = [
+//             'store', 'restaurant', 'cafe', 'bar', 'supermarket',
+//             'pharmacy', 'gas_station', 'department_store', 'hardware_store',
+//             'shopping_mall', 'clothing_store', 'home_goods_store'
+//         ];
+//
+//         // Build a geocoding URL with business type bias
+//         // This is a workaround to get businesses without using PlacesService
+//         const geocoder = new google.maps.Geocoder();
+//
+//         // Combine query with location
+//         const fullQuery = query ?
+//             `${query} near ${location.lat()},${location.lng()}` :
+//             `businesses near ${location.lat()},${location.lng()}`;
+//
+//         console.log("Geocoding with query:", fullQuery);
+//
+//         const results = await new Promise((resolve, reject) => {
+//             geocoder.geocode({
+//                 'address': fullQuery,
+//                 'location': location,
+//                 'radius': radius
+//             }, function(results, status) {
+//                 if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
+//                     resolve(results);
+//                 } else if (status === google.maps.GeocoderStatus.ZERO_RESULTS) {
+//                     resolve([]);
+//                 } else {
+//                     reject(new Error(`Geocoding search failed: ${status}`));
+//                 }
+//             });
+//         });
+//
+//         // Extract and filter unique place IDs from results
+//         const placeIds = [];
+//         if (results && results.length > 0) {
+//             for (const result of results) {
+//                 if (result.place_id && !placeIds.includes(result.place_id)) {
+//                     placeIds.push(result.place_id);
+//                 }
+//             }
+//         }
+//
+//         return placeIds;
+//     } catch (error) {
+//         console.error("Error in custom place search:", error);
+//         return [];
+//     }
+// }
+//
+// /**
+//  * Fetch place details for an array of place IDs
+//  * Uses Place API for individual place details to avoid warnings
+//  * @param {Array} placeIds - Array of place IDs
+//  * @param {Object} searchLocation - Search center location
+//  * @param {number} searchRadius - Search radius in meters
+//  * @returns {Promise<Array>} Array of business objects
+//  */
+// async function fetchPlaceDetailsForIds(placeIds, searchLocation, searchRadius) {
+//     try {
+//         // Import the Place library
+//         const { Place } = await google.maps.importLibrary("places");
+//
+//         const businessResults = [];
+//         const promises = [];
+//
+//         for (const placeId of placeIds) {
+//             promises.push((async () => {
+//                 try {
+//                     // Create a Place instance
+//                     const place = new Place({
+//                         id: placeId
+//                     });
+//
+//                     // Fetch place details
+//                     await place.fetchFields({
+//                         fields: [
+//                             'displayName',
+//                             'formattedAddress',
+//                             'addressComponents',
+//                             'location',
+//                             'types',
+//                             'nationalPhoneNumber'
+//                         ]
+//                     });
+//
+//                     console.log("Place details:", place);
+//
+//                     // Extract address components
+//                     const addressComponents = {};
+//                     if (place.addressComponents) {
+//                         for (const component of place.addressComponents) {
+//                             for (const type of component.types) {
+//                                 addressComponents[type] = component.shortText;
+//                             }
+//                         }
+//                     }
+//
+//                     // Create address parts
+//                     const address1 = `${addressComponents.street_number || ''} ${addressComponents.route || ''}`.trim();
+//                     const city = addressComponents.locality || '';
+//                     const state = addressComponents.administrative_area_level_1 || '';
+//                     const zip = addressComponents.postal_code || '';
+//
+//                     // Map to business type
+//                     let businessType = 'OTHER';
+//                     if (place.types) {
+//                         if (place.types.includes('restaurant')) businessType = 'REST';
+//                         else if (place.types.includes('store')) businessType = 'RETAIL';
+//                         else if (place.types.includes('hardware_store')) businessType = 'HARDW';
+//                         else if (place.types.includes('gas_station')) businessType = 'FUEL';
+//                         // Add more mappings as needed
+//                     }
+//
+//                     // Calculate distance from search location
+//                     let distance = 0;
+//                     if (place.location && searchLocation) {
+//                         distance = google.maps.geometry.spherical.computeDistanceBetween(
+//                             searchLocation,
+//                             place.location
+//                         );
+//                     }
+//
+//                     // Skip if out of range
+//                     if (distance > searchRadius) {
+//                         console.log(`Skipping ${place.displayName} - too far (${distance/1000}km)`);
+//                         return null;
+//                     }
+//
+//                     // Check if this place matches an existing marker by name and location
+//                     const isDuplicate = markers.some(marker => {
+//                         if (!marker.business) return false;
+//
+//                         // Match by name and proximity
+//                         const nameSimilarity = similarity(
+//                             marker.business.bname ? marker.business.bname.toLowerCase() : '',
+//                             place.displayName ? place.displayName.toLowerCase() : ''
+//                         );
+//
+//                         if (nameSimilarity > 0.7 && place.location) {
+//                             // Get positions
+//                             const markerPos = marker.position;
+//                             const placePos = place.location;
+//
+//                             // Calculate distance
+//                             const distance = google.maps.geometry.spherical.computeDistanceBetween(
+//                                 new google.maps.LatLng(markerPos.lat, markerPos.lng),
+//                                 placePos
+//                             );
+//
+//                             // If within 100 meters, it's a duplicate
+//                             if (distance < 100) {
+//                                 console.log(`Skipping duplicate: ${place.displayName} (matches ${marker.business.bname})`);
+//                                 return true;
+//                             }
+//                         }
+//
+//                         return false;
+//                     });
+//
+//                     // Skip duplicates
+//                     if (isDuplicate) return null;
+//
+//                     // Create business object
+//                     const business = {
+//                         _id: 'google_' + place.id,
+//                         bname: place.displayName,
+//                         address1: address1 || (place.formattedAddress || '').split(',')[0] || '',
+//                         city: city,
+//                         state: state,
+//                         zip: zip,
+//                         type: businessType,
+//                         phone: place.nationalPhoneNumber || '',
+//                         isGooglePlace: true,
+//                         placeId: place.id,
+//                         lat: place.location?.lat || 0,
+//                         lng: place.location?.lng || 0,
+//                         distance: distance
+//                     };
+//
+//                     // Add marker if we have coordinates
+//                     if (place.location && place.location.lat) {
+//                         addAdvancedMarker(business, place.location);
+//
+//                         // Extend bounds with this place
+//                         bounds.extend(place.location);
+//                     }
+//
+//                     return business;
+//                 } catch (error) {
+//                     console.error(`Error processing place ${placeId}:`, error);
+//                     return null;
+//                 }
+//             })());
+//         }
+//
+//         // Wait for all place details to be fetched
+//         const results = await Promise.all(promises);
+//
+//         // Filter out null results and add valid businesses
+//         results.filter(result => result !== null).forEach(business => {
+//             businessResults.push(business);
+//         });
+//
+//         return businessResults;
+//     } catch (error) {
+//         console.error("Error fetching place details:", error);
+//         return [];
+//     }
+// }
+
+
 
 /**
  * Ensure map is visible and properly sized
@@ -3164,6 +3339,92 @@ function ensureMapVisibility() {
         }
     }
 }
+
+// /**
+//  * Display Google Places search results
+//  * @param {Array} businesses - Array of business objects from Google Places
+//  */
+// function displayGoogleSearchResults(businesses) {
+//     const businessSearchTable = document.getElementById('business_search');
+//     const searchTableContainer = document.getElementById('search_table');
+//
+//     if (!businessSearchTable || !searchTableContainer) {
+//         console.error("Required elements not found in the DOM");
+//         return;
+//     }
+//
+//     // Get the table body
+//     let tableBody = businessSearchTable.querySelector('tbody');
+//     if (!tableBody) {
+//         console.error("Table body not found within business_search table");
+//         return;
+//     }
+//
+//     // Clear existing rows
+//     tableBody.innerHTML = '';
+//
+//     // Make sure businesses is an array
+//     if (!Array.isArray(businesses) || businesses.length === 0) {
+//         tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
+//         searchTableContainer.style.display = 'block';
+//         searchTableContainer.scrollIntoView({behavior: 'smooth'});
+//         return;
+//     }
+//
+//     // Show the search results table
+//     searchTableContainer.style.display = 'block';
+//
+//     // Hide the "hidden" text in the h5
+//     const searchTableH5 = searchTableContainer.querySelector('h5');
+//     if (searchTableH5) {
+//         searchTableH5.style.display = 'none';
+//     }
+//
+//     // Add each business to the table
+//     businesses.forEach(business => {
+//         if (!business) return; // skip null or undefined entries
+//
+//         // Format the address line
+//         const addressLine = business.address1 ?
+//             `${business.address1}<br>${business.city}, ${business.state} ${business.zip}` :
+//             'Address information not available';
+//
+//         // Convert the business type code to a readable label
+//         const businessType = getBusinessTypeLabel(business.type);
+//
+//         // Format distance if available
+//         const distanceText = business.distance ?
+//             ` (${(business.distance / 1609.34).toFixed(1)} miles)` : '';
+//
+//         // Create a new row
+//         const row = document.createElement('tr');
+//
+//         // Add a View on Map button and Add to Database button
+//         const viewMapButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
+//         const addToDbButton = business.isGooglePlace ?
+//             `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.placeId}')">Add to Patriot Thanks</button>` :
+//             '';
+//
+//         // First populate with basic business info
+//         row.innerHTML = `
+//             <th class="left_table" data-business-id="${business._id}">${business.bname}${distanceText}</th>
+//             <th class="left_table">${addressLine}</th>
+//             <th class="left_table">${businessType}</th>
+//             <th class="right_table">${business.isGooglePlace ? 'Not in database yet' : 'Loading incentives...'}</th>
+//             <th class="center_table">${viewMapButton} ${addToDbButton}</th>
+//         `;
+//
+//         tableBody.appendChild(row);
+//
+//         // Only fetch incentives for businesses in our database
+//         if (!business.isGooglePlace) {
+//             fetchBusinessIncentives(business._id);
+//         }
+//     });
+//
+//     // Scroll to the results
+//     searchTableContainer.scrollIntoView({behavior: 'smooth'});
+// }
 
 /**
  * Show info window for Google Places results not in the database
@@ -4031,6 +4292,92 @@ function displayBusinessesOnMap(businesses) {
     }
 }
 
+// /**
+//  * Function to enhance markers with images
+//  */
+// async function enhanceMarkersWithImages() {
+//     // Only process if we have markers
+//     if (!markers || markers.length === 0) return;
+//
+//     console.log("Enhancing markers with images...");
+//
+//     for (const marker of markers) {
+//         if (!marker.business) continue;
+//
+//         // Skip if business already has an image
+//         if (marker.business.image_url) continue;
+//
+//         // Try to get an image for the business
+//         const imageUrl = await fetchPlacePhotosForBusiness(marker.business);
+//
+//         if (imageUrl) {
+//             // Update the business object
+//             marker.business.image_url = imageUrl;
+//
+//             // Update the marker with the new image
+//             updateMarkerWithImage(marker, imageUrl);
+//         }
+//     }
+// }
+
+// /**
+//  * Geocode a business address to get coordinates
+//  * @param {Object} business - Business object with address data
+//  * @param {number} index - Index of the business in the array
+//  * @param {number} total - Total number of businesses
+//  */
+// function geocodeBusinessAddress(business, index, total) {
+//     if (!business || !business.address1) {
+//         console.error("Invalid business data for geocoding", business);
+//         return;
+//     }
+//
+//     // Construct the address string
+//     const addressString = `${business.address1}, ${business.city}, ${business.state} ${business.zip}`;
+//
+//     // Create a geocoder
+//     const geocoder = new google.maps.Geocoder();
+//
+//     // Add a small delay to avoid hitting geocoding rate limits
+//     setTimeout(() => {
+//         geocoder.geocode({'address': addressString}, function (results, status) {
+//             if (status === google.maps.GeocoderStatus.OK) {
+//                 if (results[0]) {
+//                     const location = results[0].geometry.location;
+//
+//                     // Store the coordinates in the business object
+//                     business.lat = location.lat();
+//                     business.lng = location.lng();
+//
+//                     // Create marker
+//                     addAdvancedMarker(business, location);
+//
+//                     // Extend bounds
+//                     bounds.extend(location);
+//
+//                     // If this is the last business, fit the map to the bounds
+//                     if (index === total - 1) {
+//                         map.fitBounds(bounds);
+//
+//                         // If we only have one marker, zoom in appropriately
+//                         if (total === 1) {
+//                             map.setZoom(15);
+//                         }
+//
+//                         // Search for nearby businesses if we have at least one result
+//                         if (total >= 1) {
+//                             // Use the current business instead of trying to access the businesses array
+//                             searchNearbyBusinesses(location, business.type);
+//                         }
+//                     }
+//                 }
+//             } else {
+//                 console.error("Geocode failed for address " + addressString + ": " + status);
+//             }
+//         });
+//     }, index * CONFIG.geocodeDelay); // Stagger requests
+// }
+
 /**
  * Add an advanced marker to the map with font/emoji fallbacks
  * @param {Object} business - Business object
@@ -4202,6 +4549,74 @@ function createFallbackMarker(business, location) {
     }
 }
 
+// /**
+//  * Create an Advanced Marker (using the recommended API)
+//  */
+// async function createAdvancedMarker(business) {
+//     try {
+//         if (!business || !business.lat || !business.lng) {
+//             console.error("Invalid business data for marker:", business);
+//             return null;
+//         }
+//
+//         // Import the AdvancedMarkerElement library
+//         const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
+//
+//         // Create position object from business coordinates
+//         const position = {
+//             lat: business.lat,
+//             lng: business.lng
+//         };
+//
+//         console.log(`Creating advanced marker for ${business.bname} at position:`, position);
+//
+//         // Determine marker color based on type
+//         const isNearby = business.isNearby === true;
+//         const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
+//
+//         // Create a pin element using the proper modern approach
+//         const pin = new PinElement({
+//             background: pinColor,
+//             borderColor: "#ffffff",
+//             glyphColor: "#ffffff",
+//             scale: 1.2,
+//         });
+//
+//         // Create the advanced marker
+//         const marker = new AdvancedMarkerElement({
+//             position: position,
+//             map: map,
+//             title: business.bname,
+//             content: pin.element,
+//         });
+//
+//         // Store business data with the marker
+//         marker.business = business;
+//
+//         // UPDATED: Use 'gmp-click' event instead of 'click'
+//         marker.addEventListener("gmp-click", () => {
+//             console.log(`Marker clicked for: ${business.bname}`);
+//             showInfoWindow(marker);
+//         });
+//
+//         // Add to markers array
+//         markers.push(marker);
+//         console.log(`Successfully added marker for ${business.bname} - Markers count: ${markers.length}`);
+//
+//         return marker;
+//     } catch (error) {
+//         console.error(`Error creating marker for ${business ? business.bname : 'unknown business'}:`, error);
+//
+//         // Fall back to standard marker as backup if advanced marker fails
+//         try {
+//             return fallbackCreateStandardMarker(business);
+//         } catch (fallbackError) {
+//             console.error("Fallback marker creation also failed:", fallbackError);
+//             return null;
+//         }
+//     }
+// }
+
 /**
  * Fallback function to create a standard marker if advanced marker fails
  */
@@ -4330,6 +4745,59 @@ function getBusinessTypeTextIcon(businessType) {
     return `<span style="font-size: 16px; color: white;">${iconMap[businessType] || '🏬'}</span>`;
 }
 
+
+// /**
+//  * Get an SVG icon for a business type (new function)
+//  * @param {string} businessType - Business type code
+//  * @returns {string} SVG icon markup
+//  */
+// function getBusinessTypeSVGIcon(businessType) {
+//     // Map business types to SVG icons
+//     const businessTypeIcons = {
+//         'AUTO': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#EA4335" d="M5,11L6.5,6.5H17.5L19,11M17.5,16A1.5,1.5 0 0,1 16,14.5A1.5,1.5 0 0,1 17.5,13A1.5,1.5 0 0,1 19,14.5A1.5,1.5 0 0,1 17.5,16M6.5,16A1.5,1.5 0 0,1 5,14.5A1.5,1.5 0 0,1 6.5,13A1.5,1.5 0 0,1 8,14.5A1.5,1.5 0 0,1 6.5,16M18.92,6C18.72,5.42 18.16,5 17.5,5H6.5C5.84,5 5.28,5.42 5.08,6L3,12V20A1,1 0 0,0 4,21H5A1,1 0 0,0 6,20V19H18V20A1,1 0 0,0 19,21H20A1,1 0 0,0 21,20V12L18.92,6Z"/></svg>',
+//         'BEAU': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M15.5,9.63C15.31,6.84 14.18,4.12 12.06,2C9.92,4.14 8.74,6.86 8.5,9.63C9.79,10.31 10.97,11.19 12,12.26C13.03,11.2 14.21,10.32 15.5,9.63M12,15.45C9.85,12.17 6.18,10 2,10C2,20 11.32,21.89 12,22C12.68,21.88 22,20 22,10C17.82,10 14.15,12.17 12,15.45Z"/></svg>',
+//         'REST': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#FBC02D" d="M8.1,13.34L3.91,9.16C2.35,7.59 2.35,5.06 3.91,3.5L10.93,10.5L8.1,13.34M14.88,11.53L13.41,13L20.29,19.88L18.88,21.29L12,14.41L5.12,21.29L3.71,19.88L13.47,10.12C12.76,8.59 13.26,6.44 14.85,4.85C16.76,2.93 19.5,2.57 20.96,4.03C22.43,5.5 22.07,8.24 20.15,10.15C18.56,11.74 16.41,12.24 14.88,11.53Z"/></svg>',
+//         'GROC': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#0F9D58" d="M7,18A2,2 0 0,1 5,20A2,2 0 0,1 3,18A2,2 0 0,1 5,16A2,2 0 0,1 7,18M17,18A2,2 0 0,1 15,20A2,2 0 0,1 13,18A2,2 0 0,1 15,16A2,2 0 0,1 17,18M7.17,14.75L7.2,14.63L8.1,13H15.55C16.3,13 16.96,12.59 17.3,11.97L21.16,4.96L19.42,4H19.41L18.31,6L15.55,11H8.53L8.4,10.73L6.16,6L5.21,4L4.27,2H1V4H3L6.6,11.59L5.25,14.04C5.09,14.32 5,14.65 5,15A2,2 0 0,0 7,17H19V15H7.42C7.29,15 7.17,14.89 7.17,14.75Z"/></svg>',
+//         'OTHER': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#616161" d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,7V9H16V13C16,14.1 15.1,15 14,15H12V17H8V13H12V11H8V7H12Z"/></svg>'
+//         // Add more type-specific icons as needed
+//     };
+//
+//     // Return the icon for this business type, or a default
+//     return businessTypeIcons[businessType] ||
+//         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><path fill="#616161" d="M12,7V3H2V21H22V7H12M10,19H4V17H10V19M10,15H4V13H10V15M10,11H4V9H10V11M10,7H4V5H10V7M20,19H12V5H20V19M18,11H14V13H18V11M18,7H14V9H18V7M18,15H14V17H18V15Z"/></svg>';
+// }
+
+
+// /**
+//  * Fetch icon for a business based on its type
+//  * @param {Object} business - Business object
+//  * @returns {Promise<string>} Icon URL
+//  */
+// async function fetchPlacePhotosForBusiness(business) {
+//     if (!business) {
+//         console.log("No business data provided");
+//         return getDefaultBusinessIcon();
+//     }
+//
+//     try {
+//         // Check cache first
+//         const cacheKey = business._id || business.bname + business.address1;
+//         if (placeCache.has(cacheKey)) {
+//             return placeCache.get(cacheKey);
+//         }
+//
+//         // Get an appropriate icon based on business type
+//         const iconUrl = getBusinessTypeIcon(business.type);
+//
+//         // Add to cache
+//         placeCache.set(cacheKey, iconUrl);
+//         return iconUrl;
+//     } catch (error) {
+//         console.error(`Error getting business icon: ${error.message}`);
+//         return getDefaultBusinessIcon();
+//     }
+// }
+
 /**
  * Get an appropriate icon for a business type
  * @param {string} businessType - Business type code
@@ -4380,6 +4848,48 @@ function getBusinessTypeIcon(businessType) {
 function getDefaultBusinessIcon() {
     return 'https://maps.gstatic.com/mapfiles/place_api/icons/v1/png_71/generic_business-71.png';
 }
+
+// /**
+//  * Update an existing marker with an image
+//  * @param {Object} marker - Marker object
+//  * @param {string} imageUrl - URL of the image
+//  */
+// function updateMarkerWithImage(marker, imageUrl) {
+//     if (!marker || !marker.content) return;
+//
+//     const business = marker.business;
+//     if (!business) return;
+//
+//     const isNearby = business.isNearby === true;
+//     const pinColor = isNearby ? CONFIG.markerColors.nearby : CONFIG.markerColors.primary;
+//
+//     // Create new content with the image
+//     const pinElement = document.createElement('div');
+//     pinElement.className = 'custom-marker';
+//     pinElement.style.cursor = 'pointer';
+//     pinElement.style.zIndex = '1000';
+//
+//     pinElement.innerHTML = `
+//     <div class="marker-container">
+//       <div class="marker-pin" style="background-color: ${pinColor};">
+//         <div class="marker-image-container">
+//           <img src="${imageUrl}" alt="${business.bname}" class="marker-image">
+//         </div>
+//       </div>
+//       <div class="marker-shadow"></div>
+//     </div>
+//   `;
+//
+//     // Replace the old content
+//     marker.content = pinElement;
+//
+//     // Re-add the click event listener
+//     pinElement.addEventListener('click', function(e) {
+//         console.log("Updated marker element clicked:", business.bname);
+//         e.stopPropagation();
+//         showInfoWindow(marker);
+//     });
+// }
 
 /**
  * Show info window for a marker with scrollable content
@@ -4540,6 +5050,10 @@ function showInfoWindow(marker) {
         }
     });
 }
+
+
+
+
 
 /**
  * Search for nearby businesses of similar type
@@ -4744,16 +5258,92 @@ window.focusOnMapMarker = function(businessId) {
     }
 };
 
+// // Save the original initGoogleMap function
+// const originalInitGoogleMap = window.initGoogleMap;
+//
+// // Create a new wrapper function that calls the original function
+// // Make sure the initGoogleMap function is properly defined and accessible
+// window.initGoogleMap = async function() {
+//     console.log("initGoogleMap called");
+//
+//     try {
+//         // Check if map container exists
+//         const mapContainer = document.getElementById("map");
+//         if (!mapContainer) {
+//             console.error("Map container not found in the DOM");
+//             return;
+//         }
+//
+//         console.log("Map container dimensions:", mapContainer.offsetWidth, "x", mapContainer.offsetHeight);
+//
+//         // Import required libraries
+//         const { Map } = await google.maps.importLibrary("maps");
+//         const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+//
+//         // Create map
+//         map = new Map(mapContainer, {
+//             center: CONFIG.defaultCenter,
+//             zoom: CONFIG.defaultZoom,
+//             mapId: CONFIG.mapId
+//         });
+//
+//         console.log("Map created successfully");
+//
+//         // Create needed objects
+//         infoWindow = new google.maps.InfoWindow();
+//         bounds = new google.maps.LatLngBounds();
+//
+//         // Add initial message
+//         const initialMessage = document.createElement('div');
+//         initialMessage.id = 'initial-map-message';
+//         initialMessage.innerHTML = 'Search for businesses to see them on the map';
+//         initialMessage.style.position = 'absolute';
+//         initialMessage.style.top = '50%';
+//         initialMessage.style.left = '50%';
+//         initialMessage.style.transform = 'translate(-50%, -50%)';
+//         initialMessage.style.background = 'white';
+//         initialMessage.style.padding = '10px';
+//         initialMessage.style.borderRadius = '5px';
+//         initialMessage.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+//         initialMessage.style.zIndex = '1';
+//         mapContainer.appendChild(initialMessage);
+//
+//         // Set flag
+//         mapInitialized = true;
+//         console.log("Map initialization complete");
+//
+//         // Process any pending businesses
+//         if (pendingBusinessesToDisplay.length > 0) {
+//             console.log("Processing pending businesses:", pendingBusinessesToDisplay.length);
+//             displayBusinessesOnMap(pendingBusinessesToDisplay);
+//             pendingBusinessesToDisplay = [];
+//         }
+//
+//         // Set up map click handler
+//         map.addListener('click', function(event) {
+//             console.log("Map clicked at", event.latLng.lat(), event.latLng.lng());
+//             // Your existing click handler code...
+//         });
+//
+//     } catch (error) {
+//         console.error("Error initializing Google Map:", error);
+//         mapInitialized = false;
+//
+//         // Show error message
+//         const mapContainer = document.getElementById("map");
+//         if (mapContainer) {
+//             mapContainer.innerHTML = `
+//                 <div style="text-align: center; padding: 20px;">
+//                     <p>Sorry, we couldn't load the map. Please try refreshing the page.</p>
+//                     <p>Error: ${error.message}</p>
+//                 </div>
+//             `;
+//         }
+//     }
+// };
+
 // Initialize when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Check Bootstrap version
-    if (typeof bootstrap !== 'undefined') {
-        console.log("Bootstrap 5 detected:", bootstrap.Modal ? "Modal available" : "Modal not available");
-    } else if (typeof $ !== 'undefined' && $.fn.modal) {
-        console.log("Bootstrap 4 with jQuery detected");
-    } else {
-        console.warn("Bootstrap not detected - modals may not work properly");
-    }
     // Initialize business search functionality
     initBusinessSearch();
     addCustomMarkerStyles();
