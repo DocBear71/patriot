@@ -1900,6 +1900,60 @@ async function findChainMatchesForResults(businesses) {
 }
 
 /**
+ * Find matching chain for a Google Places business result
+ * Enhanced with local fallback for when API is not available
+ * @param {string} placeName - Name of the place to match with chains
+ * @returns {Promise<Object|null>} - Matching chain or null if no match
+ */
+async function findMatchingChainForPlaceResult(placeName) {
+    try {
+        if (!placeName) {
+            console.warn("Empty place name provided for chain matching");
+            return null;
+        }
+
+        console.log("Checking if place matches a chain:", placeName);
+
+        // Get the base URL
+        const baseURL = getBaseURL();
+
+        try {
+            // Try server-side chain matching first
+            const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(placeName)}`);
+
+            // Check if the response is successful, but also handle 404 gracefully
+            if (response.status === 404) {
+                console.log("No matching chains found for", placeName);
+                // Fall back to client-side matching
+                return findMatchingChainLocally(placeName);
+            }
+
+            if (!response.ok) {
+                console.error("Error searching for matching chains:", response.status);
+                // Fall back to client-side matching
+                return findMatchingChainLocally(placeName);
+            }
+
+            const data = await response.json();
+
+            if (data.success && data.chain) {
+                console.log("Found matching chain for place:", data.chain.bname);
+                return data.chain;
+            }
+
+            // If API returns no matches, check locally as fallback
+            return findMatchingChainLocally(placeName);
+        } catch (error) {
+            console.error("Error with chain matching API, falling back to local matching:", error);
+            return findMatchingChainLocally(placeName);
+        }
+    } catch (error) {
+        console.error("Error finding matching chain:", error);
+        return null;
+    }
+}
+
+/**
  * Map Google place types to business type codes
  * @param {Array} types - Array of Google place types
  * @returns {string} Business type code
