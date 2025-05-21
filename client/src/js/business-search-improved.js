@@ -1674,7 +1674,7 @@ function createBusinessMarker(business) {
 
         // Add click event
         marker.addListener('click', function () {
-            showBusinessInfoWindow(this);
+            showInfoWindow(this);
         });
 
         // Add to markers array
@@ -1783,6 +1783,255 @@ function showBusinessInfoWindow(marker) {
             incentivesDiv.innerHTML = `<p><em>This business is not yet in the Patriot Thanks database.</em></p>`;
         }
     }
+}
+
+
+
+/**
+ * Fetch chain incentives for a Google Places result - simple version
+ * @param {string} placeId - Google Place ID
+ * @param {string} chainId - Chain ID in database
+ * @param {boolean} isNativeInfoWindow - Whether using native Google InfoWindow
+ */
+function fetchChainIncentivesForInfoWindow(placeId, chainId, isNativeInfoWindow = false) {
+    if (!chainId) {
+        console.error("No chain ID provided for fetching incentives");
+        return;
+    }
+
+    // Get container element ID based on info window type
+    const containerSelector = isNativeInfoWindow ?
+        `incentives-container-${placeId}` :
+        `info-window-incentives-${placeId}`;
+
+    // Get incentives container
+    const incentivesDiv = document.getElementById(containerSelector);
+    if (!incentivesDiv) {
+        console.error(`Could not find incentives div for place ${placeId}`);
+        return;
+    }
+
+    // Determine the base URL
+    const baseURL = getBaseURL();
+
+    // Build API URL
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
+
+    console.log("Fetching chain incentives from:", apiURL);
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch chain incentives: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`Chain incentives data for place ${placeId}:`, data);
+
+            // Check if there are any incentives
+            if (!data.results || data.results.length === 0) {
+                incentivesDiv.innerHTML = '<p><strong>Chain Incentives:</strong> No incentives found</p>';
+                return;
+            }
+
+            // Build HTML for incentives
+            let incentivesHTML = '<p><strong>Chain Incentives:</strong></p><ul style="margin:8px 0; padding-left:20px;">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ?
+                        ` (${incentive.other_description})` : '';
+
+                    // All chain incentives should have the chain badge
+                    const chainBadge = '<span style="display:inline-block; background-color:#4285F4; color:white; padding:1px 4px; border-radius:4px; font-size:0.7em; margin-left:5px;">Chain-wide</span>';
+
+                    incentivesHTML += `
+                        <li>
+                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
+                            ${incentive.information ? `<div style="font-size:13px; color:#555; margin-top:2px;">${incentive.information}</div>` : ''}
+                        </li>
+                    `;
+                }
+            });
+
+            incentivesHTML += '</ul>';
+
+            // Add explanation for chain locations
+            incentivesHTML += `
+                <div style="margin-top:10px; font-style:italic; color:#666; font-size:12px;">
+                    This location matches ${data.chain_info ? data.chain_info.bname : 'a chain'} in our database.
+                    Chain-wide incentives apply to all locations.
+                </div>
+            `;
+
+            incentivesDiv.innerHTML = incentivesHTML;
+        })
+        .catch(error => {
+            console.error(`Error fetching chain incentives: ${error}`);
+            incentivesDiv.innerHTML = '<p><strong>Chain Incentives:</strong> Error loading incentives</p>';
+        });
+}
+
+/**
+ * Show info window for a marker with scrollable content
+ * @param {Object} marker - Marker object
+ */
+function showInfoWindow(marker) {
+    console.log("showInfoWindow called with marker:", marker);
+
+    if (!marker || !marker.business) {
+        console.error("Invalid marker for info window", marker);
+        return;
+    }
+
+    const business = marker.business;
+    console.log("Business data for info window:", business);
+
+    // Format address
+    const addressLine = business.address2
+        ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
+        : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
+
+    // Get business type label
+    const businessType = getBusinessTypeLabel(business.type);
+
+    // Format phone number if available
+    const phoneDisplay = business.phone
+        ? `<p><strong>Phone:</strong> ${business.phone}</p>`
+        : '';
+
+    // Format distance if available
+    const distanceDisplay = business.distance
+        ? `<p><strong>Distance:</strong> ${(business.distance / 1609.34).toFixed(1)} miles</p>`
+        : '';
+
+    // Check if this is a Google Places result not in our database
+    const isGooglePlace = business.isGooglePlace === true;
+
+    // Customize the footer button based on whether it's in our database
+    let actionButtons;
+    if (isGooglePlace) {
+        actionButtons = `
+        <button class="add-business-btn" 
+                onclick="window.addBusinessToDatabase('${business.placeId}')">
+            Add to Patriot Thanks
+        </button>`;
+    } else {
+        actionButtons = `
+        <button class="view-details-btn" 
+                onclick="window.viewBusinessDetails('${business._id}')">
+            View Details
+        </button>`;
+    }
+
+    // Content for the info window with your existing CSS classes
+    const contentString = `
+    <div class="info-window">
+        <h3>${business.bname}</h3>
+        <p><strong>Address:</strong><br>${addressLine}</p>
+        ${phoneDisplay}
+        ${distanceDisplay}
+        <p><strong>Type:</strong> ${businessType}</p>
+        <div id="info-window-incentives-${business._id}">
+            <p><strong>Incentives:</strong> <em>${isGooglePlace ? 'Not in database' : 'Loading...'}</em></p>
+        </div>
+        ${isGooglePlace ? '<p>This business is not yet in the Patriot Thanks database.</p>' : ''}
+        <div class="info-window-actions">
+            ${actionButtons}
+        </div>
+    </div>
+    `;
+
+    // Create info window if it doesn't exist
+    if (!infoWindow) {
+        infoWindow = new google.maps.InfoWindow({
+            maxWidth: 320,
+            disableAutoPan: false
+        });
+    }
+
+    // Set content for the info window
+    infoWindow.setContent(contentString);
+
+    // Apply scrollable styles
+    applyInfoWindowScrollableStyles();
+
+    // Open the info window based on marker type
+    try {
+        if (marker.getPosition) {
+            // It's a standard Google Maps marker
+            infoWindow.open(map, marker);
+        } else if (typeof marker.position === 'object' && marker.position !== null) {
+            // For both AdvancedMarkerElement and position objects
+            if (marker.position.lat && typeof marker.position.lat === 'function') {
+                // It's a LatLng object
+                infoWindow.setPosition(marker.position);
+                infoWindow.open(map);
+            } else if (marker.position.lat && typeof marker.position.lat === 'number') {
+                // It's a position object with lat/lng properties
+                infoWindow.setPosition(new google.maps.LatLng(
+                    marker.position.lat,
+                    marker.position.lng
+                ));
+                infoWindow.open(map);
+            } else {
+                // Try to open it against the marker
+                infoWindow.open(map, marker);
+            }
+        } else {
+            // Fallback for any other marker type
+            if (business.lat && business.lng) {
+                infoWindow.setPosition(new google.maps.LatLng(business.lat, business.lng));
+                infoWindow.open(map);
+            } else {
+                console.error("Unable to position info window for marker");
+            }
+        }
+    } catch (error) {
+        console.error("Error opening info window:", error);
+        // Final fallback - try to get position from business
+        if (business.lat && business.lng) {
+            infoWindow.setPosition(new google.maps.LatLng(business.lat, business.lng));
+            infoWindow.open(map);
+        }
+    }
+
+    console.log("Opened info window for marker");
+
+    // Only fetch incentives if it's in our database
+    if (!isGooglePlace) {
+        fetchBusinessIncentivesForInfoWindow(business._id);
+    }
+
+    // Add event listener to ensure scrollable styles are applied when the window opens
+    google.maps.event.addListener(infoWindow, 'domready', function() {
+        console.log("Info window DOM ready, forcing scrollable behavior");
+
+        // Force scrollable styling application
+        const iwOuter = document.querySelector('.gm-style-iw');
+        if (iwOuter) {
+            const iwBackground = iwOuter.previousElementSibling;
+            if (iwBackground) {
+                iwBackground.style.display = 'none'; // Remove background if needed
+            }
+
+            // Force scrollable
+            const iwCloseBtn = iwOuter.nextElementSibling;
+            if (iwCloseBtn) {
+                iwCloseBtn.style.top = '3px';
+                iwCloseBtn.style.right = '3px';
+            }
+
+            // Add specific scrollable class to the container
+            const iwContainer = iwOuter.querySelector('.gm-style-iw-d');
+            if (iwContainer) {
+                iwContainer.style.overflow = 'auto';
+                iwContainer.style.maxHeight = '350px';
+            }
+        }
+    });
 }
 
 /**
@@ -2290,7 +2539,7 @@ async function setupMapClickHandler() {
 
                     if (existingMarker) {
                         console.log("Found existing marker for clicked place");
-                        showBusinessInfoWindow(existingMarker);
+                        showInfoWindow(existingMarker);
                         return;
                     }
 
@@ -2366,7 +2615,7 @@ async function setupMapClickHandler() {
                     };
 
                     // Show custom info window
-                    showBusinessInfoWindow(tempMarker);
+                    showInfoWindow(tempMarker);
                 } catch (error) {
                     console.error("Error fetching place details:", error);
                     alert("Error loading place details. Please try again.");
@@ -2426,7 +2675,7 @@ function setupMarkerClickPriority() {
 
                     // Trigger our marker click
                     setTimeout(() => {
-                        showBusinessInfoWindow(marker);
+                        showInfoWindow(marker);
                     }, 10);
 
                     return;
@@ -2612,7 +2861,7 @@ window.focusOnMapMarker = function(businessId) {
             map.setZoom(16);
 
             // Show info window
-            showBusinessInfoWindow(marker);
+            showInfoWindow(marker);
 
             // Scroll to the map
             document.getElementById('map').scrollIntoView({behavior: 'smooth'});
@@ -2659,7 +2908,7 @@ function fetchBusinessAndCreateMarker(businessId) {
                     map.setZoom(15);
 
                     // Show info window
-                    showBusinessInfoWindow(marker);
+                    showInfoWindow(marker);
 
                     console.log("Created and focused on new marker for business:", businessId);
                 }
