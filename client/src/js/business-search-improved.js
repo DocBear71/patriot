@@ -876,92 +876,6 @@ function getIncentiveTypeLabel(typeCode) {
 }
 
 /**
- * Fetch incentives for a specific business info window
- * @param {string} businessId - Business ID
- */
-function fetchBusinessIncentivesForInfoWindow(businessId) {
-    if (!businessId) {
-        console.error("No business ID provided for fetching incentives");
-        return;
-    }
-
-    // Skip if this is a Google Place result (not in our database)
-    if (businessId.startsWith('google_')) {
-        const incentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
-        if (incentivesDiv) {
-            incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Not in database</p>';
-        }
-        return;
-    }
-
-    // Determine the base URL
-    const baseURL = getBaseURL();
-
-    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
-
-    fetch(apiURL)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to fetch incentives: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            // Find the div in the info window
-            const incentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
-
-            if (!incentivesDiv) {
-                console.error(`Could not find incentives div for business ${businessId}`);
-                return;
-            }
-
-            // Check if there are any incentives
-            if (!data.results || data.results.length === 0) {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No incentives found</p>';
-                return;
-            }
-
-            // Build HTML for incentives
-            let incentivesHTML = '<p><strong>Incentives:</strong></p><ul class="incentives-list">';
-
-            data.results.forEach(incentive => {
-                if (incentive.is_available) {
-                    const typeLabel = getIncentiveTypeLabel(incentive.type);
-                    const otherDescription = incentive.other_description ?
-                        ` (${incentive.other_description})` : '';
-
-                    // Add chain badge for chain-wide incentives
-                    const chainBadge = incentive.is_chain_wide ?
-                        '<span class="chain-badge small">Chain-wide</span>' : '';
-
-                    incentivesHTML += `
-            <li>
-              <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
-              ${incentive.information ? ` <div style="font-size: 0.9em; margin-top: 3px;">${incentive.information}</div>` : ''}
-            </li>
-          `;
-                }
-            });
-
-            incentivesHTML += '</ul>';
-
-            if (incentivesHTML === '<p><strong>Incentives:</strong></p><ul class="incentives-list"></ul>') {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No active incentives found</p>';
-            } else {
-                incentivesDiv.innerHTML = incentivesHTML;
-            }
-        })
-        .catch(error => {
-            console.error(`Error fetching incentives for info window: ${error}`);
-            const incentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
-
-            if (incentivesDiv) {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading incentives</p>';
-            }
-        });
-}
-
-/**
  * Get base URL based on environment
  * @returns {string} Base URL
  */
@@ -2356,7 +2270,7 @@ async function setupMapClickHandler() {
                         console.error("Error checking for chain match:", error);
                     }
 
-                    // Create a business object from the place
+                    // Create business object from the place
                     const business = {
                         _id: 'google_' + place.id,
                         bname: businessName,
@@ -2735,6 +2649,466 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+/**
+ * Field validation function
+ * @param {string} value - Field value
+ * @returns {boolean} True if valid
+ */
+function isNotEmpty(value) {
+    return value && value.trim() !== '';
+}
+
+/**
+ * Apply validation styling to a field
+ * @param {HTMLElement} field - Form field
+ * @param {Function} validationFn - Validation function
+ */
+function validateField(field, validationFn) {
+    console.log(`Validating ${field.id} with value: ${field.value}`);
+
+    if (validationFn(field.value)) {
+        field.classList.remove('invalid-field');
+        field.classList.add('valid-field');
+        field.setAttribute('data-valid', 'true');
+        console.log(`${field.id} is VALID`);
+    } else {
+        field.classList.remove('valid-field');
+        field.classList.add('invalid-field');
+        field.setAttribute('data-valid', 'false');
+        console.log(`${field.id} is INVALID`);
+    }
+}
+
+/**
+ * Enhanced display search results function to properly categorize businesses
+ * @param {Array} businesses - Array of business objects
+ */
+function displaySearchResults(businesses) {
+    try {
+        const businessSearchTable = document.getElementById('business_search');
+        const searchTableContainer = document.getElementById('search_table');
+
+        if (!businessSearchTable || !searchTableContainer) {
+            console.error("Required elements not found in the DOM");
+            alert("There was an error displaying search results. Please try again later.");
+            return;
+        }
+
+        // Get the table body
+        let tableBody = businessSearchTable.querySelector('tbody');
+
+        if (!tableBody) {
+            console.error("Table body not found within business_search table");
+            alert("There was an error displaying search results. Please try again later.");
+            return;
+        }
+
+        // Clear existing rows
+        tableBody.innerHTML = '';
+
+        // Make sure businesses is an array
+        if (!Array.isArray(businesses)) {
+            console.error("businesses is not an array:", businesses);
+            businesses = [];
+        }
+
+        // Show the search results table
+        searchTableContainer.style.display = 'block';
+
+        // Hide the "hidden" text in the h5
+        const searchTableH5 = searchTableContainer.querySelector('h5');
+        if (searchTableH5) {
+            searchTableH5.style.display = 'none';
+        }
+
+        if (businesses.length === 0) {
+            // Show no results message
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
+            searchTableContainer.scrollIntoView({behavior: 'smooth'});
+            return;
+        }
+
+        // Split businesses into categories
+        const databaseBusinesses = businesses.filter(b => !b.isGooglePlace);
+        const chainMatchedPlaces = businesses.filter(b => b.isGooglePlace && b.chain_id);
+        const regularPlaces = businesses.filter(b => b.isGooglePlace && !b.chain_id);
+
+        console.log(`Businesses to display: ${databaseBusinesses.length} from database, ${chainMatchedPlaces.length} chain-matched Places, ${regularPlaces.length} regular Places`);
+
+        // Add database businesses first
+        databaseBusinesses.forEach(business => {
+            addBusinessRow(business, tableBody, false);
+        });
+
+        // Add chain-matched Places businesses
+        chainMatchedPlaces.forEach(business => {
+            addBusinessRow(business, tableBody, true);
+        });
+
+        // Add regular Places businesses
+        regularPlaces.forEach(business => {
+            addBusinessRow(business, tableBody, true);
+        });
+
+        // Scroll to the results
+        searchTableContainer.scrollIntoView({behavior: 'smooth'});
+
+    } catch (error) {
+        console.error("Error displaying search results: ", error);
+        alert("There was an error displaying the search results: " + error.message);
+    }
+}
+
+/**
+ * Helper function to add a business row to the table
+ * @param {Object} business - Business object
+ * @param {Element} tableBody - Table body element
+ * @param {boolean} isFromPlaces - Whether this business is from Places API
+ */
+function addBusinessRow(business, tableBody, isFromPlaces) {
+    if (!business) return;
+
+    // Format the address line
+    const addressLine = business.address2
+        ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
+        : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
+
+    // Convert business type to readable label
+    const businessType = getBusinessTypeLabel(business.type);
+
+    // Check business type and create badges
+    const isChainLocation = !!business.chain_id;
+    const isParentChain = !!business.is_chain;
+    const isGooglePlace = !!business.isGooglePlace;
+
+    // Create chain badge
+    let chainBadge = '';
+    if (isParentChain) {
+        chainBadge = '<span class="chain-badge">National Chain</span>';
+    } else if (isChainLocation) {
+        chainBadge = '<span class="chain-badge">Chain Location</span>';
+    } else if (isFromPlaces && business.chain_name) {
+        chainBadge = `<span class="chain-badge">Potential ${business.chain_name || 'Chain'} Location</span>`;
+    }
+
+    // Create appropriate action button
+    let actionButton;
+
+    if (isParentChain) {
+        const isAdmin = checkIfUserIsAdmin();
+        if (isAdmin) {
+            actionButton = `<button class="admin-action-btn" onclick="handleChainBusinessAction('${business._id}', true)">Admin: Edit Chain</button>`;
+        } else {
+            actionButton = `<button class="view-chain-btn" onclick="viewChainDetails('${business._id}')">View Chain Info</button>`;
+        }
+    } else if (isGooglePlace) {
+        if (isChainLocation) {
+            actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.place_data?.place_id || business.placeId || ''}', '${business.chain_id || ''}')">Add Chain Location</button>`;
+        } else {
+            actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.place_data?.place_id || business.placeId || ''}')">Add to Database</button>`;
+        }
+    } else {
+        actionButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
+    }
+
+    // Create the row
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <th class="left_table" data-business-id="${business._id}">
+            ${business.bname} ${chainBadge}
+        </th>
+        <th class="left_table">${addressLine}</th>
+        <th class="left_table">${businessType}</th>
+        <th class="right_table" id="incentives-for-${business._id}">
+            ${isFromPlaces && !isChainLocation ? 'Not in database yet' : 'Loading incentives...'}
+        </th>
+        <th class="center_table">${actionButton}</th>
+    `;
+
+    tableBody.appendChild(row);
+
+    // Handle incentives lookup
+    if (isFromPlaces && isChainLocation) {
+        fetchChainIncentivesForPlacesResult(business._id, business.chain_id);
+    } else if (!isGooglePlace) {
+        fetchBusinessIncentives(business._id, business.chain_id);
+    }
+}
+
+/**
+ * Fetch incentives for a specific business for table display
+ * @param {string} businessId - Business ID
+ * @param {string} chainId - Optional chain ID
+ */
+function fetchBusinessIncentives(businessId, chainId = null) {
+    if (!businessId) {
+        console.error("No business ID provided for fetching incentives");
+        return;
+    }
+
+    // Determine the base URL
+    const baseURL = getBaseURL();
+
+    // Build the API URL with optional chain_id
+    let apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+    if (chainId) {
+        apiURL += `&chain_id=${chainId}`;
+    }
+
+    console.log("Fetching incentives from: ", apiURL);
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch incentives: ${response.status} ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`Incentives data for business ${businessId}:`, data);
+
+            // Find the cell where we'll display incentives
+            const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+
+            if (!incentivesCell) {
+                console.error(`Could not find cell for incentives-for-${businessId}`);
+                return;
+            }
+
+            // Check if there are any incentives
+            if (!data.results || data.results.length === 0) {
+                incentivesCell.innerHTML = 'No incentives found';
+                return;
+            }
+
+            // Build HTML for the incentives
+            let incentivesHTML = '';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ?
+                        ` (${incentive.other_description})` : '';
+
+                    // Add a badge for chain-wide incentives
+                    const chainBadge = incentive.is_chain_wide ?
+                        '<span class="chain-badge small">Chain-wide</span>' : '';
+
+                    incentivesHTML += `
+                        <div class="incentive-item">
+                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
+                            <div class="incentive-info">${incentive.information || ''}</div>
+                        </div>
+                    `;
+                }
+            });
+
+            if (incentivesHTML === '') {
+                incentivesCell.innerHTML = 'No active incentives found';
+            } else {
+                incentivesCell.innerHTML = incentivesHTML;
+            }
+        })
+        .catch(error => {
+            console.error(`Error fetching incentives for business ${businessId}:`, error);
+            const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+
+            if (incentivesCell) {
+                incentivesCell.innerHTML = 'Error loading incentives';
+            }
+        });
+}
+
+/**
+ * Fetch chain incentives for a Google Places result
+ * @param {string} placeId - Google Place ID
+ * @param {string} chainId - Chain ID in database
+ */
+function fetchChainIncentivesForPlacesResult(placeId, chainId) {
+    if (!placeId || !chainId) {
+        console.error("Missing place ID or chain ID for fetching chain incentives");
+        return;
+    }
+
+    // Determine the base URL
+    const baseURL = getBaseURL();
+
+    // Build the API URL to fetch chain incentives
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
+
+    console.log("Fetching chain incentives for Places result: ", apiURL);
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch chain incentives: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`Chain incentives data for place ${placeId}:`, data);
+
+            // Find the cell where we'll display incentives
+            const incentivesCell = document.getElementById(`incentives-for-${placeId}`);
+
+            if (!incentivesCell) {
+                console.error(`Could not find cell for incentives-for-${placeId}`);
+                return;
+            }
+
+            // Check if there are any chain incentives
+            if (!data.results || data.results.length === 0) {
+                incentivesCell.innerHTML = 'No chain incentives available';
+                return;
+            }
+
+            // Build HTML for the chain incentives
+            let incentivesHTML = '';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ?
+                        ` (${incentive.other_description})` : '';
+
+                    incentivesHTML += `
+                        <div class="incentive-item">
+                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% 
+                            <span class="chain-badge small">Chain-wide</span>
+                            <div class="incentive-info">${incentive.information || ''}</div>
+                        </div>
+                    `;
+                }
+            });
+
+            if (incentivesHTML === '') {
+                incentivesCell.innerHTML = 'Not in database yet';
+            } else {
+                incentivesCell.innerHTML = incentivesHTML;
+            }
+        })
+        .catch(error => {
+            console.error(`Error fetching chain incentives for place ${placeId}:`, error);
+            const incentivesCell = document.getElementById(`incentives-for-${placeId}`);
+
+            if (incentivesCell) {
+                incentivesCell.innerHTML = 'Not in database yet';
+            }
+        });
+}
+
+/**
+ * Check if the current user is an admin
+ * @returns {boolean} True if user is admin
+ */
+function checkIfUserIsAdmin() {
+    try {
+        // Get session data from localStorage
+        const sessionData = localStorage.getItem('patriotThanksSession');
+        if (!sessionData) return false;
+
+        const session = JSON.parse(sessionData);
+
+        // Check if user has admin privileges
+        return (session.user && (session.user.isAdmin === true || session.user.level === 'Admin'));
+    } catch (error) {
+        console.error("Error checking admin status:", error);
+        return false;
+    }
+}
+
+/**
+ * Enhanced fetchBusinessIncentivesForInfoWindow function with better error handling
+ * @param {string} businessId - Business ID
+ * @param {boolean} isNativeInfoWindow - Whether using native Google InfoWindow
+ */
+function fetchBusinessIncentivesForInfoWindow(businessId, isNativeInfoWindow = false) {
+    if (!businessId) {
+        console.error("No business ID provided for fetching incentives");
+        return;
+    }
+
+    // Skip if this is a Google Place result (not in our database)
+    if (businessId.startsWith('google_')) {
+        const containerSelector = isNativeInfoWindow ?
+            `incentives-container-${businessId}` :
+            `info-window-incentives-${businessId}`;
+
+        const incentivesDiv = document.getElementById(containerSelector);
+        if (incentivesDiv) {
+            incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Not in database</p>';
+        }
+        return;
+    }
+
+    // Get container element ID based on info window type
+    const containerSelector = isNativeInfoWindow ?
+        `incentives-container-${businessId}` :
+        `info-window-incentives-${businessId}`;
+
+    // Get incentives container
+    const incentivesDiv = document.getElementById(containerSelector);
+    if (!incentivesDiv) {
+        console.error(`Could not find incentives div for business ${businessId}`);
+        return;
+    }
+
+    // Determine the base URL
+    const baseURL = getBaseURL();
+
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch incentives: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Check if there are any incentives
+            if (!data.results || data.results.length === 0) {
+                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No incentives found</p>';
+                return;
+            }
+
+            // Build HTML for incentives
+            let incentivesHTML = '<p><strong>Incentives:</strong></p><ul style="margin:8px 0; padding-left:20px;">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ?
+                        ` (${incentive.other_description})` : '';
+
+                    // Add chain badge for chain-wide incentives
+                    const chainBadge = incentive.is_chain_wide ?
+                        '<span style="display:inline-block; background-color:#4285F4; color:white; padding:1px 4px; border-radius:4px; font-size:0.7em; margin-left:5px;">Chain-wide</span>' :
+                        '';
+
+                    incentivesHTML += `
+                        <li>
+                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
+                            ${incentive.information ? `<div style="font-size:13px; color:#555; margin-top:2px;">${incentive.information}</div>` : ''}
+                        </li>
+                    `;
+                }
+            });
+
+            incentivesHTML += '</ul>';
+
+            if (incentivesHTML === '<p><strong>Incentives:</strong></p><ul style="margin:8px 0; padding-left:20px;"></ul>') {
+                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No active incentives found</p>';
+            } else {
+                incentivesDiv.innerHTML = incentivesHTML;
+            }
+        })
+        .catch(error => {
+            console.error(`Error fetching incentives for info window: ${error}`);
+            incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading incentives</p>';
+        });
+}
+
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = retrieveFromMongoDB;
@@ -2742,4 +3116,6 @@ if (typeof window !== 'undefined') {
     window.displayBusinessesOnMap = displayBusinessesOnMap;
     window.initGoogleMap = initGoogleMap;
     window.debugMapState = debugMapState;
+    window.validateField = validateField;
+    window.isNotEmpty = isNotEmpty;
 }
