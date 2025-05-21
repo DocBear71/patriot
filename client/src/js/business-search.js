@@ -1,6 +1,5 @@
-// brand new business-search.js not working properly
+// business-search.js not working properly
 
-// Enhanced debugging functions to help identify and fix issues
 
 /**
  * Debug the current map state with detailed information
@@ -270,7 +269,7 @@ function safeResetMapView() {
 // Configuration constants
 const CONFIG = {
     mapId: 'ebe8ec43a7bc252d',
-    defaultCenter: { lat: 39.8283, lng: -98.5795 }, // Center of US
+    defaultCenter: {lat: 39.8283, lng: -98.5795}, // Center of US
     defaultZoom: 4,
     markerColors: {
         primary: '#EA4335',   // Red for primary results
@@ -343,7 +342,7 @@ function ensureGoogleMapsInitialized() {
             const mapId = window.appConfig?.googleMapsMapId || 'ebe8ec43a7bc252d';
 
             // Create a callback function for when Maps loads
-            window.initGoogleMapCallback = function() {
+            window.initGoogleMapCallback = function () {
                 console.log("Google Maps callback executed");
                 initGoogleMap();
                 googleMapsInitialized = true;
@@ -356,7 +355,7 @@ function ensureGoogleMapsInitialized() {
             script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMapCallback&loading=async&v=weekly`;
             script.async = true;
             script.defer = true;
-            script.onerror = function(error) {
+            script.onerror = function (error) {
                 console.error('Google Maps API failed to load:', error);
                 googleMapsInitializing = false;
                 reject(error);
@@ -376,7 +375,7 @@ function ensureGoogleMapsInitialized() {
  * View business details
  * @param {string} businessId - Business ID
  */
-window.viewBusinessDetails = function(businessId) {
+window.viewBusinessDetails = function (businessId) {
     console.log("View details for business:", businessId);
     // You can implement this to navigate to a details page or show more info
     alert("This feature is coming soon: View details for " + businessId);
@@ -931,12 +930,12 @@ function getPlaceTypeLabel(types) {
  * Add a business to the database
  * @param {string} placeId - Google Place ID
  */
-window.addBusinessToDatabase = async function(placeId) {
+window.addBusinessToDatabase = async function (placeId) {
     console.log("Adding place to database:", placeId);
 
     try {
         // Load the Places library
-        const { Place } = await google.maps.importLibrary("places");
+        const {Place} = await google.maps.importLibrary("places");
 
         // Create a Place instance
         const place = new Place({
@@ -997,7 +996,7 @@ window.addBusinessToDatabase = async function(placeId) {
  * @param {string} placeId - Google Place ID
  * @param {string} chainId - Optional chain ID if this place is part of a chain
  */
-window.addBusinessToDatabase = async function(placeId, chainId = null) {
+window.addBusinessToDatabase = async function (placeId, chainId = null) {
     console.log("Adding place to database:", placeId, "Chain ID:", chainId);
 
     try {
@@ -1562,7 +1561,7 @@ function setupBusinessSelectionButtons(container, businesses) {
     // Handle regular select buttons
     const selectButtons = container.querySelectorAll('.select-business');
     selectButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             const businessId = this.getAttribute('data-business-id');
             if (!businessId) {
                 console.error("No business ID found on button");
@@ -1587,7 +1586,7 @@ function setupBusinessSelectionButtons(container, businesses) {
     // Handle view chain buttons (for non-admin users on chain parents)
     const viewChainButtons = container.querySelectorAll('.view-chain-button');
     viewChainButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             const businessId = this.getAttribute('data-business-id');
             if (!businessId) return;
 
@@ -2021,7 +2020,7 @@ function initBusinessSearch() {
 
     // Handle "Use my location" checkbox
     if (form.useMyLocation) {
-        form.useMyLocation.addEventListener('change', function() {
+        form.useMyLocation.addEventListener('change', function () {
             const locationStatus = document.getElementById('location-status');
 
             if (this.checked) {
@@ -2083,7 +2082,7 @@ function addRefreshButton() {
     refreshButton.style.cursor = 'pointer';
 
     // Add click handler
-    refreshButton.addEventListener('click', function() {
+    refreshButton.addEventListener('click', function () {
         // Get current form data
         const businessName = document.getElementById('business-name')?.value || '';
         const address = document.getElementById('address')?.value || '';
@@ -2154,7 +2153,7 @@ function checkForNewlyAddedBusiness() {
             const searchForm = document.getElementById('business-search-form');
             if (searchForm) {
                 // Create and dispatch a submit event
-                const submitEvent = new Event('submit', { cancelable: true });
+                const submitEvent = new Event('submit', {cancelable: true});
                 searchForm.dispatchEvent(submitEvent);
             }
         }, 500);
@@ -2200,7 +2199,7 @@ function showNewBusinessAlert(businessName) {
         closeButton.style.opacity = '0.5';
         closeButton.style.cursor = 'pointer';
 
-        closeButton.addEventListener('click', function() {
+        closeButton.addEventListener('click', function () {
             alertDiv.remove();
         });
     }
@@ -2438,7 +2437,7 @@ function geocodeBusinessAddress(business, index, total) {
             // Use client-side geocoding directly
             const geocoder = new google.maps.Geocoder();
 
-            geocoder.geocode({'address': addressString}, function(results, status) {
+            geocoder.geocode({'address': addressString}, function (results, status) {
                 if (status === google.maps.GeocoderStatus.OK) {
                     if (results[0]) {
                         const location = results[0].geometry.location;
@@ -2795,7 +2794,7 @@ function updateMapBounds() {
             map.fitBounds(bounds);
 
             // Don't zoom in too close for single markers
-            google.maps.event.addListenerOnce(map, 'bounds_changed', function() {
+            google.maps.event.addListenerOnce(map, 'bounds_changed', function () {
                 if (map.getZoom() > 15) map.setZoom(15);
                 if (map.getZoom() < 4) map.setZoom(4);
             });
@@ -2932,7 +2931,7 @@ async function findChainMatchesForResults(businesses) {
  * @param {string} placeId - Google Place ID
  * @param {string} chainId - Optional chain ID if this is part of a chain
  */
-window.addBusinessToDatabase = async function(placeId, chainId = null) {
+window.addBusinessToDatabase = async function (placeId, chainId = null) {
     console.log("Adding place to database:", placeId, "Chain ID:", chainId);
 
     try {
@@ -3150,7 +3149,7 @@ function showErrorMessage(message, container) {
  * @param {string} businessId - Business ID
  * @param {boolean} isAdmin - Whether the current user is an admin
  */
-window.handleChainBusinessAction = function(businessId, isAdmin) {
+window.handleChainBusinessAction = function (businessId, isAdmin) {
     if (isAdmin) {
         // For admins, redirect to the chain management page
         window.location.href = `manage-chains.html?chain_id=${businessId}`;
@@ -3164,7 +3163,7 @@ window.handleChainBusinessAction = function(businessId, isAdmin) {
  * View chain details for regular users
  * @param {string} chainId - Chain business ID
  */
-window.viewChainDetails = function(chainId) {
+window.viewChainDetails = function (chainId) {
     // Fetch chain details
     const baseURL = getBaseURL();
 
@@ -3267,7 +3266,7 @@ function showChainInfoDialog(chainBusiness) {
                     // Add close functionality to buttons
                     const closeButtons = modalElement.querySelectorAll('[data-bs-dismiss="modal"]');
                     closeButtons.forEach(button => {
-                        button.addEventListener('click', function() {
+                        button.addEventListener('click', function () {
                             modalElement.style.display = 'none';
                             modalElement.classList.remove('show');
                             document.body.removeChild(backdrop);
@@ -3620,7 +3619,7 @@ function showGooglePlaceInfoWindow(business, position) {
     infoWindow.open(map);
 
     // Add event listener to ensure scrollable styles are applied
-    google.maps.event.addListener(infoWindow, 'domready', function() {
+    google.maps.event.addListener(infoWindow, 'domready', function () {
         console.log("Google Place info window DOM ready, forcing scrollable behavior");
 
         // Force scrollable styling application
@@ -3642,12 +3641,12 @@ function showGooglePlaceInfoWindow(business, position) {
  * Add a Google Place to our database
  * @param {string} placeId - Google Place ID
  */
-window.addGooglePlaceToDatabase = async function(placeId) {
+window.addGooglePlaceToDatabase = async function (placeId) {
     console.log("Adding place to database:", placeId);
 
     try {
         // Load the Places library
-        const { Place } = await google.maps.importLibrary("places");
+        const {Place} = await google.maps.importLibrary("places");
 
         // Create a Place instance
         const place = new Place({
@@ -3704,7 +3703,7 @@ window.addGooglePlaceToDatabase = async function(placeId) {
 };
 
 // Updated initGoogleMap function
-window.initGoogleMap = function() {
+window.initGoogleMap = function () {
     console.log("Global initGoogleMap function called");
 
     try {
@@ -3842,7 +3841,7 @@ function setupResetMapButton() {
  * Function to focus on a specific marker for a business
  * @param {string} businessId - The business ID to focus on
  */
-window.focusOnMapMarker = function(businessId) {
+window.focusOnMapMarker = function (businessId) {
     console.log("focusOnMapMarker called for business ID:", businessId);
 
     // Check if map is initialized
@@ -3958,10 +3957,10 @@ async function setupMapClickHandler() {
 
     try {
         // Import the Places library
-        const { Place } = await google.maps.importLibrary("places");
+        const {Place} = await google.maps.importLibrary("places");
 
         // Listen for POI clicks (Points of Interest - businesses, landmarks, etc.)
-        map.addListener('click', async function(event) {
+        map.addListener('click', async function (event) {
             console.log("Map clicked", event);
 
             // Check if clicked on a POI (a place on the map)
@@ -4087,7 +4086,7 @@ function setupMarkerClickPriority() {
     console.log("Setting up marker click priority");
 
     // Create listener that will get called before Google's POI click
-    google.maps.event.addListener(map, 'click', function(event) {
+    google.maps.event.addListener(map, 'click', function (event) {
         // Only process if we have a POI click (place ID present)
         if (event.placeId) {
             // Check if any of our markers are close to this click
@@ -4539,7 +4538,7 @@ function createEnhancedInfoWindow() {
     });
 
     // Add event listener to apply scrollable styles when the window opens
-    google.maps.event.addListener(newInfoWindow, 'domready', function() {
+    google.maps.event.addListener(newInfoWindow, 'domready', function () {
         console.log("Info window DOM ready, applying styles");
 
         // Add a slight delay to ensure DOM elements are fully rendered
@@ -4620,7 +4619,7 @@ function createMarker(business, position, isNearby = false, isPlaceResult = fals
             marker.position = position;
 
             // Add click event manually since AdvancedMarkerElement handles events differently
-            pinElement.addEventListener('click', function() {
+            pinElement.addEventListener('click', function () {
                 showInfoWindow(marker);
             });
 
@@ -4650,7 +4649,7 @@ function createMarker(business, position, isNearby = false, isPlaceResult = fals
         marker.isNearby = isNearby;
 
         // Add click event
-        marker.addListener('click', function() {
+        marker.addListener('click', function () {
             showInfoWindow(marker);
         });
 
@@ -4778,11 +4777,11 @@ function createFallbackMarker(business, location) {
         // Create a position object from the location
         let position;
         if (location.lat && typeof location.lat === 'function') {
-            position = { lat: location.lat(), lng: location.lng() };
+            position = {lat: location.lat(), lng: location.lng()};
         } else if (typeof location.lat === 'number') {
             position = location;
         } else if (business.lat && business.lng) {
-            position = { lat: business.lat, lng: business.lng };
+            position = {lat: business.lat, lng: business.lng};
         } else {
             console.error("Invalid location for fallback marker:", location);
             return null;
@@ -4817,7 +4816,7 @@ function createFallbackMarker(business, location) {
         marker.position = position;
 
         // Add click event listener
-        marker.addListener('click', function() {
+        marker.addListener('click', function () {
             showInfoWindow(marker);
         });
 
@@ -4873,7 +4872,7 @@ function fallbackCreateStandardMarker(business) {
     marker.business = business;
 
     // Add click listener
-    marker.addListener('click', function() {
+    marker.addListener('click', function () {
         console.log(`Fallback marker clicked for: ${business.bname}`);
         showInfoWindow(marker);
     });
@@ -5160,7 +5159,7 @@ function searchNearbyBusinessesInDatabase(lat, lng, businessType) {
                             bounds.extend(position);
                         }
                     } else {
-                        console.log(`Skipping distant business: ${business.bname} (${distance/1609} miles)`);
+                        console.log(`Skipping distant business: ${business.bname} (${distance / 1609} miles)`);
                     }
                 }
             });
@@ -5341,7 +5340,7 @@ function initGoogleMap() {
             initAdditionalMapFeatures();
 
             // Add event listener to close info window when clicking on map
-            map.addListener('click', function(event) {
+            map.addListener('click', function (event) {
                 // Only process clicks on the map itself, not on markers
                 if (!event.placeId) {
                     closeInfoWindow();
@@ -5432,7 +5431,7 @@ async function createAdvancedMarker(business, position, isNearby = false) {
             marker.isNearby = isNearby;
 
             // Add click event (works differently for AdvancedMarkerElement)
-            markerElement.addEventListener('click', function() {
+            markerElement.addEventListener('click', function () {
                 showInfoWindow(marker);
             });
 
@@ -5462,7 +5461,7 @@ async function createAdvancedMarker(business, position, isNearby = false) {
             marker.isNearby = isNearby;
 
             // Add click event
-            marker.addListener('click', function() {
+            marker.addListener('click', function () {
                 showInfoWindow(marker);
             });
 
@@ -5492,7 +5491,7 @@ async function createAdvancedMarker(business, position, isNearby = false) {
             marker.isNearby = isNearby;
 
             // Add click event
-            marker.addListener('click', function() {
+            marker.addListener('click', function () {
                 showInfoWindow(marker);
             });
 
@@ -5813,7 +5812,7 @@ function closeInfoWindow() {
 /**
  * Fixed focusOnMapMarker function for centering the map on a marker
  */
-window.focusOnMapMarker = function(businessId) {
+window.focusOnMapMarker = function (businessId) {
     console.log("focusOnMapMarker called for business ID:", businessId);
 
     // Check if map is initialized
@@ -6021,7 +6020,7 @@ function addInfoWindowStyles() {
 }
 
 // Add styles when the page loads
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     addInfoWindowStyles();
 });
 
@@ -6047,7 +6046,7 @@ function processLegacyPlacesResults(places, searchLocation) {
 
             // Skip if too far away
             if (distance > 80000) { // 80km or about 50 miles
-                console.log(`Skipping distant place: ${place.name} (${distance/1609} miles)`);
+                console.log(`Skipping distant place: ${place.name} (${distance / 1609} miles)`);
                 return;
             }
 
@@ -6195,7 +6194,7 @@ function getBusinessTypeTextIcon(businessType) {
 /**
  * Focus on map marker with proper handling for both marker types
  */
-window.focusOnMapMarker = function(businessId) {
+window.focusOnMapMarker = function (businessId) {
     console.log("focusOnMapMarker called for business ID:", businessId);
 
     // Check if map is initialized
@@ -6247,7 +6246,7 @@ window.focusOnMapMarker = function(businessId) {
 };
 
 // Ensure Google Maps is properly initialized
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log("DOM loaded, initializing business search...");
 
     // Add custom marker styles and chain badge styles
@@ -6310,7 +6309,7 @@ function createSimpleMarker(business, position) {
         marker.business = business;
 
         // Add click event
-        marker.addListener('click', function() {
+        marker.addListener('click', function () {
             showBasicInfoWindow(this);
         });
 
@@ -6634,7 +6633,7 @@ function safelyFitBounds() {
         map.fitBounds(bounds);
 
         // Don't zoom in too close for single markers
-        google.maps.event.addListenerOnce(map, 'bounds_changed', function() {
+        google.maps.event.addListenerOnce(map, 'bounds_changed', function () {
             // Clamp zoom level between 4 and 16
             const currentZoom = map.getZoom();
             if (currentZoom > 16) map.setZoom(16);
@@ -6652,7 +6651,7 @@ function safelyFitBounds() {
 /**
  * Fixed version of the focusOnMapMarker function
  */
-window.focusOnMapMarker = function(businessId) {
+window.focusOnMapMarker = function (businessId) {
     console.log("focusOnMapMarker called for business ID:", businessId);
 
     // Check if map is initialized
@@ -6814,7 +6813,7 @@ function processPlacesResults(places, searchLocation) {
             marker.business = business;
 
             // Add click listener
-            marker.addListener('click', function() {
+            marker.addListener('click', function () {
                 // Create info window
                 const infoWindow = new google.maps.InfoWindow({
                     content: `
@@ -7352,7 +7351,7 @@ function createBusinessMarker(business) {
         marker.business = business;
 
         // Add click event to show info window
-        marker.addListener('click', function() {
+        marker.addListener('click', function () {
             // Create info window content
             let content = '';
 
@@ -7509,7 +7508,7 @@ async function geocodeAddressClientSide(address) {
             const geocoder = new google.maps.Geocoder();
 
             // Geocode the address
-            geocoder.geocode({'address': address}, function(results, status) {
+            geocoder.geocode({'address': address}, function (results, status) {
                 if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
                     const location = results[0].geometry.location;
                     const result = {
@@ -7581,8 +7580,7 @@ function displayBusinessesOnMap(businesses) {
                 // Create marker
                 const marker = createBusinessMarker(business);
                 if (marker) validMarkers++;
-            }
-            else {
+            } else {
                 console.warn(`Business ${business.bname} missing coordinates`);
             }
         } catch (error) {
@@ -7600,7 +7598,7 @@ function displayBusinessesOnMap(businesses) {
                 map.fitBounds(bounds);
 
                 // Prevent too much zoom for single marker
-                google.maps.event.addListenerOnce(map, 'bounds_changed', function() {
+                google.maps.event.addListenerOnce(map, 'bounds_changed', function () {
                     if (map.getZoom() > 16) map.setZoom(16);
                 });
             } else if (window.currentSearchLocation) {
@@ -7635,7 +7633,7 @@ function getIncentiveTypeLabel(type) {
 /**
  * Fixed focusOnMapMarker function to properly center on database businesses
  */
-window.focusOnMapMarker = function(businessId) {
+window.focusOnMapMarker = function (businessId) {
     console.log("focusOnMapMarker called for business ID:", businessId);
 
     // Check if map is initialized
