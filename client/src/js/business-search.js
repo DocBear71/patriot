@@ -1107,42 +1107,6 @@ function getAddressComponentFromPlace(place, type) {
 }
 
 /**
- * Convert business type codes to readable labels
- * @param {string} typeCode - Business type code
- * @returns {string} Readable type label
- */
-function getBusinessTypeLabel(typeCode) {
-    const types = {
-        'AUTO': 'Automotive',
-        'BEAU': 'Beauty',
-        'BOOK': 'Bookstore',
-        'CLTH': 'Clothing',
-        'CONV': 'Convenience Store/Gas Station',
-        'DEPT': 'Department Store',
-        'ELEC': 'Electronics',
-        'ENTR': 'Entertainment',
-        'FURN': 'Furniture',
-        'FUEL': 'Fuel Station/Truck Stop',
-        'GIFT': 'Gift Shop',
-        'GROC': 'Grocery',
-        'HARDW': 'Hardware',
-        'HEAL': 'Health',
-        'JEWL': 'Jewelry',
-        'OTHER': 'Other',
-        'RX': 'Pharmacy',
-        'REST': 'Restaurant',
-        'RETAIL': 'Retail',
-        'SERV': 'Service',
-        'SPEC': 'Specialty',
-        'SPRT': 'Sporting Goods',
-        'TECH': 'Technology',
-        'TOYS': 'Toys'
-    };
-
-    return types[typeCode] || typeCode;
-}
-
-/**
  * Fetch incentives for a specific business
  * @param {string} businessId - Business ID
  */
@@ -5350,45 +5314,6 @@ async function isPlaceAlreadyInDatabase(placeId) {
 }
 
 /**
- * Enhanced function to search for nearby businesses focusing on search location
- * @param {Object} location - Center location for the search
- * @param {string} businessType - Type of business to search for
- */
-/**
- * Improved searchNearbyBusinesses to respect the current search location
- */
-function searchNearbyBusinesses(location, businessType) {
-    if (!location) {
-        console.error("No location provided for nearby business search");
-        return;
-    }
-
-    // Get coordinates properly
-    let lat, lng;
-
-    if (typeof location.lat === 'function') {
-        lat = location.lat();
-        lng = location.lng();
-    } else {
-        lat = location.lat;
-        lng = location.lng;
-    }
-
-    console.log(`Searching for nearby businesses near ${lat} ${lng}`);
-
-    // Only search if we have valid coordinates
-    if (!isNaN(lat) && !isNaN(lng)) {
-        // First search our database with the correct coordinates
-        searchNearbyBusinessesInDatabase(lat, lng, businessType);
-
-        // Then search Google Places with the correct coordinates
-        searchNearbyBusinessesWithPlaces(lat, lng, businessType);
-    } else {
-        console.warn("Invalid coordinates for nearby search:", lat, lng);
-    }
-}
-
-/**
  * Filter nearby businesses to ensure they're only from the current search area
  * @param {Array} businesses - Array of businesses to filter
  * @returns {Array} - Filtered array of businesses
@@ -5924,119 +5849,6 @@ function addAdvancedMarker(business, position, isNearby = false, isPlaceResult =
 }
 
 /**
- * Process places results from the newer Places API format with proper business object creation
- * @param {Array} places - Place results from Places API
- * @param {google.maps.LatLng} searchLocation - Search center location
- */
-function processPlacesResults(places, searchLocation) {
-    if (!places || places.length === 0) {
-        console.log("No places to process");
-        return;
-    }
-
-    console.log("Processing places results:", places.length, "places found");
-
-    // Add each place as a marker
-    places.forEach(async (place) => {
-        try {
-            // Skip if missing location data
-            if (!place.location) {
-                console.warn("Place missing location data:", place.displayName || place.text || 'Unknown place');
-                return;
-            }
-
-            // Get the business name as a string
-            const businessName = place.displayName ||
-                (place.text ? (typeof place.text === 'string' ? place.text : place.text.text) : 'Unknown Business');
-
-            // Get location coordinates, handling different formats
-            const latitude = place.location.latitude || place.location.lat;
-            const longitude = place.location.longitude || place.location.lng;
-
-            // Create valid position
-            const placeLatLng = new google.maps.LatLng(latitude, longitude);
-
-            // Calculate distance to ensure it's not too far
-            const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                searchLocation,
-                placeLatLng
-            );
-
-            // Skip if too far away
-            if (distance > 80000) { // 80km or about 50 miles
-                console.log(`Skipping distant place: ${businessName} (${distance/1609} miles)`);
-                return;
-            }
-
-            // Check if this place is already on the map
-            const isAlreadyDisplayed = markers.some(marker =>
-                marker.business?.placeId === place.id
-            );
-
-            if (isAlreadyDisplayed) {
-                console.log(`Place already on map: ${businessName}`);
-                return;
-            }
-
-            // Check if this place matches any chains in our database
-            const chainMatch = await findMatchingChainForPlaceResult(businessName);
-
-            // Create business object with proper string fields
-            const business = {
-                _id: 'google_' + place.id,
-                bname: businessName,
-                address1: place.formattedAddress || '',
-                city: '',
-                state: '',
-                zip: '',
-                isGooglePlace: true,
-                isNearby: true, // Mark as nearby for different styling
-                placeId: place.id,
-                lat: latitude,
-                lng: longitude,
-                distance: distance
-            };
-
-            // If it matches a chain, add chain info
-            if (chainMatch) {
-                console.log(`Nearby place "${businessName}" matches chain: ${chainMatch.bname}`);
-                business.chain_id = chainMatch._id;
-                business.chain_name = chainMatch.bname;
-                business.isChainLocation = true;
-            }
-
-            // Add marker
-            addAdvancedMarker(business, placeLatLng, true);
-
-            // Extend bounds
-            if (bounds) {
-                bounds.extend(placeLatLng);
-            }
-        } catch (error) {
-            console.error("Error processing place:", error);
-        }
-    });
-
-    // Update map view if we added markers
-    setTimeout(() => {
-        if (bounds && !bounds.isEmpty()) {
-            // Don't zoom out too much - maintain reasonable context
-            const currentZoom = map.getZoom();
-            map.fitBounds(bounds);
-
-            // After bounds are fit, check if zoom is too far out
-            setTimeout(() => {
-                const newZoom = map.getZoom();
-                if (newZoom < 10 && currentZoom > 10) {
-                    // Don't zoom out past city level
-                    map.setZoom(10);
-                }
-            }, 100);
-        }
-    }, 500); // Allow time for markers to be added
-}
-
-/**
  * Improved showInfoWindow function that creates and positions a custom info window
  */
 function showInfoWindow(marker) {
@@ -6475,85 +6287,6 @@ function addInfoWindowStyles() {
 document.addEventListener('DOMContentLoaded', function() {
     addInfoWindowStyles();
 });
-
-/**
- * Updated function to use the newer Places API
- * Replaces the older searchNearbyBusinessesWithPlaces implementation
- * @param {number} lat - Latitude
- * @param {number} lng - Longitude
- * @param {string} businessType - Business type code
- */
-async function searchNearbyBusinessesWithPlaces(lat, lng, businessType) {
-    if (isNaN(lat) || isNaN(lng)) {
-        console.warn("Invalid coordinates for nearby search:", lat, lng);
-        return;
-    }
-
-    try {
-        console.log(`Searching for nearby businesses near [${lat}, ${lng}] of type ${businessType}`);
-
-        // Convert our business type to a more generic search term
-        const searchQuery = getPlacesSearchTermForBusinessType(businessType);
-
-        // Create location object
-        const searchLocation = new google.maps.LatLng(lat, lng);
-
-        // Try to use the newer Place API first
-        if (google.maps.places.Place) {
-            console.log("Using newer Places API for nearby search");
-
-            const { Place, PlacesService } = await google.maps.importLibrary("places");
-
-            // Build request with textQuery
-            const searchRequest = {
-                textQuery: searchQuery,
-                locationBias: {
-                    circle: {
-                        center: {
-                            latitude: lat,
-                            longitude: lng
-                        },
-                        radius: 10000 // 10km
-                    }
-                }
-            };
-
-            // Make the API request
-            try {
-                // Get API key
-                const apiKey = window.appConfig?.googleMapsApiKey;
-
-                // Use the Places API directly via fetch
-                const response = await fetch(`https://places.googleapis.com/v1/places:searchText`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Goog-Api-Key': apiKey,
-                        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.primaryType'
-                    },
-                    body: JSON.stringify(searchRequest)
-                });
-
-                const data = await response.json();
-
-                if (data.places && data.places.length > 0) {
-                    console.log(`Found ${data.places.length} nearby places via Places API`);
-                    processPlacesResults(data.places, searchLocation);
-                } else {
-                    console.log("No nearby places found");
-                }
-            } catch (error) {
-                console.error("Error with newer Places API, falling back to legacy API:", error);
-                fallbackToLegacyPlacesApi(searchLocation, searchQuery);
-            }
-        } else {
-            // Fall back to legacy Places API
-            fallbackToLegacyPlacesApi(searchLocation, searchQuery);
-        }
-    } catch (error) {
-        console.error("Error searching for nearby places:", error);
-    }
-}
 
 /**
  * Process places results from the legacy Places API
@@ -7348,3 +7081,329 @@ window.focusOnMapMarker = function(businessId) {
         document.getElementById('map').scrollIntoView({behavior: 'smooth'});
     }
 };
+
+/**
+ * Process places results - EMERGENCY FIX version
+ * @param {Array} places - Places API results
+ * @param {google.maps.LatLng} searchLocation - Search location
+ */
+function processPlacesResults(places, searchLocation) {
+    // Skip if no places found
+    if (!places || places.length === 0) {
+        console.log("No places to process");
+        return;
+    }
+
+    console.log("Processing places results:", places.length, "places found");
+
+    // Clear markers if needed (or use existing clearMarkers function)
+    markers = markers || [];
+
+    // Safety check - create bounds if it doesn't exist
+    if (!bounds) {
+        bounds = new google.maps.LatLngBounds();
+    }
+
+    // Local array to keep track of new valid markers
+    const validMarkers = [];
+
+    // Process each place
+    places.forEach(async (place) => {
+        try {
+            // Skip places without location information
+            if (!place.location && !place.geometry) {
+                console.warn("Place missing location data:", place);
+                return;
+            }
+
+            // Extract business name - safely handling both object and string formats
+            let businessName = "Unknown Business";
+
+            if (typeof place.displayName === 'string') {
+                businessName = place.displayName;
+            } else if (place.displayName && place.displayName.text) {
+                businessName = place.displayName.text;
+            } else if (typeof place.name === 'string') {
+                businessName = place.name;
+            } else if (place.text && typeof place.text === 'string') {
+                businessName = place.text;
+            }
+
+            // Extract coordinates - handling different place formats
+            let lat = null;
+            let lng = null;
+
+            // Modern Places API format
+            if (place.location) {
+                lat = place.location.latitude || place.location.lat;
+                lng = place.location.longitude || place.location.lng;
+            }
+            // Legacy Places API format
+            else if (place.geometry && place.geometry.location) {
+                const loc = place.geometry.location;
+
+                if (typeof loc.lat === 'function' && typeof loc.lng === 'function') {
+                    lat = loc.lat();
+                    lng = loc.lng();
+                } else {
+                    lat = loc.lat;
+                    lng = loc.lng;
+                }
+            }
+
+            // Skip if invalid coordinates
+            if (!lat || !lng || isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
+                console.warn("Invalid coordinates for place:", businessName);
+                return;
+            }
+
+            // Get address information
+            let formattedAddress = "";
+            if (place.formattedAddress) {
+                formattedAddress = place.formattedAddress;
+            } else if (place.formatted_address) {
+                formattedAddress = place.formatted_address;
+            } else if (place.vicinity) {
+                formattedAddress = place.vicinity;
+            }
+
+            // Create place ID
+            const placeId = place.id || place.place_id || ('place_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9));
+
+            // Create business object
+            const business = {
+                _id: 'google_' + placeId,
+                bname: businessName,
+                address1: formattedAddress,
+                city: '',
+                state: '',
+                zip: '',
+                isGooglePlace: true,
+                isNearby: true,
+                placeId: placeId,
+                lat: parseFloat(lat),
+                lng: parseFloat(lng)
+            };
+
+            // Create position object
+            const position = new google.maps.LatLng(lat, lng);
+
+            // Create a simple marker
+            const marker = new google.maps.Marker({
+                position: position,
+                map: map,
+                title: businessName,
+                animation: google.maps.Animation.DROP
+            });
+
+            // Add business data to marker
+            marker.business = business;
+
+            // Add click listener
+            marker.addListener('click', function() {
+                // Create info window
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="max-width:300px; font-family:Arial,sans-serif;">
+                            <h3 style="margin-top:0; margin-bottom:8px; font-size:16px;">${businessName}</h3>
+                            <p>${formattedAddress}</p>
+                            <div style="text-align:right;">
+                                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; margin-top:10px;" 
+                                        onclick="window.addBusinessToDatabase('${placeId}')">
+                                    Add to Patriot Thanks
+                                </button>
+                            </div>
+                        </div>
+                    `
+                });
+
+                // Open info window
+                infoWindow.open(map, marker);
+            });
+
+            // Add to markers array
+            markers.push(marker);
+            validMarkers.push(marker);
+
+            // SAFELY extend bounds - without using fitBounds yet
+            safeUpdateBounds(position);
+        } catch (error) {
+            console.error("Error processing place:", error);
+        }
+    });
+
+    // Update map bounds AFTER all markers have been processed
+    if (validMarkers.length > 0) {
+        console.log(`Added ${validMarkers.length} valid markers from Places API`);
+
+        setTimeout(() => {
+            // Do NOT call fitBounds directly - use a safe wrapper or directly set center
+            // Just center on a known good location
+            try {
+                if (validMarkers.length > 0 && validMarkers[0].getPosition) {
+                    // Center on first marker
+                    map.setCenter(validMarkers[0].getPosition());
+                    map.setZoom(11);
+                } else if (searchLocation) {
+                    // Or on search location
+                    map.setCenter(searchLocation);
+                    map.setZoom(11);
+                }
+            } catch (error) {
+                console.error("Error centering map:", error);
+                // Last resort - use default US center
+                map.setCenter(new google.maps.LatLng(39.8283, -98.5795));
+                map.setZoom(4);
+            }
+        }, 100);
+    }
+}
+
+/**
+ * Utility to safely update bounds without causing errors
+ * @param {google.maps.LatLng} position - Valid position to add to bounds
+ */
+function safeUpdateBounds(position) {
+    try {
+        // Skip if position is invalid
+        if (!position || !position.lat || !position.lng) return;
+
+        // Create bounds if needed
+        if (!bounds) {
+            bounds = new google.maps.LatLngBounds();
+        }
+
+        // Safely add to bounds
+        bounds.extend(position);
+    } catch (error) {
+        console.error("Error updating bounds:", error);
+    }
+}
+
+/**
+ * Search for nearby businesses with Places API - EMERGENCY FIX version
+ * @param {number} lat - Latitude
+ * @param {number} lng - Longitude
+ * @param {string} businessType - Business type
+ */
+function searchNearbyBusinessesWithPlaces(lat, lng, businessType) {
+    try {
+        // Validate coordinates first
+        if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
+            console.warn("Invalid coordinates for nearby search:", lat, lng);
+            return;
+        }
+
+        console.log(`Searching for nearby businesses near [${lat}, ${lng}]`);
+
+        // Convert business type to search term
+        const searchQuery = getBusinessTypeLabel(businessType) || "businesses";
+
+        // Create location for search
+        const searchLocation = new google.maps.LatLng(lat, lng);
+
+        // Fallback directly to legacy Places API - simpler and more reliable
+        if (google.maps.places && google.maps.places.PlacesService) {
+            const service = new google.maps.places.PlacesService(map);
+
+            // Use text search for more flexibility
+            const request = {
+                query: searchQuery,
+                location: searchLocation,
+                radius: 10000 // 10km
+            };
+
+            service.textSearch(request, (results, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+                    console.log(`Found ${results.length} nearby places via Places API`);
+
+                    // Process results with the safe version
+                    processPlacesResults(results, searchLocation);
+                } else {
+                    console.log("No nearby places found:", status);
+                }
+            });
+        } else {
+            console.warn("Places API not available");
+        }
+    } catch (error) {
+        console.error("Error searching for nearby businesses:", error);
+    }
+}
+
+/**
+ * Search for nearby businesses - EMERGENCY FIX version
+ * @param {google.maps.LatLng} location - Center location
+ * @param {string} businessType - Business type
+ */
+function searchNearbyBusinesses(location, businessType) {
+    try {
+        console.log("searchNearbyBusinesses called");
+
+        // Skip if location is invalid
+        if (!location) {
+            console.error("No location provided for nearby search");
+            return;
+        }
+
+        // Extract coordinates safely
+        let lat, lng;
+
+        if (typeof location.lat === 'function') {
+            lat = location.lat();
+            lng = location.lng();
+        } else {
+            lat = location.lat;
+            lng = location.lng;
+        }
+
+        // Validate coordinates
+        if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
+            console.warn("Invalid coordinates for nearby search:", lat, lng);
+            return;
+        }
+
+        console.log(`Searching for nearby businesses near ${lat} ${lng}`);
+
+        // Skip server-side search for now, just do client-side Places search
+        searchNearbyBusinessesWithPlaces(lat, lng, businessType);
+    } catch (error) {
+        console.error("Error in searchNearbyBusinesses:", error);
+    }
+}
+
+/**
+ * Get business type label - needed utility function
+ * @param {string} type - Business type code
+ * @returns {string} - Business type label
+ */
+function getBusinessTypeLabel(type) {
+    const types = {
+        'AUTO': 'Automotive',
+        'BEAU': 'Beauty',
+        'BOOK': 'Bookstore',
+        'CLTH': 'Clothing',
+        'CONV': 'Convenience Store',
+        'DEPT': 'Department Store',
+        'ELEC': 'Electronics',
+        'ENTR': 'Entertainment',
+        'FURN': 'Furniture',
+        'FUEL': 'Gas Station',
+        'GIFT': 'Gift Shop',
+        'GROC': 'Grocery',
+        'HARDW': 'Hardware',
+        'HEAL': 'Health',
+        'JEWL': 'Jewelry',
+        'OTHER': 'Business',
+        'RX': 'Pharmacy',
+        'REST': 'Restaurant',
+        'RETAIL': 'Retail',
+        'SERV': 'Service',
+        'SPEC': 'Specialty',
+        'SPRT': 'Sporting Goods',
+        'TECH': 'Technology',
+        'TOYS': 'Toys'
+    };
+
+    return types[type] || 'Business';
+}
