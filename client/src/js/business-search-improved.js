@@ -1610,41 +1610,11 @@ function createBusinessMarker(business) {
             parseFloat(business.lng)
         );
 
-        // Determine marker color
-        const isFromDatabase = !business.isGooglePlace;
-        const markerColor = isFromDatabase ? CONFIG.markerColors.primary : CONFIG.markerColors.nearby;
+        // Use the enhanced marker creation
+        const marker = createEnhancedBusinessMarker(business, position);
 
-        // Create marker with improved settings
-        const marker = new google.maps.Marker({
-            position: position,
-            map: map,
-            title: business.bname,
-            animation: google.maps.Animation.DROP,
-            optimized: false, // Disable optimization for better click handling
-            icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                fillColor: markerColor,
-                fillOpacity: 1,
-                strokeWeight: 2,
-                strokeColor: '#FFFFFF',
-                scale: 12 // Slightly larger for easier clicking
-            }
-        });
-
-        // Store business data
-        marker.business = business;
-
-        // Add click event with improved handling
-        marker.addListener('click', function() {
-            console.log("Marker clicked for business:", business.bname);
-            showInfoWindow(this);
-        });
-
-        // Add to markers array
-        markers.push(marker);
-
-        // Add to bounds
-        if (bounds) {
+        // Add to bounds if successful
+        if (marker && bounds) {
             bounds.extend(position);
         }
 
@@ -3203,7 +3173,7 @@ async function setupMapClickHandler() {
                     };
 
                     // Show custom info window
-                    showInfoWindow(tempMarker);
+                    showEnhancedInfoWindow(tempMarker);
                 } catch (error) {
                     console.error("Error fetching place details:", error);
                     // Show a user-friendly message instead of breaking
@@ -4144,6 +4114,8 @@ document.addEventListener('DOMContentLoaded', function() {
     addCustomMarkerStyles();
     addChainBadgeStyles();
 
+    addEnhancedMarkerStyles();
+
     // Initialize business search functionality
     initBusinessSearch();
 
@@ -4590,6 +4562,687 @@ function performIncentivesFetch(businessId, incentivesDiv) {
         });
 }
 
+/**
+ * Enhanced marker creation with better styling and fallbacks
+ * @param {Object} business - Business object
+ * @param {Object} location - Google Maps location object
+ */
+async function createEnhancedBusinessMarker(business, location) {
+    try {
+        // Import the marker library
+        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+        // Create a position object from the location
+        let position = createSafeLatLng(location);
+        if (!position) {
+            console.error("Invalid position for enhanced marker:", location);
+            return createFallbackMarker(business, location);
+        }
+
+        // Determine marker styling
+        const isFromDatabase = !business.isGooglePlace;
+        const isNearby = business.isNearby === true;
+        const isChainLocation = !!business.chain_id;
+
+        // Choose marker color and style
+        let markerColor, markerClass;
+        if (isFromDatabase) {
+            markerColor = CONFIG.markerColors.primary; // Red for database businesses
+            markerClass = "primary";
+        } else {
+            markerColor = CONFIG.markerColors.nearby; // Blue for Google Places
+            markerClass = "nearby";
+        }
+
+        // Get business icon (emoji works better than Font Awesome in markers)
+        const businessIcon = getBusinessTypeTextIcon(business.type);
+
+        // Create enhanced pin element
+        const pinElement = document.createElement('div');
+        pinElement.className = 'enhanced-custom-marker';
+        pinElement.setAttribute('title', business.bname);
+        pinElement.style.cursor = 'pointer';
+
+        // Enhanced marker HTML with better styling
+        pinElement.innerHTML = `
+            <div class="enhanced-marker-container">
+                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor};">
+                    <div class="enhanced-marker-icon">
+                        ${businessIcon}
+                    </div>
+                </div>
+                <div class="enhanced-marker-shadow"></div>
+                ${isChainLocation ? '<div class="chain-indicator">⭐</div>' : ''}
+            </div>
+        `;
+
+        // Create the advanced marker
+        const marker = new AdvancedMarkerElement({
+            position: position,
+            map: map,
+            title: business.bname,
+            content: pinElement,
+            collisionBehavior: isFromDatabase ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
+        });
+
+        // Store the business data and position
+        marker.business = business;
+        marker.position = position;
+        marker.isFromDatabase = isFromDatabase;
+
+        // Add click event listener
+        pinElement.addEventListener('click', function(e) {
+            console.log("Enhanced marker clicked:", business.bname);
+            e.stopPropagation();
+            showEnhancedInfoWindow(marker);
+        });
+
+        // Add hover effects
+        pinElement.addEventListener('mouseenter', function() {
+            pinElement.style.transform = 'scale(1.1)';
+            pinElement.style.zIndex = '1000';
+        });
+
+        pinElement.addEventListener('mouseleave', function() {
+            pinElement.style.transform = 'scale(1)';
+            pinElement.style.zIndex = 'auto';
+        });
+
+        // Add the marker to our array
+        markers.push(marker);
+        console.log(`Added enhanced marker for ${business.bname}`);
+
+        return marker;
+    } catch (error) {
+        console.error("Error creating enhanced marker:", error);
+        return createFallbackMarker(business, location);
+    }
+}
+
+/**
+ * Enhanced info window with better content organization
+ * @param {Object} marker - The marker that was clicked
+ */
+function showEnhancedInfoWindow(marker) {
+    console.log("showEnhancedInfoWindow called with marker:", marker);
+
+    if (!marker || !marker.business) {
+        console.error("Invalid marker for enhanced info window", marker);
+        return;
+    }
+
+    const business = marker.business;
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+
+    // Close any existing info window
+    if (infoWindow) {
+        infoWindow.close();
+    }
+
+    // Create new info window
+    infoWindow = new google.maps.InfoWindow({
+        maxWidth: 320,
+        disableAutoPan: false
+    });
+
+    // Build enhanced content
+    const content = buildEnhancedInfoWindowContent(business);
+
+    // Set content
+    infoWindow.setContent(content);
+
+    // Get safe position
+    const position = marker.position || createSafeLatLng(business);
+    if (!position) {
+        console.error("Could not determine position for info window");
+        return;
+    }
+
+    // Pan to position
+    try {
+        map.panTo(position);
+    } catch (panError) {
+        console.warn("Error panning to position:", panError);
+    }
+
+    // Open info window
+    setTimeout(() => {
+        try {
+            if (marker.getPosition) {
+                infoWindow.open(map, marker);
+            } else {
+                infoWindow.setPosition(position);
+                infoWindow.open(map);
+            }
+
+            console.log("Enhanced info window opened successfully");
+
+            // Apply fixes after DOM is ready
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
+                setTimeout(() => {
+                    applyEnhancedInfoWindowFixes();
+
+                    // Load incentives with correct container ID
+                    if (!isGooglePlace) {
+                        loadIncentivesForEnhancedWindow(business._id);
+                    } else if (isChainLocation) {
+                        loadChainIncentivesForEnhancedWindow(business.placeId, business.chain_id);
+                    }
+                }, 100);
+            });
+
+        } catch (error) {
+            console.error("Error opening enhanced info window:", error);
+        }
+    }, 200);
+}
+
+/**
+ * Build enhanced info window content with better organization
+ * @param {Object} business - Business object
+ * @returns {string} HTML content
+ */
+function buildEnhancedInfoWindowContent(business) {
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+
+    // Format address
+    let addressHTML = '';
+    if (business.address1) {
+        addressHTML = `<div class="info-address">
+            <strong>📍 Address:</strong><br>
+            ${business.address1}
+            ${business.address2 ? `<br>${business.address2}` : ''}
+            <br>${business.city}, ${business.state} ${business.zip}
+        </div>`;
+    } else if (business.formattedAddress) {
+        addressHTML = `<div class="info-address">
+            <strong>📍 Address:</strong><br>${business.formattedAddress}
+        </div>`;
+    }
+
+    // Phone number
+    const phoneHTML = business.phone ?
+        `<div class="info-phone"><strong>📞 Phone:</strong> ${business.phone}</div>` : '';
+
+    // Business type
+    const typeHTML = business.type ?
+        `<div class="info-type"><strong>🏢 Type:</strong> ${getBusinessTypeLabel(business.type)}</div>` : '';
+
+    // Distance
+    const distanceHTML = business.distance ?
+        `<div class="info-distance"><strong>📏 Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</div>` : '';
+
+    // Chain badge
+    const chainBadge = isChainLocation ?
+        `<span class="enhanced-chain-badge">🔗 ${business.chain_name || 'Chain Location'}</span>` : '';
+
+    // Status indicator
+    const statusHTML = isGooglePlace ?
+        '<div class="info-status">ℹ️ This business is not yet in the Patriot Thanks database.</div>' :
+        '<div class="info-status">✅ This business is in the Patriot Thanks database.</div>';
+
+    // Chain explanation
+    const chainExplanation = isChainLocation && isGooglePlace ?
+        `<div class="chain-explanation">
+            🔗 This location appears to match <strong>${business.chain_name}</strong> in our database. 
+            Chain-wide incentives may apply to this location.
+        </div>` : '';
+
+    // Action button
+    let actionButton;
+    if (isGooglePlace) {
+        if (isChainLocation) {
+            actionButton = `
+                <button class="enhanced-add-btn" onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
+                    ➕ Add ${business.chain_name} Location
+                </button>
+            `;
+        } else {
+            actionButton = `
+                <button class="enhanced-add-btn" onclick="window.addBusinessToDatabase('${business.placeId}')">
+                    ➕ Add to Patriot Thanks
+                </button>
+            `;
+        }
+    } else {
+        actionButton = `
+            <button class="enhanced-view-btn" onclick="window.viewBusinessDetails('${business._id}')">
+                👁️ View Details
+            </button>
+        `;
+    }
+
+    // Unique container ID that matches what the loading functions expect
+    const containerId = business._id || business.placeId;
+
+    return `
+        <div class="enhanced-info-window">
+            <div class="info-header">
+                <h3>${business.bname} ${chainBadge}</h3>
+            </div>
+            
+            <div class="info-body">
+                ${addressHTML}
+                ${phoneHTML}
+                ${typeHTML}
+                ${distanceHTML}
+                ${statusHTML}
+                ${chainExplanation}
+                
+                <div class="info-incentives">
+                    <div id="incentives-container-${containerId}">
+                        ${isGooglePlace && !isChainLocation ?
+        '<em>💡 Add this business to see available incentives.</em>' :
+        '<em>⏳ Loading incentives...</em>'}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-actions">
+                ${actionButton}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Load incentives for enhanced info window (database businesses)
+ * @param {string} businessId - Business ID
+ */
+function loadIncentivesForEnhancedWindow(businessId) {
+    const container = document.getElementById(`incentives-container-${businessId}`);
+    if (!container) {
+        console.error("Enhanced incentives container not found for business:", businessId);
+        return;
+    }
+
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+
+    fetch(apiURL)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.results || data.results.length === 0) {
+                container.innerHTML = '<em>💭 No incentives available</em>';
+                return;
+            }
+
+            let incentivesHTML = '<div class="incentives-header"><strong>🎁 Available Incentives:</strong></div>';
+            incentivesHTML += '<div class="incentives-list">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+                    const chainBadge = incentive.is_chain_wide ?
+                        '<span class="mini-chain-badge">🔗 Chain-wide</span>' : '';
+
+                    incentivesHTML += `
+                        <div class="incentive-item">
+                            <div class="incentive-type">${typeLabel}${otherDescription}:</div>
+                            <div class="incentive-amount">${incentive.amount}% ${chainBadge}</div>
+                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                        </div>
+                    `;
+                }
+            });
+
+            incentivesHTML += '</div>';
+            container.innerHTML = incentivesHTML;
+        })
+        .catch(error => {
+            console.error("Error loading incentives:", error);
+            container.innerHTML = '<em>❌ Error loading incentives</em>';
+        });
+}
+
+/**
+ * Load chain incentives for enhanced info window (Google Places)
+ * @param {string} placeId - Google Place ID
+ * @param {string} chainId - Chain ID
+ */
+function loadChainIncentivesForEnhancedWindow(placeId, chainId) {
+    const container = document.getElementById(`incentives-container-${placeId}`);
+    if (!container) {
+        console.error("Enhanced chain incentives container not found for place:", placeId);
+        return;
+    }
+
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
+
+    fetch(apiURL)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.results || data.results.length === 0) {
+                container.innerHTML = '<em>💭 No chain incentives available</em>';
+                return;
+            }
+
+            let incentivesHTML = '<div class="incentives-header"><strong>🎁 Chain-wide Incentives:</strong></div>';
+            incentivesHTML += '<div class="incentives-list">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+
+                    incentivesHTML += `
+                        <div class="incentive-item">
+                            <div class="incentive-type">${typeLabel}${otherDescription}:</div>
+                            <div class="incentive-amount">${incentive.amount}% <span class="mini-chain-badge">🔗 Chain-wide</span></div>
+                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                        </div>
+                    `;
+                }
+            });
+
+            incentivesHTML += '</div>';
+            incentivesHTML += '<div class="chain-note">ℹ️ These incentives apply to all locations of this chain.</div>';
+
+            container.innerHTML = incentivesHTML;
+        })
+        .catch(error => {
+            console.error("Error loading chain incentives:", error);
+            container.innerHTML = '<em>❌ Error loading chain incentives</em>';
+        });
+}
+
+/**
+ * Apply enhanced info window positioning fixes
+ */
+function applyEnhancedInfoWindowFixes() {
+    const iwContainer = document.querySelector('.gm-style-iw-c');
+    const iwTail = document.querySelector('.gm-style-iw-t');
+
+    if (iwContainer) {
+        const rect = iwContainer.getBoundingClientRect();
+
+        // Fix width if too small
+        if (rect.width < 50) {
+            iwContainer.style.width = 'auto';
+            iwContainer.style.minWidth = '300px';
+            iwContainer.style.maxWidth = '350px';
+        }
+
+        // Fix positioning if off-screen
+        if (rect.top < 0 || rect.top > window.innerHeight || rect.left < 0 || rect.left > window.innerWidth) {
+            iwContainer.style.position = 'relative';
+            iwContainer.style.transform = 'none';
+        }
+
+        // Fix tail positioning
+        if (iwTail) {
+            iwTail.style.bottom = '0px';
+            iwTail.style.left = '50%';
+            iwTail.style.right = 'auto';
+            iwTail.style.transform = 'translateX(-50%)';
+        }
+    }
+}
+
+/**
+ * Add enhanced marker and info window styles
+ */
+function addEnhancedMarkerStyles() {
+    if (!document.getElementById('enhanced-marker-styles')) {
+        const style = document.createElement('style');
+        style.id = 'enhanced-marker-styles';
+        style.textContent = `
+            /* Enhanced marker container */
+            .enhanced-custom-marker {
+                cursor: pointer;
+                transition: transform 0.2s ease;
+                z-index: 100;
+            }
+
+            .enhanced-marker-container {
+                position: relative;
+                width: 36px;
+                height: 46px;
+            }
+
+            /* Enhanced pin styling */
+            .enhanced-marker-pin {
+                width: 32px;
+                height: 40px;
+                border-radius: 50% 50% 50% 0;
+                transform: rotate(-45deg);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+                position: absolute;
+                top: 0;
+                left: 2px;
+                border: 2px solid white;
+            }
+
+            .enhanced-marker-pin.primary {
+                background: linear-gradient(45deg, #EA4335, #FF6B6B);
+            }
+
+            .enhanced-marker-pin.nearby {
+                background: linear-gradient(45deg, #4285F4, #64B5F6);
+            }
+
+            /* Enhanced icon styling */
+            .enhanced-marker-icon {
+                transform: rotate(45deg);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 20px;
+                height: 20px;
+                font-size: 16px;
+                filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+            }
+
+            /* Enhanced shadow */
+            .enhanced-marker-shadow {
+                position: absolute;
+                bottom: -2px;
+                left: 8px;
+                width: 20px;
+                height: 8px;
+                background: radial-gradient(ellipse, rgba(0,0,0,0.3) 0%, transparent 70%);
+                border-radius: 50%;
+                filter: blur(1px);
+            }
+
+            /* Chain indicator */
+            .chain-indicator {
+                position: absolute;
+                top: -5px;
+                right: -5px;
+                background: #FFD700;
+                border-radius: 50%;
+                width: 18px;
+                height: 18px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                border: 2px solid white;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                z-index: 1001;
+            }
+
+            /* Enhanced info window styles */
+            .enhanced-info-window {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                max-width: 320px;
+                line-height: 1.4;
+            }
+
+            .info-header {
+                border-bottom: 2px solid #f0f0f0;
+                padding-bottom: 8px;
+                margin-bottom: 12px;
+            }
+
+            .info-header h3 {
+                margin: 0;
+                font-size: 16px;
+                color: #333;
+                font-weight: 600;
+            }
+
+            .enhanced-chain-badge {
+                display: inline-block;
+                background: linear-gradient(45deg, #4285F4, #64B5F6);
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 11px;
+                margin-left: 8px;
+                font-weight: 500;
+            }
+
+            .info-body > div {
+                margin: 8px 0;
+                font-size: 14px;
+            }
+
+            .info-address, .info-phone, .info-type, .info-distance {
+                color: #555;
+            }
+
+            .info-status {
+                padding: 6px 10px;
+                border-radius: 6px;
+                font-size: 13px;
+                margin: 10px 0;
+            }
+
+            .info-status:has-text("✅") {
+                background-color: #e8f5e8;
+                color: #2e7d32;
+            }
+
+            .info-status:has-text("ℹ️") {
+                background-color: #e3f2fd;
+                color: #1565c0;
+            }
+
+            .chain-explanation {
+                background-color: #fff3e0;
+                padding: 8px;
+                border-radius: 6px;
+                font-size: 13px;
+                color: #ef6c00;
+                border-left: 3px solid #ff9800;
+            }
+
+            .info-incentives {
+                margin: 12px 0;
+            }
+
+            .incentives-header {
+                font-weight: 600;
+                color: #333;
+                margin-bottom: 8px;
+            }
+
+            .incentive-item {
+                background-color: #f8f9fa;
+                padding: 8px;
+                border-radius: 6px;
+                margin: 6px 0;
+                border-left: 3px solid #4285F4;
+            }
+
+            .incentive-type {
+                font-weight: 500;
+                color: #333;
+            }
+
+            .incentive-amount {
+                font-size: 16px;
+                font-weight: 600;
+                color: #2e7d32;
+                margin: 2px 0;
+            }
+
+            .incentive-info {
+                font-size: 12px;
+                color: #666;
+                font-style: italic;
+                margin-top: 4px;
+            }
+
+            .mini-chain-badge {
+                background: #4285F4;
+                color: white;
+                padding: 1px 6px;
+                border-radius: 8px;
+                font-size: 10px;
+                margin-left: 4px;
+            }
+
+            .chain-note {
+                font-size: 12px;
+                color: #666;
+                font-style: italic;
+                margin-top: 8px;
+                padding: 4px 8px;
+                background-color: #f0f8ff;
+                border-radius: 4px;
+            }
+
+            .info-actions {
+                margin-top: 12px;
+                padding-top: 12px;
+                border-top: 1px solid #eee;
+                text-align: center;
+            }
+
+            .enhanced-add-btn, .enhanced-view-btn {
+                background: linear-gradient(45deg, #4285F4, #64B5F6);
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 500;
+                font-size: 14px;
+                transition: all 0.2s ease;
+                width: 100%;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+
+            .enhanced-add-btn {
+                background: linear-gradient(45deg, #EA4335, #FF6B6B);
+            }
+
+            .enhanced-add-btn:hover, .enhanced-view-btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            }
+
+            /* Responsive adjustments */
+            @media (max-width: 400px) {
+                .enhanced-info-window {
+                    max-width: 280px;
+                }
+                
+                .enhanced-marker-container {
+                    width: 32px;
+                    height: 42px;
+                }
+                
+                .enhanced-marker-pin {
+                    width: 28px;
+                    height: 36px;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = retrieveFromMongoDB;
@@ -4607,5 +5260,9 @@ if (typeof window !== 'undefined') {
     window.safeExtractCoordinates = safeExtractCoordinates;
     window.showInfoWindow = showInfoWindow;
     window.withErrorHandling = withErrorHandling;
+    window.createEnhancedBusinessMarker = createEnhancedBusinessMarker;
+    window.showEnhancedInfoWindow = showEnhancedInfoWindow;
+    window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
+    window.addEnhancedMarkerStyles = addEnhancedMarkerStyles;
 }
 
