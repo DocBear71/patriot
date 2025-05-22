@@ -1227,15 +1227,25 @@ async function retrieveFromMongoDB(formData, bustCache = false) {
         if (formData.businessName && formData.businessName.trim() !== '') {
             params.business_name = formData.businessName;
         }
-        if (formData.address && formData.address.trim() !== '') {
+
+        // CRITICAL FIX: Only send address if we DON'T have geocoded coordinates
+        // The server gets confused when it receives both address and lat/lng
+        if (formData.address && formData.address.trim() !== '' && !searchLocation) {
             params.address = formData.address;
         }
 
-        // Add location parameters if we have them
+        //  Add location parameters if we have them
         if (searchLocation && searchLocation.lat && searchLocation.lng) {
             params.lat = searchLocation.lat;
             params.lng = searchLocation.lng;
             params.radius = 25; // Search radius in miles
+
+            // Log the geocoded location for debugging
+            console.log("Using geocoded search location:", searchLocation);
+            console.log("NOT sending address parameter to avoid server confusion");
+        } else if (formData.address && formData.address.trim() !== '') {
+            // Only log this if we're using address-only search
+            console.log("Using address-only search (no geocoding):", formData.address);
         }
 
         // Add cache-busting parameter if requested
@@ -1248,7 +1258,8 @@ async function retrieveFromMongoDB(formData, bustCache = false) {
         // Get base URL and build API endpoint
         const baseURL = getBaseURL();
         const apiURL = `${baseURL}/api/business.js?operation=search&${queryParams}`;
-        console.log("Submitting search to API:", apiURL);
+        console.log("Fixed API call (should find both locations):", apiURL);
+
 
         const response = await fetch(apiURL, {
             method: 'GET',
