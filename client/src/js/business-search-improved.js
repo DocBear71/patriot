@@ -1713,6 +1713,58 @@ function applyMapHeightFix() {
     }
 }
 
+const mapHeightCSS = `
+#map {
+    width: 100%;
+    height: 800px !important; /* Increased from 500px */
+    min-height: 800px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin: 10px 0;
+    position: relative;
+}
+
+#map-container {
+    width: 100%;
+    margin: 20px 0;
+    clear: both;
+}
+
+.map-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 0 5px;
+}
+
+/* Ensure proper info window positioning */
+.gm-style .gm-style-iw-c {
+    padding: 0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3) !important;
+    max-width: 330px !important;
+    max-height: 400px !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+.gm-style .gm-style-iw-d {
+    overflow: auto !important;
+    max-height: 350px !important;
+    padding-right: 8px !important;
+}
+
+/* Fix info window tail positioning */
+.gm-style .gm-style-iw-t::after {
+    background: white !important;
+    border-radius: 50% !important;
+    width: 12px !important;
+    height: 12px !important;
+    border: 1px solid #ccc !important;
+}
+`;
+
 /**
  * Show info window for a business marker
  * @param {Object} marker - The marker that was clicked
