@@ -1725,8 +1725,8 @@ const mapHeightCSS = `
 }
 
 #map-container {
-    width: 100%;
-    margin: 20px 0;
+    width: 90%;
+    margin: 20px auto;
     clear: both;
 }
 
@@ -1755,14 +1755,7 @@ const mapHeightCSS = `
     padding-right: 8px !important;
 }
 
-/* Fix info window tail positioning */
-.gm-style .gm-style-iw-t::after {
-    background: white !important;
-    border-radius: 50% !important;
-    width: 12px !important;
-    height: 12px !important;
-    border: 1px solid #ccc !important;
-}
+
 `;
 
 /**

@@ -205,7 +205,7 @@
 
 /* Map container styles */
 #map-container {
-    width: 100%;
+    width: 90%;
     margin: 20px auto;
     padding: 15px;
     background-color: #f8f9fa;
@@ -353,7 +353,7 @@
 /* Responsive design for map */
 @media (max-width: 768px) {
     #map-container {
-        width: 95%;
+        width: 90%;
         padding: 10px;
     }
 
