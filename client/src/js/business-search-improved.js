@@ -344,7 +344,6 @@ function createNewBounds() {
     return new google.maps.LatLngBounds();
 }
 
-
 // Global flag to track if Google Maps is being initialized
 let googleMapsInitializing = false;
 
@@ -1785,8 +1784,6 @@ function showBusinessInfoWindow(marker) {
     }
 }
 
-
-
 /**
  * Fetch chain incentives for a Google Places result - simple version
  * @param {string} placeId - Google Place ID
@@ -2785,10 +2782,79 @@ function applyInfoWindowScrollableStyles() {
             .gm-style .gm-style-iw-d {
                 overflow: auto !important;
                 max-height: 350px !important;
-                padding-right: 8px !important;
+                padding-right: 8px !important; /* Allow space for scrollbar */
             }
             
-            /* Custom scrollbar */
+            /* Custom info window styles */
+            .info-window {
+                padding: 12px;
+                max-width: 300px;
+            }
+            
+            .info-window h3 {
+                margin-top: 0;
+                margin-bottom: 10px;
+                color: #212121;
+                font-size: 16px;
+                line-height: 1.3;
+            }
+            
+            .info-window p {
+                margin: 6px 0;
+                font-size: 14px;
+                line-height: 1.4;
+            }
+            
+            .info-window-actions {
+                margin-top: 12px;
+                padding-top: 8px;
+                border-top: 1px solid #eee;
+                text-align: right;
+            }
+            
+            .add-business-btn {
+                background-color: #EA4335;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 5px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            
+            .add-business-btn:hover {
+                background-color: #D32F2F;
+            }
+            
+            .view-details-btn {
+                background-color: #4285F4;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 5px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            
+            .view-details-btn:hover {
+                background-color: #2A75F3;
+            }
+            
+            /* Incentives list */
+            .incentives-list {
+                margin: 8px 0;
+                padding-left: 20px;
+            }
+            
+            .incentives-list li {
+                margin-bottom: 6px;
+            }
+            
+            /* Custom scrollbar styles */
             .gm-style .gm-style-iw-d::-webkit-scrollbar {
                 width: 6px;
                 height: 6px;
@@ -2806,6 +2872,12 @@ function applyInfoWindowScrollableStyles() {
             
             .gm-style .gm-style-iw-d::-webkit-scrollbar-thumb:hover {
                 background: #a8a8a8;
+            }
+            
+            /* Close button adjustment */
+            .gm-ui-hover-effect {
+                top: 2px !important;
+                right: 2px !important;
             }
         `;
         document.head.appendChild(style);
