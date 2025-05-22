@@ -1652,27 +1652,29 @@ function createBusinessMarker(business) {
         const isFromDatabase = !business.isGooglePlace;
         const markerColor = isFromDatabase ? CONFIG.markerColors.primary : CONFIG.markerColors.nearby;
 
-        // Create marker
+        // Create marker with improved settings
         const marker = new google.maps.Marker({
             position: position,
             map: map,
             title: business.bname,
             animation: google.maps.Animation.DROP,
+            optimized: false, // Disable optimization for better click handling
             icon: {
                 path: google.maps.SymbolPath.CIRCLE,
                 fillColor: markerColor,
                 fillOpacity: 1,
-                strokeWeight: 1,
+                strokeWeight: 2,
                 strokeColor: '#FFFFFF',
-                scale: 10
+                scale: 12 // Slightly larger for easier clicking
             }
         });
 
         // Store business data
         marker.business = business;
 
-        // Add click event
-        marker.addListener('click', function () {
+        // Add click event with improved handling
+        marker.addListener('click', function() {
+            console.log("Marker clicked for business:", business.bname);
             showInfoWindow(this);
         });
 
@@ -1688,6 +1690,26 @@ function createBusinessMarker(business) {
     } catch (error) {
         console.error("Error creating business marker:", error);
         return null;
+    }
+}
+
+function applyMapHeightFix() {
+    // Check if styles already applied
+    if (!document.getElementById('map-height-fix')) {
+        const style = document.createElement('style');
+        style.id = 'map-height-fix';
+        style.textContent = mapHeightCSS;
+        document.head.appendChild(style);
+
+        console.log("Applied map height and info window positioning fixes");
+
+        // Force map resize if it exists
+        if (map && google.maps.event) {
+            setTimeout(() => {
+                google.maps.event.trigger(map, 'resize');
+                console.log("Triggered map resize event");
+            }, 100);
+        }
     }
 }
 
@@ -1945,83 +1967,101 @@ function showInfoWindow(marker) {
     if (!infoWindow) {
         infoWindow = new google.maps.InfoWindow({
             maxWidth: 320,
-            disableAutoPan: false
+            disableAutoPan: false, // Allow auto-pan to keep info window visible
+            pixelOffset: new google.maps.Size(0, -10) // Offset to position better relative to marker
         });
     }
 
     // Set content for the info window
     infoWindow.setContent(contentString);
 
-    // Apply scrollable styles
-    applyInfoWindowScrollableStyles();
+    // Close any existing info window first
+    infoWindow.close();
 
-    // Open the info window based on marker type
+    // Get the marker position
+    let markerPosition;
     try {
-        if (marker.getPosition) {
-            // It's a standard Google Maps marker
-            infoWindow.open(map, marker);
-        } else if (typeof marker.position === 'object' && marker.position !== null) {
-            // For both AdvancedMarkerElement and position objects
-            if (marker.position.lat && typeof marker.position.lat === 'function') {
-                // It's a LatLng object
-                infoWindow.setPosition(marker.position);
-                infoWindow.open(map);
-            } else if (marker.position.lat && typeof marker.position.lat === 'number') {
-                // It's a position object with lat/lng properties
-                infoWindow.setPosition(new google.maps.LatLng(
-                    marker.position.lat,
-                    marker.position.lng
-                ));
-                infoWindow.open(map);
-            } else {
-                // Try to open it against the marker
-                infoWindow.open(map, marker);
+        if (marker.getPosition && typeof marker.getPosition === 'function') {
+            markerPosition = marker.getPosition();
+        } else if (marker.position) {
+            if (typeof marker.position.lat === 'function') {
+                markerPosition = marker.position;
+            } else if (typeof marker.position.lat === 'number') {
+                markerPosition = new google.maps.LatLng(marker.position.lat, marker.position.lng);
             }
-        } else {
-            // Fallback for any other marker type
-            if (business.lat && business.lng) {
-                infoWindow.setPosition(new google.maps.LatLng(business.lat, business.lng));
-                infoWindow.open(map);
-            } else {
-                console.error("Unable to position info window for marker");
-            }
+        } else if (business.lat && business.lng) {
+            markerPosition = new google.maps.LatLng(business.lat, business.lng);
         }
+
+        if (!markerPosition) {
+            throw new Error("Could not determine marker position");
+        }
+
+        // Pan to marker position first to ensure it's visible
+        map.panTo(markerPosition);
+
+        // Small delay to allow pan to complete, then open info window
+        setTimeout(() => {
+            try {
+                // Open the info window at the marker position
+                if (marker.getPosition) {
+                    // Standard marker
+                    infoWindow.open(map, marker);
+                } else {
+                    // Advanced marker or custom marker
+                    infoWindow.setPosition(markerPosition);
+                    infoWindow.open(map);
+                }
+
+                console.log("Info window opened successfully");
+            } catch (openError) {
+                console.error("Error opening info window:", openError);
+                // Fallback: try setting position directly
+                infoWindow.setPosition(markerPosition);
+                infoWindow.open(map);
+            }
+        }, 200);
+
     } catch (error) {
-        console.error("Error opening info window:", error);
-        // Final fallback - try to get position from business
+        console.error("Error positioning info window:", error);
+
+        // Final fallback - try to get position from business data
         if (business.lat && business.lng) {
-            infoWindow.setPosition(new google.maps.LatLng(business.lat, business.lng));
-            infoWindow.open(map);
+            const fallbackPosition = new google.maps.LatLng(business.lat, business.lng);
+            map.panTo(fallbackPosition);
+            setTimeout(() => {
+                infoWindow.setPosition(fallbackPosition);
+                infoWindow.open(map);
+            }, 200);
+        } else {
+            alert("Could not display information for this business.");
+            return;
         }
     }
-
-    console.log("Opened info window for marker");
 
     // Only fetch incentives if it's in our database
     if (!isGooglePlace) {
         fetchBusinessIncentivesForInfoWindow(business._id);
     }
 
-    // Add event listener to ensure scrollable styles are applied when the window opens
+    // Add event listener to ensure proper positioning when the window opens
     google.maps.event.addListener(infoWindow, 'domready', function() {
-        console.log("Info window DOM ready, forcing scrollable behavior");
+        console.log("Info window DOM ready, applying final positioning fixes");
 
-        // Force scrollable styling application
+        // Ensure the info window is properly positioned
         const iwOuter = document.querySelector('.gm-style-iw');
         if (iwOuter) {
-            const iwBackground = iwOuter.previousElementSibling;
-            if (iwBackground) {
-                iwBackground.style.display = 'none'; // Remove background if needed
-            }
-
-            // Force scrollable
+            // Improve close button positioning
             const iwCloseBtn = iwOuter.nextElementSibling;
             if (iwCloseBtn) {
                 iwCloseBtn.style.top = '3px';
                 iwCloseBtn.style.right = '3px';
+                iwCloseBtn.style.width = '24px';
+                iwCloseBtn.style.height = '24px';
+                iwCloseBtn.style.opacity = '0.8';
             }
 
-            // Add specific scrollable class to the container
+            // Ensure scrollable content
             const iwContainer = iwOuter.querySelector('.gm-style-iw-d');
             if (iwContainer) {
                 iwContainer.style.overflow = 'auto';
@@ -2030,6 +2070,7 @@ function showInfoWindow(marker) {
         }
     });
 }
+
 
 /**
  * Fixed displayBusinessesOnMap function for better GeoJSON handling
@@ -2375,9 +2416,12 @@ function showErrorMessage(message, container) {
  * Initialize the Google Map
  */
 window.initGoogleMap = function() {
-    console.log("Global initGoogleMap function called");
+    console.log("Enhanced initGoogleMap function called");
 
     try {
+        // Apply CSS fixes first
+        applyMapHeightFix();
+
         // Check if map container exists
         const mapContainer = document.getElementById("map");
         if (!mapContainer) {
@@ -2389,18 +2433,30 @@ window.initGoogleMap = function() {
 
         // Only create the map if it doesn't already exist
         if (!map) {
-            // Create map with POI clicks enabled
+            // Create map with enhanced settings for better info window handling
             map = new google.maps.Map(mapContainer, {
                 center: CONFIG.defaultCenter,
                 zoom: CONFIG.defaultZoom,
                 mapId: CONFIG.mapId || 'ebe8ec43a7bc252d',
-                clickableIcons: true
+                clickableIcons: true,
+                gestureHandling: 'greedy', // Better touch handling
+                zoomControl: true,
+                mapTypeControl: false,
+                scaleControl: true,
+                streetViewControl: false,
+                rotateControl: false,
+                fullscreenControl: true
             });
 
-            console.log("Map object created:", !!map);
+            console.log("Map object created with enhanced settings:", !!map);
 
-            // Create info window and bounds
-            infoWindow = new google.maps.InfoWindow();
+            // Create info window with better settings
+            infoWindow = new google.maps.InfoWindow({
+                maxWidth: 320,
+                disableAutoPan: false,
+                pixelOffset: new google.maps.Size(0, -10)
+            });
+
             bounds = new google.maps.LatLngBounds();
 
             // Add initial message
@@ -2411,7 +2467,7 @@ window.initGoogleMap = function() {
 
             // Set initialization flag
             mapInitialized = true;
-            console.log("Google Map successfully initialized");
+            console.log("Google Map successfully initialized with enhanced settings");
 
             // Process any pending businesses
             if (pendingBusinessesToDisplay.length > 0) {
@@ -2424,8 +2480,18 @@ window.initGoogleMap = function() {
             setupMapClickHandler();
             setupMarkerClickPriority();
             initAdditionalMapFeatures();
+
+            // Trigger resize to ensure proper rendering
+            setTimeout(() => {
+                google.maps.event.trigger(map, 'resize');
+            }, 200);
+
         } else {
-            console.log("Map already exists, skipping initialization");
+            console.log("Map already exists, applying height fix and triggering resize");
+            applyMapHeightFix();
+            setTimeout(() => {
+                google.maps.event.trigger(map, 'resize');
+            }, 100);
         }
 
     } catch (error) {
@@ -3005,6 +3071,7 @@ function fetchBusinessAndCreateMarker(businessId) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log("DOM loaded, initializing business search...");
 
+    applyMapHeightFix();
     // Add custom styles
     addCustomMarkerStyles();
     addChainBadgeStyles();
