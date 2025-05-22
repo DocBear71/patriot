@@ -2012,50 +2012,20 @@ function showInfoWindow(marker) {
     business.lat = businessLat;
     business.lng = businessLng;
 
-    // Format content
-    const addressLine = business.address2
-        ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
-        : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
-
-    const businessType = getBusinessTypeLabel(business.type);
-    const phoneDisplay = business.phone ? `<p><strong>Phone:</strong> ${business.phone}</p>` : '';
-    const distanceDisplay = business.distance && !isNaN(business.distance)
-        ? `<p><strong>Distance:</strong> ${(business.distance / 1609.34).toFixed(1)} miles</p>`
-        : '';
-
-    const isGooglePlace = business.isGooglePlace === true;
-    const businessDisplayId = isGooglePlace ? business.placeId : business._id;
-
-    let actionButtons;
-    if (isGooglePlace) {
-        actionButtons = `<button class="add-business-btn" onclick="window.addBusinessToDatabase('${business.placeId}')">Add to Patriot Thanks</button>`;
-    } else {
-        actionButtons = `<button class="view-details-btn" onclick="window.viewBusinessDetails('${business._id}')">View Details</button>`;
-    }
-
-    // Content with inline styles for better control
+    // Simple content for testing
     const contentString = `
-    <div class="info-window" style="padding: 10px; max-width: 280px;">
-        <h3 style="margin: 0 0 8px 0; font-size: 16px;">${business.bname}</h3>
-        <p style="margin: 4px 0;"><strong>Address:</strong><br>${addressLine}</p>
-        ${phoneDisplay}
-        ${distanceDisplay}
-        <p style="margin: 4px 0;"><strong>Type:</strong> ${businessType}</p>
-        <div id="info-window-incentives-${businessDisplayId}" style="margin: 8px 0;">
-            <p><strong>Incentives:</strong> <em>${isGooglePlace ? 'Not in database' : 'Loading...'}</em></p>
-        </div>
-        ${isGooglePlace ? '<p style="font-style: italic; color: #666;">This business is not yet in the Patriot Thanks database.</p>' : ''}
-        <div style="margin-top: 10px; text-align: center;">
-            ${actionButtons}
-        </div>
+    <div style="padding: 10px; max-width: 250px;">
+        <h3 style="margin: 0 0 8px 0;">${business.bname}</h3>
+        <p style="margin: 4px 0;"><strong>Address:</strong><br>${business.address1}</p>
+        <p style="margin: 4px 0;"><strong>Type:</strong> ${getBusinessTypeLabel(business.type)}</p>
     </div>
     `;
 
-    // Create or reuse info window
+    // Create info window with MINIMAL configuration
     if (!infoWindow) {
         infoWindow = new google.maps.InfoWindow({
-            maxWidth: 300,
-            disableAutoPan: false
+            maxWidth: 280
+            // No pixelOffset, no other fancy options
         });
     }
 
@@ -2081,10 +2051,21 @@ function showInfoWindow(marker) {
 
                 console.log("Info window opened successfully");
 
+                // Check if it's visible after opening
+                setTimeout(() => {
+                    const iwElement = document.querySelector('.gm-style-iw-c');
+                    if (iwElement) {
+                        const rect = iwElement.getBoundingClientRect();
+                        console.log("Info window position after opening:", rect);
+                        if (rect.top < 0 || rect.top > window.innerHeight) {
+                            console.log("Info window is outside viewport, attempting gentle fix...");
+                            gentlyFixInfoWindowPosition();
+                        }
+                    }
+                }, 200);
+
             } catch (openError) {
                 console.error("Error opening info window:", openError);
-                infoWindow.setPosition(markerPosition);
-                infoWindow.open(map);
             }
         }, 300);
 
@@ -2093,36 +2074,181 @@ function showInfoWindow(marker) {
         return;
     }
 
-    // CRITICAL: Add DOM ready handler with tail positioning fix
+    // Very simple DOM ready handler - NO aggressive fixes initially
     google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
-        console.log("Info window DOM ready, applying positioning fixes");
+        console.log("Info window DOM ready");
 
         setTimeout(() => {
-            // FIX THE TAIL POSITIONING ISSUE
-            fixInfoWindowTailPositioning();
-
-            // Apply other fixes
-            const iwOuter = document.querySelector('.gm-style-iw');
-            if (iwOuter) {
-                const iwCloseBtn = iwOuter.nextElementSibling;
-                if (iwCloseBtn) {
-                    iwCloseBtn.style.top = '3px';
-                    iwCloseBtn.style.right = '3px';
-                    iwCloseBtn.style.width = '24px';
-                    iwCloseBtn.style.height = '24px';
-                    iwCloseBtn.style.opacity = '0.8';
-                }
-            }
-
-            // Load incentives for database businesses
-            if (!isGooglePlace) {
-                setTimeout(() => {
-                    fetchBusinessIncentivesForInfoWindow(business._id);
-                }, 100);
-            }
-        }, 50); // Shorter delay for faster fix
+            checkAndReportInfoWindowPosition();
+        }, 100);
     });
 }
+
+function gentlyFixInfoWindowPosition() {
+    console.log("Applying gentle info window position fix...");
+
+    const tailElement = document.querySelector('.gm-style-iw-t');
+    if (tailElement) {
+        const currentStyles = window.getComputedStyle(tailElement);
+        console.log("Current tail styles:", {
+            bottom: currentStyles.bottom,
+            right: currentStyles.right,
+            left: currentStyles.left,
+            position: currentStyles.position
+        });
+
+        // Only fix if it has the problematic positioning
+        if (currentStyles.bottom === '34px' && currentStyles.right === '0px') {
+            console.log("Found problematic tail positioning, applying gentle fix...");
+
+            // Just change the bottom value, leave everything else alone
+            tailElement.style.bottom = '0px';
+
+            console.log("Applied gentle fix - changed bottom from 34px to 0px");
+
+            // Check if this fixes the positioning
+            setTimeout(() => {
+                const iwElement = document.querySelector('.gm-style-iw-c');
+                if (iwElement) {
+                    const rect = iwElement.getBoundingClientRect();
+                    console.log("Info window position after gentle fix:", rect);
+                }
+            }, 100);
+        }
+    }
+}
+
+// Function to check and report info window position without changing anything
+function checkAndReportInfoWindowPosition() {
+    console.log("=== INFO WINDOW POSITION REPORT ===");
+
+    const iwContainer = document.querySelector('.gm-style-iw-c');
+    const iwContent = document.querySelector('.gm-style-iw-d');
+    const tailElement = document.querySelector('.gm-style-iw-t');
+
+    if (iwContainer) {
+        const rect = iwContainer.getBoundingClientRect();
+        const styles = window.getComputedStyle(iwContainer);
+
+        console.log("Container position:", rect);
+        console.log("Container visibility:", styles.visibility);
+        console.log("Container display:", styles.display);
+        console.log("Container opacity:", styles.opacity);
+        console.log("Container transform:", styles.transform);
+
+        // Determine status
+        const isVisible = rect.width > 0 && rect.height > 0;
+        const isInViewport = rect.top >= 0 && rect.top <= window.innerHeight &&
+            rect.left >= 0 && rect.left <= window.innerWidth;
+
+        console.log("Is visible:", isVisible);
+        console.log("Is in viewport:", isInViewport);
+
+        if (!isInViewport && tailElement) {
+            const tailStyles = window.getComputedStyle(tailElement);
+            console.log("Tail styles:", {
+                bottom: tailStyles.bottom,
+                right: tailStyles.right,
+                left: tailStyles.left,
+                width: tailStyles.width,
+                height: tailStyles.height
+            });
+        }
+    } else {
+        console.log("No info window container found");
+    }
+
+    console.log("=== END REPORT ===");
+}
+
+// Remove any existing aggressive CSS that might be hiding things
+function removeAggressiveCSS() {
+    const stylesToRemove = [
+        'final-info-window-fix',
+        'info-window-position-fix',
+        'minimal-info-window-fix'
+    ];
+
+    stylesToRemove.forEach(id => {
+        const existingStyle = document.getElementById(id);
+        if (existingStyle) {
+            console.log("Removing potentially problematic CSS:", id);
+            existingStyle.remove();
+        }
+    });
+}
+
+// Apply only the most basic CSS to ensure visibility
+function applyBasicInfoWindowCSS() {
+    if (!document.getElementById('basic-info-window-css')) {
+        const style = document.createElement('style');
+        style.id = 'basic-info-window-css';
+        style.textContent = `
+            /* Very basic CSS - just ensure visibility */
+            .gm-style .gm-style-iw-c {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            .gm-style .gm-style-iw {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            /* Map height fix */
+            #map-container {
+                width: 90%;
+                margin: 20px auto;
+                clear: both;
+                position: relative;
+            }
+
+            #map {
+                width: 100%;
+                height: 800px !important;
+                min-height: 800px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                margin: 10px 0;
+                position: relative;
+                z-index: 1;
+            }
+        `;
+        document.head.appendChild(style);
+        console.log("Applied basic info window CSS");
+    }
+}
+
+// Test function you can call from console
+window.testInfoWindow = function() {
+    console.log("=== TESTING INFO WINDOW SETUP ===");
+
+    // Remove aggressive CSS
+    removeAggressiveCSS();
+
+    // Apply basic CSS
+    applyBasicInfoWindowCSS();
+
+    // Close any existing info window
+    if (infoWindow) {
+        infoWindow.close();
+    }
+
+    console.log("Reset complete. Try clicking a marker now.");
+    console.log("If it still doesn't work, run: checkAndReportInfoWindowPosition()");
+};
+
+// Auto-setup when DOM loads
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        removeAggressiveCSS();
+        applyBasicInfoWindowCSS();
+    }, 500);
+});
+
+console.log("Step-by-step info window fix loaded. Run testInfoWindow() in console to reset everything.");
 
 // IMPROVED: More aggressive tail positioning fix
 function fixInfoWindowTailPositioning() {
