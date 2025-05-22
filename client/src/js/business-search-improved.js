@@ -2078,11 +2078,114 @@ function showInfoWindow(marker) {
     google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
         console.log("Info window DOM ready");
 
+        // Wait a bit for Google to finish positioning
         setTimeout(() => {
+            // Check current position
             checkAndReportInfoWindowPosition();
+
+            // Apply just the tail fix
+            applyTargetedTailFix();
+
+            // If this business is from the database, load incentives
+            if (!business.isGooglePlace) {
+                setTimeout(() => {
+                    fetchBusinessIncentivesForInfoWindow(business._id, false);
+                }, 100);
+            }
         }, 100);
     });
 }
+
+function applyTargetedTailFix() {
+    console.log("Applying targeted tail fix...");
+
+    const tailElement = document.querySelector('.gm-style-iw-t');
+    if (tailElement) {
+        const currentStyles = window.getComputedStyle(tailElement);
+        console.log("Current tail positioning:", {
+            bottom: currentStyles.bottom,
+            right: currentStyles.right,
+            left: currentStyles.left,
+            width: currentStyles.width,
+            height: currentStyles.height
+        });
+
+        // Store original values for comparison
+        const originalBottom = currentStyles.bottom;
+        const originalRight = currentStyles.right;
+
+        // Apply the minimal fix - just center the tail at the bottom
+        tailElement.style.setProperty('bottom', '0px', 'important');
+        tailElement.style.setProperty('left', '50%', 'important');
+        tailElement.style.setProperty('right', 'auto', 'important');
+        tailElement.style.setProperty('transform', 'translateX(-50%)', 'important');
+
+        console.log(`Applied tail fix: changed bottom from ${originalBottom} to 0px, right from ${originalRight} to auto`);
+
+        // Check the result
+        setTimeout(() => {
+            const newRect = document.querySelector('.gm-style-iw-c').getBoundingClientRect();
+            console.log("Info window position after tail fix:", newRect);
+
+            const newTailStyles = window.getComputedStyle(tailElement);
+            console.log("New tail positioning:", {
+                bottom: newTailStyles.bottom,
+                right: newTailStyles.right,
+                left: newTailStyles.left,
+                transform: newTailStyles.transform
+            });
+        }, 50);
+    } else {
+        console.log("No tail element found for fixing");
+    }
+}
+
+function applyCSSOnlyTailFix() {
+    if (!document.getElementById('css-only-tail-fix')) {
+        const style = document.createElement('style');
+        style.id = 'css-only-tail-fix';
+        style.textContent = `
+            /* Target only the tail positioning without affecting the container */
+            .gm-style .gm-style-iw-t {
+                bottom: 0px !important;
+                left: 50% !important;
+                right: auto !important;
+                transform: translateX(-50%) !important;
+                width: 20px !important;
+                height: 15px !important;
+            }
+            
+            /* Don't touch the main container transform */
+            .gm-style .gm-style-iw-c {
+                /* Let Google handle the main positioning */
+            }
+        `;
+        document.head.appendChild(style);
+        console.log("Applied CSS-only tail fix");
+    }
+}
+
+// Test function for the tail fix specifically
+window.testTailFix = function() {
+    console.log("Testing tail fix...");
+
+    // Remove any existing fix
+    const existingFix = document.getElementById('css-only-tail-fix');
+    if (existingFix) {
+        existingFix.remove();
+        console.log("Removed existing tail fix");
+    }
+
+    // Apply the CSS fix
+    applyCSSOnlyTailFix();
+
+    // Close and reopen info window to test
+    if (infoWindow) {
+        infoWindow.close();
+        console.log("Closed info window. Click a marker to test the tail fix.");
+    }
+};
+
 
 function gentlyFixInfoWindowPosition() {
     console.log("Applying gentle info window position fix...");
@@ -2243,8 +2346,7 @@ window.testInfoWindow = function() {
 // Auto-setup when DOM loads
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
-        removeAggressiveCSS();
-        applyBasicInfoWindowCSS();
+        applyCSSOnlyTailFix();
     }, 500);
 });
 
@@ -2327,11 +2429,9 @@ function applyInfoWindowPositioningFixes() {
         style.textContent = `
             /* CRITICAL: Override Google's tail positioning that causes off-screen issues */
             .gm-style .gm-style-iw-t {
-                position: absolute !important;
                 bottom: 0px !important;
-                right: auto !important;
                 left: 50% !important;
-                top: auto !important;
+                right: auto !important;
                 transform: translateX(-50%) !important;
                 width: 20px !important;
                 height: 15px !important;
