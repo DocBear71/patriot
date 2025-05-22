@@ -1401,12 +1401,37 @@ async function searchGooglePlacesForBusiness(businessName, searchLocation) {
             };
 
             // Perform the search
-            service.textSearch(request, (results, status) => {
+            service.textSearch(request, async (results, status) => {
                 if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
                     console.log("Found businesses via Google Places:", results.length);
 
+                    // FILTER OUT UNWANTED RESULTS
+                    const filteredResults = results.filter(place => {
+                        const name = place.name.toLowerCase();
+
+                        // Skip department-specific results
+                        if (name.includes('pro desk') ||
+                            name.includes('garden center') ||
+                            name.includes('rental center') ||
+                            name.includes('tool rental') ||
+                            name.includes('customer service')) {
+                            console.log("Filtering out department:", place.name);
+                            return false;
+                        }
+
+                        // Skip if it has weird formatting that suggests it's not a main store
+                        if (name.includes(' - ') && !name.toLowerCase().startsWith(businessName.toLowerCase())) {
+                            console.log("Filtering out formatted result:", place.name);
+                            return false;
+                        }
+
+                        return true;
+                    });
+
+                    console.log(`Filtered to ${filteredResults.length} main store results`);
+
                     // Process results and create business objects
-                    const businesses = results.map(place => {
+                    const businessPromises = filteredResults.map(async (place) => {
                         // Extract address components
                         const addressParts = place.formatted_address ? place.formatted_address.split(',') : [];
                         let address1 = '';
@@ -1428,7 +1453,8 @@ async function searchGooglePlacesForBusiness(businessName, searchLocation) {
                         const placeLatLng = place.geometry.location;
                         const distance = google.maps.geometry.spherical.computeDistanceBetween(latlng, placeLatLng);
 
-                        return {
+                        // Create base business object
+                        const business = {
                             _id: 'google_' + place.place_id,
                             bname: place.name,
                             address1: address1,
@@ -1444,10 +1470,37 @@ async function searchGooglePlacesForBusiness(businessName, searchLocation) {
                             lng: place.geometry.location.lng(),
                             distance: distance
                         };
+
+                        // ENHANCED CHAIN MATCHING
+                        try {
+                            const chainMatch = await findMatchingChainForPlaceResult(place.name);
+                            if (chainMatch) {
+                                console.log(`Found chain match for "${place.name}": ${chainMatch.bname}`);
+                                business.chain_id = chainMatch._id;
+                                business.chain_name = chainMatch.bname;
+                                business.isChainLocation = true;
+                            } else {
+                                console.log(`No chain match found for: ${place.name}`);
+                            }
+                        } catch (error) {
+                            console.warn("Error checking for chain match:", error);
+                        }
+
+                        return business;
                     });
+
+                    // Wait for all chain matching to complete
+                    const businesses = await Promise.all(businessPromises);
 
                     // Sort by distance
                     businesses.sort((a, b) => a.distance - b.distance);
+
+                    console.log("Final processed businesses:", businesses.map(b => ({
+                        name: b.bname,
+                        isChain: !!b.chain_id,
+                        chainName: b.chain_name
+                    })));
+
                     resolve(businesses);
                 } else {
                     console.log("No businesses found via Google Places:", status);
@@ -1460,6 +1513,7 @@ async function searchGooglePlacesForBusiness(businessName, searchLocation) {
         }
     });
 }
+
 
 /**
  * Show no results message
@@ -3175,28 +3229,54 @@ function findMatchingChainLocally(placeName) {
                 return;
             }
 
-            console.log("Local chain matching for:", placeName);
+            console.log("Enhanced local chain matching for:", placeName);
 
-            // Simple local matching logic - you can enhance this
+            // Enhanced chain database with more variations
             const commonChains = [
-                { name: 'Home Depot', variations: ['home depot', 'the home depot'] },
-                { name: 'Lowe\'s', variations: ['lowes', 'lowe\'s', 'lowes home improvement'] },
-                { name: 'Olive Garden', variations: ['olive garden'] },
-                { name: 'McDonald\'s', variations: ['mcdonalds', 'mcdonald\'s'] },
-                { name: 'Walmart', variations: ['walmart', 'wal-mart'] },
-                { name: 'Target', variations: ['target'] },
-                { name: 'Best Buy', variations: ['best buy'] },
-                { name: 'Starbucks', variations: ['starbucks'] }
+                {
+                    name: 'The Home Depot',
+                    variations: ['the home depot', 'home depot', 'homedepot'],
+                    id: '681fe0e67d92c3d3e1e2a3da' // Your actual chain ID from the logs
+                },
+                {
+                    name: 'Lowe\'s',
+                    variations: ['lowes', 'lowe\'s', 'lowes home improvement', 'lowe\'s home improvement'],
+                    id: 'lowes_chain_id'
+                },
+                {
+                    name: 'Walmart',
+                    variations: ['walmart', 'wal-mart', 'walmart supercenter'],
+                    id: 'walmart_chain_id'
+                },
+                {
+                    name: 'Target',
+                    variations: ['target', 'target store'],
+                    id: 'target_chain_id'
+                },
+                {
+                    name: 'Best Buy',
+                    variations: ['best buy', 'bestbuy'],
+                    id: 'bestbuy_chain_id'
+                },
+                {
+                    name: 'McDonald\'s',
+                    variations: ['mcdonalds', 'mcdonald\'s', 'mickey d\'s'],
+                    id: 'mcdonalds_chain_id'
+                }
             ];
 
-            const lowerPlaceName = placeName.toLowerCase();
+            const lowerPlaceName = placeName.toLowerCase().trim();
 
             for (const chain of commonChains) {
                 for (const variation of chain.variations) {
-                    if (lowerPlaceName.includes(variation)) {
-                        console.log(`Local match found: ${placeName} matches ${chain.name}`);
+                    // Check for exact match or if place name contains the variation
+                    if (lowerPlaceName === variation ||
+                        lowerPlaceName.includes(variation) ||
+                        variation.includes(lowerPlaceName)) {
+
+                        console.log(`Enhanced local match: "${placeName}" matches "${chain.name}"`);
                         resolve({
-                            _id: 'local_' + chain.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase(),
+                            _id: chain.id,
                             bname: chain.name,
                             isLocalMatch: true
                         });
@@ -3205,14 +3285,15 @@ function findMatchingChainLocally(placeName) {
                 }
             }
 
-            console.log("No local chain match found for:", placeName);
+            console.log("No enhanced local chain match found for:", placeName);
             resolve(null);
         } catch (error) {
-            console.error("Error in local chain matching:", error);
+            console.error("Error in enhanced local chain matching:", error);
             resolve(null);
         }
     });
 }
+
 
 /**
  * Fixed setupMapClickHandler function with proper error handling
@@ -3579,39 +3660,83 @@ async function findMatchingChainForPlaceResult(placeName) {
 
         console.log("Checking if place matches a chain:", placeName);
 
+        // Clean the place name for better matching
+        const cleanPlaceName = placeName.trim();
+
         // Get the base URL
         const baseURL = getBaseURL();
 
         try {
-            // Try server-side chain matching first
-            const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(placeName)}`);
+            // Try server-side chain matching first with the exact name
+            const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(cleanPlaceName)}`);
 
-            // Check if the response is successful
             if (response.ok) {
                 const data = await response.json();
                 if (data.success && data.chain) {
-                    console.log("Found matching chain for place:", data.chain.bname);
+                    console.log("Found exact chain match:", data.chain.bname);
                     return data.chain;
                 }
-            } else if (response.status === 404) {
-                console.log("No matching chains found in database for", placeName);
-                // This is normal, not an error
-            } else {
-                console.warn("Chain matching API returned error:", response.status);
             }
 
-            // Fall back to client-side matching (always try this as backup)
-            return await findMatchingChainLocally(placeName);
+            // If exact match fails, try variations
+            const variations = generateNameVariations(cleanPlaceName);
+
+            for (const variation of variations) {
+                try {
+                    const variationResponse = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(variation)}`);
+
+                    if (variationResponse.ok) {
+                        const variationData = await variationResponse.json();
+                        if (variationData.success && variationData.chain) {
+                            console.log(`Found chain match with variation "${variation}":`, variationData.chain.bname);
+                            return variationData.chain;
+                        }
+                    }
+                } catch (variationError) {
+                    console.warn(`Error testing variation "${variation}":`, variationError);
+                    continue;
+                }
+            }
+
+            // Fall back to enhanced local matching
+            return await findMatchingChainLocally(cleanPlaceName);
 
         } catch (fetchError) {
             console.warn("Error with chain matching API, using local matching:", fetchError.message);
-            // Fall back to client-side matching
-            return await findMatchingChainLocally(placeName);
+            return await findMatchingChainLocally(cleanPlaceName);
         }
     } catch (error) {
         console.warn("Error finding matching chain (non-critical):", error);
         return null;
     }
+}
+
+/**
+ * Generate name variations for better chain matching
+ */
+function generateNameVariations(placeName) {
+    const variations = [];
+    const lowerName = placeName.toLowerCase();
+
+    // For "The Home Depot", try "Home Depot"
+    if (lowerName.startsWith('the ')) {
+        variations.push(placeName.substring(4));
+    }
+
+    // For "Home Depot", try "The Home Depot"
+    if (!lowerName.startsWith('the ') && !lowerName.includes('the ')) {
+        variations.push('The ' + placeName);
+    }
+
+    // Remove common suffixes
+    const suffixesToRemove = [' Store', ' Location', ' #', ' - '];
+    suffixesToRemove.forEach(suffix => {
+        if (placeName.includes(suffix)) {
+            variations.push(placeName.split(suffix)[0]);
+        }
+    });
+
+    return [...new Set(variations)]; // Remove duplicates
 }
 
 /**
@@ -5024,12 +5149,10 @@ function buildEnhancedInfoWindowContent(business) {
             <strong>📍 Address:</strong><br>
             ${business.address1}`;
 
-        // Add second address line if it exists
         if (business.address2) {
             addressHTML += `<br>${business.address2}`;
         }
 
-        // Add city, state, zip on separate line if they exist
         const locationParts = [];
         if (business.city) locationParts.push(business.city);
         if (business.state) locationParts.push(business.state);
@@ -5041,17 +5164,15 @@ function buildEnhancedInfoWindowContent(business) {
 
         addressHTML += '</div>';
     } else if (business.formattedAddress) {
-        // If we only have formatted address, display it nicely
         const addressParts = business.formattedAddress.split(',').map(part => part.trim());
         addressHTML = `<div class="info-address">
             <strong>📍 Address:</strong><br>`;
 
-        // Format the address parts on separate lines for better readability
         if (addressParts.length >= 1) {
-            addressHTML += addressParts[0]; // Street address
+            addressHTML += addressParts[0];
         }
         if (addressParts.length >= 2) {
-            addressHTML += `<br>${addressParts.slice(1).join(', ')}`; // City, State ZIP, Country
+            addressHTML += `<br>${addressParts.slice(1).join(', ')}`;
         }
 
         addressHTML += '</div>';
@@ -5065,28 +5186,27 @@ function buildEnhancedInfoWindowContent(business) {
     let typeHTML = '';
     if (business.type && business.type !== 'OTHER') {
         typeHTML = `<div class="info-type"><strong>🏢 Type:</strong> ${getBusinessTypeLabel(business.type)}</div>`;
-    } else if (isGooglePlace && business.types && business.types.length > 0) {
-        // For Google Places, show the primary type in a more readable format
-        const primaryType = business.types[0];
-        const readableType = primaryType
-            .replace(/_/g, ' ')
-            .replace(/\b\w/g, l => l.toUpperCase());
-        typeHTML = `<div class="info-type"><strong>🏢 Type:</strong> ${readableType}</div>`;
     }
 
     // Distance with better formatting
     const distanceHTML = business.distance ?
         `<div class="info-distance"><strong>📏 Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</div>` : '';
 
-    // Chain badge with better styling
+    // Enhanced chain badge
     const chainBadge = isChainLocation ?
         `<span class="enhanced-chain-badge">🔗 ${business.chain_name || 'Chain Location'}</span>` : '';
 
-    // Status indicator with better messaging
+    // Enhanced status and messaging for chain locations
     let statusHTML = '';
+    let chainExplanation = '';
+
     if (isGooglePlace) {
         if (isChainLocation) {
-            statusHTML = '<div class="info-status google-place">🔗 This location may be part of a chain in our database.</div>';
+            statusHTML = '<div class="info-status chain-match">🔗 This location appears to match a chain in our database!</div>';
+            chainExplanation = `<div class="chain-explanation">
+                ✨ Great news! This location matches <strong>${business.chain_name}</strong> in our database. 
+                Chain-wide incentives should apply to this location once added.
+            </div>`;
         } else {
             statusHTML = '<div class="info-status google-place">ℹ️ This business is not yet in the Patriot Thanks database.</div>';
         }
@@ -5094,20 +5214,13 @@ function buildEnhancedInfoWindowContent(business) {
         statusHTML = '<div class="info-status database-business">✅ This business is in the Patriot Thanks database.</div>';
     }
 
-    // Chain explanation with better wording
-    const chainExplanation = isChainLocation && isGooglePlace ?
-        `<div class="chain-explanation">
-            🔗 This location appears to match <strong>${business.chain_name}</strong> in our database. 
-            Chain-wide incentives may apply to this location.
-        </div>` : '';
-
-    // Action button with better labeling
+    // Enhanced action button
     let actionButton;
     if (isGooglePlace) {
         if (isChainLocation) {
             actionButton = `
-                <button class="enhanced-add-btn" onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
-                    ➕ Add ${business.chain_name} Location
+                <button class="enhanced-add-btn chain-add" onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
+                    🔗 Add ${business.chain_name} Location
                 </button>
             `;
         } else {
@@ -5125,15 +5238,15 @@ function buildEnhancedInfoWindowContent(business) {
         `;
     }
 
-    // Unique container ID that matches what the loading functions expect
+    // Unique container ID
     const containerId = business._id || business.placeId;
 
-    // Better incentives messaging
+    // Enhanced incentives messaging
     let incentivesMessage;
-    if (isGooglePlace && !isChainLocation) {
-        incentivesMessage = '<em>💡 Add this business to see available incentives.</em>';
-    } else if (isGooglePlace && isChainLocation) {
+    if (isGooglePlace && isChainLocation) {
         incentivesMessage = '<em>⏳ Loading chain incentives...</em>';
+    } else if (isGooglePlace && !isChainLocation) {
+        incentivesMessage = '<em>💡 Add this business to see available incentives.</em>';
     } else {
         incentivesMessage = '<em>⏳ Loading incentives...</em>';
     }
@@ -5165,8 +5278,6 @@ function buildEnhancedInfoWindowContent(business) {
         </div>
     `;
 }
-
-console.log("Enhanced info window address formatting fix loaded!");
 
 /**
  * Load incentives for enhanced info window (database businesses)
@@ -6053,6 +6164,10 @@ console.log("Enhanced nearby similar businesses functionality loaded!");
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = retrieveFromMongoDB;
     window.searchGooglePlacesForBusiness = searchGooglePlacesForBusiness;
+    window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResult;
+    window.generateNameVariations = generateNameVariations;
+    window.findMatchingChainLocally = findMatchingChainLocally;
+    window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
     window.showNoResultsMessage = showNoResultsMessage;
     window.displayBusinessesOnMap = displayBusinessesOnMap;
     window.displaySearchResults = displaySearchResults;
@@ -6060,9 +6175,7 @@ if (typeof window !== 'undefined') {
     window.debugMapState = debugMapState;
     window.validateField = validateField;
     window.isNotEmpty = isNotEmpty;
-    window.findMatchingChainLocally = findMatchingChainLocally;
     window.setupMapClickHandler = setupMapClickHandler;
-    window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResult;
     window.buildInfoWindowContent = buildInfoWindowContent;
     window.getPlaceTypeLabel = getPlaceTypeLabel;
     window.safeExtractCoordinates = safeExtractCoordinates;
@@ -6076,7 +6189,6 @@ if (typeof window !== 'undefined') {
     window.createEnhancedFallbackMarker = createEnhancedFallbackMarker;
     window.createEnhancedBusinessMarker = createEnhancedBusinessMarker;
     window.showEnhancedInfoWindow = showEnhancedInfoWindow;
-    window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
     window.addEnhancedMarkerStyles = addEnhancedMarkerStyles;
     window.createBusinessMarker = createBusinessMarker;
     window.searchNearbyBusinesses = searchNearbyBusinesses;
