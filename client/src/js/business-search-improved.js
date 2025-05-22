@@ -1590,41 +1590,6 @@ async function searchGooglePlaces(formData, searchLocation = null) {
     }
 }
 
-/**
- * Create a business marker with working info window
- * @param {Object} business - Business object
- * @returns {Object} Created marker
- */
-function createBusinessMarker(business) {
-    try {
-        // Validate coordinates
-        if (!business.lat || !business.lng ||
-            isNaN(parseFloat(business.lat)) || isNaN(parseFloat(business.lng))) {
-            console.warn(`Invalid coordinates for business: ${business.bname}`);
-            return null;
-        }
-
-        // Create position
-        const position = new google.maps.LatLng(
-            parseFloat(business.lat),
-            parseFloat(business.lng)
-        );
-
-        // Use the enhanced marker creation
-        const marker = createEnhancedBusinessMarker(business, position);
-
-        // Add to bounds if successful
-        if (marker && bounds) {
-            bounds.extend(position);
-        }
-
-        return marker;
-    } catch (error) {
-        console.error("Error creating business marker:", error);
-        return null;
-    }
-}
-
 function applyMapHeightFix() {
     // Check if styles already applied
     if (!document.getElementById('map-height-fix')) {
@@ -3071,7 +3036,7 @@ async function setupMapClickHandler() {
 
                     if (existingMarker) {
                         console.log("Found existing marker for clicked place");
-                        showInfoWindow(existingMarker);
+                        showEnhancedInfoWindow(existingMarker); // USE ENHANCED VERSION
                         return;
                     }
 
@@ -3172,8 +3137,8 @@ async function setupMapClickHandler() {
                         }
                     };
 
-                    // Show custom info window
-                    showEnhancedInfoWindow(tempMarker);
+                    // Show enhanced info window
+                    showEnhancedInfoWindow(tempMarker); // USE ENHANCED VERSION
                 } catch (error) {
                     console.error("Error fetching place details:", error);
                     // Show a user-friendly message instead of breaking
@@ -3738,7 +3703,7 @@ function setupMarkerClickPriority() {
         return;
     }
 
-    console.log("Setting up marker click priority");
+    console.log("Setting up enhanced marker click priority");
 
     // Create listener that gets called before Google's POI click
     google.maps.event.addListener(map, 'click', function(event) {
@@ -3770,12 +3735,12 @@ function setupMarkerClickPriority() {
 
                 // If click is near our marker
                 if (pixelDistance <= pixelRadius) {
-                    console.log("Preventing POI click, using our marker instead");
+                    console.log("Preventing POI click, using our enhanced marker instead");
                     event.stop();
 
-                    // Trigger our marker click
+                    // Trigger our enhanced marker click
                     setTimeout(() => {
-                        showInfoWindow(marker);
+                        showEnhancedInfoWindow(marker); // USE ENHANCED VERSION
                     }, 10);
 
                     return;
@@ -3784,6 +3749,26 @@ function setupMarkerClickPriority() {
         }
     }, {passive: false});
 }
+
+window.debugEnhancedMarkers = function() {
+    console.log("=== ENHANCED MARKER DEBUG ===");
+    console.log("Total markers:", markers.length);
+
+    markers.forEach((marker, index) => {
+        console.log(`Marker ${index}:`, {
+            business: marker.business?.bname,
+            isFromDatabase: marker.isFromDatabase,
+            position: marker.position,
+            hasAdvancedMarker: marker instanceof google.maps.marker?.AdvancedMarkerElement
+        });
+    });
+
+    console.log("Enhanced styles loaded:", !!document.getElementById('enhanced-marker-styles'));
+    console.log("=== END DEBUG ===");
+};
+
+console.log("Enhanced marker integration loaded successfully!");
+console.log("Run debugEnhancedMarkers() in console to check marker status");
 
 /**
  * Initialize additional map features
@@ -4035,8 +4020,8 @@ window.focusOnMapMarker = function(businessId) {
             map.setCenter(position);
             map.setZoom(16);
 
-            // Show info window
-            showInfoWindow(marker);
+            // Show enhanced info window
+            showEnhancedInfoWindow(marker); // USE ENHANCED VERSION
 
             // Scroll to the map
             document.getElementById('map').scrollIntoView({behavior: 'smooth'});
@@ -4074,18 +4059,18 @@ function fetchBusinessAndCreateMarker(businessId) {
             if (data.result) {
                 console.log("Found business data:", data.result);
 
-                // Create marker for this business
-                const marker = createBusinessMarker(data.result);
+                // Create enhanced marker for this business
+                const marker = createBusinessMarker(data.result); // This now uses enhanced markers
 
                 if (marker) {
                     // Center on the marker
-                    map.setCenter(marker.getPosition());
+                    map.setCenter(marker.position);
                     map.setZoom(15);
 
-                    // Show info window
-                    showInfoWindow(marker);
+                    // Show enhanced info window
+                    showEnhancedInfoWindow(marker);
 
-                    console.log("Created and focused on new marker for business:", businessId);
+                    console.log("Created and focused on new enhanced marker for business:", businessId);
                 }
             } else {
                 console.error("Business data not found");
@@ -4106,15 +4091,20 @@ function fetchBusinessAndCreateMarker(businessId) {
 
 // Ensure Google Maps is properly initialized when DOM loads
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("DOM loaded, initializing business search...");
+    console.log("DOM loaded, initializing enhanced business search...");
 
-    applyInfoWindowPositioningFixes();
-    applyMapHeightFix();
-    // Add custom styles
+    // Add enhanced marker styles FIRST
+    addEnhancedMarkerStyles();
+
+    // Apply the existing positioning fixes
+    setTimeout(() => {
+        applyInfoWindowPositioningFixes();
+        applyMapHeightFix();
+    }, 500);
+
+    // Add existing custom styles
     addCustomMarkerStyles();
     addChainBadgeStyles();
-
-    addEnhancedMarkerStyles();
 
     // Initialize business search functionality
     initBusinessSearch();
@@ -4563,7 +4553,113 @@ function performIncentivesFetch(businessId, incentivesDiv) {
 }
 
 /**
- * Enhanced marker creation with better styling and fallbacks
+ * Get business type text icon (emoji version)
+ * @param {string} businessType - Business type code
+ * @returns {string} Emoji icon
+ */
+function getBusinessTypeTextIcon(businessType) {
+    const iconMap = {
+        'AUTO': '🚗',
+        'BEAU': '💇',
+        'BOOK': '📚',
+        'CLTH': '👕',
+        'CONV': '🏪',
+        'DEPT': '🛍️',
+        'ELEC': '⚡',
+        'ENTR': '🎬',
+        'FURN': '🪑',
+        'FUEL': '⛽',
+        'GIFT': '🎁',
+        'GROC': '🛒',
+        'HARDW': '🔨',
+        'HEAL': '❤️',
+        'JEWL': '💎',
+        'OTHER': '🏬',
+        'RX': '💊',
+        'REST': '🍽️',
+        'RETAIL': '🛍️',
+        'SERV': '🔧',
+        'SPEC': '⭐',
+        'SPRT': '🏈',
+        'TECH': '💻',
+        'TOYS': '🎮'
+    };
+
+    return `<span style="font-size: 16px; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${iconMap[businessType] || '🏬'}</span>`;
+}
+
+/**
+ * Enhanced fallback marker creation
+ * @param {Object} business - Business object
+ * @param {Object} location - Location object
+ * @returns {Object} Google Maps marker
+ */
+function createEnhancedFallbackMarker(business, location) {
+    try {
+        console.log("Creating enhanced fallback marker for:", business.bname);
+
+        // Create a safe position
+        let position = createSafeLatLng(location);
+        if (!position && business.lat && business.lng) {
+            position = new google.maps.LatLng(
+                parseFloat(business.lat),
+                parseFloat(business.lng)
+            );
+        }
+
+        if (!position) {
+            console.error("Invalid location for enhanced fallback marker:", location);
+            return null;
+        }
+
+        // Determine marker styling
+        const isFromDatabase = !business.isGooglePlace;
+        const isChainLocation = !!business.chain_id;
+
+        // Choose marker color
+        const markerColor = isFromDatabase ? CONFIG.markerColors.primary : CONFIG.markerColors.nearby;
+
+        // Create a standard marker with custom icon
+        const marker = new google.maps.Marker({
+            position: position,
+            map: map,
+            title: business.bname,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: markerColor,
+                fillOpacity: 0.9,
+                strokeWeight: 2,
+                strokeColor: '#FFFFFF',
+                scale: isFromDatabase ? 14 : 12  // Database businesses slightly larger
+            },
+            animation: google.maps.Animation.DROP,
+            zIndex: isFromDatabase ? 1000 : 100  // Database businesses on top
+        });
+
+        // Store the business data
+        marker.business = business;
+        marker.position = position;
+        marker.isFromDatabase = isFromDatabase;
+
+        // Add click event listener
+        marker.addListener('click', function() {
+            console.log("Enhanced fallback marker clicked:", business.bname);
+            showEnhancedInfoWindow(marker);
+        });
+
+        // Add the marker to our array
+        markers.push(marker);
+        console.log(`Added enhanced fallback marker for ${business.bname}`);
+
+        return marker;
+    } catch (error) {
+        console.error("Error creating enhanced fallback marker:", error);
+        return null;
+    }
+}
+
+/**
+ * Enhanced marker creation with all dependencies included
  * @param {Object} business - Business object
  * @param {Object} location - Google Maps location object
  */
@@ -4576,7 +4672,7 @@ async function createEnhancedBusinessMarker(business, location) {
         let position = createSafeLatLng(location);
         if (!position) {
             console.error("Invalid position for enhanced marker:", location);
-            return createFallbackMarker(business, location);
+            return createEnhancedFallbackMarker(business, location);
         }
 
         // Determine marker styling
@@ -4655,7 +4751,7 @@ async function createEnhancedBusinessMarker(business, location) {
         return marker;
     } catch (error) {
         console.error("Error creating enhanced marker:", error);
-        return createFallbackMarker(business, location);
+        return createEnhancedFallbackMarker(business, location);
     }
 }
 
@@ -4693,9 +4789,16 @@ function showEnhancedInfoWindow(marker) {
     infoWindow.setContent(content);
 
     // Get safe position
-    const position = marker.position || createSafeLatLng(business);
+    let position = marker.position;
+    if (!position && marker.getPosition) {
+        position = marker.getPosition();
+    }
     if (!position) {
-        console.error("Could not determine position for info window");
+        position = createSafeLatLng(business);
+    }
+
+    if (!position) {
+        console.error("Could not determine position for enhanced info window");
         return;
     }
 
@@ -4780,8 +4883,8 @@ function buildEnhancedInfoWindowContent(business) {
 
     // Status indicator
     const statusHTML = isGooglePlace ?
-        '<div class="info-status">ℹ️ This business is not yet in the Patriot Thanks database.</div>' :
-        '<div class="info-status">✅ This business is in the Patriot Thanks database.</div>';
+        '<div class="info-status google-place">ℹ️ This business is not yet in the Patriot Thanks database.</div>' :
+        '<div class="info-status database-business">✅ This business is in the Patriot Thanks database.</div>';
 
     // Chain explanation
     const chainExplanation = isChainLocation && isGooglePlace ?
@@ -5117,12 +5220,12 @@ function addEnhancedMarkerStyles() {
                 margin: 10px 0;
             }
 
-            .info-status:has-text("✅") {
+            .info-status.database-business {
                 background-color: #e8f5e8;
                 color: #2e7d32;
             }
 
-            .info-status:has-text("ℹ️") {
+            .info-status.google-place {
                 background-color: #e3f2fd;
                 color: #1565c0;
             }
@@ -5243,6 +5346,36 @@ function addEnhancedMarkerStyles() {
     }
 }
 
+function createBusinessMarker(business) {
+    try {
+        // Validate coordinates
+        if (!business.lat || !business.lng ||
+            isNaN(parseFloat(business.lat)) || isNaN(parseFloat(business.lng))) {
+            console.warn(`Invalid coordinates for business: ${business.bname}`);
+            return null;
+        }
+
+        // Create position
+        const position = new google.maps.LatLng(
+            parseFloat(business.lat),
+            parseFloat(business.lng)
+        );
+
+        // Use the enhanced marker creation
+        const marker = createEnhancedBusinessMarker(business, position);
+
+        // Add to bounds if successful
+        if (marker && bounds) {
+            bounds.extend(position);
+        }
+
+        return marker;
+    } catch (error) {
+        console.error("Error creating business marker:", error);
+        return null;
+    }
+}
+
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = retrieveFromMongoDB;
@@ -5264,5 +5397,12 @@ if (typeof window !== 'undefined') {
     window.showEnhancedInfoWindow = showEnhancedInfoWindow;
     window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
     window.addEnhancedMarkerStyles = addEnhancedMarkerStyles;
+    window.getBusinessTypeTextIcon = getBusinessTypeTextIcon;
+    window.createEnhancedFallbackMarker = createEnhancedFallbackMarker;
+    window.createEnhancedBusinessMarker = createEnhancedBusinessMarker;
+    window.showEnhancedInfoWindow = showEnhancedInfoWindow;
+    window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
+    window.addEnhancedMarkerStyles = addEnhancedMarkerStyles;
+    window.createBusinessMarker = createBusinessMarker;
 }
 
