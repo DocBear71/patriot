@@ -768,6 +768,23 @@ async function getChainDetails(chainId) {
 }
 
 /**
+ * Helper function to extract address components (same as used in addBusinessToDatabase)
+ * @param {Array} addressComponents - Array of address components from Google Places
+ * @param {string} type - Component type to extract
+ * @returns {string} Extracted component text
+ */
+function getAddressComponent(addressComponents, type) {
+    if (!addressComponents || !Array.isArray(addressComponents)) return '';
+
+    const component = addressComponents.find(
+        component => component.types && component.types.includes(type)
+    );
+
+    return component ? (component.shortText || component.short_name || '') : '';
+}
+
+
+/**
  * Extract address component from place
  * @param {Object} place - Google Place object
  * @param {string} type - Component type to extract
@@ -3036,7 +3053,7 @@ async function setupMapClickHandler() {
 
                     if (existingMarker) {
                         console.log("Found existing marker for clicked place");
-                        showEnhancedInfoWindow(existingMarker); // USE ENHANCED VERSION
+                        showEnhancedInfoWindow(existingMarker);
                         return;
                     }
 
@@ -3045,15 +3062,17 @@ async function setupMapClickHandler() {
                         id: event.placeId
                     });
 
-                    // Fetch place details
+                    // Fetch place details with more comprehensive fields
                     await place.fetchFields({
                         fields: [
                             'displayName',
                             'formattedAddress',
+                            'addressComponents',
                             'location',
                             'types',
                             'businessStatus',
-                            'nationalPhoneNumber'
+                            'nationalPhoneNumber',
+                            'formattedPhoneNumber'
                         ]
                     });
 
@@ -3062,16 +3081,62 @@ async function setupMapClickHandler() {
                     // Extract business name safely
                     const businessName = place.displayName || 'Unknown Business';
 
-                    // Check if this business matches any chains (with error handling)
-                    let chainMatch = null;
-                    try {
-                        chainMatch = await findMatchingChainForPlaceResult(businessName);
-                    } catch (error) {
-                        console.warn("Error checking for chain match (non-critical):", error);
-                        // Continue without chain match
+                    // Parse address components properly
+                    let address1 = '';
+                    let city = '';
+                    let state = '';
+                    let zip = '';
+                    let phone = '';
+
+                    // Extract phone number
+                    phone = place.nationalPhoneNumber || place.formattedPhoneNumber || '';
+
+                    // Parse address components if available
+                    if (place.addressComponents && place.addressComponents.length > 0) {
+                        console.log("Parsing address components:", place.addressComponents);
+
+                        // Extract components using the same logic as addBusinessToDatabase
+                        const streetNumber = getAddressComponent(place.addressComponents, 'street_number');
+                        const route = getAddressComponent(place.addressComponents, 'route');
+                        city = getAddressComponent(place.addressComponents, 'locality');
+                        state = getAddressComponent(place.addressComponents, 'administrative_area_level_1');
+                        zip = getAddressComponent(place.addressComponents, 'postal_code');
+
+                        // Combine street number and route for address1
+                        if (streetNumber && route) {
+                            address1 = `${streetNumber} ${route}`;
+                        } else if (route) {
+                            address1 = route;
+                        } else if (streetNumber) {
+                            address1 = streetNumber;
+                        }
                     }
 
-                    // Create business object from the place with safe coordinate extraction
+                    // Fallback: if we couldn't parse components, parse the formatted address
+                    if (!address1 && place.formattedAddress) {
+                        console.log("Falling back to formatted address parsing");
+                        const addressParts = place.formattedAddress.split(',').map(part => part.trim());
+
+                        if (addressParts.length >= 1) address1 = addressParts[0];
+                        if (addressParts.length >= 2) city = addressParts[1];
+                        if (addressParts.length >= 3) {
+                            // Parse "State ZIP" format
+                            const stateZipMatch = addressParts[2].match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+                            if (stateZipMatch) {
+                                state = stateZipMatch[1];
+                                zip = stateZipMatch[2];
+                            } else {
+                                // If pattern doesn't match, try to split by space
+                                const stateZipParts = addressParts[2].split(' ');
+                                if (stateZipParts.length >= 2) {
+                                    state = stateZipParts[0];
+                                    zip = stateZipParts[1];
+                                }
+                            }
+                        }
+                    }
+
+                    // Extract coordinates safely
                     let lat = 0, lng = 0;
                     if (place.location) {
                         try {
@@ -3090,13 +3155,29 @@ async function setupMapClickHandler() {
                         lng = event.latLng.lng();
                     }
 
+                    // Map business type from Google Places types
+                    const businessType = mapGooglePlaceTypeToBusinessType(place.types || []);
+
+                    // Check if this business matches any chains (with error handling)
+                    let chainMatch = null;
+                    try {
+                        chainMatch = await findMatchingChainForPlaceResult(businessName);
+                    } catch (error) {
+                        console.warn("Error checking for chain match (non-critical):", error);
+                        // Continue without chain match
+                    }
+
+                    // Create properly parsed business object
                     const business = {
                         _id: 'google_' + place.id,
                         bname: businessName,
-                        address1: place.formattedAddress || '',
-                        city: '',
-                        state: '',
-                        zip: '',
+                        address1: address1,
+                        city: city,
+                        state: state,
+                        zip: zip,
+                        phone: phone,
+                        type: businessType,
+                        formattedAddress: place.formattedAddress,
                         isGooglePlace: true,
                         placeId: place.id,
                         lat: lat,
@@ -3128,6 +3209,8 @@ async function setupMapClickHandler() {
                         }
                     }
 
+                    console.log("Parsed business object:", business);
+
                     // Create temporary marker for info window
                     const tempMarker = {
                         business: business,
@@ -3138,7 +3221,7 @@ async function setupMapClickHandler() {
                     };
 
                     // Show enhanced info window
-                    showEnhancedInfoWindow(tempMarker); // USE ENHANCED VERSION
+                    showEnhancedInfoWindow(tempMarker);
                 } catch (error) {
                     console.error("Error fetching place details:", error);
                     // Show a user-friendly message instead of breaking
@@ -3369,74 +3452,119 @@ function getPlaceTypeLabel(types) {
 }
 
 /**
- * Map Google place types to business type codes
+ * Enhanced business type mapping from Google Places types
  * @param {Array} types - Array of Google place types
  * @returns {string} Business type code
  */
 function mapGooglePlaceTypeToBusinessType(types) {
     if (!types || !Array.isArray(types)) return 'OTHER';
 
-    // Map Google place types to our business type codes
-    if (types.includes('restaurant')) return 'REST';
-    if (types.includes('meal_takeaway')) return 'REST';
-    if (types.includes('cafe')) return 'REST';
-    if (types.includes('bakery')) return 'REST';
-    if (types.includes('bar')) return 'REST';
+    // More comprehensive mapping
+    const typeMap = {
+        // Restaurants and Food
+        'restaurant': 'REST',
+        'meal_takeaway': 'REST',
+        'meal_delivery': 'REST',
+        'cafe': 'REST',
+        'bakery': 'REST',
+        'bar': 'REST',
+        'night_club': 'REST',
+        'food': 'REST',
+        'mexican_restaurant': 'REST',
+        'chinese_restaurant': 'REST',
+        'italian_restaurant': 'REST',
+        'japanese_restaurant': 'REST',
+        'indian_restaurant': 'REST',
+        'thai_restaurant': 'REST',
+        'american_restaurant': 'REST',
+        'pizza_restaurant': 'REST',
+        'seafood_restaurant': 'REST',
+        'steak_house': 'REST',
+        'sushi_restaurant': 'REST',
+        'vegetarian_restaurant': 'REST',
+        'fast_food_restaurant': 'REST',
 
-    if (types.includes('grocery_or_supermarket')) return 'GROC';
-    if (types.includes('supermarket')) return 'GROC';
+        // Retail and Shopping
+        'grocery_or_supermarket': 'GROC',
+        'supermarket': 'GROC',
+        'convenience_store': 'CONV',
+        'gas_station': 'FUEL',
+        'hardware_store': 'HARDW',
+        'department_store': 'DEPT',
+        'clothing_store': 'CLTH',
+        'shoe_store': 'CLTH',
+        'electronics_store': 'ELEC',
+        'furniture_store': 'FURN',
+        'home_goods_store': 'FURN',
+        'jewelry_store': 'JEWL',
+        'book_store': 'BOOK',
+        'bicycle_store': 'SPRT',
+        'sporting_goods_store': 'SPRT',
+        'toy_store': 'TOYS',
+        'pet_store': 'OTHER',
+        'florist': 'GIFT',
+        'gift_shop': 'GIFT',
 
-    if (types.includes('gas_station')) return 'FUEL';
-    if (types.includes('hardware_store')) return 'HARDW';
-    if (types.includes('department_store')) return 'DEPT';
-    if (types.includes('convenience_store')) return 'CONV';
-    if (types.includes('clothing_store')) return 'CLTH';
-    if (types.includes('shoe_store')) return 'CLTH';
+        // Automotive
+        'car_dealer': 'AUTO',
+        'car_rental': 'AUTO',
+        'car_repair': 'AUTO',
+        'car_wash': 'AUTO',
+        'auto_parts_store': 'AUTO',
 
-    if (types.includes('electronics_store')) return 'ELEC';
-    if (types.includes('computer_store')) return 'TECH';
+        // Health and Beauty
+        'pharmacy': 'RX',
+        'drugstore': 'RX',
+        'hospital': 'HEAL',
+        'doctor': 'HEAL',
+        'dentist': 'HEAL',
+        'veterinary_care': 'HEAL',
+        'beauty_salon': 'BEAU',
+        'hair_care': 'BEAU',
+        'spa': 'BEAU',
 
-    if (types.includes('furniture_store')) return 'FURN';
-    if (types.includes('store')) return 'RETAIL';
-    if (types.includes('drugstore')) return 'RX';
-    if (types.includes('pharmacy')) return 'RX';
+        // Entertainment
+        'movie_theater': 'ENTR',
+        'amusement_park': 'ENTR',
+        'zoo': 'ENTR',
+        'aquarium': 'ENTR',
+        'museum': 'ENTR',
+        'art_gallery': 'ENTR',
+        'bowling_alley': 'ENTR',
+        'casino': 'ENTR',
 
-    if (types.includes('car_dealer')) return 'AUTO';
-    if (types.includes('car_repair')) return 'AUTO';
-    if (types.includes('car_wash')) return 'AUTO';
+        // Services
+        'bank': 'SERV',
+        'atm': 'SERV',
+        'post_office': 'SERV',
+        'laundry': 'SERV',
+        'gym': 'SPRT',
+        'library': 'BOOK',
 
-    if (types.includes('beauty_salon')) return 'BEAU';
-    if (types.includes('hair_care')) return 'BEAU';
-    if (types.includes('spa')) return 'BEAU';
+        // Lodging
+        'lodging': 'OTHER',
+        'hotel': 'OTHER',
+        'motel': 'OTHER',
 
-    if (types.includes('book_store')) return 'BOOK';
-    if (types.includes('library')) return 'BOOK';
+        // Generic
+        'store': 'RETAIL',
+        'shopping_mall': 'RETAIL',
+        'establishment': 'OTHER',
+        'point_of_interest': 'OTHER'
+    };
 
-    if (types.includes('movie_theater')) return 'ENTR';
-    if (types.includes('amusement_park')) return 'ENTR';
-    if (types.includes('aquarium')) return 'ENTR';
-    if (types.includes('art_gallery')) return 'ENTR';
-    if (types.includes('museum')) return 'ENTR';
-    if (types.includes('zoo')) return 'ENTR';
+    // Find the most specific type first
+    for (const type of types) {
+        if (typeMap[type]) {
+            return typeMap[type];
+        }
+    }
 
-    if (types.includes('sporting_goods_store')) return 'SPRT';
-    if (types.includes('gym')) return 'SPRT';
-
-    if (types.includes('jewelry_store')) return 'JEWL';
-    if (types.includes('home_goods_store')) return 'GIFT';
-    if (types.includes('gift_shop')) return 'GIFT';
-
-    if (types.includes('health')) return 'HEAL';
-    if (types.includes('doctor')) return 'HEAL';
-    if (types.includes('dentist')) return 'HEAL';
-    if (types.includes('hospital')) return 'HEAL';
-
-    if (types.includes('point_of_interest')) return 'SPEC';
-    if (types.includes('establishment')) return 'SERV';
-
-    // Default to OTHER if no specific mapping found
+    // Default to OTHER if no mapping found
     return 'OTHER';
 }
+
+console.log("Google Places address parsing fix loaded successfully!");
 
 /**
  * Search for nearby businesses of similar type
@@ -4850,50 +4978,91 @@ function buildEnhancedInfoWindowContent(business) {
     const isGooglePlace = business.isGooglePlace === true;
     const isChainLocation = !!business.chain_id;
 
-    // Format address
+    // Enhanced address formatting
     let addressHTML = '';
     if (business.address1) {
         addressHTML = `<div class="info-address">
             <strong>📍 Address:</strong><br>
-            ${business.address1}
-            ${business.address2 ? `<br>${business.address2}` : ''}
-            <br>${business.city}, ${business.state} ${business.zip}
-        </div>`;
+            ${business.address1}`;
+
+        // Add second address line if it exists
+        if (business.address2) {
+            addressHTML += `<br>${business.address2}`;
+        }
+
+        // Add city, state, zip on separate line if they exist
+        const locationParts = [];
+        if (business.city) locationParts.push(business.city);
+        if (business.state) locationParts.push(business.state);
+        if (business.zip) locationParts.push(business.zip);
+
+        if (locationParts.length > 0) {
+            addressHTML += `<br>${locationParts.join(', ')}`;
+        }
+
+        addressHTML += '</div>';
     } else if (business.formattedAddress) {
+        // If we only have formatted address, display it nicely
+        const addressParts = business.formattedAddress.split(',').map(part => part.trim());
         addressHTML = `<div class="info-address">
-            <strong>📍 Address:</strong><br>${business.formattedAddress}
-        </div>`;
+            <strong>📍 Address:</strong><br>`;
+
+        // Format the address parts on separate lines for better readability
+        if (addressParts.length >= 1) {
+            addressHTML += addressParts[0]; // Street address
+        }
+        if (addressParts.length >= 2) {
+            addressHTML += `<br>${addressParts.slice(1).join(', ')}`; // City, State ZIP, Country
+        }
+
+        addressHTML += '</div>';
     }
 
-    // Phone number
+    // Phone number with better formatting
     const phoneHTML = business.phone ?
-        `<div class="info-phone"><strong>📞 Phone:</strong> ${business.phone}</div>` : '';
+        `<div class="info-phone"><strong>📞 Phone:</strong> <a href="tel:${business.phone.replace(/\D/g, '')}" style="color: #4285F4; text-decoration: none;">${business.phone}</a></div>` : '';
 
-    // Business type
-    const typeHTML = business.type ?
-        `<div class="info-type"><strong>🏢 Type:</strong> ${getBusinessTypeLabel(business.type)}</div>` : '';
+    // Business type with better labeling
+    let typeHTML = '';
+    if (business.type && business.type !== 'OTHER') {
+        typeHTML = `<div class="info-type"><strong>🏢 Type:</strong> ${getBusinessTypeLabel(business.type)}</div>`;
+    } else if (isGooglePlace && business.types && business.types.length > 0) {
+        // For Google Places, show the primary type in a more readable format
+        const primaryType = business.types[0];
+        const readableType = primaryType
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, l => l.toUpperCase());
+        typeHTML = `<div class="info-type"><strong>🏢 Type:</strong> ${readableType}</div>`;
+    }
 
-    // Distance
+    // Distance with better formatting
     const distanceHTML = business.distance ?
         `<div class="info-distance"><strong>📏 Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</div>` : '';
 
-    // Chain badge
+    // Chain badge with better styling
     const chainBadge = isChainLocation ?
         `<span class="enhanced-chain-badge">🔗 ${business.chain_name || 'Chain Location'}</span>` : '';
 
-    // Status indicator
-    const statusHTML = isGooglePlace ?
-        '<div class="info-status google-place">ℹ️ This business is not yet in the Patriot Thanks database.</div>' :
-        '<div class="info-status database-business">✅ This business is in the Patriot Thanks database.</div>';
+    // Status indicator with better messaging
+    let statusHTML = '';
+    if (isGooglePlace) {
+        if (isChainLocation) {
+            statusHTML = '<div class="info-status google-place">🔗 This location may be part of a chain in our database.</div>';
+        } else {
+            statusHTML = '<div class="info-status google-place">ℹ️ This business is not yet in the Patriot Thanks database.</div>';
+        }
+    } else {
+        statusHTML = '<div class="info-status database-business">✅ This business is in the Patriot Thanks database.</div>';
+    }
 
-    // Chain explanation
+    // Chain explanation with better wording
     const chainExplanation = isChainLocation && isGooglePlace ?
         `<div class="chain-explanation">
             🔗 This location appears to match <strong>${business.chain_name}</strong> in our database. 
             Chain-wide incentives may apply to this location.
         </div>` : '';
 
-    // Action button
+    // Action button with better labeling
     let actionButton;
     if (isGooglePlace) {
         if (isChainLocation) {
@@ -4920,6 +5089,16 @@ function buildEnhancedInfoWindowContent(business) {
     // Unique container ID that matches what the loading functions expect
     const containerId = business._id || business.placeId;
 
+    // Better incentives messaging
+    let incentivesMessage;
+    if (isGooglePlace && !isChainLocation) {
+        incentivesMessage = '<em>💡 Add this business to see available incentives.</em>';
+    } else if (isGooglePlace && isChainLocation) {
+        incentivesMessage = '<em>⏳ Loading chain incentives...</em>';
+    } else {
+        incentivesMessage = '<em>⏳ Loading incentives...</em>';
+    }
+
     return `
         <div class="enhanced-info-window">
             <div class="info-header">
@@ -4936,9 +5115,7 @@ function buildEnhancedInfoWindowContent(business) {
                 
                 <div class="info-incentives">
                     <div id="incentives-container-${containerId}">
-                        ${isGooglePlace && !isChainLocation ?
-        '<em>💡 Add this business to see available incentives.</em>' :
-        '<em>⏳ Loading incentives...</em>'}
+                        ${incentivesMessage}
                     </div>
                 </div>
             </div>
@@ -4949,6 +5126,8 @@ function buildEnhancedInfoWindowContent(business) {
         </div>
     `;
 }
+
+console.log("Enhanced info window address formatting fix loaded!");
 
 /**
  * Load incentives for enhanced info window (database businesses)
