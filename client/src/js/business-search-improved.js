@@ -3643,81 +3643,6 @@ function getPlaceTypeLabel(types) {
 }
 
 /**
- * Search for nearby businesses of similar type
- * @param {google.maps.LatLng} location - Center location
- * @param {string} businessType - Business type to search for
- */
-function searchNearbyBusinesses(location, businessType) {
-    try {
-        console.log("Searching for nearby businesses near", location.lat(), location.lng());
-
-        // Get base URL
-        const baseURL = getBaseURL();
-
-        // Search for businesses of the same type in the database
-        const apiURL = `${baseURL}/api/business.js?operation=search&type=${businessType}&lat=${location.lat()}&lng=${location.lng()}&radius=25`;
-
-        fetch(apiURL)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch nearby businesses: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (!data.results || data.results.length === 0) {
-                    console.log("No additional nearby businesses found in database");
-                    return;
-                }
-
-                console.log(`Found ${data.results.length} potential nearby businesses in database`);
-
-                // Filter out businesses already on the map
-                const existingBusinessIds = markers.map(marker => marker.business?._id).filter(id => id);
-                const newBusinesses = data.results.filter(business =>
-                    !existingBusinessIds.includes(business._id)
-                );
-
-                console.log(`${newBusinesses.length} new businesses to add to map from database`);
-
-                // Add new businesses to the map
-                newBusinesses.forEach(business => {
-                    // Mark as nearby for different styling
-                    business.isNearby = true;
-
-                    // Create marker if business has coordinates
-                    if (business.lat && business.lng) {
-                        const position = new google.maps.LatLng(business.lat, business.lng);
-
-                        // Only add if within reasonable distance
-                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            location,
-                            position
-                        );
-
-                        if (distance < 80000) { // 80km or about 50 miles
-                            createBusinessMarker(business);
-
-                            // DON'T extend bounds here - we want to keep the search location centered
-                            console.log(`Added nearby business: ${business.bname} (${(distance / 1609).toFixed(1)} miles)`);
-                        } else {
-                            console.log(`Skipping distant business: ${business.bname} (${(distance / 1609).toFixed(1)} miles)`);
-                        }
-                    }
-                });
-
-                // DON'T update map bounds here - let the main search keep the focus on search location
-                console.log(`Added ${newBusinesses.length} nearby businesses without changing map center`);
-            })
-            .catch(error => {
-                console.error("Error searching for nearby businesses in database:", error);
-            });
-    } catch (error) {
-        console.error("Error in searchNearbyBusinesses:", error);
-    }
-}
-
-/**
  * Show error message in appropriate container
  * @param {string} message - Error message to display
  * @param {HTMLElement} container - Optional specific container
@@ -4858,102 +4783,7 @@ function createEnhancedFallbackMarker(business, location) {
     }
 }
 
-/**
- * Enhanced marker creation with all dependencies included
- * @param {Object} business - Business object
- * @param {Object} location - Google Maps location object
- */
-async function createEnhancedBusinessMarker(business, location) {
-    try {
-        // Import the marker library
-        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
 
-        // Create a position object from the location
-        let position = createSafeLatLng(location);
-        if (!position) {
-            console.error("Invalid position for enhanced marker:", location);
-            return createEnhancedFallbackMarker(business, location);
-        }
-
-        // Determine marker styling
-        const isFromDatabase = !business.isGooglePlace;
-        const isNearby = business.isNearby === true;
-        const isChainLocation = !!business.chain_id;
-
-        // Choose marker color and style
-        let markerColor, markerClass;
-        if (isFromDatabase) {
-            markerColor = CONFIG.markerColors.primary; // Red for database businesses
-            markerClass = "primary";
-        } else {
-            markerColor = CONFIG.markerColors.nearby; // Blue for Google Places
-            markerClass = "nearby";
-        }
-
-        // Get business icon (emoji works better than Font Awesome in markers)
-        const businessIcon = getBusinessTypeTextIcon(business.type);
-
-        // Create enhanced pin element
-        const pinElement = document.createElement('div');
-        pinElement.className = 'enhanced-custom-marker';
-        pinElement.setAttribute('title', business.bname);
-        pinElement.style.cursor = 'pointer';
-
-        // Enhanced marker HTML with better styling
-        pinElement.innerHTML = `
-            <div class="enhanced-marker-container">
-                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor};">
-                    <div class="enhanced-marker-icon">
-                        ${businessIcon}
-                    </div>
-                </div>
-                <div class="enhanced-marker-shadow"></div>
-                ${isChainLocation ? '<div class="chain-indicator">⭐</div>' : ''}
-            </div>
-        `;
-
-        // Create the advanced marker
-        const marker = new AdvancedMarkerElement({
-            position: position,
-            map: map,
-            title: business.bname,
-            content: pinElement,
-            collisionBehavior: isFromDatabase ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
-        });
-
-        // Store the business data and position
-        marker.business = business;
-        marker.position = position;
-        marker.isFromDatabase = isFromDatabase;
-
-        // Add click event listener
-        pinElement.addEventListener('click', function(e) {
-            console.log("Enhanced marker clicked:", business.bname);
-            e.stopPropagation();
-            showEnhancedInfoWindow(marker);
-        });
-
-        // Add hover effects
-        pinElement.addEventListener('mouseenter', function() {
-            pinElement.style.transform = 'scale(1.1)';
-            pinElement.style.zIndex = '1000';
-        });
-
-        pinElement.addEventListener('mouseleave', function() {
-            pinElement.style.transform = 'scale(1)';
-            pinElement.style.zIndex = 'auto';
-        });
-
-        // Add the marker to our array
-        markers.push(marker);
-        console.log(`Added enhanced marker for ${business.bname}`);
-
-        return marker;
-    } catch (error) {
-        console.error("Error creating enhanced marker:", error);
-        return createEnhancedFallbackMarker(business, location);
-    }
-}
 
 /**
  * Enhanced info window with better content organization
@@ -5741,6 +5571,347 @@ function createBusinessMarker(business) {
     }
 }
 
+/**
+ * Enhanced searchNearbyBusinesses function to find truly similar businesses
+ * @param {google.maps.LatLng} location - Center location
+ * @param {string} primaryBusinessType - Primary business type from search results
+ */
+function searchNearbyBusinesses(location, primaryBusinessType) {
+    try {
+        console.log("Searching for nearby similar businesses near", location.lat(), location.lng());
+        console.log("Primary business type:", primaryBusinessType);
+
+        // Get similar business types based on the primary type
+        const similarTypes = getSimilarBusinessTypes(primaryBusinessType);
+        console.log("Looking for similar business types:", similarTypes);
+
+        if (similarTypes.length === 0) {
+            console.log("No similar business types defined for:", primaryBusinessType);
+            return;
+        }
+
+        // Get base URL
+        const baseURL = getBaseURL();
+
+        // Search for each similar business type
+        const searchPromises = similarTypes.map(businessType => {
+            const apiURL = `${baseURL}/api/business.js?operation=search&type=${businessType}&lat=${location.lat()}&lng=${location.lng()}&radius=15`;
+            console.log("Searching for similar businesses:", apiURL);
+
+            return fetch(apiURL)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch businesses of type ${businessType}: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => ({
+                    businessType: businessType,
+                    results: data.results || []
+                }));
+        });
+
+        // Execute all searches in parallel
+        Promise.all(searchPromises)
+            .then(searchResults => {
+                // Combine all results
+                let allSimilarBusinesses = [];
+                searchResults.forEach(result => {
+                    if (result.results.length > 0) {
+                        console.log(`Found ${result.results.length} businesses of type ${result.businessType}`);
+                        allSimilarBusinesses = allSimilarBusinesses.concat(result.results);
+                    }
+                });
+
+                if (allSimilarBusinesses.length === 0) {
+                    console.log("No similar businesses found in the area");
+                    return;
+                }
+
+                console.log(`Found ${allSimilarBusinesses.length} total potential similar businesses`);
+
+                // Filter out businesses already on the map (avoid duplicates)
+                const existingBusinessIds = markers.map(marker => marker.business?._id).filter(id => id);
+                const existingBusinessNames = markers.map(marker => marker.business?.bname.toLowerCase()).filter(name => name);
+
+                const newSimilarBusinesses = allSimilarBusinesses.filter(business => {
+                    // Exclude if already displayed by ID
+                    if (existingBusinessIds.includes(business._id)) {
+                        return false;
+                    }
+
+                    // Exclude if very similar name (avoid chain duplicates)
+                    const businessNameLower = business.bname.toLowerCase();
+                    const isDuplicate = existingBusinessNames.some(existingName => {
+                        return businessNameLower.includes(existingName) || existingName.includes(businessNameLower);
+                    });
+
+                    return !isDuplicate;
+                });
+
+                console.log(`${newSimilarBusinesses.length} new similar businesses to add to map`);
+
+                // Add new similar businesses to the map with blue markers
+                let addedCount = 0;
+                newSimilarBusinesses.forEach(business => {
+                    // Mark as nearby similar business for blue marker styling
+                    business.isNearby = true;
+                    business.isSimilarBusiness = true;
+
+                    // Create marker if business has coordinates
+                    const businessLocation = getBusinessLocation(business);
+                    if (businessLocation) {
+                        const position = new google.maps.LatLng(businessLocation.lat, businessLocation.lng);
+
+                        // Only add if within reasonable distance (15 miles)
+                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            location,
+                            position
+                        );
+
+                        if (distance <= 24140) { // 15 miles in meters
+                            const marker = createSimilarBusinessMarker(business, position);
+                            if (marker) {
+                                addedCount++;
+                                console.log(`Added similar business: ${business.bname} (${(distance / 1609).toFixed(1)} miles) - ${getBusinessTypeLabel(business.type)}`);
+                            }
+                        } else {
+                            console.log(`Skipping distant similar business: ${business.bname} (${(distance / 1609).toFixed(1)} miles)`);
+                        }
+                    } else {
+                        console.warn(`Similar business ${business.bname} missing coordinates`);
+                    }
+                });
+
+                console.log(`Added ${addedCount} similar businesses with blue markers`);
+            })
+            .catch(error => {
+                console.error("Error searching for similar businesses:", error);
+            });
+
+    } catch (error) {
+        console.error("Error in searchNearbyBusinesses:", error);
+    }
+}
+
+/**
+ * Get similar business types for a given primary type
+ * @param {string} primaryType - Primary business type
+ * @returns {Array} Array of similar business type codes
+ */
+function getSimilarBusinessTypes(primaryType) {
+    const similarBusinessMap = {
+        // Hardware stores - compete with each other
+        'HARDW': ['HARDW', 'DEPT'], // Include department stores that sell hardware
+
+        // Restaurants - group by general category
+        'REST': ['REST'], // All restaurants are similar
+
+        // Grocery stores
+        'GROC': ['GROC', 'CONV'], // Grocery and convenience stores
+
+        // Department stores
+        'DEPT': ['DEPT', 'RETAIL', 'HARDW'], // Department stores, retail, and hardware
+
+        // Clothing stores
+        'CLTH': ['CLTH', 'DEPT'], // Clothing and department stores
+
+        // Electronics
+        'ELEC': ['ELEC', 'DEPT', 'TECH'], // Electronics, department, and tech stores
+
+        // Furniture
+        'FURN': ['FURN', 'DEPT'], // Furniture and department stores
+
+        // Automotive
+        'AUTO': ['AUTO', 'FUEL'], // Auto services and fuel stations
+
+        // Health and beauty
+        'BEAU': ['BEAU', 'RX'], // Beauty and pharmacy
+        'RX': ['RX', 'BEAU', 'GROC'], // Pharmacy, beauty, and grocery (many have pharmacies)
+
+        // Entertainment
+        'ENTR': ['ENTR'], // Entertainment venues
+
+        // Sporting goods
+        'SPRT': ['SPRT', 'DEPT'], // Sporting goods and department stores
+
+        // Gas stations and convenience
+        'FUEL': ['FUEL', 'CONV'], // Fuel and convenience stores
+        'CONV': ['CONV', 'FUEL', 'GROC'], // Convenience, fuel, and small grocery
+
+        // Services
+        'SERV': ['SERV'], // General services
+
+        // Default fallback
+        'OTHER': ['OTHER', 'RETAIL']
+    };
+
+    // Get similar types, excluding the exact same type to avoid duplicates
+    const similarTypes = similarBusinessMap[primaryType] || [primaryType];
+
+    // Remove the primary type itself to avoid finding the same businesses again
+    return similarTypes.filter(type => type !== primaryType);
+}
+
+/**
+ * Extract location from business object (handles different coordinate formats)
+ * @param {Object} business - Business object
+ * @returns {Object|null} Object with lat/lng or null if invalid
+ */
+function getBusinessLocation(business) {
+    let lat, lng;
+
+    // For MongoDB businesses with GeoJSON format
+    if (business.location && business.location.coordinates &&
+        Array.isArray(business.location.coordinates) && business.location.coordinates.length >= 2) {
+        // MongoDB stores as [longitude, latitude]
+        lng = business.location.coordinates[0];
+        lat = business.location.coordinates[1];
+    }
+    // For businesses with direct lat/lng fields
+    else if (business.lat !== undefined && business.lng !== undefined) {
+        lat = parseFloat(business.lat);
+        lng = parseFloat(business.lng);
+    } else {
+        return null;
+    }
+
+    // Validate coordinates
+    if (isNaN(lat) || isNaN(lng)) {
+        return null;
+    }
+
+    return { lat, lng };
+}
+
+/**
+ * Create a blue marker for similar businesses
+ * @param {Object} business - Business object
+ * @param {google.maps.LatLng} position - Marker position
+ * @returns {Object} Created marker
+ */
+function createSimilarBusinessMarker(business, position) {
+    try {
+        // Update business coordinates
+        business.lat = position.lat();
+        business.lng = position.lng();
+
+        // Use the enhanced marker creation but force blue color
+        return createEnhancedBusinessMarker(business, position, true); // true = force nearby/blue styling
+    } catch (error) {
+        console.error("Error creating similar business marker:", error);
+        return createEnhancedFallbackMarker(business, position);
+    }
+}
+
+/**
+ * Update the enhanced marker creation to support forced nearby styling
+ * @param {Object} business - Business object
+ * @param {Object} location - Google Maps location object
+ * @param {boolean} forceNearby - Force blue/nearby styling
+ */
+async function createEnhancedBusinessMarker(business, location, forceNearby = false) {
+    try {
+        // Import the marker library
+        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+        // Create a position object from the location
+        let position = createSafeLatLng(location);
+        if (!position) {
+            console.error("Invalid position for enhanced marker:", location);
+            return createEnhancedFallbackMarker(business, location);
+        }
+
+        // Determine marker styling
+        const isFromDatabase = !business.isGooglePlace;
+        const isNearby = forceNearby || business.isNearby === true || business.isSimilarBusiness === true;
+
+        // Choose marker color and style
+        let markerColor, markerClass;
+        if (isNearby || business.isSimilarBusiness) {
+            markerColor = CONFIG.markerColors.nearby; // Blue for nearby/similar businesses
+            markerClass = "nearby";
+        } else if (isFromDatabase) {
+            markerColor = CONFIG.markerColors.primary; // Red for primary search results
+            markerClass = "primary";
+        } else {
+            markerColor = CONFIG.markerColors.nearby; // Blue for Google Places
+            markerClass = "nearby";
+        }
+
+        // Get business icon
+        const businessIcon = getBusinessTypeTextIcon(business.type);
+
+        // Create enhanced pin element
+        const pinElement = document.createElement('div');
+        pinElement.className = 'enhanced-custom-marker';
+        pinElement.setAttribute('title', business.bname);
+        pinElement.style.cursor = 'pointer';
+
+        // Enhanced marker HTML with better styling
+        pinElement.innerHTML = `
+            <div class="enhanced-marker-container">
+                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor};">
+                    <div class="enhanced-marker-icon">
+                        ${businessIcon}
+                    </div>
+                </div>
+                <div class="enhanced-marker-shadow"></div>
+                ${business.chain_id ? '<div class="chain-indicator">⭐</div>' : ''}
+                ${business.isSimilarBusiness ? '<div class="similar-indicator">≈</div>' : ''}
+            </div>
+        `;
+
+        // Create the advanced marker
+        const marker = new AdvancedMarkerElement({
+            position: position,
+            map: map,
+            title: business.bname,
+            content: pinElement,
+            collisionBehavior: isFromDatabase ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
+        });
+
+        // Store the business data and position
+        marker.business = business;
+        marker.position = position;
+        marker.isFromDatabase = isFromDatabase;
+        marker.isSimilarBusiness = business.isSimilarBusiness || forceNearby;
+
+        // Add click event listener
+        pinElement.addEventListener('click', function(e) {
+            console.log("Enhanced similar business marker clicked:", business.bname);
+            e.stopPropagation();
+            showEnhancedInfoWindow(marker);
+        });
+
+        // Add hover effects
+        pinElement.addEventListener('mouseenter', function() {
+            pinElement.style.transform = 'scale(1.1)';
+            pinElement.style.zIndex = '1000';
+        });
+
+        pinElement.addEventListener('mouseleave', function() {
+            pinElement.style.transform = 'scale(1)';
+            pinElement.style.zIndex = 'auto';
+        });
+
+        // Add the marker to our array
+        markers.push(marker);
+        console.log(`Added enhanced ${business.isSimilarBusiness ? 'similar business' : ''} marker for ${business.bname}`);
+
+        return marker;
+    } catch (error) {
+        console.error("Error creating enhanced marker:", error);
+        return createEnhancedFallbackMarker(business, location);
+    }
+}
+
+// Export the new functions
+if (typeof window !== 'undefined') {
+}
+
+console.log("Enhanced nearby similar businesses functionality loaded!");
+
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = retrieveFromMongoDB;
@@ -5769,5 +5940,9 @@ if (typeof window !== 'undefined') {
     window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
     window.addEnhancedMarkerStyles = addEnhancedMarkerStyles;
     window.createBusinessMarker = createBusinessMarker;
+    window.searchNearbyBusinesses = searchNearbyBusinesses;
+    window.getSimilarBusinessTypes = getSimilarBusinessTypes;
+    window.getBusinessLocation = getBusinessLocation;
+    window.createSimilarBusinessMarker = createSimilarBusinessMarker;
 }
 
