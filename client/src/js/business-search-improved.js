@@ -1984,6 +1984,37 @@ function showInfoWindow(marker) {
     const business = marker.business;
     console.log("Business data for info window:", business);
 
+    // FIXED: Properly extract coordinates for Google Places businesses
+    let businessLat, businessLng;
+
+    if (business.isGooglePlace && typeof business.lat === 'function' && typeof business.lng === 'function') {
+        // For Google Places results, lat/lng are functions
+        try {
+            businessLat = business.lat();
+            businessLng = business.lng();
+            console.log("Extracted Google Places coordinates:", businessLat, businessLng);
+        } catch (error) {
+            console.error("Error extracting Google Places coordinates:", error);
+            return;
+        }
+    } else {
+        // For database businesses, lat/lng are direct values
+        businessLat = parseFloat(business.lat);
+        businessLng = parseFloat(business.lng);
+        console.log("Using database coordinates:", businessLat, businessLng);
+    }
+
+    // Validate coordinates
+    if (isNaN(businessLat) || isNaN(businessLng)) {
+        console.error("Invalid coordinates:", businessLat, businessLng);
+        alert("Cannot display information - invalid location data");
+        return;
+    }
+
+    // Update business object with numeric coordinates for consistency
+    business.lat = businessLat;
+    business.lng = businessLng;
+
     // Format address
     const addressLine = business.address2
         ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
@@ -1998,7 +2029,7 @@ function showInfoWindow(marker) {
         : '';
 
     // Format distance if available
-    const distanceDisplay = business.distance
+    const distanceDisplay = business.distance && !isNaN(business.distance)
         ? `<p><strong>Distance:</strong> ${(business.distance / 1609.34).toFixed(1)} miles</p>`
         : '';
 
@@ -2021,6 +2052,9 @@ function showInfoWindow(marker) {
         </button>`;
     }
 
+    // FIXED: Create unique ID that works for both business types
+    const businessDisplayId = isGooglePlace ? business.placeId : business._id;
+
     // Content for the info window
     const contentString = `
     <div class="info-window">
@@ -2029,7 +2063,7 @@ function showInfoWindow(marker) {
         ${phoneDisplay}
         ${distanceDisplay}
         <p><strong>Type:</strong> ${businessType}</p>
-        <div id="info-window-incentives-${business._id}">
+        <div id="info-window-incentives-${businessDisplayId}">
             <p><strong>Incentives:</strong> <em>${isGooglePlace ? 'Not in database' : 'Loading...'}</em></p>
         </div>
         ${isGooglePlace ? '<p>This business is not yet in the Patriot Thanks database.</p>' : ''}
@@ -2044,7 +2078,7 @@ function showInfoWindow(marker) {
         infoWindow = new google.maps.InfoWindow({
             maxWidth: 320,
             disableAutoPan: false,
-            pixelOffset: new google.maps.Size(0, -30) // Adjust offset to compensate for tail positioning
+            pixelOffset: new google.maps.Size(0, -10)
         });
     }
 
@@ -2054,35 +2088,23 @@ function showInfoWindow(marker) {
     // Close any existing info window first
     infoWindow.close();
 
-    // Get the marker position
-    let markerPosition;
+    // FIXED: Create marker position using the validated coordinates
+    const markerPosition = new google.maps.LatLng(businessLat, businessLng);
+
     try {
-        if (marker.getPosition && typeof marker.getPosition === 'function') {
-            markerPosition = marker.getPosition();
-        } else if (marker.position) {
-            if (typeof marker.position.lat === 'function') {
-                markerPosition = marker.position;
-            } else if (typeof marker.position.lat === 'number') {
-                markerPosition = new google.maps.LatLng(marker.position.lat, marker.position.lng);
-            }
-        } else if (business.lat && business.lng) {
-            markerPosition = new google.maps.LatLng(business.lat, business.lng);
-        }
-
-        if (!markerPosition) {
-            throw new Error("Could not determine marker position");
-        }
-
         // Pan to marker position first to ensure it's visible
+        console.log("Panning to position:", businessLat, businessLng);
         map.panTo(markerPosition);
 
         // Small delay to allow pan to complete, then open info window
         setTimeout(() => {
             try {
                 // Open the info window at the marker position
-                if (marker.getPosition) {
+                if (marker.getPosition && typeof marker.getPosition === 'function') {
+                    console.log("Opening info window on standard marker");
                     infoWindow.open(map, marker);
                 } else {
+                    console.log("Opening info window at position");
                     infoWindow.setPosition(markerPosition);
                     infoWindow.open(map);
                 }
@@ -2090,6 +2112,7 @@ function showInfoWindow(marker) {
                 console.log("Info window opened successfully");
             } catch (openError) {
                 console.error("Error opening info window:", openError);
+                // Fallback
                 infoWindow.setPosition(markerPosition);
                 infoWindow.open(map);
             }
@@ -2097,95 +2120,100 @@ function showInfoWindow(marker) {
 
     } catch (error) {
         console.error("Error positioning info window:", error);
-
-        if (business.lat && business.lng) {
-            const fallbackPosition = new google.maps.LatLng(business.lat, business.lng);
-            map.panTo(fallbackPosition);
-            setTimeout(() => {
-                infoWindow.setPosition(fallbackPosition);
-                infoWindow.open(map);
-            }, 200);
-        } else {
-            alert("Could not display information for this business.");
-            return;
-        }
+        alert("Could not display information for this business.");
+        return;
     }
 
-    // Only fetch incentives if it's in our database
+    // FIXED: Only fetch incentives if it's in our database, with proper delay
     if (!isGooglePlace) {
-        fetchBusinessIncentivesForInfoWindow(business._id);
+        setTimeout(() => {
+            fetchBusinessIncentivesForInfoWindow(business._id, false);
+        }, 300); // Give the DOM time to render
     }
 
-    // CRITICAL FIX: Add event listener to fix positioning after DOM is ready
-    google.maps.event.addListener(infoWindow, 'domready', function() {
+    // Add event listener to fix positioning after DOM is ready
+    google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
         console.log("Info window DOM ready, applying positioning fixes");
 
-        // Fix the tail positioning that's causing the issue
-        fixInfoWindowTailPositioning();
+        // Small delay to ensure DOM is fully rendered
+        setTimeout(() => {
+            fixInfoWindowTailPositioning();
 
-        // Apply other styling fixes
-        const iwOuter = document.querySelector('.gm-style-iw');
-        if (iwOuter) {
-            const iwCloseBtn = iwOuter.nextElementSibling;
-            if (iwCloseBtn) {
-                iwCloseBtn.style.top = '3px';
-                iwCloseBtn.style.right = '3px';
-                iwCloseBtn.style.width = '24px';
-                iwCloseBtn.style.height = '24px';
-                iwCloseBtn.style.opacity = '0.8';
+            // Apply other styling fixes
+            const iwOuter = document.querySelector('.gm-style-iw');
+            if (iwOuter) {
+                const iwCloseBtn = iwOuter.nextElementSibling;
+                if (iwCloseBtn) {
+                    iwCloseBtn.style.top = '3px';
+                    iwCloseBtn.style.right = '3px';
+                    iwCloseBtn.style.width = '24px';
+                    iwCloseBtn.style.height = '24px';
+                    iwCloseBtn.style.opacity = '0.8';
+                }
+
+                const iwContainer = iwOuter.querySelector('.gm-style-iw-d');
+                if (iwContainer) {
+                    iwContainer.style.overflow = 'auto';
+                    iwContainer.style.maxHeight = '350px';
+                }
             }
 
-            const iwContainer = iwOuter.querySelector('.gm-style-iw-d');
-            if (iwContainer) {
-                iwContainer.style.overflow = 'auto';
-                iwContainer.style.maxHeight = '350px';
+            // Verify the incentives div exists for database businesses
+            if (!isGooglePlace) {
+                const incentivesDiv = document.getElementById(`info-window-incentives-${business._id}`);
+                if (incentivesDiv) {
+                    console.log("Incentives div found, good to proceed");
+                } else {
+                    console.error("Incentives div still not found after DOM ready");
+                }
             }
-        }
+        }, 100);
     });
 }
 
 function fixInfoWindowTailPositioning() {
-    // Find the problematic tail element
-    const tailElement = document.querySelector('.gm-style-iw-t');
+    console.log("Attempting to fix info window tail positioning");
 
-    if (tailElement) {
-        console.log("Found info window tail element, fixing positioning");
+    // Try multiple selectors to find the tail element
+    let tailElement = document.querySelector('.gm-style-iw-t');
 
-        // Override the inline styles that are causing the problem
-        tailElement.style.bottom = '0px';
-        tailElement.style.right = 'auto';
-        tailElement.style.left = '50%';
-        tailElement.style.transform = 'translateX(-50%)';
-        tailElement.style.width = '20px';
-        tailElement.style.height = '15px';
-
-        console.log("Applied positioning fixes to tail element");
-    } else {
-        console.log("Tail element not found, will retry");
-
-        // If not found immediately, try again after a short delay
-        setTimeout(() => {
-            const retryTailElement = document.querySelector('.gm-style-iw-t');
-            if (retryTailElement) {
-                retryTailElement.style.bottom = '0px';
-                retryTailElement.style.right = 'auto';
-                retryTailElement.style.left = '50%';
-                retryTailElement.style.transform = 'translateX(-50%)';
-                retryTailElement.style.width = '20px';
-                retryTailElement.style.height = '15px';
-                console.log("Applied positioning fixes to tail element (retry)");
-            }
-        }, 100);
+    if (!tailElement) {
+        // Try alternative selector
+        tailElement = document.querySelector('[class*="gm-style-iw-t"]');
     }
 
-    // Also fix the tail connector if it exists
-    const tailConnector = document.querySelector('.gm-style-iw-tc');
-    if (tailConnector) {
-        tailConnector.style.top = 'auto';
-        tailConnector.style.bottom = '-15px';
-        tailConnector.style.left = '50%';
-        tailConnector.style.right = 'auto';
-        tailConnector.style.transform = 'translateX(-50%)';
+    if (tailElement) {
+        console.log("Found info window tail element, applying fixes");
+
+        // Remove the problematic positioning
+        tailElement.style.removeProperty('bottom');
+        tailElement.style.removeProperty('right');
+
+        // Apply correct positioning
+        tailElement.style.setProperty('bottom', '0px', 'important');
+        tailElement.style.setProperty('right', 'auto', 'important');
+        tailElement.style.setProperty('left', '50%', 'important');
+        tailElement.style.setProperty('transform', 'translateX(-50%)', 'important');
+        tailElement.style.setProperty('width', '20px', 'important');
+        tailElement.style.setProperty('height', '15px', 'important');
+
+        console.log("Applied positioning fixes to tail element");
+
+        // Also check for and fix the tail connector
+        const tailConnector = document.querySelector('.gm-style-iw-tc');
+        if (tailConnector) {
+            tailConnector.style.setProperty('top', 'auto', 'important');
+            tailConnector.style.setProperty('bottom', '-15px', 'important');
+            tailConnector.style.setProperty('left', '50%', 'important');
+            tailConnector.style.setProperty('right', 'auto', 'important');
+            tailConnector.style.setProperty('transform', 'translateX(-50%)', 'important');
+            console.log("Fixed tail connector positioning");
+        }
+
+        return true;
+    } else {
+        console.warn("Could not find tail element to fix");
+        return false;
     }
 }
 
@@ -3636,33 +3664,42 @@ function fetchBusinessIncentivesForInfoWindow(businessId, isNativeInfoWindow = f
 
     // Skip if this is a Google Place result (not in our database)
     if (businessId.startsWith('google_')) {
-        const containerSelector = isNativeInfoWindow ?
-            `incentives-container-${businessId}` :
-            `info-window-incentives-${businessId}`;
+        console.log("Skipping incentives fetch for Google Places result");
+        return;
+    }
 
-        const incentivesDiv = document.getElementById(containerSelector);
-        if (incentivesDiv) {
-            incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Not in database</p>';
+    console.log("Fetching incentives for business:", businessId);
+
+    // Wait a bit to ensure the DOM element exists
+    setTimeout(() => {
+        const incentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
+
+        if (!incentivesDiv) {
+            console.error(`Could not find incentives div for business ${businessId} - DOM may not be ready`);
+
+            // Try one more time after a longer delay
+            setTimeout(() => {
+                const retryIncentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
+                if (retryIncentivesDiv) {
+                    console.log("Found incentives div on retry");
+                    performIncentivesFetch(businessId, retryIncentivesDiv);
+                } else {
+                    console.error("Still cannot find incentives div after retry");
+                }
+            }, 500);
+            return;
         }
-        return;
-    }
 
-    // Get container element ID based on info window type
-    const containerSelector = isNativeInfoWindow ?
-        `incentives-container-${businessId}` :
-        `info-window-incentives-${businessId}`;
+        performIncentivesFetch(businessId, incentivesDiv);
+    }, 200);
+}
 
-    // Get incentives container
-    const incentivesDiv = document.getElementById(containerSelector);
-    if (!incentivesDiv) {
-        console.error(`Could not find incentives div for business ${businessId}`);
-        return;
-    }
-
-    // Determine the base URL
+// Helper function to perform the actual incentives fetch
+function performIncentivesFetch(businessId, incentivesDiv) {
     const baseURL = getBaseURL();
-
     const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+
+    console.log("Fetching incentives from:", apiURL);
 
     fetch(apiURL)
         .then(response => {
@@ -3672,6 +3709,8 @@ function fetchBusinessIncentivesForInfoWindow(businessId, isNativeInfoWindow = f
             return response.json();
         })
         .then(data => {
+            console.log(`Incentives data for business ${businessId}:`, data);
+
             // Check if there are any incentives
             if (!data.results || data.results.length === 0) {
                 incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No incentives found</p>';
