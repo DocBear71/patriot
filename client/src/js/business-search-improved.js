@@ -5054,10 +5054,11 @@ function loadChainIncentivesForEnhancedWindow(placeId, chainId) {
 }
 
 /**
- * Apply enhanced info window positioning fixes
+ * Enhanced info window positioning fixes with padding correction
  */
 function applyEnhancedInfoWindowFixes() {
     const iwContainer = document.querySelector('.gm-style-iw-c');
+    const iwContent = document.querySelector('.gm-style-iw-d');
     const iwTail = document.querySelector('.gm-style-iw-t');
 
     if (iwContainer) {
@@ -5070,20 +5071,34 @@ function applyEnhancedInfoWindowFixes() {
             iwContainer.style.maxWidth = '350px';
         }
 
+        // Reset any padding/margin that Google might have added incorrectly
+        iwContainer.style.padding = '0';
+        iwContainer.style.margin = '0';
+
         // Fix positioning if off-screen
         if (rect.top < 0 || rect.top > window.innerHeight || rect.left < 0 || rect.left > window.innerWidth) {
             iwContainer.style.position = 'relative';
             iwContainer.style.transform = 'none';
         }
-
-        // Fix tail positioning
-        if (iwTail) {
-            iwTail.style.bottom = '0px';
-            iwTail.style.left = '50%';
-            iwTail.style.right = 'auto';
-            iwTail.style.transform = 'translateX(-50%)';
-        }
     }
+
+    // Ensure content container has no padding (our content will have its own)
+    if (iwContent) {
+        iwContent.style.padding = '0';
+        iwContent.style.margin = '0';
+        iwContent.style.overflow = 'auto';
+        iwContent.style.maxHeight = '350px';
+    }
+
+    // Fix tail positioning
+    if (iwTail) {
+        iwTail.style.bottom = '0px';
+        iwTail.style.left = '50%';
+        iwTail.style.right = 'auto';
+        iwTail.style.transform = 'translateX(-50%)';
+    }
+
+    console.log("Applied enhanced info window fixes with proper padding");
 }
 
 /**
@@ -5173,11 +5188,33 @@ function addEnhancedMarkerStyles() {
                 z-index: 1001;
             }
 
-            /* Enhanced info window styles */
+            /* CRITICAL: Google Maps info window container fixes */
+            .gm-style .gm-style-iw-c {
+                padding: 0 !important;
+                border-radius: 8px !important;
+                box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3) !important;
+                max-width: 350px !important;
+                max-height: 400px !important;
+                overflow: hidden !important;
+            }
+
+            .gm-style .gm-style-iw-d {
+                overflow: auto !important;
+                max-height: 350px !important;
+                padding: 0 !important;
+                /* Add proper padding that Google Maps won't strip */
+                margin: 0 !important;
+            }
+
+            /* Enhanced info window styles with proper padding */
             .enhanced-info-window {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 max-width: 320px;
                 line-height: 1.4;
+                /* CRITICAL: Add padding to the content container instead of relying on Google's padding */
+                padding: 12px 12px 12px 12px !important;
+                margin: 0;
+                box-sizing: border-box;
             }
 
             .info-header {
@@ -5300,6 +5337,8 @@ function addEnhancedMarkerStyles() {
                 padding-top: 12px;
                 border-top: 1px solid #eee;
                 text-align: center;
+                /* Add bottom margin to ensure spacing at bottom */
+                margin-bottom: 4px;
             }
 
             .enhanced-add-btn, .enhanced-view-btn {
@@ -5325,10 +5364,56 @@ function addEnhancedMarkerStyles() {
                 box-shadow: 0 4px 8px rgba(0,0,0,0.15);
             }
 
+            /* ENHANCED SCROLLBAR - More visible and styled */
+            .gm-style .gm-style-iw-d::-webkit-scrollbar {
+                width: 8px;
+                height: 8px;
+            }
+
+            .gm-style .gm-style-iw-d::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 4px;
+                border: 1px solid #e0e0e0;
+            }
+
+            .gm-style .gm-style-iw-d::-webkit-scrollbar-thumb {
+                background: linear-gradient(180deg, #4285F4, #64B5F6);
+                border-radius: 4px;
+                border: 1px solid #3367D6;
+                box-shadow: inset 0 1px 2px rgba(255,255,255,0.3);
+            }
+
+            .gm-style .gm-style-iw-d::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(180deg, #3367D6, #4285F4);
+                cursor: pointer;
+            }
+
+            .gm-style .gm-style-iw-d::-webkit-scrollbar-thumb:active {
+                background: linear-gradient(180deg, #2A56C6, #3367D6);
+            }
+
+            /* Add padding indicator when content is scrollable */
+            .gm-style .gm-style-iw-d::before {
+                content: '';
+                display: block;
+                height: 1px;
+                width: 100%;
+                background: transparent;
+            }
+
+            .gm-style .gm-style-iw-d::after {
+                content: '';
+                display: block;
+                height: 1px;
+                width: 100%;
+                background: transparent;
+            }
+
             /* Responsive adjustments */
             @media (max-width: 400px) {
                 .enhanced-info-window {
                     max-width: 280px;
+                    padding: 10px 10px 10px 10px !important;
                 }
                 
                 .enhanced-marker-container {
@@ -5340,11 +5425,40 @@ function addEnhancedMarkerStyles() {
                     width: 28px;
                     height: 36px;
                 }
+
+                .gm-style .gm-style-iw-d::-webkit-scrollbar {
+                    width: 6px;
+                }
+            }
+
+            /* Fix for tail positioning */
+            .gm-style .gm-style-iw-t {
+                bottom: 0px !important;
+                left: 50% !important;
+                right: auto !important;
+                transform: translateX(-50%) !important;
+                width: 20px !important;
+                height: 15px !important;
+            }
+
+            /* Ensure close button is properly positioned */
+            .gm-ui-hover-effect {
+                opacity: 0.8 !important;
+                top: 8px !important;
+                right: 8px !important;
+                width: 24px !important;
+                height: 24px !important;
+                z-index: 1002 !important;
+            }
+
+            .gm-ui-hover-effect:hover {
+                opacity: 1 !important;
             }
         `;
         document.head.appendChild(style);
     }
 }
+
 
 function createBusinessMarker(business) {
     try {
