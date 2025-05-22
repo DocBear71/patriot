@@ -1973,6 +1973,7 @@ function fetchChainIncentivesForInfoWindow(placeId, chainId, isNativeInfoWindow 
  * Show info window for a marker with scrollable content
  * @param {Object} marker - Marker object
  */
+// Diagnostic version of showInfoWindow to troubleshoot visibility issues
 function showInfoWindow(marker) {
     console.log("showInfoWindow called with marker:", marker);
 
@@ -1984,11 +1985,10 @@ function showInfoWindow(marker) {
     const business = marker.business;
     console.log("Business data for info window:", business);
 
-    // FIXED: Properly extract coordinates for Google Places businesses
+    // Extract coordinates properly
     let businessLat, businessLng;
 
     if (business.isGooglePlace && typeof business.lat === 'function' && typeof business.lng === 'function') {
-        // For Google Places results, lat/lng are functions
         try {
             businessLat = business.lat();
             businessLng = business.lng();
@@ -1998,7 +1998,6 @@ function showInfoWindow(marker) {
             return;
         }
     } else {
-        // For database businesses, lat/lng are direct values
         businessLat = parseFloat(business.lat);
         businessLng = parseFloat(business.lng);
         console.log("Using database coordinates:", businessLat, businessLng);
@@ -2007,99 +2006,72 @@ function showInfoWindow(marker) {
     // Validate coordinates
     if (isNaN(businessLat) || isNaN(businessLng)) {
         console.error("Invalid coordinates:", businessLat, businessLng);
-        alert("Cannot display information - invalid location data");
         return;
     }
 
-    // Update business object with numeric coordinates for consistency
+    // Update business object
     business.lat = businessLat;
     business.lng = businessLng;
 
-    // Format address
+    // Format content
     const addressLine = business.address2
         ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
         : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
 
-    // Get business type label
     const businessType = getBusinessTypeLabel(business.type);
-
-    // Format phone number if available
-    const phoneDisplay = business.phone
-        ? `<p><strong>Phone:</strong> ${business.phone}</p>`
-        : '';
-
-    // Format distance if available
+    const phoneDisplay = business.phone ? `<p><strong>Phone:</strong> ${business.phone}</p>` : '';
     const distanceDisplay = business.distance && !isNaN(business.distance)
         ? `<p><strong>Distance:</strong> ${(business.distance / 1609.34).toFixed(1)} miles</p>`
         : '';
 
-    // Check if this is a Google Places result not in our database
     const isGooglePlace = business.isGooglePlace === true;
-
-    // Customize the footer button based on whether it's in our database
-    let actionButtons;
-    if (isGooglePlace) {
-        actionButtons = `
-        <button class="add-business-btn" 
-                onclick="window.addBusinessToDatabase('${business.placeId}')">
-            Add to Patriot Thanks
-        </button>`;
-    } else {
-        actionButtons = `
-        <button class="view-details-btn" 
-                onclick="window.viewBusinessDetails('${business._id}')">
-            View Details
-        </button>`;
-    }
-
-    // FIXED: Create unique ID that works for both business types
     const businessDisplayId = isGooglePlace ? business.placeId : business._id;
 
-    // Content for the info window
+    let actionButtons;
+    if (isGooglePlace) {
+        actionButtons = `<button class="add-business-btn" onclick="window.addBusinessToDatabase('${business.placeId}')">Add to Patriot Thanks</button>`;
+    } else {
+        actionButtons = `<button class="view-details-btn" onclick="window.viewBusinessDetails('${business._id}')">View Details</button>`;
+    }
+
+    // Simple content without complex styling initially
     const contentString = `
-    <div class="info-window">
-        <h3>${business.bname}</h3>
-        <p><strong>Address:</strong><br>${addressLine}</p>
+    <div class="info-window" style="padding: 10px; max-width: 280px;">
+        <h3 style="margin: 0 0 8px 0; font-size: 16px;">${business.bname}</h3>
+        <p style="margin: 4px 0;"><strong>Address:</strong><br>${addressLine}</p>
         ${phoneDisplay}
         ${distanceDisplay}
-        <p><strong>Type:</strong> ${businessType}</p>
-        <div id="info-window-incentives-${businessDisplayId}">
+        <p style="margin: 4px 0;"><strong>Type:</strong> ${businessType}</p>
+        <div id="info-window-incentives-${businessDisplayId}" style="margin: 8px 0;">
             <p><strong>Incentives:</strong> <em>${isGooglePlace ? 'Not in database' : 'Loading...'}</em></p>
         </div>
-        ${isGooglePlace ? '<p>This business is not yet in the Patriot Thanks database.</p>' : ''}
-        <div class="info-window-actions">
+        ${isGooglePlace ? '<p style="font-style: italic; color: #666;">This business is not yet in the Patriot Thanks database.</p>' : ''}
+        <div style="margin-top: 10px; text-align: center;">
             ${actionButtons}
         </div>
     </div>
     `;
 
-    // Create info window if it doesn't exist
+    // Create or reuse info window with minimal configuration
     if (!infoWindow) {
         infoWindow = new google.maps.InfoWindow({
-            maxWidth: 320,
-            disableAutoPan: false,
-            pixelOffset: new google.maps.Size(0, -10)
+            maxWidth: 300,
+            disableAutoPan: false
+            // Remove pixelOffset for now to see if that's causing issues
         });
     }
 
-    // Set content for the info window
     infoWindow.setContent(contentString);
-
-    // Close any existing info window first
     infoWindow.close();
 
-    // FIXED: Create marker position using the validated coordinates
     const markerPosition = new google.maps.LatLng(businessLat, businessLng);
 
     try {
-        // Pan to marker position first to ensure it's visible
         console.log("Panning to position:", businessLat, businessLng);
         map.panTo(markerPosition);
 
-        // Small delay to allow pan to complete, then open info window
         setTimeout(() => {
             try {
-                // Open the info window at the marker position
                 if (marker.getPosition && typeof marker.getPosition === 'function') {
                     console.log("Opening info window on standard marker");
                     infoWindow.open(map, marker);
@@ -2110,65 +2082,207 @@ function showInfoWindow(marker) {
                 }
 
                 console.log("Info window opened successfully");
+
+                // Diagnostic: Check if info window is actually visible
+                setTimeout(() => {
+                    checkInfoWindowVisibility();
+                }, 500);
+
             } catch (openError) {
                 console.error("Error opening info window:", openError);
-                // Fallback
                 infoWindow.setPosition(markerPosition);
                 infoWindow.open(map);
             }
-        }, 200);
+        }, 300); // Increased delay
 
     } catch (error) {
         console.error("Error positioning info window:", error);
-        alert("Could not display information for this business.");
         return;
     }
 
-    // FIXED: Only fetch incentives if it's in our database, with proper delay
-    if (!isGooglePlace) {
-        setTimeout(() => {
-            fetchBusinessIncentivesForInfoWindow(business._id, false);
-        }, 300); // Give the DOM time to render
-    }
-
-    // Add event listener to fix positioning after DOM is ready
+    // Simplified DOM ready handler - NO tail positioning fixes initially
     google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
-        console.log("Info window DOM ready, applying positioning fixes");
+        console.log("Info window DOM ready");
 
-        // Small delay to ensure DOM is fully rendered
         setTimeout(() => {
-            fixInfoWindowTailPositioning();
-
-            // Apply other styling fixes
+            // Just check visibility and basic styling
             const iwOuter = document.querySelector('.gm-style-iw');
             if (iwOuter) {
-                const iwCloseBtn = iwOuter.nextElementSibling;
-                if (iwCloseBtn) {
-                    iwCloseBtn.style.top = '3px';
-                    iwCloseBtn.style.right = '3px';
-                    iwCloseBtn.style.width = '24px';
-                    iwCloseBtn.style.height = '24px';
-                    iwCloseBtn.style.opacity = '0.8';
+                console.log("Found info window element:", iwOuter);
+                console.log("Info window styles:", window.getComputedStyle(iwOuter));
+
+                // Check if it's visible
+                const rect = iwOuter.getBoundingClientRect();
+                console.log("Info window position:", rect);
+
+                if (rect.width === 0 || rect.height === 0) {
+                    console.error("Info window has zero dimensions!");
                 }
 
-                const iwContainer = iwOuter.querySelector('.gm-style-iw-d');
-                if (iwContainer) {
-                    iwContainer.style.overflow = 'auto';
-                    iwContainer.style.maxHeight = '350px';
+                if (rect.top < 0 || rect.left < 0 || rect.top > window.innerHeight || rect.left > window.innerWidth) {
+                    console.error("Info window is positioned outside viewport!");
                 }
+            } else {
+                console.error("Could not find info window element in DOM");
             }
 
-            // Verify the incentives div exists for database businesses
+            // Load incentives for database businesses
             if (!isGooglePlace) {
-                const incentivesDiv = document.getElementById(`info-window-incentives-${business._id}`);
-                if (incentivesDiv) {
-                    console.log("Incentives div found, good to proceed");
-                } else {
-                    console.error("Incentives div still not found after DOM ready");
-                }
+                setTimeout(() => {
+                    fetchBusinessIncentivesForInfoWindow(business._id, false);
+                }, 100);
             }
-        }, 100);
+        }, 200);
     });
+}
+
+// Diagnostic function to check info window visibility
+function checkInfoWindowVisibility() {
+    console.log("=== INFO WINDOW VISIBILITY DIAGNOSTIC ===");
+
+    const iwElements = document.querySelectorAll('.gm-style-iw, .gm-style-iw-c, .gm-style-iw-d');
+    console.log("Found info window elements:", iwElements.length);
+
+    iwElements.forEach((element, index) => {
+        const rect = element.getBoundingClientRect();
+        const styles = window.getComputedStyle(element);
+
+        console.log(`Element ${index} (${element.className}):`);
+        console.log("  Position:", rect);
+        console.log("  Visibility:", styles.visibility);
+        console.log("  Display:", styles.display);
+        console.log("  Opacity:", styles.opacity);
+        console.log("  Z-index:", styles.zIndex);
+        console.log("  Transform:", styles.transform);
+    });
+
+    // Check if there are any elements with the tail class that might be causing issues
+    const tailElements = document.querySelectorAll('.gm-style-iw-t');
+    console.log("Found tail elements:", tailElements.length);
+
+    tailElements.forEach((element, index) => {
+        const rect = element.getBoundingClientRect();
+        const styles = window.getComputedStyle(element);
+
+        console.log(`Tail ${index}:`);
+        console.log("  Position:", rect);
+        console.log("  Bottom:", styles.bottom);
+        console.log("  Right:", styles.right);
+        console.log("  Left:", styles.left);
+        console.log("  Transform:", styles.transform);
+    });
+
+    console.log("=== END DIAGNOSTIC ===");
+}
+
+// Temporary function to remove any problematic CSS that might be hiding info windows
+function removeProblematicInfoWindowCSS() {
+    // Remove any existing CSS that might be causing issues
+    const existingStyles = document.querySelectorAll('#info-window-position-fix, #map-height-fix');
+    existingStyles.forEach(style => {
+        console.log("Removing potentially problematic style:", style.id);
+        style.remove();
+    });
+
+    // Add very minimal CSS to ensure visibility
+    const style = document.createElement('style');
+    style.id = 'minimal-info-window-fix';
+    style.textContent = `
+        /* Minimal CSS to ensure info windows are visible */
+        .gm-style .gm-style-iw-c {
+            max-width: 320px !important;
+            max-height: 400px !important;
+            overflow: visible !important;
+        }
+        
+        .gm-style .gm-style-iw-d {
+            overflow: auto !important;
+            max-height: 350px !important;
+        }
+        
+        .gm-style .gm-style-iw {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+        
+        /* Don't touch the tail positioning for now */
+        .gm-style .gm-style-iw-t {
+            /* Let Google handle this naturally */
+        }
+    `;
+    document.head.appendChild(style);
+
+    console.log("Applied minimal info window CSS");
+}
+
+// Call this to reset and test
+window.debugInfoWindow = function() {
+    console.log("Starting info window debug...");
+    removeProblematicInfoWindowCSS();
+
+    // Close any existing info window
+    if (infoWindow) {
+        infoWindow.close();
+    }
+
+    console.log("Ready for testing - try clicking a marker now");
+};
+
+// Auto-apply the minimal CSS when this script loads
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        removeProblematicInfoWindowCSS();
+    }, 1000);
+});
+
+/**
+ * Enhanced fetchBusinessIncentivesForInfoWindow function with better error handling
+ * @param {string} businessId - Business ID
+ * @param {boolean} isNativeInfoWindow - Whether using native Google InfoWindow
+ */
+function fetchBusinessIncentivesForInfoWindow(businessId, isNativeInfoWindow = false) {
+    if (!businessId || businessId.startsWith('google_')) {
+        return;
+    }
+
+    setTimeout(() => {
+        const incentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
+
+        if (!incentivesDiv) {
+            console.error(`Could not find incentives div for business ${businessId}`);
+            return;
+        }
+
+        const baseURL = getBaseURL();
+        const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+
+        fetch(apiURL)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.results || data.results.length === 0) {
+                    incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No incentives found</p>';
+                    return;
+                }
+
+                let incentivesHTML = '<p><strong>Incentives:</strong></p><ul style="margin:8px 0; padding-left:20px;">';
+
+                data.results.forEach(incentive => {
+                    if (incentive.is_available) {
+                        const typeLabel = getIncentiveTypeLabel(incentive.type);
+                        const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+                        incentivesHTML += `<li><strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}%</li>`;
+                    }
+                });
+
+                incentivesHTML += '</ul>';
+                incentivesDiv.innerHTML = incentivesHTML;
+            })
+            .catch(error => {
+                console.error(`Error fetching incentives:`, error);
+                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading</p>';
+            });
+    }, 300);
 }
 
 function fixInfoWindowTailPositioning() {
@@ -3651,48 +3765,8 @@ function checkIfUserIsAdmin() {
     }
 }
 
-/**
- * Enhanced fetchBusinessIncentivesForInfoWindow function with better error handling
- * @param {string} businessId - Business ID
- * @param {boolean} isNativeInfoWindow - Whether using native Google InfoWindow
- */
-function fetchBusinessIncentivesForInfoWindow(businessId, isNativeInfoWindow = false) {
-    if (!businessId) {
-        console.error("No business ID provided for fetching incentives");
-        return;
-    }
 
-    // Skip if this is a Google Place result (not in our database)
-    if (businessId.startsWith('google_')) {
-        console.log("Skipping incentives fetch for Google Places result");
-        return;
-    }
 
-    console.log("Fetching incentives for business:", businessId);
-
-    // Wait a bit to ensure the DOM element exists
-    setTimeout(() => {
-        const incentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
-
-        if (!incentivesDiv) {
-            console.error(`Could not find incentives div for business ${businessId} - DOM may not be ready`);
-
-            // Try one more time after a longer delay
-            setTimeout(() => {
-                const retryIncentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
-                if (retryIncentivesDiv) {
-                    console.log("Found incentives div on retry");
-                    performIncentivesFetch(businessId, retryIncentivesDiv);
-                } else {
-                    console.error("Still cannot find incentives div after retry");
-                }
-            }, 500);
-            return;
-        }
-
-        performIncentivesFetch(businessId, incentivesDiv);
-    }, 200);
-}
 
 // Helper function to perform the actual incentives fetch
 function performIncentivesFetch(businessId, incentivesDiv) {
