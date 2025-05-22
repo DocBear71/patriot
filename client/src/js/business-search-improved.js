@@ -2882,6 +2882,7 @@ function displayBusinessesOnMap(businesses) {
 
     // Counter for valid markers
     let validMarkers = 0;
+    let nearbyMarkers = 0; // Count of markers near search location
 
     // Process each business
     businesses.forEach(business => {
@@ -2921,27 +2922,75 @@ function displayBusinessesOnMap(businesses) {
             const marker = createBusinessMarker(business);
             if (marker) {
                 validMarkers++;
+
+                // Check if this business is near the search location
+                if (window.currentSearchLocation) {
+                    const businessLatLng = new google.maps.LatLng(lat, lng);
+                    const searchLatLng = new google.maps.LatLng(
+                        window.currentSearchLocation.lat,
+                        window.currentSearchLocation.lng
+                    );
+
+                    const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                        businessLatLng,
+                        searchLatLng
+                    );
+
+                    // If within 50 miles of search location, count as nearby
+                    if (distance <= 80467) { // 50 miles in meters
+                        nearbyMarkers++;
+                        console.log(`${business.bname} is ${(distance * 0.000621371).toFixed(1)} miles from search location`);
+                    } else {
+                        console.log(`${business.bname} is ${(distance * 0.000621371).toFixed(1)} miles from search location (distant)`);
+                    }
+                }
             }
         } catch (error) {
             console.error(`Error adding business ${business.bname} to map:`, error);
         }
     });
 
-    console.log(`Added ${validMarkers} valid markers to the map`);
+    console.log(`Added ${validMarkers} valid markers to the map (${nearbyMarkers} nearby)`);
 
-    // Update map view
+    // IMPROVED MAP CENTERING LOGIC
     setTimeout(() => {
         try {
-            if (validMarkers > 0 && bounds && !bounds.isEmpty()) {
-                console.log("Fitting map to bounds of markers");
-                safelyFitBounds(map, bounds);
-            } else if (window.currentSearchLocation) {
-                console.log("Centering on search location:", window.currentSearchLocation);
-                map.setCenter(new google.maps.LatLng(
+            // Priority 1: If we have a search location, center on that
+            if (window.currentSearchLocation) {
+                console.log("Centering map on search location:", window.currentSearchLocation);
+
+                const searchLatLng = new google.maps.LatLng(
                     window.currentSearchLocation.lat,
                     window.currentSearchLocation.lng
-                ));
-                map.setZoom(11);
+                );
+
+                map.setCenter(searchLatLng);
+
+                // Set zoom based on how many nearby businesses we found
+                if (nearbyMarkers > 0) {
+                    // If we have nearby businesses, zoom to show the local area
+                    map.setZoom(12); // City level zoom
+                    console.log(`Set zoom to 12 for ${nearbyMarkers} nearby businesses`);
+                } else if (validMarkers > 0) {
+                    // If we only have distant businesses, zoom out a bit more but still center on search
+                    map.setZoom(10); // Regional zoom
+                    console.log("Set zoom to 10 for distant businesses only");
+                } else {
+                    // No businesses found, just show the search area
+                    map.setZoom(13); // Neighborhood zoom
+                    console.log("Set zoom to 13 for search area (no businesses found)");
+                }
+            }
+            // Priority 2: If no search location but we have businesses, fit to bounds
+            else if (validMarkers > 0 && bounds && !bounds.isEmpty()) {
+                console.log("No search location, fitting map to business bounds");
+                safelyFitBounds(map, bounds);
+            }
+            // Priority 3: Default fallback
+            else {
+                console.log("Using default map center");
+                map.setCenter(CONFIG.defaultCenter);
+                map.setZoom(CONFIG.defaultZoom);
             }
         } catch (error) {
             console.error("Error updating map view:", error);
@@ -3649,20 +3698,16 @@ function searchNearbyBusinesses(location, businessType) {
                         if (distance < 80000) { // 80km or about 50 miles
                             createBusinessMarker(business);
 
-                            // Extend bounds
-                            if (bounds) {
-                                bounds.extend(position);
-                            }
+                            // DON'T extend bounds here - we want to keep the search location centered
+                            console.log(`Added nearby business: ${business.bname} (${(distance / 1609).toFixed(1)} miles)`);
                         } else {
-                            console.log(`Skipping distant business: ${business.bname} (${distance / 1609} miles)`);
+                            console.log(`Skipping distant business: ${business.bname} (${(distance / 1609).toFixed(1)} miles)`);
                         }
                     }
                 });
 
-                // Update map bounds if we added markers
-                if (newBusinesses.length > 0 && bounds && !bounds.isEmpty()) {
-                    safelyFitBounds(map, bounds);
-                }
+                // DON'T update map bounds here - let the main search keep the focus on search location
+                console.log(`Added ${newBusinesses.length} nearby businesses without changing map center`);
             })
             .catch(error => {
                 console.error("Error searching for nearby businesses in database:", error);
