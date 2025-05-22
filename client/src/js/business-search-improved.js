@@ -3062,7 +3062,7 @@ async function setupMapClickHandler() {
                         id: event.placeId
                     });
 
-                    // Fetch place details with more comprehensive fields
+                    // Fetch place details with correct field names
                     await place.fetchFields({
                         fields: [
                             'displayName',
@@ -3072,7 +3072,7 @@ async function setupMapClickHandler() {
                             'types',
                             'businessStatus',
                             'nationalPhoneNumber',
-                            'formattedPhoneNumber'
+                            'internationalPhoneNumber'
                         ]
                     });
 
@@ -3088,8 +3088,8 @@ async function setupMapClickHandler() {
                     let zip = '';
                     let phone = '';
 
-                    // Extract phone number
-                    phone = place.nationalPhoneNumber || place.formattedPhoneNumber || '';
+                    // Extract phone number - FIXED: removed formattedPhoneNumber
+                    phone = place.nationalPhoneNumber || place.internationalPhoneNumber || '';
 
                     // Parse address components if available
                     if (place.addressComponents && place.addressComponents.length > 0) {
@@ -3236,6 +3236,137 @@ async function setupMapClickHandler() {
         // Don't break the app if this fails
     }
 }
+
+/**
+ * Helper function to extract address components (same as used in addBusinessToDatabase)
+ * @param {Array} addressComponents - Array of address components from Google Places
+ * @param {string} type - Component type to extract
+ * @returns {string} Extracted component text
+ */
+function getAddressComponent(addressComponents, type) {
+    if (!addressComponents || !Array.isArray(addressComponents)) return '';
+
+    const component = addressComponents.find(
+        component => component.types && component.types.includes(type)
+    );
+
+    return component ? (component.shortText || component.short_name || '') : '';
+}
+
+/**
+ * Enhanced business type mapping from Google Places types
+ * @param {Array} types - Array of Google place types
+ * @returns {string} Business type code
+ */
+function mapGooglePlaceTypeToBusinessType(types) {
+    if (!types || !Array.isArray(types)) return 'OTHER';
+
+    // More comprehensive mapping
+    const typeMap = {
+        // Restaurants and Food
+        'restaurant': 'REST',
+        'meal_takeaway': 'REST',
+        'meal_delivery': 'REST',
+        'cafe': 'REST',
+        'bakery': 'REST',
+        'bar': 'REST',
+        'night_club': 'REST',
+        'food': 'REST',
+        'mexican_restaurant': 'REST',
+        'chinese_restaurant': 'REST',
+        'italian_restaurant': 'REST',
+        'japanese_restaurant': 'REST',
+        'indian_restaurant': 'REST',
+        'thai_restaurant': 'REST',
+        'american_restaurant': 'REST',
+        'pizza_restaurant': 'REST',
+        'seafood_restaurant': 'REST',
+        'steak_house': 'REST',
+        'sushi_restaurant': 'REST',
+        'vegetarian_restaurant': 'REST',
+        'fast_food_restaurant': 'REST',
+
+        // Retail and Shopping
+        'grocery_or_supermarket': 'GROC',
+        'supermarket': 'GROC',
+        'convenience_store': 'CONV',
+        'gas_station': 'FUEL',
+        'hardware_store': 'HARDW',
+        'department_store': 'DEPT',
+        'clothing_store': 'CLTH',
+        'shoe_store': 'CLTH',
+        'electronics_store': 'ELEC',
+        'furniture_store': 'FURN',
+        'home_goods_store': 'FURN',
+        'jewelry_store': 'JEWL',
+        'book_store': 'BOOK',
+        'bicycle_store': 'SPRT',
+        'sporting_goods_store': 'SPRT',
+        'toy_store': 'TOYS',
+        'pet_store': 'OTHER',
+        'florist': 'GIFT',
+        'gift_shop': 'GIFT',
+
+        // Automotive
+        'car_dealer': 'AUTO',
+        'car_rental': 'AUTO',
+        'car_repair': 'AUTO',
+        'car_wash': 'AUTO',
+        'auto_parts_store': 'AUTO',
+
+        // Health and Beauty
+        'pharmacy': 'RX',
+        'drugstore': 'RX',
+        'hospital': 'HEAL',
+        'doctor': 'HEAL',
+        'dentist': 'HEAL',
+        'veterinary_care': 'HEAL',
+        'beauty_salon': 'BEAU',
+        'hair_care': 'BEAU',
+        'spa': 'BEAU',
+
+        // Entertainment
+        'movie_theater': 'ENTR',
+        'amusement_park': 'ENTR',
+        'zoo': 'ENTR',
+        'aquarium': 'ENTR',
+        'museum': 'ENTR',
+        'art_gallery': 'ENTR',
+        'bowling_alley': 'ENTR',
+        'casino': 'ENTR',
+
+        // Services
+        'bank': 'SERV',
+        'atm': 'SERV',
+        'post_office': 'SERV',
+        'laundry': 'SERV',
+        'gym': 'SPRT',
+        'library': 'BOOK',
+
+        // Lodging
+        'lodging': 'OTHER',
+        'hotel': 'OTHER',
+        'motel': 'OTHER',
+
+        // Generic
+        'store': 'RETAIL',
+        'shopping_mall': 'RETAIL',
+        'establishment': 'OTHER',
+        'point_of_interest': 'OTHER'
+    };
+
+    // Find the most specific type first
+    for (const type of types) {
+        if (typeMap[type]) {
+            return typeMap[type];
+        }
+    }
+
+    // Default to OTHER if no mapping found
+    return 'OTHER';
+}
+
+console.log("Google Places address parsing fix loaded successfully!");
 
 /**
  * Fixed findMatchingChainForPlaceResult with proper error handling
@@ -3450,121 +3581,6 @@ function getPlaceTypeLabel(types) {
     // Default to first type if we can't find a mapping, cleaned up
     return types[0].replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
-
-/**
- * Enhanced business type mapping from Google Places types
- * @param {Array} types - Array of Google place types
- * @returns {string} Business type code
- */
-function mapGooglePlaceTypeToBusinessType(types) {
-    if (!types || !Array.isArray(types)) return 'OTHER';
-
-    // More comprehensive mapping
-    const typeMap = {
-        // Restaurants and Food
-        'restaurant': 'REST',
-        'meal_takeaway': 'REST',
-        'meal_delivery': 'REST',
-        'cafe': 'REST',
-        'bakery': 'REST',
-        'bar': 'REST',
-        'night_club': 'REST',
-        'food': 'REST',
-        'mexican_restaurant': 'REST',
-        'chinese_restaurant': 'REST',
-        'italian_restaurant': 'REST',
-        'japanese_restaurant': 'REST',
-        'indian_restaurant': 'REST',
-        'thai_restaurant': 'REST',
-        'american_restaurant': 'REST',
-        'pizza_restaurant': 'REST',
-        'seafood_restaurant': 'REST',
-        'steak_house': 'REST',
-        'sushi_restaurant': 'REST',
-        'vegetarian_restaurant': 'REST',
-        'fast_food_restaurant': 'REST',
-
-        // Retail and Shopping
-        'grocery_or_supermarket': 'GROC',
-        'supermarket': 'GROC',
-        'convenience_store': 'CONV',
-        'gas_station': 'FUEL',
-        'hardware_store': 'HARDW',
-        'department_store': 'DEPT',
-        'clothing_store': 'CLTH',
-        'shoe_store': 'CLTH',
-        'electronics_store': 'ELEC',
-        'furniture_store': 'FURN',
-        'home_goods_store': 'FURN',
-        'jewelry_store': 'JEWL',
-        'book_store': 'BOOK',
-        'bicycle_store': 'SPRT',
-        'sporting_goods_store': 'SPRT',
-        'toy_store': 'TOYS',
-        'pet_store': 'OTHER',
-        'florist': 'GIFT',
-        'gift_shop': 'GIFT',
-
-        // Automotive
-        'car_dealer': 'AUTO',
-        'car_rental': 'AUTO',
-        'car_repair': 'AUTO',
-        'car_wash': 'AUTO',
-        'auto_parts_store': 'AUTO',
-
-        // Health and Beauty
-        'pharmacy': 'RX',
-        'drugstore': 'RX',
-        'hospital': 'HEAL',
-        'doctor': 'HEAL',
-        'dentist': 'HEAL',
-        'veterinary_care': 'HEAL',
-        'beauty_salon': 'BEAU',
-        'hair_care': 'BEAU',
-        'spa': 'BEAU',
-
-        // Entertainment
-        'movie_theater': 'ENTR',
-        'amusement_park': 'ENTR',
-        'zoo': 'ENTR',
-        'aquarium': 'ENTR',
-        'museum': 'ENTR',
-        'art_gallery': 'ENTR',
-        'bowling_alley': 'ENTR',
-        'casino': 'ENTR',
-
-        // Services
-        'bank': 'SERV',
-        'atm': 'SERV',
-        'post_office': 'SERV',
-        'laundry': 'SERV',
-        'gym': 'SPRT',
-        'library': 'BOOK',
-
-        // Lodging
-        'lodging': 'OTHER',
-        'hotel': 'OTHER',
-        'motel': 'OTHER',
-
-        // Generic
-        'store': 'RETAIL',
-        'shopping_mall': 'RETAIL',
-        'establishment': 'OTHER',
-        'point_of_interest': 'OTHER'
-    };
-
-    // Find the most specific type first
-    for (const type of types) {
-        if (typeMap[type]) {
-            return typeMap[type];
-        }
-    }
-
-    // Default to OTHER if no mapping found
-    return 'OTHER';
-}
-
-console.log("Google Places address parsing fix loaded successfully!");
 
 /**
  * Search for nearby businesses of similar type
