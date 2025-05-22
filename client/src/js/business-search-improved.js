@@ -1970,8 +1970,8 @@ function fetchChainIncentivesForInfoWindow(placeId, chainId, isNativeInfoWindow 
 }
 
 /**
- * Show info window for a marker with scrollable content
- * @param {Object} marker - Marker object
+ * Create and show info window with proper positioning
+ * @param {Object} marker - The marker that was clicked
  */
 function showInfoWindow(marker) {
     console.log("showInfoWindow called with marker:", marker);
@@ -1984,116 +1984,364 @@ function showInfoWindow(marker) {
     const business = marker.business;
     console.log("Business data for info window:", business);
 
-    // Extract coordinates properly
-    let businessLat, businessLng;
+    // Close any existing info window
+    if (infoWindow) {
+        infoWindow.close();
+    }
 
-    if (business.isGooglePlace && typeof business.lat === 'function' && typeof business.lng === 'function') {
+    // Create new info window with minimal configuration
+    infoWindow = new google.maps.InfoWindow({
+        maxWidth: 300,
+        disableAutoPan: false
+    });
+
+    // Build the content
+    const content = buildInfoWindowContent(business);
+
+    // Set content
+    infoWindow.setContent(content);
+
+    // Get marker position
+    let position;
+    if (marker.getPosition && typeof marker.getPosition === 'function') {
+        position = marker.getPosition();
+    } else if (marker.position) {
+        position = marker.position;
+    } else {
+        position = new google.maps.LatLng(
+            parseFloat(business.lat),
+            parseFloat(business.lng)
+        );
+    }
+
+    // Pan to position first
+    map.panTo(position);
+
+    // Wait a moment then open the info window
+    setTimeout(() => {
         try {
-            businessLat = business.lat();
-            businessLng = business.lng();
-            console.log("Extracted Google Places coordinates:", businessLat, businessLng);
+            infoWindow.open(map, marker);
+            console.log("Info window opened successfully");
+
+            // Apply positioning fix after DOM is ready
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
+                setTimeout(() => {
+                    fixInfoWindowPositioning();
+
+                    // Load incentives if this is a database business
+                    if (!business.isGooglePlace) {
+                        loadIncentivesForInfoWindow(business._id);
+                    } else if (business.chain_id) {
+                        loadChainIncentivesForInfoWindow(business.placeId, business.chain_id);
+                    }
+                }, 100);
+            });
+
         } catch (error) {
-            console.error("Error extracting Google Places coordinates:", error);
-            return;
+            console.error("Error opening info window:", error);
+        }
+    }, 200);
+}
+
+/**
+ * Build info window content HTML
+ * @param {Object} business - Business object
+ * @returns {string} HTML content
+ */
+function buildInfoWindowContent(business) {
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+
+    // Format address
+    let addressText = '';
+    if (business.address1) {
+        addressText = `<p><strong>Address:</strong><br>${business.address1}`;
+        if (business.city) addressText += `, ${business.city}`;
+        if (business.state) addressText += `, ${business.state}`;
+        if (business.zip) addressText += ` ${business.zip}`;
+        addressText += '</p>';
+    } else if (business.formattedAddress) {
+        addressText = `<p><strong>Address:</strong><br>${business.formattedAddress}</p>`;
+    }
+
+    // Create chain badge if applicable
+    const chainBadge = isChainLocation ?
+        `<span style="display:inline-block; background-color:#4285F4; color:white; padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:5px;">${business.chain_name || 'Chain Location'}</span>` :
+        '';
+
+    // Business type
+    const businessType = business.type ?
+        `<p><strong>Type:</strong> ${getBusinessTypeLabel(business.type)}</p>` : '';
+
+    // Distance if available
+    const distanceText = business.distance ?
+        `<p><strong>Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</p>` : '';
+
+    // Determine action button
+    let actionButton;
+    if (isGooglePlace) {
+        if (isChainLocation) {
+            actionButton = `
+                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
+                        onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
+                    Add Chain Location to Database
+                </button>
+            `;
+        } else {
+            actionButton = `
+                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
+                        onclick="window.addBusinessToDatabase('${business.placeId}')">
+                    Add to Patriot Thanks
+                </button>
+            `;
         }
     } else {
-        businessLat = parseFloat(business.lat);
-        businessLng = parseFloat(business.lng);
-        console.log("Using database coordinates:", businessLat, businessLng);
+        actionButton = `
+            <button style="background-color:#4285F4; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
+                    onclick="window.viewBusinessDetails('${business._id}')">
+                View Details
+            </button>
+        `;
     }
 
-    // Validate coordinates
-    if (isNaN(businessLat) || isNaN(businessLng)) {
-        console.error("Invalid coordinates:", businessLat, businessLng);
-        return;
-    }
-
-    // Update business object
-    business.lat = businessLat;
-    business.lng = businessLng;
-
-    // Simple content for testing
-    const contentString = `
-    <div style="padding: 10px; max-width: 250px;">
-        <h3 style="margin: 0 0 8px 0;">${business.bname}</h3>
-        <p style="margin: 4px 0;"><strong>Address:</strong><br>${business.address1}</p>
-        <p style="margin: 4px 0;"><strong>Type:</strong> ${getBusinessTypeLabel(business.type)}</p>
-    </div>
+    // Build complete content
+    const content = `
+        <div style="max-width:280px; font-family:Arial,sans-serif; padding:8px;">
+            <h3 style="margin:0 0 8px 0; font-size:16px; line-height:1.2;">${business.bname} ${chainBadge}</h3>
+            ${addressText}
+            ${businessType}
+            ${distanceText}
+            <div id="incentives-container-${business._id || business.placeId}" style="margin:8px 0;">
+                <p style="margin:4px 0;"><em>Loading incentives...</em></p>
+            </div>
+            <div style="margin-top:12px; text-align:center;">
+                ${actionButton}
+            </div>
+        </div>
     `;
 
-    // Create info window with MINIMAL configuration
-    if (!infoWindow) {
-        infoWindow = new google.maps.InfoWindow({
-            maxWidth: 280
-            // No pixelOffset, no other fancy options
-        });
-    }
+    return content;
+}
 
-    infoWindow.setContent(contentString);
-    infoWindow.close();
+/**
+ * Fix info window positioning issues
+ */
+function fixInfoWindowPositioning() {
+    console.log("Applying info window positioning fix");
 
-    const markerPosition = new google.maps.LatLng(businessLat, businessLng);
+    // Find the info window elements
+    const iwContainer = document.querySelector('.gm-style-iw-c');
+    const iwTail = document.querySelector('.gm-style-iw-t');
 
-    try {
-        console.log("Panning to position:", businessLat, businessLng);
-        map.panTo(markerPosition);
-
-        setTimeout(() => {
-            try {
-                if (marker.getPosition && typeof marker.getPosition === 'function') {
-                    console.log("Opening info window on standard marker");
-                    infoWindow.open(map, marker);
-                } else {
-                    console.log("Opening info window at position");
-                    infoWindow.setPosition(markerPosition);
-                    infoWindow.open(map);
-                }
-
-                console.log("Info window opened successfully");
-
-                // Check if it's visible after opening
-                setTimeout(() => {
-                    const iwElement = document.querySelector('.gm-style-iw-c');
-                    if (iwElement) {
-                        const rect = iwElement.getBoundingClientRect();
-                        console.log("Info window position after opening:", rect);
-                        if (rect.top < 0 || rect.top > window.innerHeight) {
-                            console.log("Info window is outside viewport, attempting gentle fix...");
-                            gentlyFixInfoWindowPosition();
-                        }
-                    }
-                }, 200);
-
-            } catch (openError) {
-                console.error("Error opening info window:", openError);
-            }
-        }, 300);
-
-    } catch (error) {
-        console.error("Error positioning info window:", error);
+    if (!iwContainer) {
+        console.log("Info window container not found");
         return;
     }
 
-    // Very simple DOM ready handler - NO aggressive fixes initially
-    google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
-        console.log("Info window DOM ready");
+    // Check current position
+    const rect = iwContainer.getBoundingClientRect();
+    console.log("Info window position:", rect);
 
-        // Wait a bit for Google to finish positioning
-        setTimeout(() => {
-            // Check current position
-            checkAndReportInfoWindowPosition();
+    // If the info window is positioned off-screen, fix it
+    if (rect.top < 0 || rect.top > window.innerHeight || rect.left < 0 || rect.left > window.innerWidth) {
+        console.log("Info window is off-screen, applying fix");
 
-            // Apply just the tail fix
-            applyTargetedTailFix();
+        // Reset any problematic transforms
+        iwContainer.style.transform = 'none';
 
-            // If this business is from the database, load incentives
-            if (!business.isGooglePlace) {
-                setTimeout(() => {
-                    fetchBusinessIncentivesForInfoWindow(business._id, false);
-                }, 100);
+        // Fix the tail positioning if it exists
+        if (iwTail) {
+            iwTail.style.bottom = '0px';
+            iwTail.style.left = '50%';
+            iwTail.style.right = 'auto';
+            iwTail.style.transform = 'translateX(-50%)';
+        }
+
+        // Force the info window to be visible and properly positioned
+        iwContainer.style.position = 'relative';
+        iwContainer.style.top = 'auto';
+        iwContainer.style.left = 'auto';
+        iwContainer.style.right = 'auto';
+        iwContainer.style.bottom = 'auto';
+
+        console.log("Applied positioning fix");
+    }
+}
+
+/**
+ * Load incentives for a database business
+ * @param {string} businessId - Business ID
+ */
+function loadIncentivesForInfoWindow(businessId) {
+    const container = document.getElementById(`incentives-container-${businessId}`);
+    if (!container) {
+        console.error("Incentives container not found for business:", businessId);
+        return;
+    }
+
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+
+    fetch(apiURL)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.results || data.results.length === 0) {
+                container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">No incentives available</p>';
+                return;
             }
-        }, 100);
-    });
+
+            let incentivesHTML = '<p style="margin:4px 0;"><strong>Incentives:</strong></p><ul style="margin:4px 0; padding-left:16px; font-size:13px;">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+                    const chainBadge = incentive.is_chain_wide ?
+                        '<span style="background-color:#4285F4; color:white; padding:1px 4px; border-radius:3px; font-size:11px; margin-left:4px;">Chain-wide</span>' : '';
+
+                    incentivesHTML += `<li style="margin-bottom:4px;"><strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}</li>`;
+                }
+            });
+
+            incentivesHTML += '</ul>';
+            container.innerHTML = incentivesHTML;
+        })
+        .catch(error => {
+            console.error("Error loading incentives:", error);
+            container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">Error loading incentives</p>';
+        });
+}
+
+/**
+ * Load chain incentives for a Google Places result
+ * @param {string} placeId - Google Place ID
+ * @param {string} chainId - Chain ID
+ */
+function loadChainIncentivesForInfoWindow(placeId, chainId) {
+    const container = document.getElementById(`incentives-container-${placeId}`);
+    if (!container) {
+        console.error("Incentives container not found for place:", placeId);
+        return;
+    }
+
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
+
+    fetch(apiURL)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.results || data.results.length === 0) {
+                container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">No chain incentives available</p>';
+                return;
+            }
+
+            let incentivesHTML = '<p style="margin:4px 0;"><strong>Chain Incentives:</strong></p><ul style="margin:4px 0; padding-left:16px; font-size:13px;">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+
+                    incentivesHTML += `<li style="margin-bottom:4px;"><strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% <span style="background-color:#4285F4; color:white; padding:1px 4px; border-radius:3px; font-size:11px; margin-left:4px;">Chain-wide</span></li>`;
+                }
+            });
+
+            incentivesHTML += '</ul>';
+            incentivesHTML += '<p style="margin:8px 0 4px 0; font-size:12px; font-style:italic; color:#666;">These incentives apply to all locations of this chain.</p>';
+
+            container.innerHTML = incentivesHTML;
+        })
+        .catch(error => {
+            console.error("Error loading chain incentives:", error);
+            container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">Error loading chain incentives</p>';
+        });
+}
+
+/**
+ * Apply CSS fixes for info windows
+ */
+function applyInfoWindowCSS() {
+    if (!document.getElementById('info-window-fix-css')) {
+        const style = document.createElement('style');
+        style.id = 'info-window-fix-css';
+        style.textContent = `
+            /* Ensure info windows are visible and properly positioned */
+            .gm-style .gm-style-iw-c {
+                max-width: 320px !important;
+                max-height: 400px !important;
+                padding: 0 !important;
+                border-radius: 8px !important;
+                box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3) !important;
+                overflow: hidden !important;
+            }
+
+            .gm-style .gm-style-iw-d {
+                overflow: auto !important;
+                max-height: 350px !important;
+            }
+
+            .gm-style .gm-style-iw {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+
+            /* Fix tail positioning */
+            .gm-style .gm-style-iw-t {
+                bottom: 0px !important;
+                left: 50% !important;
+                right: auto !important;
+                transform: translateX(-50%) !important;
+                width: 20px !important;
+                height: 15px !important;
+            }
+
+            /* Ensure close button is visible */
+            .gm-ui-hover-effect {
+                opacity: 0.8 !important;
+                top: 2px !important;
+                right: 2px !important;
+            }
+
+            .gm-ui-hover-effect:hover {
+                opacity: 1 !important;
+            }
+
+            /* Custom scrollbar for info window content */
+            .gm-style .gm-style-iw-d::-webkit-scrollbar {
+                width: 6px;
+            }
+
+            .gm-style .gm-style-iw-d::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 3px;
+            }
+
+            .gm-style .gm-style-iw-d::-webkit-scrollbar-thumb {
+                background: #c1c1c1;
+                border-radius: 3px;
+            }
+
+            .gm-style .gm-style-iw-d::-webkit-scrollbar-thumb:hover {
+                background: #a8a8a8;
+            }
+        `;
+        document.head.appendChild(style);
+        console.log("Applied info window CSS fixes");
+    }
+}
+
+// Apply CSS fixes when script loads
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        applyInfoWindowCSS();
+    }, 500);
+});
+
+// Export functions for global access
+if (typeof window !== 'undefined') {
+    window.showInfoWindow = showInfoWindow;
+    window.fixInfoWindowPositioning = fixInfoWindowPositioning;
 }
 
 function applyTargetedTailFix() {
