@@ -2025,16 +2025,23 @@ function showInfoWindow(marker) {
 
             // Apply positioning fix after DOM is ready
             google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
+                console.log("Info window DOM ready");
+
+                // Wait longer for Google to finish its initial rendering
                 setTimeout(() => {
                     fixInfoWindowPositioning();
 
                     // Load incentives if this is a database business
                     if (!business.isGooglePlace) {
-                        loadIncentivesForInfoWindow(business._id);
+                        setTimeout(() => {
+                            loadIncentivesForInfoWindow(business._id);
+                        }, 200);
                     } else if (business.chain_id) {
-                        loadChainIncentivesForInfoWindow(business.placeId, business.chain_id);
+                        setTimeout(() => {
+                            loadChainIncentivesForInfoWindow(business.placeId, business.chain_id);
+                        }, 200);
                     }
-                }, 100);
+                }, 300); // Increased delay to let Google finish rendering
             });
 
         } catch (error) {
@@ -2131,6 +2138,7 @@ function fixInfoWindowPositioning() {
 
     // Find the info window elements
     const iwContainer = document.querySelector('.gm-style-iw-c');
+    const iwContent = document.querySelector('.gm-style-iw-d');
     const iwTail = document.querySelector('.gm-style-iw-t');
 
     if (!iwContainer) {
@@ -2138,16 +2146,51 @@ function fixInfoWindowPositioning() {
         return;
     }
 
-    // Check current position
+    // Check current position and dimensions
     const rect = iwContainer.getBoundingClientRect();
     console.log("Info window position:", rect);
 
-    // If the info window is positioned off-screen, fix it
-    if (rect.top < 0 || rect.top > window.innerHeight || rect.left < 0 || rect.left > window.innerWidth) {
-        console.log("Info window is off-screen, applying fix");
+    // If width is too small (like 1px), force proper dimensions
+    if (rect.width < 50) {
+        console.log("Info window width too small, forcing proper dimensions");
 
-        // Reset any problematic transforms
-        iwContainer.style.transform = 'none';
+        // Remove any width restrictions
+        iwContainer.style.width = 'auto';
+        iwContainer.style.minWidth = '280px';
+        iwContainer.style.maxWidth = '320px';
+
+        if (iwContent) {
+            iwContent.style.width = 'auto';
+            iwContent.style.minWidth = '280px';
+        }
+    }
+
+    // Fix positioning issues
+    if (rect.top < 0 || rect.top > window.innerHeight || rect.left < 0 || rect.left > window.innerWidth || rect.width < 50) {
+        console.log("Info window has positioning/sizing issues, applying comprehensive fix");
+
+        // Don't remove transform completely, just fix problematic values
+        const currentTransform = iwContainer.style.transform;
+        if (currentTransform && currentTransform.includes('translate')) {
+            console.log("Current transform:", currentTransform);
+            // Only reset if transform is causing issues
+            const transformMatch = currentTransform.match(/translate\(([^,]+),\s*([^)]+)\)/);
+            if (transformMatch) {
+                const translateX = parseFloat(transformMatch[1]);
+                const translateY = parseFloat(transformMatch[2]);
+
+                // If translation is extreme, reset it
+                if (Math.abs(translateX) > window.innerWidth || Math.abs(translateY) > window.innerHeight) {
+                    console.log("Resetting extreme transform values");
+                    iwContainer.style.transform = 'translate(0px, 0px)';
+                }
+            }
+        }
+
+        // Ensure proper display properties
+        iwContainer.style.display = 'block';
+        iwContainer.style.visibility = 'visible';
+        iwContainer.style.opacity = '1';
 
         // Fix the tail positioning if it exists
         if (iwTail) {
@@ -2157,14 +2200,14 @@ function fixInfoWindowPositioning() {
             iwTail.style.transform = 'translateX(-50%)';
         }
 
-        // Force the info window to be visible and properly positioned
-        iwContainer.style.position = 'relative';
-        iwContainer.style.top = 'auto';
-        iwContainer.style.left = 'auto';
-        iwContainer.style.right = 'auto';
-        iwContainer.style.bottom = 'auto';
+        console.log("Applied comprehensive positioning fix");
 
-        console.log("Applied positioning fix");
+        // Trigger a resize to force re-rendering
+        setTimeout(() => {
+            google.maps.event.trigger(map, 'resize');
+            const newRect = iwContainer.getBoundingClientRect();
+            console.log("Info window dimensions after fix:", newRect);
+        }, 100);
     }
 }
 
@@ -2343,7 +2386,6 @@ if (typeof window !== 'undefined') {
     window.showInfoWindow = showInfoWindow;
     window.fixInfoWindowPositioning = fixInfoWindowPositioning;
 }
-
 function applyTargetedTailFix() {
     console.log("Applying targeted tail fix...");
 

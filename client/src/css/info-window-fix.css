@@ -3,18 +3,25 @@
     padding: 0 !important;
     border-radius: 8px !important;
     box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3) !important;
+    width: auto !important;
+    min-width: 280px !important;
     max-width: 320px !important;
     max-height: 400px !important;
     overflow: hidden !important;
     /* Prevent off-screen positioning */
     position: relative !important;
-    transform: none !important;
+    /* Don't completely remove transform, let Google handle basic positioning */
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .gm-style .gm-style-iw-d {
     overflow: auto !important;
     max-height: 350px !important;
     padding: 0 !important;
+    width: auto !important;
+    min-width: 280px !important;
 }
 
 .gm-style .gm-style-iw {
