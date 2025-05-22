@@ -644,44 +644,6 @@ function getUserLocation() {
 }
 
 /**
- * Convert place types to readable format
- * @param {Array} types - Array of place types
- * @returns {string} Readable type label
- */
-function getPlaceTypeLabel(types) {
-    if (!types || !types.length) return 'Unknown';
-
-    // Map Google place types to more readable formats
-    const typeMapping = {
-        'restaurant': 'Restaurant',
-        'food': 'Food',
-        'store': 'Store',
-        'establishment': 'Business',
-        'point_of_interest': 'Point of Interest',
-        'gas_station': 'Gas Station',
-        'lodging': 'Lodging',
-        'cafe': 'Cafe',
-        'bar': 'Bar',
-        'hardware_store': 'Hardware Store',
-        'home_goods_store': 'Home Goods',
-        'department_store': 'Department Store',
-        'grocery_or_supermarket': 'Grocery Store',
-        'furniture_store': 'Furniture Store',
-        'electronics_store': 'Electronics Store'
-    };
-
-    // Try to find a good primary type
-    for (const type of types) {
-        if (typeMapping[type]) {
-            return typeMapping[type];
-        }
-    }
-
-    // Default to first type if we can't find a mapping
-    return types[0].replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-}
-
-/**
  * Add a business to the database
  * @param {string} placeId - Google Place ID
  * @param {string} chainId - Optional chain ID if this place is part of a chain
@@ -1970,7 +1932,64 @@ function fetchChainIncentivesForInfoWindow(placeId, chainId, isNativeInfoWindow 
 }
 
 /**
- * Create and show info window with proper positioning
+ * Safely extract coordinates from various Google Maps objects
+ * @param {Object} locationObj - Location object (could be LatLng, Place.location, etc.)
+ * @returns {Object} Object with lat and lng properties, or null if invalid
+ */
+function safeExtractCoordinates(locationObj) {
+    try {
+        if (!locationObj) {
+            return null;
+        }
+
+        let lat, lng;
+
+        // Handle Google Maps LatLng objects
+        if (typeof locationObj.lat === 'function' && typeof locationObj.lng === 'function') {
+            lat = locationObj.lat();
+            lng = locationObj.lng();
+        }
+        // Handle plain objects with lat/lng properties
+        else if (locationObj.lat !== undefined && locationObj.lng !== undefined) {
+            lat = parseFloat(locationObj.lat);
+            lng = parseFloat(locationObj.lng);
+        }
+        // Handle latitude/longitude properties
+        else if (locationObj.latitude !== undefined && locationObj.longitude !== undefined) {
+            lat = parseFloat(locationObj.latitude);
+            lng = parseFloat(locationObj.longitude);
+        }
+        // Handle arrays [lat, lng]
+        else if (Array.isArray(locationObj) && locationObj.length >= 2) {
+            lat = parseFloat(locationObj[0]);
+            lng = parseFloat(locationObj[1]);
+        }
+        else {
+            console.warn("Unrecognized location object format:", locationObj);
+            return null;
+        }
+
+        // Validate the extracted coordinates
+        if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
+            console.warn("Invalid coordinates extracted:", lat, lng);
+            return null;
+        }
+
+        // Check coordinate ranges
+        if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+            console.warn("Coordinates out of valid range:", lat, lng);
+            return null;
+        }
+
+        return { lat: lat, lng: lng };
+    } catch (error) {
+        console.error("Error extracting coordinates:", error);
+        return null;
+    }
+}
+
+/**
+ * Fixed showInfoWindow function with safe coordinate handling
  * @param {Object} marker - The marker that was clicked
  */
 function showInfoWindow(marker) {
@@ -2001,26 +2020,67 @@ function showInfoWindow(marker) {
     // Set content
     infoWindow.setContent(content);
 
-    // Get marker position
-    let position;
+    // Get marker position safely
+    let position = null;
+
+    // Try to get position from marker first
     if (marker.getPosition && typeof marker.getPosition === 'function') {
-        position = marker.getPosition();
-    } else if (marker.position) {
-        position = marker.position;
-    } else {
-        position = new google.maps.LatLng(
-            parseFloat(business.lat),
-            parseFloat(business.lng)
-        );
+        try {
+            position = marker.getPosition();
+        } catch (error) {
+            console.warn("Error getting position from marker.getPosition():", error);
+        }
     }
 
+    // Fallback to marker.position property
+    if (!position && marker.position) {
+        position = marker.position;
+    }
+
+    // Fallback to business coordinates
+    if (!position && business) {
+        const coords = safeExtractCoordinates(business);
+        if (coords) {
+            position = new google.maps.LatLng(coords.lat, coords.lng);
+        }
+    }
+
+    // Final fallback - use a default position if we still don't have one
+    if (!position) {
+        console.error("Could not determine position for info window");
+        position = new google.maps.LatLng(39.8283, -98.5795); // Center of US
+    }
+
+    // Validate the position before using it
+    const validatedCoords = safeExtractCoordinates(position);
+    if (!validatedCoords) {
+        console.error("Invalid position for info window");
+        return;
+    }
+
+    // Create a safe LatLng object
+    const safePosition = new google.maps.LatLng(validatedCoords.lat, validatedCoords.lng);
+
     // Pan to position first
-    map.panTo(position);
+    try {
+        map.panTo(safePosition);
+    } catch (panError) {
+        console.warn("Error panning to position:", panError);
+        // Continue anyway
+    }
 
     // Wait a moment then open the info window
     setTimeout(() => {
         try {
-            infoWindow.open(map, marker);
+            // Try to open on the marker first
+            if (marker.getPosition) {
+                infoWindow.open(map, marker);
+            } else {
+                // Open at the position
+                infoWindow.setPosition(safePosition);
+                infoWindow.open(map);
+            }
+
             console.log("Info window opened successfully");
 
             // Apply positioning fix after DOM is ready
@@ -2041,7 +2101,7 @@ function showInfoWindow(marker) {
                             loadChainIncentivesForInfoWindow(business.placeId, business.chain_id);
                         }, 200);
                     }
-                }, 300); // Increased delay to let Google finish rendering
+                }, 300);
             });
 
         } catch (error) {
@@ -2051,84 +2111,23 @@ function showInfoWindow(marker) {
 }
 
 /**
- * Build info window content HTML
- * @param {Object} business - Business object
- * @returns {string} HTML content
+ * Enhanced error handling wrapper for critical functions
+ * @param {Function} func - Function to wrap
+ * @param {string} funcName - Name of the function for logging
+ * @returns {Function} Wrapped function with error handling
  */
-function buildInfoWindowContent(business) {
-    const isGooglePlace = business.isGooglePlace === true;
-    const isChainLocation = !!business.chain_id;
-
-    // Format address
-    let addressText = '';
-    if (business.address1) {
-        addressText = `<p><strong>Address:</strong><br>${business.address1}`;
-        if (business.city) addressText += `, ${business.city}`;
-        if (business.state) addressText += `, ${business.state}`;
-        if (business.zip) addressText += ` ${business.zip}`;
-        addressText += '</p>';
-    } else if (business.formattedAddress) {
-        addressText = `<p><strong>Address:</strong><br>${business.formattedAddress}</p>`;
-    }
-
-    // Create chain badge if applicable
-    const chainBadge = isChainLocation ?
-        `<span style="display:inline-block; background-color:#4285F4; color:white; padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:5px;">${business.chain_name || 'Chain Location'}</span>` :
-        '';
-
-    // Business type
-    const businessType = business.type ?
-        `<p><strong>Type:</strong> ${getBusinessTypeLabel(business.type)}</p>` : '';
-
-    // Distance if available
-    const distanceText = business.distance ?
-        `<p><strong>Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</p>` : '';
-
-    // Determine action button
-    let actionButton;
-    if (isGooglePlace) {
-        if (isChainLocation) {
-            actionButton = `
-                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
-                        onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
-                    Add Chain Location to Database
-                </button>
-            `;
-        } else {
-            actionButton = `
-                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
-                        onclick="window.addBusinessToDatabase('${business.placeId}')">
-                    Add to Patriot Thanks
-                </button>
-            `;
+function withErrorHandling(func, funcName) {
+    return function(...args) {
+        try {
+            return func.apply(this, args);
+        } catch (error) {
+            console.error(`Error in ${funcName}:`, error);
+            // Don't re-throw, just log and continue
+            return null;
         }
-    } else {
-        actionButton = `
-            <button style="background-color:#4285F4; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
-                    onclick="window.viewBusinessDetails('${business._id}')">
-                View Details
-            </button>
-        `;
-    }
-
-    // Build complete content
-    const content = `
-        <div style="max-width:280px; font-family:Arial,sans-serif; padding:8px;">
-            <h3 style="margin:0 0 8px 0; font-size:16px; line-height:1.2;">${business.bname} ${chainBadge}</h3>
-            ${addressText}
-            ${businessType}
-            ${distanceText}
-            <div id="incentives-container-${business._id || business.placeId}" style="margin:8px 0;">
-                <p style="margin:4px 0;"><em>Loading incentives...</em></p>
-            </div>
-            <div style="margin-top:12px; text-align:center;">
-                ${actionButton}
-            </div>
-        </div>
-    `;
-
-    return content;
+    };
 }
+
 
 /**
  * Fix info window positioning issues
@@ -3015,8 +3014,213 @@ async function findChainMatchesForResults(businesses) {
 }
 
 /**
- * Find matching chain for a Google Places business result
- * Enhanced with local fallback for when API is not available
+ * Fixed findMatchingChainLocally function (was missing)
+ * @param {string} placeName - Name of the place to match with chains
+ * @returns {Promise<Object|null>} - Matching chain or null if no match
+ */
+function findMatchingChainLocally(placeName) {
+    return new Promise((resolve) => {
+        try {
+            if (!placeName) {
+                resolve(null);
+                return;
+            }
+
+            console.log("Local chain matching for:", placeName);
+
+            // Simple local matching logic - you can enhance this
+            const commonChains = [
+                { name: 'Home Depot', variations: ['home depot', 'the home depot'] },
+                { name: 'Lowe\'s', variations: ['lowes', 'lowe\'s', 'lowes home improvement'] },
+                { name: 'Olive Garden', variations: ['olive garden'] },
+                { name: 'McDonald\'s', variations: ['mcdonalds', 'mcdonald\'s'] },
+                { name: 'Walmart', variations: ['walmart', 'wal-mart'] },
+                { name: 'Target', variations: ['target'] },
+                { name: 'Best Buy', variations: ['best buy'] },
+                { name: 'Starbucks', variations: ['starbucks'] }
+            ];
+
+            const lowerPlaceName = placeName.toLowerCase();
+
+            for (const chain of commonChains) {
+                for (const variation of chain.variations) {
+                    if (lowerPlaceName.includes(variation)) {
+                        console.log(`Local match found: ${placeName} matches ${chain.name}`);
+                        resolve({
+                            _id: 'local_' + chain.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase(),
+                            bname: chain.name,
+                            isLocalMatch: true
+                        });
+                        return;
+                    }
+                }
+            }
+
+            console.log("No local chain match found for:", placeName);
+            resolve(null);
+        } catch (error) {
+            console.error("Error in local chain matching:", error);
+            resolve(null);
+        }
+    });
+}
+
+/**
+ * Fixed setupMapClickHandler function with proper error handling
+ */
+async function setupMapClickHandler() {
+    if (!map) {
+        console.error("Map not initialized in setupMapClickHandler");
+        return;
+    }
+
+    console.log("Setting up map click handler");
+
+    try {
+        // Import the Places library
+        const { Place } = await google.maps.importLibrary("places");
+
+        // Listen for POI clicks
+        map.addListener('click', async function(event) {
+            console.log("Map clicked", event);
+
+            // Check if clicked on a POI
+            if (event.placeId) {
+                // Stop the default info window
+                event.stop();
+
+                console.log("POI clicked, placeId:", event.placeId);
+
+                try {
+                    // Check if this is already one of our markers
+                    const existingMarker = markers.find(marker =>
+                        marker.business &&
+                        (marker.business.placeId === event.placeId ||
+                            marker.business._id === 'google_' + event.placeId)
+                    );
+
+                    if (existingMarker) {
+                        console.log("Found existing marker for clicked place");
+                        showInfoWindow(existingMarker);
+                        return;
+                    }
+
+                    // Create a Place instance with the clicked place ID
+                    const place = new Place({
+                        id: event.placeId
+                    });
+
+                    // Fetch place details
+                    await place.fetchFields({
+                        fields: [
+                            'displayName',
+                            'formattedAddress',
+                            'location',
+                            'types',
+                            'businessStatus',
+                            'nationalPhoneNumber'
+                        ]
+                    });
+
+                    console.log("Place details:", place);
+
+                    // Extract business name safely
+                    const businessName = place.displayName || 'Unknown Business';
+
+                    // Check if this business matches any chains (with error handling)
+                    let chainMatch = null;
+                    try {
+                        chainMatch = await findMatchingChainForPlaceResult(businessName);
+                    } catch (error) {
+                        console.warn("Error checking for chain match (non-critical):", error);
+                        // Continue without chain match
+                    }
+
+                    // Create business object from the place with safe coordinate extraction
+                    let lat = 0, lng = 0;
+                    if (place.location) {
+                        try {
+                            lat = typeof place.location.lat === 'function' ? place.location.lat() : place.location.lat || 0;
+                            lng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng || 0;
+                        } catch (coordError) {
+                            console.warn("Error extracting coordinates:", coordError);
+                            // Use event coordinates as fallback
+                            if (event.latLng) {
+                                lat = event.latLng.lat();
+                                lng = event.latLng.lng();
+                            }
+                        }
+                    } else if (event.latLng) {
+                        lat = event.latLng.lat();
+                        lng = event.latLng.lng();
+                    }
+
+                    const business = {
+                        _id: 'google_' + place.id,
+                        bname: businessName,
+                        address1: place.formattedAddress || '',
+                        city: '',
+                        state: '',
+                        zip: '',
+                        isGooglePlace: true,
+                        placeId: place.id,
+                        lat: lat,
+                        lng: lng,
+                        types: place.types || []
+                    };
+
+                    // Add chain info if it matches
+                    if (chainMatch) {
+                        console.log(`POI "${businessName}" matches chain: ${chainMatch.bname}`);
+                        business.chain_id = chainMatch._id;
+                        business.chain_name = chainMatch.bname;
+                        business.isChainLocation = true;
+                    }
+
+                    // Calculate distance if possible
+                    if (lat && lng && window.currentSearchLocation) {
+                        try {
+                            business.distance = google.maps.geometry.spherical.computeDistanceBetween(
+                                new google.maps.LatLng(lat, lng),
+                                new google.maps.LatLng(
+                                    window.currentSearchLocation.lat,
+                                    window.currentSearchLocation.lng
+                                )
+                            );
+                        } catch (distanceError) {
+                            console.warn("Error calculating distance:", distanceError);
+                            // Distance calculation failed, continue without it
+                        }
+                    }
+
+                    // Create temporary marker for info window
+                    const tempMarker = {
+                        business: business,
+                        position: new google.maps.LatLng(lat, lng),
+                        getPosition: function() {
+                            return this.position;
+                        }
+                    };
+
+                    // Show custom info window
+                    showInfoWindow(tempMarker);
+                } catch (error) {
+                    console.error("Error fetching place details:", error);
+                    // Show a user-friendly message instead of breaking
+                    alert("Unable to load details for this location. Please try again.");
+                }
+            }
+        });
+
+        console.log("Map click handler set up successfully");
+    } catch (error) {
+        console.error("Error setting up map click handler:", error);
+        // Don't break the app if this fails
+    }
+}
+
+/**
+ * Fixed findMatchingChainForPlaceResult with proper error handling
  * @param {string} placeName - Name of the place to match with chains
  * @returns {Promise<Object|null>} - Matching chain or null if no match
  */
@@ -3036,36 +3240,197 @@ async function findMatchingChainForPlaceResult(placeName) {
             // Try server-side chain matching first
             const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(placeName)}`);
 
-            // Check if the response is successful, but also handle 404 gracefully
-            if (response.status === 404) {
-                console.log("No matching chains found for", placeName);
-                // Fall back to client-side matching
-                return findMatchingChainLocally(placeName);
+            // Check if the response is successful
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.chain) {
+                    console.log("Found matching chain for place:", data.chain.bname);
+                    return data.chain;
+                }
+            } else if (response.status === 404) {
+                console.log("No matching chains found in database for", placeName);
+                // This is normal, not an error
+            } else {
+                console.warn("Chain matching API returned error:", response.status);
             }
 
-            if (!response.ok) {
-                console.error("Error searching for matching chains:", response.status);
-                // Fall back to client-side matching
-                return findMatchingChainLocally(placeName);
-            }
+            // Fall back to client-side matching (always try this as backup)
+            return await findMatchingChainLocally(placeName);
 
-            const data = await response.json();
-
-            if (data.success && data.chain) {
-                console.log("Found matching chain for place:", data.chain.bname);
-                return data.chain;
-            }
-
-            // If API returns no matches, check locally as fallback
-            return findMatchingChainLocally(placeName);
-        } catch (error) {
-            console.error("Error with chain matching API, falling back to local matching:", error);
-            return findMatchingChainLocally(placeName);
+        } catch (fetchError) {
+            console.warn("Error with chain matching API, using local matching:", fetchError.message);
+            // Fall back to client-side matching
+            return await findMatchingChainLocally(placeName);
         }
     } catch (error) {
-        console.error("Error finding matching chain:", error);
+        console.warn("Error finding matching chain (non-critical):", error);
         return null;
     }
+}
+
+/**
+ * Fixed buildInfoWindowContent function with better Google Places handling
+ * @param {Object} business - Business object
+ * @returns {string} HTML content
+ */
+function buildInfoWindowContent(business) {
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+
+    // Format address
+    let addressText = '';
+    if (business.address1) {
+        addressText = `<p><strong>Address:</strong><br>${business.address1}`;
+        if (business.city) addressText += `, ${business.city}`;
+        if (business.state) addressText += `, ${business.state}`;
+        if (business.zip) addressText += ` ${business.zip}`;
+        addressText += '</p>';
+    } else if (business.formattedAddress) {
+        addressText = `<p><strong>Address:</strong><br>${business.formattedAddress}</p>`;
+    }
+
+    // Create chain badge if applicable
+    const chainBadge = isChainLocation ?
+        `<span style="display:inline-block; background-color:#4285F4; color:white; padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:5px;">${business.chain_name || 'Chain Location'}</span>` :
+        '';
+
+    // Business type (for Google Places, try to determine from types)
+    let businessType = '';
+    if (business.type) {
+        businessType = `<p><strong>Type:</strong> ${getBusinessTypeLabel(business.type)}</p>`;
+    } else if (isGooglePlace && business.types && business.types.length > 0) {
+        const placeType = getPlaceTypeLabel(business.types);
+        businessType = `<p><strong>Type:</strong> ${placeType}</p>`;
+    }
+
+    // Distance if available
+    const distanceText = business.distance ?
+        `<p><strong>Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</p>` : '';
+
+    // Status for Google Places
+    const statusText = isGooglePlace ?
+        '<p style="color:#666; font-style:italic;">This business is not yet in the Patriot Thanks database.</p>' : '';
+
+    // Chain explanation if applicable
+    const chainExplanation = isChainLocation ?
+        `<p style="color:#4285F4; font-size:12px; margin-top:8px;">This location appears to match ${business.chain_name} in our database. Chain-wide incentives may apply.</p>` : '';
+
+    // Determine action button
+    let actionButton;
+    if (isGooglePlace) {
+        if (isChainLocation) {
+            actionButton = `
+                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
+                        onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
+                    Add ${business.chain_name} Location
+                </button>
+            `;
+        } else {
+            actionButton = `
+                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
+                        onclick="window.addBusinessToDatabase('${business.placeId}')">
+                    Add to Patriot Thanks
+                </button>
+            `;
+        }
+    } else {
+        actionButton = `
+            <button style="background-color:#4285F4; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
+                    onclick="window.viewBusinessDetails('${business._id}')">
+                View Details
+            </button>
+        `;
+    }
+
+    // Build complete content
+    return `
+        <div style="max-width:280px; font-family:Arial,sans-serif; padding:8px;">
+            <h3 style="margin:0 0 8px 0; font-size:16px; line-height:1.2;">${business.bname} ${chainBadge}</h3>
+            ${addressText}
+            ${businessType}
+            ${distanceText}
+            ${statusText}
+            ${chainExplanation}
+            <div id="incentives-container-${business._id || business.placeId}" style="margin:8px 0;">
+                ${isGooglePlace && !isChainLocation ?
+        '<p style="margin:4px 0; font-style:italic; color:#666;">Add this business to see available incentives.</p>' :
+        '<p style="margin:4px 0;"><em>Loading incentives...</em></p>'}
+            </div>
+            <div style="margin-top:12px; text-align:center;">
+                ${actionButton}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Enhanced getPlaceTypeLabel function for Google Places types
+ * @param {Array} types - Array of place types
+ * @returns {string} Readable type label
+ */
+function getPlaceTypeLabel(types) {
+    if (!types || !types.length) return 'Business';
+
+    // Map Google place types to more readable formats
+    const typeMapping = {
+        'restaurant': 'Restaurant',
+        'food': 'Food & Dining',
+        'store': 'Store',
+        'establishment': 'Business',
+        'point_of_interest': 'Point of Interest',
+        'gas_station': 'Gas Station',
+        'lodging': 'Lodging',
+        'cafe': 'Cafe',
+        'bar': 'Bar',
+        'hardware_store': 'Hardware Store',
+        'home_goods_store': 'Home Goods',
+        'department_store': 'Department Store',
+        'grocery_or_supermarket': 'Grocery Store',
+        'furniture_store': 'Furniture Store',
+        'electronics_store': 'Electronics Store',
+        'clothing_store': 'Clothing Store',
+        'shoe_store': 'Shoe Store',
+        'beauty_salon': 'Beauty Salon',
+        'hair_care': 'Hair Salon',
+        'spa': 'Spa',
+        'pharmacy': 'Pharmacy',
+        'drugstore': 'Pharmacy',
+        'bank': 'Bank',
+        'atm': 'ATM',
+        'shopping_mall': 'Shopping Mall',
+        'supermarket': 'Supermarket',
+        'convenience_store': 'Convenience Store',
+        'car_dealer': 'Car Dealer',
+        'car_repair': 'Auto Repair',
+        'car_wash': 'Car Wash',
+        'gym': 'Gym',
+        'hospital': 'Hospital',
+        'doctor': 'Medical',
+        'dentist': 'Dental',
+        'veterinary_care': 'Veterinary',
+        'movie_theater': 'Movie Theater',
+        'amusement_park': 'Amusement Park',
+        'zoo': 'Zoo',
+        'aquarium': 'Aquarium',
+        'museum': 'Museum',
+        'library': 'Library',
+        'book_store': 'Bookstore',
+        'jewelry_store': 'Jewelry Store',
+        'florist': 'Florist',
+        'pet_store': 'Pet Store',
+        'bicycle_store': 'Bike Shop',
+        'sporting_goods_store': 'Sporting Goods'
+    };
+
+    // Try to find a good primary type
+    for (const type of types) {
+        if (typeMapping[type]) {
+            return typeMapping[type];
+        }
+    }
+
+    // Default to first type if we can't find a mapping, cleaned up
+    return types[0].replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 /**
@@ -3391,132 +3756,6 @@ function resetMapView() {
         }
     } catch (error) {
         console.error("Error resetting map view:", error);
-    }
-}
-
-/**
- * Setup map click handler for POI clicks
- */
-async function setupMapClickHandler() {
-    if (!map) {
-        console.error("Map not initialized in setupMapClickHandler");
-        return;
-    }
-
-    console.log("Setting up map click handler");
-
-    try {
-        // Import the Places library
-        const { Place } = await google.maps.importLibrary("places");
-
-        // Listen for POI clicks
-        map.addListener('click', async function(event) {
-            console.log("Map clicked", event);
-
-            // Check if clicked on a POI
-            if (event.placeId) {
-                // Stop the default info window
-                event.stop();
-
-                console.log("POI clicked, placeId:", event.placeId);
-
-                try {
-                    // Check if this is already one of our markers
-                    const existingMarker = markers.find(marker =>
-                        marker.business &&
-                        (marker.business.placeId === event.placeId ||
-                            marker.business._id === 'google_' + event.placeId)
-                    );
-
-                    if (existingMarker) {
-                        console.log("Found existing marker for clicked place");
-                        showInfoWindow(existingMarker);
-                        return;
-                    }
-
-                    // Create a Place instance with the clicked place ID
-                    const place = new Place({
-                        id: event.placeId
-                    });
-
-                    // Fetch place details
-                    await place.fetchFields({
-                        fields: [
-                            'displayName',
-                            'formattedAddress',
-                            'location',
-                            'types',
-                            'businessStatus',
-                            'nationalPhoneNumber'
-                        ]
-                    });
-
-                    console.log("Place details:", place);
-
-                    // Extract business name
-                    const businessName = place.displayName || '';
-
-                    // Check if this business matches any chains
-                    let chainMatch = null;
-                    try {
-                        chainMatch = await findMatchingChainForPlaceResult(businessName);
-                    } catch (error) {
-                        console.error("Error checking for chain match:", error);
-                    }
-
-                    // Create business object from the place
-                    const business = {
-                        _id: 'google_' + place.id,
-                        bname: businessName,
-                        address1: place.formattedAddress || '',
-                        city: '',
-                        state: '',
-                        zip: '',
-                        isGooglePlace: true,
-                        placeId: place.id,
-                        lat: place.location?.lat || 0,
-                        lng: place.location?.lng || 0
-                    };
-
-                    // Add chain info if it matches
-                    if (chainMatch) {
-                        console.log(`POI "${businessName}" matches chain: ${chainMatch.bname}`);
-                        business.chain_id = chainMatch._id;
-                        business.chain_name = chainMatch.bname;
-                        business.isChainLocation = true;
-                    }
-
-                    // Calculate distance if possible
-                    if (place.location && window.currentSearchLocation) {
-                        business.distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            new google.maps.LatLng(place.location.lat, place.location.lng),
-                            new google.maps.LatLng(
-                                window.currentSearchLocation.lat,
-                                window.currentSearchLocation.lng
-                            )
-                        );
-                    }
-
-                    // Create temporary marker for info window
-                    const tempMarker = {
-                        business: business,
-                        position: place.location ?
-                            new google.maps.LatLng(place.location.lat, place.location.lng) :
-                            event.latLng
-                    };
-
-                    // Show custom info window
-                    showInfoWindow(tempMarker);
-                } catch (error) {
-                    console.error("Error fetching place details:", error);
-                    alert("Error loading place details. Please try again.");
-                }
-            }
-        });
-
-        console.log("Map click handler set up");
-    } catch (error) {
-        console.error("Error setting up map click handler:", error);
     }
 }
 
@@ -4360,4 +4599,13 @@ if (typeof window !== 'undefined') {
     window.debugMapState = debugMapState;
     window.validateField = validateField;
     window.isNotEmpty = isNotEmpty;
+    window.findMatchingChainLocally = findMatchingChainLocally;
+    window.setupMapClickHandler = setupMapClickHandler;
+    window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResult;
+    window.buildInfoWindowContent = buildInfoWindowContent;
+    window.getPlaceTypeLabel = getPlaceTypeLabel;
+    window.safeExtractCoordinates = safeExtractCoordinates;
+    window.showInfoWindow = showInfoWindow;
+    window.withErrorHandling = withErrorHandling;
 }
+
