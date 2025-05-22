@@ -2148,11 +2148,11 @@ function applyCSSOnlyTailFix() {
             /* Target only the tail positioning without affecting the container */
             .gm-style .gm-style-iw-t {
                 bottom: 0px !important;
-                left: 50% !important;
-                right: auto !important;
+                left: 0px !important;
+                right: 0px !important;
                 transform: translateX(-50%) !important;
-                width: 20px !important;
-                height: 15px !important;
+                width: 0 !important;
+                height: 0 !important;
             }
             
             /* Don't touch the main container transform */
@@ -2428,13 +2428,13 @@ function applyInfoWindowPositioningFixes() {
         style.id = 'final-info-window-fix';
         style.textContent = `
             /* CRITICAL: Override Google's tail positioning that causes off-screen issues */
-            .gm-style .gm-style-iw-t {
+            ..gm-style .gm-style-iw-t {
                 bottom: 0px !important;
-                left: 50% !important;
-                right: auto !important;
+                left: 0px !important;
+                right: 0px !important;
                 transform: translateX(-50%) !important;
-                width: 20px !important;
-                height: 15px !important;
+                width: 0 !important;
+                height: 0 !important;
             }
             
             /* Prevent off-screen positioning */
