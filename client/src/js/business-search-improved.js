@@ -1747,6 +1747,9 @@ const mapHeightCSS = `
     max-height: 400px !important;
     overflow: hidden !important;
     position: relative !important;
+    z-index: 1000 !important;
+    /* Ensure it's positioned correctly relative to the tail */
+    margin-bottom: 15px !important;
 }
 
 .gm-style .gm-style-iw-d {
@@ -1755,7 +1758,35 @@ const mapHeightCSS = `
     padding-right: 8px !important;
 }
 
+.gm-style .gm-style-iw {
+    /* Override any problematic positioning */
+    position: relative !important;
+    z-index: 1001 !important;
+}
 
+.gm-style .gm-style-iw-t {
+    position: absolute !important;
+    width: 100% !important;
+    /* Override the inline bottom positioning that's causing the issue */
+    bottom: 0px !important;
+    /* Ensure proper positioning */
+    right: auto !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    /* Make sure it's properly sized */
+    height: 15px !important;
+}
+
+.gm-style .gm-style-iw-tc {
+    /* This is the tail connector - make sure it's positioned correctly */
+    top: auto !important;
+    bottom: -15px !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: 24px !important;
+    height: 24px !important;
+}
 `;
 
 /**
@@ -1990,7 +2021,7 @@ function showInfoWindow(marker) {
         </button>`;
     }
 
-    // Content for the info window with your existing CSS classes
+    // Content for the info window
     const contentString = `
     <div class="info-window">
         <h3>${business.bname}</h3>
@@ -2012,8 +2043,8 @@ function showInfoWindow(marker) {
     if (!infoWindow) {
         infoWindow = new google.maps.InfoWindow({
             maxWidth: 320,
-            disableAutoPan: false, // Allow auto-pan to keep info window visible
-            pixelOffset: new google.maps.Size(0, -10) // Offset to position better relative to marker
+            disableAutoPan: false,
+            pixelOffset: new google.maps.Size(0, -30) // Adjust offset to compensate for tail positioning
         });
     }
 
@@ -2050,10 +2081,8 @@ function showInfoWindow(marker) {
             try {
                 // Open the info window at the marker position
                 if (marker.getPosition) {
-                    // Standard marker
                     infoWindow.open(map, marker);
                 } else {
-                    // Advanced marker or custom marker
                     infoWindow.setPosition(markerPosition);
                     infoWindow.open(map);
                 }
@@ -2061,7 +2090,6 @@ function showInfoWindow(marker) {
                 console.log("Info window opened successfully");
             } catch (openError) {
                 console.error("Error opening info window:", openError);
-                // Fallback: try setting position directly
                 infoWindow.setPosition(markerPosition);
                 infoWindow.open(map);
             }
@@ -2070,7 +2098,6 @@ function showInfoWindow(marker) {
     } catch (error) {
         console.error("Error positioning info window:", error);
 
-        // Final fallback - try to get position from business data
         if (business.lat && business.lng) {
             const fallbackPosition = new google.maps.LatLng(business.lat, business.lng);
             map.panTo(fallbackPosition);
@@ -2089,14 +2116,16 @@ function showInfoWindow(marker) {
         fetchBusinessIncentivesForInfoWindow(business._id);
     }
 
-    // Add event listener to ensure proper positioning when the window opens
+    // CRITICAL FIX: Add event listener to fix positioning after DOM is ready
     google.maps.event.addListener(infoWindow, 'domready', function() {
-        console.log("Info window DOM ready, applying final positioning fixes");
+        console.log("Info window DOM ready, applying positioning fixes");
 
-        // Ensure the info window is properly positioned
+        // Fix the tail positioning that's causing the issue
+        fixInfoWindowTailPositioning();
+
+        // Apply other styling fixes
         const iwOuter = document.querySelector('.gm-style-iw');
         if (iwOuter) {
-            // Improve close button positioning
             const iwCloseBtn = iwOuter.nextElementSibling;
             if (iwCloseBtn) {
                 iwCloseBtn.style.top = '3px';
@@ -2106,7 +2135,6 @@ function showInfoWindow(marker) {
                 iwCloseBtn.style.opacity = '0.8';
             }
 
-            // Ensure scrollable content
             const iwContainer = iwOuter.querySelector('.gm-style-iw-d');
             if (iwContainer) {
                 iwContainer.style.overflow = 'auto';
@@ -2116,6 +2144,96 @@ function showInfoWindow(marker) {
     });
 }
 
+function fixInfoWindowTailPositioning() {
+    // Find the problematic tail element
+    const tailElement = document.querySelector('.gm-style-iw-t');
+
+    if (tailElement) {
+        console.log("Found info window tail element, fixing positioning");
+
+        // Override the inline styles that are causing the problem
+        tailElement.style.bottom = '0px';
+        tailElement.style.right = 'auto';
+        tailElement.style.left = '50%';
+        tailElement.style.transform = 'translateX(-50%)';
+        tailElement.style.width = '20px';
+        tailElement.style.height = '15px';
+
+        console.log("Applied positioning fixes to tail element");
+    } else {
+        console.log("Tail element not found, will retry");
+
+        // If not found immediately, try again after a short delay
+        setTimeout(() => {
+            const retryTailElement = document.querySelector('.gm-style-iw-t');
+            if (retryTailElement) {
+                retryTailElement.style.bottom = '0px';
+                retryTailElement.style.right = 'auto';
+                retryTailElement.style.left = '50%';
+                retryTailElement.style.transform = 'translateX(-50%)';
+                retryTailElement.style.width = '20px';
+                retryTailElement.style.height = '15px';
+                console.log("Applied positioning fixes to tail element (retry)");
+            }
+        }, 100);
+    }
+
+    // Also fix the tail connector if it exists
+    const tailConnector = document.querySelector('.gm-style-iw-tc');
+    if (tailConnector) {
+        tailConnector.style.top = 'auto';
+        tailConnector.style.bottom = '-15px';
+        tailConnector.style.left = '50%';
+        tailConnector.style.right = 'auto';
+        tailConnector.style.transform = 'translateX(-50%)';
+    }
+}
+
+function applyInfoWindowPositioningFixes() {
+    if (!document.getElementById('info-window-position-fix')) {
+        const style = document.createElement('style');
+        style.id = 'info-window-position-fix';
+        style.textContent = `
+            /* CRITICAL: Fix for Google Maps InfoWindow tail positioning */
+            .gm-style .gm-style-iw-t {
+                position: absolute !important;
+                width: 20px !important;
+                height: 15px !important;
+                bottom: 0px !important;
+                right: auto !important;
+                left: 50% !important;
+                transform: translateX(-50%) !important;
+            }
+            
+            /* Override inline styles with high specificity */
+            .gm-style div[class="gm-style-iw-t"][style] {
+                bottom: 0px !important;
+                right: auto !important;
+                left: 50% !important;
+                transform: translateX(-50%) !important;
+                width: 20px !important;
+                height: 15px !important;
+            }
+            
+            /* Fix tail connector */
+            .gm-style .gm-style-iw-tc {
+                top: auto !important;
+                bottom: -15px !important;
+                left: 50% !important;
+                right: auto !important;
+                transform: translateX(-50%) !important;
+            }
+            
+            /* Ensure info window container positioning */
+            .gm-style .gm-style-iw-c {
+                margin-bottom: 15px !important;
+                position: relative !important;
+            }
+        `;
+        document.head.appendChild(style);
+        console.log("Applied info window positioning fixes");
+    }
+}
 
 /**
  * Fixed displayBusinessesOnMap function for better GeoJSON handling
@@ -3116,6 +3234,7 @@ function fetchBusinessAndCreateMarker(businessId) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log("DOM loaded, initializing business search...");
 
+    applyInfoWindowPositioningFixes();
     applyMapHeightFix();
     // Add custom styles
     addCustomMarkerStyles();
