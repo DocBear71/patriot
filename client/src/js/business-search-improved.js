@@ -1873,7 +1873,7 @@ function showBusinessInfoWindow(marker) {
     if (isGooglePlace && isChainLocation) {
         fetchChainIncentivesForInfoWindow(business.placeId, business.chain_id, true);
     } else if (!isGooglePlace) {
-        fetchBusinessIncentivesForInfoWindow(business._id, true);
+        fetchBusinessIncentivesForInfoWindow(business._id);
     } else {
         const incentivesDiv = document.getElementById(`incentives-container-${business._id || business.placeId}`);
         if (incentivesDiv) {
@@ -1973,7 +1973,6 @@ function fetchChainIncentivesForInfoWindow(placeId, chainId, isNativeInfoWindow 
  * Show info window for a marker with scrollable content
  * @param {Object} marker - Marker object
  */
-// Diagnostic version of showInfoWindow to troubleshoot visibility issues
 function showInfoWindow(marker) {
     console.log("showInfoWindow called with marker:", marker);
 
@@ -2034,7 +2033,7 @@ function showInfoWindow(marker) {
         actionButtons = `<button class="view-details-btn" onclick="window.viewBusinessDetails('${business._id}')">View Details</button>`;
     }
 
-    // Simple content without complex styling initially
+    // Content with inline styles for better control
     const contentString = `
     <div class="info-window" style="padding: 10px; max-width: 280px;">
         <h3 style="margin: 0 0 8px 0; font-size: 16px;">${business.bname}</h3>
@@ -2052,12 +2051,11 @@ function showInfoWindow(marker) {
     </div>
     `;
 
-    // Create or reuse info window with minimal configuration
+    // Create or reuse info window
     if (!infoWindow) {
         infoWindow = new google.maps.InfoWindow({
             maxWidth: 300,
             disableAutoPan: false
-            // Remove pixelOffset for now to see if that's causing issues
         });
     }
 
@@ -2083,96 +2081,245 @@ function showInfoWindow(marker) {
 
                 console.log("Info window opened successfully");
 
-                // Diagnostic: Check if info window is actually visible
-                setTimeout(() => {
-                    checkInfoWindowVisibility();
-                }, 500);
-
             } catch (openError) {
                 console.error("Error opening info window:", openError);
                 infoWindow.setPosition(markerPosition);
                 infoWindow.open(map);
             }
-        }, 300); // Increased delay
+        }, 300);
 
     } catch (error) {
         console.error("Error positioning info window:", error);
         return;
     }
 
-    // Simplified DOM ready handler - NO tail positioning fixes initially
+    // CRITICAL: Add DOM ready handler with tail positioning fix
     google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
-        console.log("Info window DOM ready");
+        console.log("Info window DOM ready, applying positioning fixes");
 
         setTimeout(() => {
-            // Just check visibility and basic styling
+            // FIX THE TAIL POSITIONING ISSUE
+            fixInfoWindowTailPositioning();
+
+            // Apply other fixes
             const iwOuter = document.querySelector('.gm-style-iw');
             if (iwOuter) {
-                console.log("Found info window element:", iwOuter);
-                console.log("Info window styles:", window.getComputedStyle(iwOuter));
-
-                // Check if it's visible
-                const rect = iwOuter.getBoundingClientRect();
-                console.log("Info window position:", rect);
-
-                if (rect.width === 0 || rect.height === 0) {
-                    console.error("Info window has zero dimensions!");
+                const iwCloseBtn = iwOuter.nextElementSibling;
+                if (iwCloseBtn) {
+                    iwCloseBtn.style.top = '3px';
+                    iwCloseBtn.style.right = '3px';
+                    iwCloseBtn.style.width = '24px';
+                    iwCloseBtn.style.height = '24px';
+                    iwCloseBtn.style.opacity = '0.8';
                 }
-
-                if (rect.top < 0 || rect.left < 0 || rect.top > window.innerHeight || rect.left > window.innerWidth) {
-                    console.error("Info window is positioned outside viewport!");
-                }
-            } else {
-                console.error("Could not find info window element in DOM");
             }
 
             // Load incentives for database businesses
             if (!isGooglePlace) {
                 setTimeout(() => {
-                    fetchBusinessIncentivesForInfoWindow(business._id, false);
+                    fetchBusinessIncentivesForInfoWindow(business._id);
                 }, 100);
             }
-        }, 200);
+        }, 50); // Shorter delay for faster fix
     });
 }
 
-// Diagnostic function to check info window visibility
-function checkInfoWindowVisibility() {
-    console.log("=== INFO WINDOW VISIBILITY DIAGNOSTIC ===");
+// IMPROVED: More aggressive tail positioning fix
+function fixInfoWindowTailPositioning() {
+    console.log("Attempting to fix info window tail positioning");
 
-    const iwElements = document.querySelectorAll('.gm-style-iw, .gm-style-iw-c, .gm-style-iw-d');
-    console.log("Found info window elements:", iwElements.length);
+    // Find the tail element that's causing the problem
+    const tailElement = document.querySelector('.gm-style-iw-t');
 
-    iwElements.forEach((element, index) => {
-        const rect = element.getBoundingClientRect();
-        const styles = window.getComputedStyle(element);
+    if (tailElement) {
+        console.log("Found info window tail element, applying aggressive fixes");
 
-        console.log(`Element ${index} (${element.className}):`);
-        console.log("  Position:", rect);
-        console.log("  Visibility:", styles.visibility);
-        console.log("  Display:", styles.display);
-        console.log("  Opacity:", styles.opacity);
-        console.log("  Z-index:", styles.zIndex);
-        console.log("  Transform:", styles.transform);
-    });
+        // Remove the problematic inline styles completely
+        tailElement.style.removeProperty('bottom');
+        tailElement.style.removeProperty('right');
+        tailElement.style.removeProperty('left');
+        tailElement.style.removeProperty('top');
 
-    // Check if there are any elements with the tail class that might be causing issues
-    const tailElements = document.querySelectorAll('.gm-style-iw-t');
-    console.log("Found tail elements:", tailElements.length);
+        // Force correct positioning with maximum specificity
+        tailElement.style.setProperty('position', 'absolute', 'important');
+        tailElement.style.setProperty('bottom', '0px', 'important');
+        tailElement.style.setProperty('right', 'auto', 'important');
+        tailElement.style.setProperty('left', '50%', 'important');
+        tailElement.style.setProperty('top', 'auto', 'important');
+        tailElement.style.setProperty('transform', 'translateX(-50%)', 'important');
+        tailElement.style.setProperty('width', '20px', 'important');
+        tailElement.style.setProperty('height', '15px', 'important');
 
-    tailElements.forEach((element, index) => {
-        const rect = element.getBoundingClientRect();
-        const styles = window.getComputedStyle(element);
+        console.log("Applied positioning fixes to tail element");
 
-        console.log(`Tail ${index}:`);
-        console.log("  Position:", rect);
-        console.log("  Bottom:", styles.bottom);
-        console.log("  Right:", styles.right);
-        console.log("  Left:", styles.left);
-        console.log("  Transform:", styles.transform);
-    });
+        // Also fix the main info window container if it has problematic transforms
+        const iwContainer = document.querySelector('.gm-style-iw-c');
+        if (iwContainer) {
+            // Reset any problematic transforms that might be positioning it off-screen
+            const currentTransform = window.getComputedStyle(iwContainer).transform;
+            console.log("Current info window transform:", currentTransform);
 
-    console.log("=== END DIAGNOSTIC ===");
+            // If the transform is moving it way off screen, reset it
+            if (currentTransform && currentTransform.includes('matrix')) {
+                const rect = iwContainer.getBoundingClientRect();
+                if (rect.top < -100 || rect.top > window.innerHeight + 100) {
+                    console.log("Info window positioned off-screen, attempting to reset transform");
+                    iwContainer.style.setProperty('transform', 'none', 'important');
+
+                    // Give it a moment then restore a reasonable transform if needed
+                    setTimeout(() => {
+                        const newRect = iwContainer.getBoundingClientRect();
+                        console.log("Info window position after transform reset:", newRect);
+                    }, 100);
+                }
+            }
+        }
+
+        // Fix the tail connector as well
+        const tailConnector = document.querySelector('.gm-style-iw-tc');
+        if (tailConnector) {
+            tailConnector.style.setProperty('top', 'auto', 'important');
+            tailConnector.style.setProperty('bottom', '-15px', 'important');
+            tailConnector.style.setProperty('left', '50%', 'important');
+            tailConnector.style.setProperty('right', 'auto', 'important');
+            tailConnector.style.setProperty('transform', 'translateX(-50%)', 'important');
+            console.log("Fixed tail connector positioning");
+        }
+
+        return true;
+    } else {
+        console.warn("Could not find tail element to fix");
+        return false;
+    }
+}
+
+// Enhanced CSS to prevent the positioning issues
+function applyInfoWindowPositioningFixes() {
+    if (!document.getElementById('final-info-window-fix')) {
+        const style = document.createElement('style');
+        style.id = 'final-info-window-fix';
+        style.textContent = `
+            /* CRITICAL: Override Google's tail positioning that causes off-screen issues */
+            .gm-style .gm-style-iw-t {
+                position: absolute !important;
+                bottom: 0px !important;
+                right: auto !important;
+                left: 50% !important;
+                top: auto !important;
+                transform: translateX(-50%) !important;
+                width: 20px !important;
+                height: 15px !important;
+            }
+            
+            /* Prevent off-screen positioning */
+            .gm-style .gm-style-iw-c {
+                max-width: 320px !important;
+                max-height: 400px !important;
+                overflow: hidden !important;
+                /* Prevent problematic transforms */
+                transform: none !important;
+            }
+            
+            /* Ensure visibility */
+            .gm-style .gm-style-iw {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            
+            .gm-style .gm-style-iw-d {
+                overflow: auto !important;
+                max-height: 350px !important;
+            }
+            
+            /* Fix tail connector */
+            .gm-style .gm-style-iw-tc {
+                top: auto !important;
+                bottom: -15px !important;
+                left: 50% !important;
+                right: auto !important;
+                transform: translateX(-50%) !important;
+            }
+            
+            /* Map container styles */
+            #map-container {
+                width: 90%;
+                margin: 20px auto;
+                clear: both;
+                position: relative;
+            }
+
+            #map {
+                width: 100%;
+                height: 800px !important;
+                min-height: 800px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                margin: 10px 0;
+                position: relative;
+                z-index: 1;
+            }
+        `;
+        document.head.appendChild(style);
+        console.log("Applied final info window positioning fixes");
+    }
+}
+
+// Apply fixes when DOM loads
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        applyInfoWindowPositioningFixes();
+    }, 500);
+});
+
+/**
+ * Enhanced fetchBusinessIncentivesForInfoWindow function with better error handling
+ * @param {string} businessId - Business ID
+ */
+function fetchBusinessIncentivesForInfoWindow(businessId) {
+    if (!businessId || businessId.startsWith('google_')) {
+        return;
+    }
+
+    setTimeout(() => {
+        const incentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
+
+        if (!incentivesDiv) {
+            console.error(`Could not find incentives div for business ${businessId}`);
+            return;
+        }
+
+        const baseURL = getBaseURL();
+        const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+
+        fetch(apiURL)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.results || data.results.length === 0) {
+                    incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No incentives found</p>';
+                    return;
+                }
+
+                let incentivesHTML = '<p><strong>Incentives:</strong></p><ul style="margin:8px 0; padding-left:20px;">';
+
+                data.results.forEach(incentive => {
+                    if (incentive.is_available) {
+                        const typeLabel = getIncentiveTypeLabel(incentive.type);
+                        const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+                        const chainBadge = incentive.is_chain_wide ?
+                            '<span style="display:inline-block; background-color:#4285F4; color:white; padding:1px 4px; border-radius:4px; font-size:0.7em; margin-left:5px;">Chain-wide</span>' : '';
+                        incentivesHTML += `<li><strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}</li>`;
+                    }
+                });
+
+                incentivesHTML += '</ul>';
+                incentivesDiv.innerHTML = incentivesHTML;
+            })
+            .catch(error => {
+                console.error(`Error fetching incentives:`, error);
+                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading</p>';
+            });
+    }, 300);
 }
 
 // Temporary function to remove any problematic CSS that might be hiding info windows
@@ -2236,146 +2383,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 1000);
 });
 
-/**
- * Enhanced fetchBusinessIncentivesForInfoWindow function with better error handling
- * @param {string} businessId - Business ID
- * @param {boolean} isNativeInfoWindow - Whether using native Google InfoWindow
- */
-function fetchBusinessIncentivesForInfoWindow(businessId, isNativeInfoWindow = false) {
-    if (!businessId || businessId.startsWith('google_')) {
-        return;
-    }
-
-    setTimeout(() => {
-        const incentivesDiv = document.getElementById(`info-window-incentives-${businessId}`);
-
-        if (!incentivesDiv) {
-            console.error(`Could not find incentives div for business ${businessId}`);
-            return;
-        }
-
-        const baseURL = getBaseURL();
-        const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
-
-        fetch(apiURL)
-            .then(response => response.json())
-            .then(data => {
-                if (!data.results || data.results.length === 0) {
-                    incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No incentives found</p>';
-                    return;
-                }
-
-                let incentivesHTML = '<p><strong>Incentives:</strong></p><ul style="margin:8px 0; padding-left:20px;">';
-
-                data.results.forEach(incentive => {
-                    if (incentive.is_available) {
-                        const typeLabel = getIncentiveTypeLabel(incentive.type);
-                        const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
-                        incentivesHTML += `<li><strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}%</li>`;
-                    }
-                });
-
-                incentivesHTML += '</ul>';
-                incentivesDiv.innerHTML = incentivesHTML;
-            })
-            .catch(error => {
-                console.error(`Error fetching incentives:`, error);
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading</p>';
-            });
-    }, 300);
-}
-
-function fixInfoWindowTailPositioning() {
-    console.log("Attempting to fix info window tail positioning");
-
-    // Try multiple selectors to find the tail element
-    let tailElement = document.querySelector('.gm-style-iw-t');
-
-    if (!tailElement) {
-        // Try alternative selector
-        tailElement = document.querySelector('[class*="gm-style-iw-t"]');
-    }
-
-    if (tailElement) {
-        console.log("Found info window tail element, applying fixes");
-
-        // Remove the problematic positioning
-        tailElement.style.removeProperty('bottom');
-        tailElement.style.removeProperty('right');
-
-        // Apply correct positioning
-        tailElement.style.setProperty('bottom', '0px', 'important');
-        tailElement.style.setProperty('right', 'auto', 'important');
-        tailElement.style.setProperty('left', '50%', 'important');
-        tailElement.style.setProperty('transform', 'translateX(-50%)', 'important');
-        tailElement.style.setProperty('width', '20px', 'important');
-        tailElement.style.setProperty('height', '15px', 'important');
-
-        console.log("Applied positioning fixes to tail element");
-
-        // Also check for and fix the tail connector
-        const tailConnector = document.querySelector('.gm-style-iw-tc');
-        if (tailConnector) {
-            tailConnector.style.setProperty('top', 'auto', 'important');
-            tailConnector.style.setProperty('bottom', '-15px', 'important');
-            tailConnector.style.setProperty('left', '50%', 'important');
-            tailConnector.style.setProperty('right', 'auto', 'important');
-            tailConnector.style.setProperty('transform', 'translateX(-50%)', 'important');
-            console.log("Fixed tail connector positioning");
-        }
-
-        return true;
-    } else {
-        console.warn("Could not find tail element to fix");
-        return false;
-    }
-}
-
-function applyInfoWindowPositioningFixes() {
-    if (!document.getElementById('info-window-position-fix')) {
-        const style = document.createElement('style');
-        style.id = 'info-window-position-fix';
-        style.textContent = `
-            /* CRITICAL: Fix for Google Maps InfoWindow tail positioning */
-            .gm-style .gm-style-iw-t {
-                position: absolute !important;
-                width: 20px !important;
-                height: 15px !important;
-                bottom: 0px !important;
-                right: auto !important;
-                left: 50% !important;
-                transform: translateX(-50%) !important;
-            }
-            
-            /* Override inline styles with high specificity */
-            .gm-style div[class="gm-style-iw-t"][style] {
-                bottom: 0px !important;
-                right: auto !important;
-                left: 50% !important;
-                transform: translateX(-50%) !important;
-                width: 20px !important;
-                height: 15px !important;
-            }
-            
-            /* Fix tail connector */
-            .gm-style .gm-style-iw-tc {
-                top: auto !important;
-                bottom: -15px !important;
-                left: 50% !important;
-                right: auto !important;
-                transform: translateX(-50%) !important;
-            }
-            
-            /* Ensure info window container positioning */
-            .gm-style .gm-style-iw-c {
-                margin-bottom: 15px !important;
-                position: relative !important;
-            }
-        `;
-        document.head.appendChild(style);
-        console.log("Applied info window positioning fixes");
-    }
-}
 
 /**
  * Fixed displayBusinessesOnMap function for better GeoJSON handling
