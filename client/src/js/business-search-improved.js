@@ -12067,22 +12067,362 @@ async function testFixedOliveGardenSearch() {
     }
 }
 
-console.log("🚀 FIXED duplicate detection loaded!");
-console.log("🧪 Run testFixedOliveGardenSearch() to test the fix");
-console.log("📍 Should now show 9+ Olive Garden locations in Las Vegas!");
+/**
+ * FIXED: Always search for nearby database businesses to show green markers
+ * The previous logic was skipping nearby searches when many results were found
+ */
+
+/**
+ * FIXED: Enhanced search function that ALWAYS searches for nearby database businesses
+ */
+async function performEnhancedBusinessSearchWithNearbyFixed(formData, bustCache = false) {
+    try {
+        console.log("🔍 NEARBY FIXED SEARCH: Starting search with guaranteed nearby search:", formData);
+
+        // Show loading indicator
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading"><div class="loading-text">Searching for businesses...</div><div class="loading-spinner"></div></div>';
+            resultsContainer.style.display = 'block';
+        }
+
+        // Process search location (same as before)
+        let searchLocation = null;
+        let searchRadius = 30;
+
+        if (formData.useMyLocation) {
+            try {
+                updateLoadingMessage("Getting your location...");
+                searchLocation = await getUserLocation();
+                window.currentSearchLocation = searchLocation;
+            } catch (error) {
+                console.error("❌ Error getting user location:", error);
+                hideLoadingIndicator();
+                alert("Unable to get your current location. Please try entering an address instead.");
+                return;
+            }
+        } else if (formData.address && formData.address.trim() !== '') {
+            try {
+                updateLoadingMessage("Finding location...");
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    window.currentSearchLocation = searchLocation;
+
+                    if (/^\d{5}$/.test(formData.address.trim())) {
+                        searchRadius = 25;
+                        console.log("📍 ZIP CODE SEARCH: Using 25km radius");
+                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
+                        searchRadius = 30;
+                        console.log("📍 CITY SEARCH: Using 30km radius");
+                    } else {
+                        searchRadius = 20;
+                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
+                    }
+
+                    if (map && searchLocation) {
+                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                        map.setCenter(center);
+                        map.setZoom(searchRadius <= 20 ? 12 : 11);
+                    }
+                } else {
+                    throw new Error(`Geocoding failed for address: ${formData.address}`);
+                }
+            } catch (error) {
+                console.error("❌ Error geocoding address:", error);
+                hideLoadingIndicator();
+                alert("We couldn't recognize that address. Please try a more specific address.");
+                return;
+            }
+        }
+
+        // PHASE 1: Search database for primary results
+        updateLoadingMessage("Searching database...");
+        let primaryResults = [];
+
+        if (formData.businessName && formData.businessName.trim() !== '') {
+            try {
+                primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
+                primaryResults = primaryResults.filter(business => business.is_chain !== true);
+                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
+            } catch (error) {
+                console.error("❌ Primary search failed:", error);
+            }
+        }
+
+        // PHASE 2: Search Google Places
+        let placesResults = [];
+
+        if (formData.businessName && searchLocation) {
+            try {
+                updateLoadingMessage("Searching for additional locations...");
+                const placesSearchLocation = {
+                    ...searchLocation,
+                    searchRadius: Math.max(searchRadius, 35)
+                };
+                placesResults = await searchGooglePlacesForBusinessEnhanced(formData.businessName, placesSearchLocation);
+                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
+            } catch (error) {
+                console.error("❌ Places search failed:", error);
+            }
+        }
+
+        // PHASE 3: FIXED - ALWAYS search for nearby database businesses when we have a location
+        let nearbyDatabaseBusinesses = [];
+
+        if (searchLocation) {
+            try {
+                updateLoadingMessage("Finding other nearby businesses in database...");
+
+                // FIXED: Always search nearby, but adjust the approach based on results
+                console.log(`🔍 ALWAYS SEARCHING nearby businesses for context and completeness`);
+
+                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinessesEnhanced(searchLocation, searchRadius, formData.businessName);
+                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
+
+                // Log what we found for debugging
+                if (nearbyDatabaseBusinesses.length > 0) {
+                    console.log("🏢 NEARBY BUSINESSES FOUND:");
+                    nearbyDatabaseBusinesses.slice(0, 10).forEach((business, index) => {
+                        console.log(`   ${index + 1}. ${business.bname} (${business.type}) - ${business.city}, ${business.state}`);
+                    });
+                } else {
+                    console.log("❌ No nearby database businesses found - this seems unusual for Las Vegas");
+                }
+
+            } catch (error) {
+                console.error("❌ Nearby database search failed:", error);
+            }
+        } else {
+            console.log("⏭️ No search location available - cannot search for nearby businesses");
+        }
+
+        // PHASE 4: Enhanced categorization with fixed duplicate detection
+        const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
+            categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
+
+        // PHASE 5: Display results
+        const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
+        console.log(`📊 NEARBY FIXED SEARCH RESULTS:`);
+        console.log(`   - 🔴 Primary Database (RED): ${finalPrimaryResults.length} businesses`);
+        console.log(`   - 🔵 Additional Locations (BLUE): ${finalPlacesResults.length} businesses`);
+        console.log(`   - 🟢 Other Nearby Database (GREEN): ${finalNearbyResults.length} businesses`);
+        console.log(`   - Total: ${allResults.length} businesses`);
+
+        if (allResults.length > 0) {
+            // Set proper flags
+            finalPrimaryResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = true;
+                business.markerColor = 'primary';
+                business.priority = 1;
+            });
+
+            finalPlacesResults.forEach(business => {
+                business.isGooglePlace = true;
+                business.isFromDatabase = false;
+                business.isPrimaryResult = false;
+                business.isRelevantPlaces = true;
+                business.markerColor = 'nearby';
+                business.priority = 2;
+            });
+
+            finalNearbyResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = false;
+                business.isNearbyDatabase = true;
+                business.markerColor = 'database';
+                business.priority = 3;
+            });
+
+            hideLoadingIndicator();
+
+            // Display results
+            displayBusinessesOnMapWithBetterPriority(allResults);
+            displaySearchResultsWithBetterPriority(allResults);
+
+            // Show enhanced success message
+            showImprovedSearchSuccessMessage(finalPrimaryResults.length, finalPlacesResults.length, finalNearbyResults.length, formData.businessName);
+
+            console.log("✅ NEARBY FIXED SEARCH: Completed successfully with guaranteed nearby search");
+        } else {
+            hideLoadingIndicator();
+            showNoResultsMessage();
+        }
+
+    } catch (error) {
+        console.error("❌ Nearby fixed search error:", error);
+        hideLoadingIndicator();
+        showErrorMessage(`Error searching for businesses: ${error.message}`);
+    }
+}
+
+/**
+ * ENHANCED: Better nearby search that provides more debugging info
+ */
+async function searchNearbyDatabaseBusinessesWithDebugging(searchLocation, radiusKm, excludeBusinessName = '') {
+    try {
+        console.log(`🏢 DEBUGGING NEARBY SEARCH: ${radiusKm}km radius around ${searchLocation.lat}, ${searchLocation.lng}`);
+        console.log(`   Excluding business name: "${excludeBusinessName}"`);
+
+        const baseURL = getBaseURL();
+
+        // Use larger radius for metro areas
+        const enhancedRadius = Math.max(radiusKm, 30);
+        console.log(`   Using enhanced radius: ${enhancedRadius}km`);
+
+        // Build API URL for location-based search
+        const params = new URLSearchParams({
+            operation: 'search',
+            lat: searchLocation.lat,
+            lng: searchLocation.lng,
+            radius: enhancedRadius,
+            limit: 100
+        });
+
+        const apiURL = `${baseURL}/api/business.js?${params.toString()}`;
+        console.log(`🌐 DEBUGGING nearby search URL: ${apiURL}`);
+
+        const response = await fetch(apiURL);
+        if (!response.ok) {
+            throw new Error(`Nearby search failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        let nearbyBusinesses = data.results || [];
+
+        console.log(`📊 DEBUGGING raw nearby results: ${nearbyBusinesses.length} businesses total`);
+
+        // Log ALL businesses found (first 20) for debugging
+        console.log("🔍 ALL NEARBY BUSINESSES FOUND (first 20):");
+        nearbyBusinesses.slice(0, 20).forEach((business, index) => {
+            const isChain = business.is_chain === true ? ' (CHAIN PARENT)' : '';
+            const hasCoords = hasValidCoordinates(business) ? '✅' : '❌';
+            console.log(`   ${index + 1}. ${business.bname} - ${business.city}, ${business.state} ${hasCoords}${isChain}`);
+        });
+
+        // Filter with detailed logging
+        const filteredBusinesses = nearbyBusinesses.filter((business, index) => {
+            console.log(`🔍 FILTERING #${index + 1}: ${business.bname}`);
+
+            // Exclude parent chains
+            if (business.is_chain === true) {
+                console.log(`   🚫 EXCLUDE: Parent chain business`);
+                return false;
+            }
+
+            // Check coordinates
+            if (!hasValidCoordinates(business)) {
+                console.log(`   🚫 EXCLUDE: Invalid coordinates`);
+                return false;
+            }
+
+            // Check business name exclusion
+            if (excludeBusinessName) {
+                const businessNameLower = business.bname.toLowerCase();
+                const excludeNameLower = excludeBusinessName.toLowerCase();
+
+                if (businessNameLower === excludeNameLower ||
+                    businessNameLower.includes(excludeNameLower) ||
+                    excludeNameLower.includes(businessNameLower)) {
+                    console.log(`   🚫 EXCLUDE: Matches excluded name "${excludeBusinessName}"`);
+                    return false;
+                }
+            }
+
+            console.log(`   ✅ INCLUDE: ${business.bname}`);
+            return true;
+        });
+
+        console.log(`✅ DEBUGGING FILTER RESULTS: ${filteredBusinesses.length} businesses after filtering`);
+
+        // Log final results
+        if (filteredBusinesses.length > 0) {
+            console.log("📋 FINAL NEARBY BUSINESSES:");
+            filteredBusinesses.slice(0, 10).forEach((business, index) => {
+                console.log(`   ${index + 1}. ${business.bname} (${business.type}) - ${business.city}, ${business.state}`);
+            });
+        } else {
+            console.log("❌ NO NEARBY BUSINESSES after filtering - this indicates a potential issue");
+        }
+
+        return filteredBusinesses;
+
+    } catch (error) {
+        console.error("❌ Error in debugging nearby database search:", error);
+        return [];
+    }
+}
+
+/**
+ * Test function for the nearby search fix
+ */
+async function testNearbySearchFix() {
+    console.log("🧪 TESTING NEARBY SEARCH FIX: Should find Home Depot in Las Vegas");
+
+    const formData = {
+        businessName: "Olive Garden",
+        address: "89121",
+        useMyLocation: false
+    };
+
+    try {
+        clearMarkers();
+        await performEnhancedBusinessSearchWithNearbyFixed(formData, true);
+        console.log("✅ Nearby search fix test completed - should now show Home Depot in green!");
+    } catch (error) {
+        console.error("❌ Nearby search fix test failed:", error);
+    }
+}
+
+/**
+ * Debug nearby search specifically
+ */
+async function debugNearbySearchOnly() {
+    console.log("🔍 DEBUGGING: Nearby search only for Las Vegas");
+
+    // Las Vegas coordinates
+    const lasVegasLocation = {
+        lat: 36.1165487,
+        lng: -115.0881146
+    };
+
+    try {
+        const nearbyResults = await searchNearbyDatabaseBusinessesWithDebugging(lasVegasLocation, 30, "Olive Garden");
+        console.log(`📊 NEARBY DEBUG RESULTS: Found ${nearbyResults.length} nearby businesses`);
+        return nearbyResults;
+    } catch (error) {
+        console.error("❌ Nearby debug failed:", error);
+        return [];
+    }
+}
+
+console.log("🚀 NEARBY SEARCH FIX loaded!");
+console.log("🧪 Run testNearbySearchFix() to test the complete fix");
+console.log("🔍 Run debugNearbySearchOnly() to debug just the nearby search");
+console.log("📍 Should now show: 1 red (Cedar Rapids), 9 blue (Las Vegas Olive Gardens), + green (Home Depot, etc.)");
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
-    window.retrieveFromMongoDB = performEnhancedBusinessSearchWithFixedDuplicates;
+    window.retrieveFromMongoDB = performEnhancedBusinessSearchWithNearbyFixed;
+    window.performEnhancedBusinessSearchWithNearbyFixed = performEnhancedBusinessSearchWithNearbyFixed;
+    window.searchNearbyDatabaseBusinessesWithDebugging = searchNearbyDatabaseBusinessesWithDebugging;
+    window.testNearbySearchFix = testNearbySearchFix;
+    window.debugNearbySearchOnly = debugNearbySearchOnly;
+    window.performEnhancedBusinessSearch = performEnhancedBusinessSearchWithNearbyFixed;
+
+    // Also override the nearby search function for better debugging
+    window.searchNearbyDatabaseBusinessesEnhanced = searchNearbyDatabaseBusinessesWithDebugging;
     window.createEnhancedAddressKey = createEnhancedAddressKey;
     window.createBusinessNameKey = createBusinessNameKey;
     window.categorizeResultsWithFixedDuplicateDetection = categorizeResultsWithFixedDuplicateDetection;
     window.performEnhancedBusinessSearchWithFixedDuplicates = performEnhancedBusinessSearchWithFixedDuplicates;
     window.testFixedOliveGardenSearch = testFixedOliveGardenSearch;
-    window.performEnhancedBusinessSearch = performEnhancedBusinessSearchWithFixedDuplicates;
     window.searchGooglePlacesForBusinessEnhanced = searchGooglePlacesForBusinessEnhanced;
     window.processPlacesResults = processPlacesResults;
-    window.searchNearbyDatabaseBusinessesEnhanced = searchNearbyDatabaseBusinessesEnhanced;
     window.debugLasVegasOliveGardenSearch = debugLasVegasOliveGardenSearch;
     window.testOliveGardenLasVegas = testOliveGardenLasVegas;
     window.searchGooglePlacesForBusiness = searchGooglePlacesForBusinessEnhanced;
