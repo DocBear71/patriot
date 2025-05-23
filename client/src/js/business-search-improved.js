@@ -1,12 +1,12 @@
 /**
-* Enhanced business-search-improved.js with improved chain business support
-* Combines the best of both versions with proper error handling
-*/
+ * Enhanced business-search-improved.js with improved chain business support
+ * Combines the best of both versions with proper error handling
+ */
 
 // Configuration constants
 const CONFIG = {
     mapId: 'ebe8ec43a7bc252d',
-    defaultCenter: { lat: 39.8283, lng: -98.5795 }, // Center of US
+    defaultCenter: {lat: 39.8283, lng: -98.5795}, // Center of US
     defaultZoom: 4,
     markerColors: {
         primary: '#EA4335',      // RED - Primary search results (database)
@@ -322,7 +322,7 @@ function safelyFitBounds(mapObj, boundsObj, defaultZoom = 11) {
         mapObj.fitBounds(boundsObj);
 
         // Add a listener to adjust zoom if it's too close
-        google.maps.event.addListenerOnce(mapObj, 'bounds_changed', function() {
+        google.maps.event.addListenerOnce(mapObj, 'bounds_changed', function () {
             const zoomLevel = mapObj.getZoom();
             if (zoomLevel > 16) {
                 mapObj.setZoom(16);
@@ -390,7 +390,7 @@ function ensureGoogleMapsInitialized() {
             const mapId = window.appConfig?.googleMapsMapId || CONFIG.mapId;
 
             // Create a callback function for when Maps loads
-            window.initGoogleMapCallback = function() {
+            window.initGoogleMapCallback = function () {
                 console.log("Google Maps callback executed");
                 initGoogleMap();
                 googleMapsInitialized = true;
@@ -403,7 +403,7 @@ function ensureGoogleMapsInitialized() {
             script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&map_ids=${mapId}&libraries=places,geometry,marker&callback=initGoogleMapCallback&loading=async&v=weekly`;
             script.async = true;
             script.defer = true;
-            script.onerror = function(error) {
+            script.onerror = function (error) {
                 console.error('Google Maps API failed to load:', error);
                 googleMapsInitializing = false;
                 reject(error);
@@ -423,7 +423,7 @@ function ensureGoogleMapsInitialized() {
  * View business details
  * @param {string} businessId - Business ID
  */
-window.viewBusinessDetails = function(businessId) {
+window.viewBusinessDetails = function (businessId) {
     console.log("View details for business:", businessId);
     // You can implement this to navigate to a details page or show more info
     alert("This feature is coming soon: View details for " + businessId);
@@ -660,12 +660,12 @@ function getUserLocation() {
  * @param {string} placeId - Google Place ID
  * @param {string} chainId - Optional chain ID if this place is part of a chain
  */
-window.addBusinessToDatabase = async function(placeId, chainId = null) {
+window.addBusinessToDatabase = async function (placeId, chainId = null) {
     console.log("Adding place to database:", placeId, "Chain ID:", chainId);
 
     try {
         // Import the new Places library instead of using deprecated PlacesService
-        const { Place } = await google.maps.importLibrary("places");
+        const {Place} = await google.maps.importLibrary("places");
 
         // Create a Place instance with the clicked place ID
         const place = new Place({
@@ -1211,7 +1211,7 @@ async function searchGooglePlacesForBusiness(businessName, searchLocation) {
         console.log("Searching Google Places (new API) for:", businessName, "near", searchLocation);
 
         // Import the new Places library
-        const { Place, SearchNearbyRequest } = await google.maps.importLibrary("places");
+        const {Place, SearchNearbyRequest} = await google.maps.importLibrary("places");
 
         // Create search location
         const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
@@ -1239,7 +1239,7 @@ async function searchGooglePlacesForBusiness(businessName, searchLocation) {
         console.log("New Places API request:", request);
 
         // Perform text search using the new API
-        const { places } = await Place.searchByText(request);
+        const {places} = await Place.searchByText(request);
 
         if (!places || places.length === 0) {
             console.log("No businesses found via new Places API");
@@ -1473,8 +1473,7 @@ function displayBusinessesOnMap(businesses) {
                 Array.isArray(business.location.coordinates) && business.location.coordinates.length >= 2) {
                 lng = business.location.coordinates[0];
                 lat = business.location.coordinates[1];
-            }
-            else if (business.lat !== undefined && business.lng !== undefined) {
+            } else if (business.lat !== undefined && business.lng !== undefined) {
                 lat = parseFloat(business.lat);
                 lng = parseFloat(business.lng);
             } else {
@@ -2172,8 +2171,7 @@ function safeExtractCoordinates(locationObj) {
         else if (Array.isArray(locationObj) && locationObj.length >= 2) {
             lat = parseFloat(locationObj[0]);
             lng = parseFloat(locationObj[1]);
-        }
-        else {
+        } else {
             console.warn("Unrecognized location object format:", locationObj);
             return null;
         }
@@ -2190,7 +2188,7 @@ function safeExtractCoordinates(locationObj) {
             return null;
         }
 
-        return { lat: lat, lng: lng };
+        return {lat: lat, lng: lng};
     } catch (error) {
         console.error("Error extracting coordinates:", error);
         return null;
@@ -2293,7 +2291,7 @@ function showInfoWindow(marker) {
             console.log("Info window opened successfully");
 
             // Apply positioning fix after DOM is ready
-            google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
                 console.log("Info window DOM ready");
 
                 // Wait longer for Google to finish its initial rendering
@@ -2326,7 +2324,7 @@ function showInfoWindow(marker) {
  * @returns {Function} Wrapped function with error handling
  */
 function withErrorHandling(func, funcName) {
-    return function(...args) {
+    return function (...args) {
         try {
             return func.apply(this, args);
         } catch (error) {
@@ -2583,12 +2581,12 @@ function applyInfoWindowCSS() {
 }
 
 
-
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.showInfoWindow = showInfoWindow;
     window.fixInfoWindowPositioning = fixInfoWindowPositioning;
 }
+
 function applyTargetedTailFix() {
     console.log("Applying targeted tail fix...");
 
@@ -2659,7 +2657,7 @@ function applyCSSOnlyTailFix() {
 }
 
 // Test function for the tail fix specifically
-window.testTailFix = function() {
+window.testTailFix = function () {
     console.log("Testing tail fix...");
 
     // Remove any existing fix
@@ -2818,7 +2816,7 @@ function applyBasicInfoWindowCSS() {
 }
 
 // Test function you can call from console
-window.testInfoWindow = function() {
+window.testInfoWindow = function () {
     console.log("=== TESTING INFO WINDOW SETUP ===");
 
     // Remove aggressive CSS
@@ -3071,7 +3069,7 @@ function removeProblematicInfoWindowCSS() {
 }
 
 // Call this to reset and test
-window.debugInfoWindow = function() {
+window.debugInfoWindow = function () {
     console.log("Starting info window debug...");
     removeProblematicInfoWindowCSS();
 
@@ -3203,10 +3201,10 @@ async function setupMapClickHandler() {
 
     try {
         // Import the Places library
-        const { Place } = await google.maps.importLibrary("places");
+        const {Place} = await google.maps.importLibrary("places");
 
         // Listen for POI clicks
-        map.addListener('click', async function(event) {
+        map.addListener('click', async function (event) {
             console.log("Map clicked", event);
 
             // Check if clicked on a POI
@@ -3388,7 +3386,7 @@ async function setupMapClickHandler() {
                     const tempMarker = {
                         business: business,
                         position: new google.maps.LatLng(lat, lng),
-                        getPosition: function() {
+                        getPosition: function () {
                             return this.position;
                         }
                     };
@@ -3709,7 +3707,7 @@ function getPlaceTypeLabel(types) {
 /**
  * Initialize the Google Map
  */
-window.initGoogleMap = function() {
+window.initGoogleMap = function () {
     console.log("Enhanced initGoogleMap function called");
 
     try {
@@ -3832,7 +3830,7 @@ function addInitialMapMessage(mapContainer) {
 function setupResetMapButton() {
     const resetMapButton = document.getElementById('reset-map');
     if (resetMapButton) {
-        resetMapButton.addEventListener('click', function() {
+        resetMapButton.addEventListener('click', function () {
             resetMapView();
         });
     }
@@ -3872,7 +3870,7 @@ function setupMarkerClickPriority() {
     console.log("Setting up enhanced marker click priority");
 
     // Create listener that gets called before Google's POI click
-    google.maps.event.addListener(map, 'click', function(event) {
+    google.maps.event.addListener(map, 'click', function (event) {
         // Only process if we have a POI click
         if (event.placeId) {
             // Check if any of our markers are close to this click
@@ -3916,7 +3914,7 @@ function setupMarkerClickPriority() {
     }, {passive: false});
 }
 
-window.debugEnhancedMarkers = function() {
+window.debugEnhancedMarkers = function () {
     console.log("=== ENHANCED MARKER DEBUG ===");
     console.log("Total markers:", markers.length);
 
@@ -4141,7 +4139,7 @@ function applyInfoWindowScrollableStyles() {
 /**
  * Enhanced focus on map marker function
  */
-window.focusOnMapMarker = function(businessId) {
+window.focusOnMapMarker = function (businessId) {
     console.log("focusOnMapMarker called for business ID:", businessId);
 
     // Check if map is initialized
@@ -4256,7 +4254,7 @@ function fetchBusinessAndCreateMarker(businessId) {
 }
 
 // Ensure Google Maps is properly initialized when DOM loads
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log("DOM loaded, initializing enhanced business search...");
 
     // Add enhanced marker styles FIRST
@@ -4580,8 +4578,6 @@ function checkIfUserIsAdmin() {
 }
 
 
-
-
 // Helper function to perform the actual incentives fetch
 function performIncentivesFetch(businessId, incentivesDiv) {
     const baseURL = getBaseURL();
@@ -4732,7 +4728,7 @@ function createEnhancedFallbackMarker(business, location) {
         marker.isFromDatabase = isFromDatabase;
 
         // Add click event listener
-        marker.addListener('click', function() {
+        marker.addListener('click', function () {
             console.log("Enhanced fallback marker clicked:", business.bname);
             showEnhancedInfoWindow(marker);
         });
@@ -4747,7 +4743,6 @@ function createEnhancedFallbackMarker(business, location) {
         return null;
     }
 }
-
 
 
 /**
@@ -4817,7 +4812,7 @@ function showEnhancedInfoWindow(marker) {
             console.log("Enhanced info window opened successfully");
 
             // Apply fixes after DOM is ready
-            google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
                 setTimeout(() => {
                     applyEnhancedInfoWindowFixes();
 
@@ -5727,7 +5722,7 @@ function getBusinessLocation(business) {
         return null;
     }
 
-    return { lat, lng };
+    return {lat, lng};
 }
 
 /**
@@ -5759,7 +5754,7 @@ function createSimilarBusinessMarker(business, position) {
 async function createEnhancedBusinessMarker(business, location, forceNearby = false) {
     try {
         // Import the marker library
-        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+        const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
 
         // Create a position object from the location
         let position = createSafeLatLng(location);
@@ -5824,19 +5819,19 @@ async function createEnhancedBusinessMarker(business, location, forceNearby = fa
         marker.isSimilarBusiness = business.isSimilarBusiness || forceNearby;
 
         // Add click event listener
-        pinElement.addEventListener('click', function(e) {
+        pinElement.addEventListener('click', function (e) {
             console.log("Enhanced similar business marker clicked:", business.bname);
             e.stopPropagation();
             showEnhancedInfoWindow(marker);
         });
 
         // Add hover effects
-        pinElement.addEventListener('mouseenter', function() {
+        pinElement.addEventListener('mouseenter', function () {
             pinElement.style.transform = 'scale(1.1)';
             pinElement.style.zIndex = '1000';
         });
 
-        pinElement.addEventListener('mouseleave', function() {
+        pinElement.addEventListener('mouseleave', function () {
             pinElement.style.transform = 'scale(1)';
             pinElement.style.zIndex = 'auto';
         });
@@ -6692,7 +6687,7 @@ function createBusinessMarker(business) {
 async function createEnhancedBusinessMarkerFixed(business, location, forceDatabase = false) {
     try {
         // Import the marker library
-        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+        const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
 
         // Create a position object from the location
         let position = createSafeLatLng(location);
@@ -6755,19 +6750,19 @@ async function createEnhancedBusinessMarkerFixed(business, location, forceDataba
         marker.isFromDatabase = isFromDatabase;
 
         // Add click event listener
-        pinElement.addEventListener('click', function(e) {
+        pinElement.addEventListener('click', function (e) {
             console.log(`🖱️ Marker clicked: ${business.bname} (${isFromDatabase ? 'Database' : 'Google Places'})`);
             e.stopPropagation();
             showEnhancedInfoWindow(marker);
         });
 
         // Add hover effects
-        pinElement.addEventListener('mouseenter', function() {
+        pinElement.addEventListener('mouseenter', function () {
             pinElement.style.transform = 'scale(1.1)';
             pinElement.style.zIndex = '1000';
         });
 
-        pinElement.addEventListener('mouseleave', function() {
+        pinElement.addEventListener('mouseleave', function () {
             pinElement.style.transform = 'scale(1)';
             pinElement.style.zIndex = 'auto';
         });
@@ -7407,7 +7402,7 @@ function hasValidCoordinates(business) {
  */
 
 // Add this comprehensive debugger to your page
-window.debugBusinessSearch = function() {
+window.debugBusinessSearch = function () {
     console.log("🔍 ===== COMPREHENSIVE BUSINESS SEARCH DEBUG =====");
 
     // 1. Check current search state
@@ -7508,7 +7503,7 @@ async function testAPIEndpoints() {
 }
 
 // Enhanced search test function
-window.testSpecificSearch = function(businessName, useLocation = false) {
+window.testSpecificSearch = function (businessName, useLocation = false) {
     console.log(`🧪 TESTING SEARCH: "${businessName}" (Location: ${useLocation ? 'Yes' : 'No'})`);
 
     // Clear current state
@@ -7536,7 +7531,7 @@ window.testSpecificSearch = function(businessName, useLocation = false) {
 };
 
 // Test incentives loading specifically
-window.testIncentivesLoading = function(businessId) {
+window.testIncentivesLoading = function (businessId) {
     console.log(`🎁 TESTING INCENTIVES LOADING: ${businessId}`);
 
     // Check if element exists
@@ -7557,12 +7552,12 @@ window.testIncentivesLoading = function(businessId) {
 };
 
 // Monitor API calls
-window.monitorAPICalls = function() {
+window.monitorAPICalls = function () {
     console.log("📡 MONITORING API CALLS...");
 
     // Intercept fetch calls
     const originalFetch = window.fetch;
-    window.fetch = function(...args) {
+    window.fetch = function (...args) {
         const url = args[0];
         if (url.includes('/api/')) {
             console.log(`🌐 API CALL: ${url}`);
@@ -7587,7 +7582,7 @@ window.monitorAPICalls = function() {
 };
 
 // Quick fix test
-window.quickFixTest = function() {
+window.quickFixTest = function () {
     console.log("🔧 RUNNING QUICK FIX TEST...");
 
     // 1. Test with Home Depot search
@@ -7605,7 +7600,7 @@ window.quickFixTest = function() {
 };
 
 // Add visual debugging overlay
-window.addDebugOverlay = function() {
+window.addDebugOverlay = function () {
     // Remove existing overlay
     const existingOverlay = document.getElementById('debug-overlay');
     if (existingOverlay) {
@@ -7648,7 +7643,7 @@ window.addDebugOverlay = function() {
 
 // Auto-start debugging on page load
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => {
             console.log("🚀 Business Search Debugger loaded!");
             console.log("Run debugBusinessSearch() to start debugging");
@@ -7666,7 +7661,7 @@ async function searchGooglePlacesForBusinessFixed(businessName, searchLocation) 
         console.log("🔍 PLACES SEARCH: Searching Google Places for:", businessName, "near", searchLocation);
 
         // Import the new Places library
-        const { Place } = await google.maps.importLibrary("places");
+        const {Place} = await google.maps.importLibrary("places");
 
         // Create search location
         const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
@@ -7693,7 +7688,7 @@ async function searchGooglePlacesForBusinessFixed(businessName, searchLocation) 
         console.log("🌐 Places API request:", request);
 
         // Perform text search using the new API
-        const { places } = await Place.searchByText(request);
+        const {places} = await Place.searchByText(request);
 
         if (!places || places.length === 0) {
             console.log("❌ No businesses found via Places API");
@@ -8165,7 +8160,7 @@ function showEnhancedInfoWindowFixed(marker) {
             console.log("✅ Info window opened successfully");
 
             // Load incentives after DOM is ready
-            google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
                 setTimeout(() => {
                     applyEnhancedInfoWindowFixes();
 
@@ -8407,7 +8402,7 @@ function showEnhancedInfoWindowFixed2(marker) {
             console.log("✅ Info window opened successfully");
 
             // Load incentives after DOM is ready
-            google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
                 setTimeout(() => {
                     applyEnhancedInfoWindowFixes();
 
@@ -8672,7 +8667,7 @@ async function processApiQueue() {
     isProcessingQueue = true;
 
     while (apiCallQueue.length > 0) {
-        const { placeName, cleanName, resolve } = apiCallQueue.shift();
+        const {placeName, cleanName, resolve} = apiCallQueue.shift();
 
         try {
             console.log(`🌐 API QUEUE: Processing ${placeName} (${apiCallQueue.length} remaining)`);
@@ -9584,7 +9579,7 @@ async function retrieveFromMongoDBWithNearbyDetection(formData, bustCache = fals
         }
 
         // PHASE 4: Remove duplicates and categorize results
-        const { finalPrimaryResults, finalNearbyResults, finalPlacesResults } =
+        const {finalPrimaryResults, finalNearbyResults, finalPlacesResults} =
             categorizeFinalResults(primaryResults, nearbyDatabaseBusinesses, placesResults);
 
         // PHASE 5: Display all results
@@ -9764,7 +9759,7 @@ function createAddressKey(business) {
 async function createEnhancedBusinessMarkerWithCategory(business, location) {
     try {
         // Import the marker library
-        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+        const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
 
         // Create a position object from the location
         let position = createSafeLatLng(location);
@@ -9839,19 +9834,19 @@ async function createEnhancedBusinessMarkerWithCategory(business, location) {
         marker.isNearbyDatabase = business.isNearbyDatabase;
 
         // Add click event listener
-        pinElement.addEventListener('click', function(e) {
+        pinElement.addEventListener('click', function (e) {
             console.log(`🖱️ Marker clicked: ${business.bname} (${business.markerColor})`);
             e.stopPropagation();
             showEnhancedInfoWindowWithCategory(marker);
         });
 
         // Add hover effects
-        pinElement.addEventListener('mouseenter', function() {
+        pinElement.addEventListener('mouseenter', function () {
             pinElement.style.transform = 'scale(1.1)';
             pinElement.style.zIndex = '1000';
         });
 
-        pinElement.addEventListener('mouseleave', function() {
+        pinElement.addEventListener('mouseleave', function () {
             pinElement.style.transform = 'scale(1)';
             pinElement.style.zIndex = 'auto';
         });
@@ -9934,7 +9929,7 @@ function showEnhancedInfoWindowWithCategory(marker) {
             console.log("✅ Category info window opened successfully");
 
             // Load incentives after DOM is ready
-            google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
                 setTimeout(() => {
                     applyEnhancedInfoWindowFixes();
 
@@ -10578,7 +10573,7 @@ async function retrieveFromMongoDBWithBetterPriority(formData, bustCache = false
 
         // Process search location
         let searchLocation = null;
-        let searchRadius = 25; // Default radius in km
+        let searchRadius = 30; // Default radius in km - increased for better coverage
 
         if (formData.useMyLocation) {
             try {
@@ -10599,19 +10594,25 @@ async function retrieveFromMongoDBWithBetterPriority(formData, bustCache = false
                     searchLocation = geocodedLocation;
                     window.currentSearchLocation = searchLocation;
 
-                    // Determine search radius based on address type
+                    // FIXED: Better radius logic for different area types
                     if (/^\d{5}$/.test(formData.address.trim())) {
-                        searchRadius = 15;
-                        console.log("📍 ZIP CODE SEARCH: Using 15km radius");
+                        // ZIP code search - use larger radius for metro areas
+                        searchRadius = 25; // Increased from 15km to cover metro areas better
+                        console.log("📍 ZIP CODE SEARCH: Using 25km radius for better metro coverage");
                     } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
+                        // City search - use even larger radius
+                        searchRadius = 30;
+                        console.log("📍 CITY SEARCH: Using 30km radius");
+                    } else {
+                        // Address search - moderate radius
                         searchRadius = 20;
-                        console.log("📍 CITY SEARCH: Using 20km radius");
+                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
                     }
 
                     if (map && searchLocation) {
                         const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
                         map.setCenter(center);
-                        map.setZoom(searchRadius <= 15 ? 12 : 11);
+                        map.setZoom(searchRadius <= 20 ? 12 : 11);
                     }
                 } else {
                     throw new Error(`Geocoding failed for address: ${formData.address}`);
@@ -10644,21 +10645,25 @@ async function retrieveFromMongoDBWithBetterPriority(formData, bustCache = false
         if (formData.businessName && searchLocation) {
             try {
                 updateLoadingMessage("Searching for additional locations...");
-                placesResults = await searchGooglePlacesForBusinessFixed(formData.businessName, searchLocation);
+                // Use larger radius for Google Places to get more comprehensive results
+                const placesSearchLocation = {
+                    ...searchLocation,
+                    searchRadius: Math.max(searchRadius, 35) // Ensure at least 35km for Places search
+                };
+                placesResults = await searchGooglePlacesForBusinessWithRadius(formData.businessName, placesSearchLocation);
                 console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
             } catch (error) {
                 console.error("❌ Places search failed:", error);
             }
         }
 
-        // PHASE 3: Search for nearby database businesses (LOWER PRIORITY NOW - only if no specific business name or few results)
+        // PHASE 3: Search for nearby database businesses (LOWER PRIORITY NOW - but still search for context)
         let nearbyDatabaseBusinesses = [];
 
-        // IMPROVED LOGIC: Only search for nearby businesses if:
-        // 1. No specific business name was provided, OR
-        // 2. Very few primary results were found AND user might want to see other options
+        // IMPROVED LOGIC: Search for nearby businesses to provide context, but with lower priority
+        // Only skip if we have a very specific search with many results
         const shouldSearchNearby = !formData.businessName ||
-            (primaryResults.length + placesResults.length < 3);
+            (primaryResults.length + placesResults.length < 8); // Increased threshold
 
         if (searchLocation && shouldSearchNearby) {
             try {
@@ -10669,11 +10674,11 @@ async function retrieveFromMongoDBWithBetterPriority(formData, bustCache = false
                 console.error("❌ Nearby database search failed:", error);
             }
         } else {
-            console.log("⏭️ SKIPPING nearby search - sufficient relevant results found");
+            console.log("⏭️ SKIPPING nearby search - found many relevant results");
         }
 
         // PHASE 4: Remove duplicates and categorize with NEW PRIORITY ORDER
-        const { finalPrimaryResults, finalPlacesResults, finalNearbyResults } =
+        const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
             categorizeResultsWithBetterPriority(primaryResults, placesResults, nearbyDatabaseBusinesses);
 
         // PHASE 5: Display all results in NEW PRIORITY ORDER
@@ -10734,6 +10739,322 @@ async function retrieveFromMongoDBWithBetterPriority(formData, bustCache = false
     }
 }
 
+/**
+ * FIXED: Enhanced Google Places search with configurable radius
+ */
+async function searchGooglePlacesForBusinessWithRadius(businessName, searchLocationWithRadius) {
+    try {
+        console.log("🔍 ENHANCED PLACES SEARCH: Searching for:", businessName, "near", searchLocationWithRadius);
+
+        // Import the new Places library
+        const {Place} = await google.maps.importLibrary("places");
+
+        // Create search location
+        const center = new google.maps.LatLng(searchLocationWithRadius.lat, searchLocationWithRadius.lng);
+
+        // Use the enhanced radius
+        const searchRadius = (searchLocationWithRadius.searchRadius || 35) * 1000; // Convert km to meters, default 35km
+
+        // Create a text search request using the new API with larger radius
+        const request = {
+            textQuery: businessName,
+            locationBias: {
+                center: center,
+                radius: searchRadius // Use enhanced radius
+            },
+            maxResultCount: 20,
+            fields: [
+                'id',
+                'displayName',
+                'formattedAddress',
+                'location',
+                'types',
+                'nationalPhoneNumber',
+                'internationalPhoneNumber'
+            ]
+        };
+
+        console.log(`🌐 Enhanced Places API request with ${searchRadius / 1000}km radius:`, request);
+
+        // Perform text search using the new API
+        const {places} = await Place.searchByText(request);
+
+        if (!places || places.length === 0) {
+            console.log("❌ No businesses found via enhanced Places API");
+            return [];
+        }
+
+        console.log(`✅ Found ${places.length} businesses via enhanced Places API`);
+
+        // Process results and create business objects
+        const businessPromises = places.map(async (place) => {
+            // Extract address components
+            const addressParts = place.formattedAddress ? place.formattedAddress.split(',') : [];
+            let address1 = '';
+            let city = '';
+            let state = '';
+            let zip = '';
+
+            if (addressParts.length >= 1) address1 = addressParts[0].trim();
+            if (addressParts.length >= 2) city = addressParts[1].trim();
+            if (addressParts.length >= 3) {
+                const stateZipMatch = addressParts[2].trim().match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+                if (stateZipMatch) {
+                    state = stateZipMatch[1];
+                    zip = stateZipMatch[2];
+                }
+            }
+
+            // Calculate distance from search center
+            const placeLatLng = place.location;
+            const distance = google.maps.geometry.spherical.computeDistanceBetween(center, placeLatLng);
+
+            // Extract coordinates safely
+            let lat = 0, lng = 0;
+            if (place.location) {
+                try {
+                    lat = typeof place.location.lat === 'function' ? place.location.lat() : place.location.lat || 0;
+                    lng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng || 0;
+                } catch (coordError) {
+                    console.warn("⚠️ Error extracting coordinates:", coordError);
+                    lat = searchLocationWithRadius.lat;
+                    lng = searchLocationWithRadius.lng;
+                }
+            }
+
+            // Create base business object
+            const business = {
+                _id: 'google_' + place.id,
+                bname: place.displayName,
+                address1: address1,
+                city: city,
+                state: state,
+                zip: zip,
+                formattedAddress: place.formattedAddress,
+                type: mapGooglePlaceTypeToBusinessType(place.types),
+                phone: place.nationalPhoneNumber || place.internationalPhoneNumber || '',
+                isGooglePlace: true,
+                placeId: place.id,
+                lat: lat,
+                lng: lng,
+                distance: distance
+            };
+
+            // Enhanced chain matching
+            try {
+                const chainMatch = await findMatchingChainForPlaceResult(place.displayName);
+                if (chainMatch) {
+                    console.log(`🔗 CHAIN MATCH: "${place.displayName}" matches "${chainMatch.bname}"`);
+                    business.chain_id = chainMatch._id;
+                    business.chain_name = chainMatch.bname;
+                    business.isChainLocation = true;
+                } else {
+                    console.log(`❌ No chain match for: ${place.displayName}`);
+                }
+            } catch (error) {
+                console.warn("⚠️ Error checking for chain match:", error);
+            }
+
+            return business;
+        });
+
+        // Wait for all chain matching to complete
+        const businesses = await Promise.all(businessPromises);
+
+        // Sort by distance
+        businesses.sort((a, b) => a.distance - b.distance);
+
+        console.log(`📊 ENHANCED PLACES RESULTS: ${businesses.length} businesses processed with ${searchRadius / 1000}km radius`);
+        businesses.forEach((business, index) => {
+            const distanceKm = (business.distance / 1000).toFixed(1);
+            console.log(`   ${index + 1}. ${business.bname} (${distanceKm}km away, Chain: ${business.isChainLocation ? business.chain_name : 'No'})`);
+        });
+
+        return businesses;
+
+    } catch (error) {
+        console.error("❌ Error in enhanced Places API search:", error);
+        // FIXED: Fallback with correct parameter format
+        const fallbackLocation = {
+            lat: searchLocationWithRadius.lat,
+            lng: searchLocationWithRadius.lng
+        };
+        return await searchGooglePlacesForBusinessFixed(businessName, fallbackLocation);
+    }
+}
+
+/**
+ * MAIN SEARCH FUNCTION - This should be separate from the Places search function
+ */
+async function performEnhancedBusinessSearch(formData, bustCache = false) {
+    try {
+        // Process search location
+        let searchLocation = null;
+        let searchRadius = 30; // Default radius in km - increased for better coverage
+
+        if (formData.useMyLocation) {
+            try {
+                updateLoadingMessage("Getting your location...");
+                searchLocation = await getUserLocation();
+                window.currentSearchLocation = searchLocation;
+            } catch (error) {
+                console.error("❌ Error getting user location:", error);
+                hideLoadingIndicator();
+                alert("Unable to get your current location. Please try entering an address instead.");
+                return;
+            }
+        } else if (formData.address && formData.address.trim() !== '') {
+            try {
+                updateLoadingMessage("Finding location...");
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    window.currentSearchLocation = searchLocation;
+
+                    // FIXED: Better radius logic for different area types
+                    if (/^\d{5}$/.test(formData.address.trim())) {
+                        // ZIP code search - use larger radius for metro areas
+                        searchRadius = 25; // Increased from 15km to cover metro areas better
+                        console.log("📍 ZIP CODE SEARCH: Using 25km radius for better metro coverage");
+                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
+                        // City search - use even larger radius
+                        searchRadius = 30;
+                        console.log("📍 CITY SEARCH: Using 30km radius");
+                    } else {
+                        // Address search - moderate radius
+                        searchRadius = 20;
+                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
+                    }
+
+                    if (map && searchLocation) {
+                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                        map.setCenter(center);
+                        map.setZoom(searchRadius <= 20 ? 12 : 11);
+                    }
+                } else {
+                    throw new Error(`Geocoding failed for address: ${formData.address}`);
+                }
+            } catch (error) {
+                console.error("❌ Error geocoding address:", error);
+                hideLoadingIndicator();
+                alert("We couldn't recognize that address. Please try a more specific address.");
+                return;
+            }
+        }
+
+        // PHASE 1: Search for primary results (specific business name search)
+        updateLoadingMessage("Searching database...");
+        let primaryResults = [];
+
+        if (formData.businessName && formData.businessName.trim() !== '') {
+            try {
+                primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
+                primaryResults = primaryResults.filter(business => business.is_chain !== true);
+                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
+            } catch (error) {
+                console.error("❌ Primary search failed:", error);
+            }
+        }
+
+        // PHASE 2: Search Google Places for primary business name (HIGHER PRIORITY NOW)
+        let placesResults = [];
+
+        if (formData.businessName && searchLocation) {
+            try {
+                updateLoadingMessage("Searching for additional locations...");
+                // Use larger radius for Google Places to get more comprehensive results
+                const placesSearchLocation = {
+                    ...searchLocation,
+                    searchRadius: Math.max(searchRadius, 35) // Ensure at least 35km for Places search
+                };
+                placesResults = await searchGooglePlacesForBusinessWithRadius(formData.businessName, placesSearchLocation);
+                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
+            } catch (error) {
+                console.error("❌ Places search failed:", error);
+            }
+        }
+
+        // PHASE 3: Search for nearby database businesses (LOWER PRIORITY NOW - but still search for context)
+        let nearbyDatabaseBusinesses = [];
+
+        // IMPROVED LOGIC: Search for nearby businesses to provide context, but with lower priority
+        // Only skip if we have a very specific search with many results
+        const shouldSearchNearby = !formData.businessName ||
+            (primaryResults.length + placesResults.length < 8); // Increased threshold
+
+        if (searchLocation && shouldSearchNearby) {
+            try {
+                updateLoadingMessage("Finding other nearby businesses...");
+                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinesses(searchLocation, searchRadius, formData.businessName);
+                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
+            } catch (error) {
+                console.error("❌ Nearby database search failed:", error);
+            }
+        } else {
+            console.log("⏭️ SKIPPING nearby search - found many relevant results");
+        }
+
+        // PHASE 4: Remove duplicates and categorize with NEW PRIORITY ORDER
+        const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
+            categorizeResultsWithBetterPriority(primaryResults, placesResults, nearbyDatabaseBusinesses);
+
+        // PHASE 5: Display all results in NEW PRIORITY ORDER
+        const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
+        console.log(`📊 IMPROVED PRIORITIZATION:`);
+        console.log(`   - 🔴 Primary Database (RED): ${finalPrimaryResults.length} businesses`);
+        console.log(`   - 🔵 Additional Locations (BLUE): ${finalPlacesResults.length} businesses`);
+        console.log(`   - 🟢 Other Nearby (GREEN): ${finalNearbyResults.length} businesses`);
+        console.log(`   - Total: ${allResults.length} businesses`);
+
+        if (allResults.length > 0) {
+            // Set proper flags for each category with NEW PRIORITY
+            finalPrimaryResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = true;
+                business.markerColor = 'primary'; // RED - highest priority
+                business.priority = 1;
+            });
+
+            finalPlacesResults.forEach(business => {
+                business.isGooglePlace = true;
+                business.isFromDatabase = false;
+                business.isPrimaryResult = false;
+                business.isRelevantPlaces = true;
+                business.markerColor = 'nearby'; // BLUE - second priority (more relevant than unrelated nearby)
+                business.priority = 2;
+            });
+
+            finalNearbyResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = false;
+                business.isNearbyDatabase = true;
+                business.markerColor = 'database'; // GREEN - third priority (least relevant)
+                business.priority = 3;
+            });
+
+            hideLoadingIndicator();
+
+            // Display results with improved priority
+            displayBusinessesOnMapWithBetterPriority(allResults);
+            displaySearchResultsWithBetterPriority(allResults);
+
+            // Show enhanced success message
+            showImprovedSearchSuccessMessage(finalPrimaryResults.length, finalPlacesResults.length, finalNearbyResults.length, formData.businessName);
+
+            console.log("✅ IMPROVED SEARCH: Completed successfully with better prioritization");
+        } else {
+            hideLoadingIndicator();
+            showNoResultsMessage();
+        }
+
+    } catch (error) {
+        console.error("❌ Enhanced search error:", error);
+        hideLoadingIndicator();
+        showErrorMessage(`Error searching for businesses: ${error.message}`);
+    }
+}
 /**
  * FIXED: Categorize results with better priority logic
  * Priority: 1) Database matches, 2) Relevant Google Places, 3) Other nearby database businesses
@@ -11064,10 +11385,6 @@ function showImprovedSearchSuccessMessage(primaryCount, placesCount, nearbyCount
     }, 8000);
 }
 
-// Export the improved functions for global access
-if (typeof window !== 'undefined') {
-}
-
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = retrieveFromMongoDBWithBetterPriority;
@@ -11075,6 +11392,7 @@ if (typeof window !== 'undefined') {
     window.displaySearchResultsWithBetterPriority = displaySearchResultsWithBetterPriority;
     window.displayBusinessesOnMapWithBetterPriority = displayBusinessesOnMapWithBetterPriority;
     window.showImprovedSearchSuccessMessage = showImprovedSearchSuccessMessage;
+    window.searchGooglePlacesForBusinessWithRadius = searchGooglePlacesForBusinessWithRadius;
     window.displayBusinessesOnMap = displayBusinessesOnMapWithCategories;
     window.displaySearchResults = displaySearchResultsWithCategories;
     window.displayBusinessesOnMapFixed = displayBusinessesOnMapWithCategories;
