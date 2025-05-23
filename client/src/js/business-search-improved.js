@@ -8845,9 +8845,642 @@ function getChainMatchCacheStatus() {
     }
 }
 
+async function retrieveFromMongoDBWithRecovery(formData, bustCache = false) {
+    try {
+        console.log("🔍 SEARCH WITH RECOVERY: Starting enhanced search:", formData);
+
+        // Show loading with recovery messaging
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading"><div class="loading-text">Searching for businesses...</div><div class="loading-spinner"></div></div>';
+            resultsContainer.style.display = 'block';
+        }
+
+        // Process search location with enhanced error handling
+        let searchLocation = null;
+        let locationSource = 'none';
+
+        if (formData.useMyLocation) {
+            try {
+                updateLoadingMessage("Getting your location...");
+                searchLocation = await getUserLocation();
+                window.currentSearchLocation = searchLocation;
+                locationSource = 'geolocation';
+                console.log(`📍 LOCATION SOURCE: ${locationSource} - ${searchLocation.lat}, ${searchLocation.lng}`);
+            } catch (error) {
+                console.error("❌ Geolocation failed:", error);
+
+                // Fallback: try to use IP-based location
+                try {
+                    updateLoadingMessage("Using approximate location...");
+                    searchLocation = await getApproximateLocation();
+                    if (searchLocation) {
+                        window.currentSearchLocation = searchLocation;
+                        locationSource = 'approximate';
+                        console.log(`📍 FALLBACK LOCATION: ${locationSource}`);
+                    }
+                } catch (fallbackError) {
+                    console.error("❌ Fallback location failed:", fallbackError);
+                }
+
+                if (!searchLocation) {
+                    hideLoadingIndicator();
+                    showUserFriendlyError("location", "Unable to determine your location. Please try entering a city or zip code instead.");
+                    return;
+                }
+            }
+        } else if (formData.address && formData.address.trim() !== '') {
+            try {
+                updateLoadingMessage("Finding location...");
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    window.currentSearchLocation = searchLocation;
+                    locationSource = 'geocoded';
+                    console.log(`📍 LOCATION SOURCE: ${locationSource} - ${formData.address}`);
+
+                    if (map && searchLocation) {
+                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                        map.setCenter(center);
+                        map.setZoom(11);
+                    }
+                } else {
+                    throw new Error(`Geocoding failed for: ${formData.address}`);
+                }
+            } catch (error) {
+                console.error("❌ Geocoding failed:", error);
+                hideLoadingIndicator();
+                showUserFriendlyError("geocoding", `We couldn't find "${formData.address}". Please try a more specific address like "Las Vegas, NV" or "89121".`);
+                return;
+            }
+        }
+
+        // Enhanced database search with retry logic
+        updateLoadingMessage("Searching database...");
+        let dbResults = [];
+        let dbSearchSuccess = false;
+
+        try {
+            dbResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
+            dbSearchSuccess = true;
+            console.log(`📊 DATABASE SUCCESS: Found ${dbResults.length} businesses`);
+        } catch (dbError) {
+            console.error("❌ Database search failed:", dbError);
+
+            // Try simplified search as fallback
+            try {
+                console.log("🔄 RETRY: Attempting simplified database search...");
+                const simplifiedFormData = {
+                    businessName: formData.businessName,
+                    address: '',
+                    useMyLocation: false
+                };
+                dbResults = await searchDatabaseWithFuzzyMatching(simplifiedFormData, null, bustCache);
+                dbSearchSuccess = true;
+                console.log(`📊 SIMPLIFIED SEARCH SUCCESS: Found ${dbResults.length} businesses`);
+            } catch (retryError) {
+                console.error("❌ Simplified search also failed:", retryError);
+                // Continue with empty results
+            }
+        }
+
+        // Filter results properly
+        const validDbBusinesses = dbResults.filter(business => business.is_chain !== true);
+        console.log(`✅ VALID DB BUSINESSES: ${validDbBusinesses.length} after filtering`);
+
+        // Enhanced Google Places search with error recovery
+        let placesResults = [];
+        let placesSearchSuccess = false;
+
+        if (formData.businessName && searchLocation) {
+            updateLoadingMessage("Searching Google Places...");
+
+            try {
+                placesResults = await searchGooglePlacesForBusinessFixed(formData.businessName, searchLocation);
+                placesSearchSuccess = true;
+                console.log(`📊 PLACES SUCCESS: Found ${placesResults.length} businesses`);
+            } catch (placesError) {
+                console.error("❌ Places search failed:", placesError);
+
+                // Continue without Places results
+                console.log("⚠️ Continuing with database results only");
+            }
+        }
+
+        // Combine and display results
+        const allResults = [...validDbBusinesses, ...placesResults];
+        console.log(`📊 TOTAL RESULTS: ${allResults.length} (${validDbBusinesses.length} database + ${placesResults.length} places)`);
+
+        if (allResults.length > 0) {
+            // Ensure proper business flags
+            validDbBusinesses.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+            });
+
+            placesResults.forEach(business => {
+                business.isGooglePlace = true;
+                business.isFromDatabase = false;
+            });
+
+            hideLoadingIndicator();
+
+            // Display results
+            displayBusinessesOnMapFixed(allResults);
+            displaySearchResultsFixed(allResults);
+
+            // Show success message with details
+            showSearchSuccessMessage(validDbBusinesses.length, placesResults.length, locationSource);
+
+            console.log("✅ SEARCH WITH RECOVERY: Completed successfully");
+        } else {
+            hideLoadingIndicator();
+
+            // Enhanced no results message based on what was attempted
+            let noResultsMessage = "No businesses found matching your search.";
+
+            if (!dbSearchSuccess && !placesSearchSuccess) {
+                noResultsMessage = "Unable to search for businesses at this time. Please check your internet connection and try again.";
+            } else if (formData.businessName && !searchLocation) {
+                noResultsMessage = `No businesses named "${formData.businessName}" found. Try adding a location or searching for a more general term.`;
+            } else if (searchLocation && !formData.businessName) {
+                noResultsMessage = "No businesses found in this area. Try expanding your search with a business name.";
+            }
+
+            showUserFriendlyError("no-results", noResultsMessage);
+        }
+
+    } catch (error) {
+        console.error("❌ CRITICAL SEARCH ERROR:", error);
+        hideLoadingIndicator();
+        showUserFriendlyError("critical", "Something went wrong with the search. Please try refreshing the page and searching again.");
+    }
+}
+
+// FIX 2: Approximate location fallback
+async function getApproximateLocation() {
+    // This would typically use IP geolocation service
+    // For now, return a default location (can be enhanced with actual IP geolocation)
+    return {
+        lat: 39.8283,
+        lng: -98.5795,
+        source: 'default-us-center'
+    };
+}
+
+// FIX 3: User-friendly error messages
+function showUserFriendlyError(errorType, message) {
+    const resultsContainer = document.getElementById('business-search-results') ||
+        document.getElementById('search_table');
+
+    if (!resultsContainer) return;
+
+    const errorIcons = {
+        'location': '📍',
+        'geocoding': '🗺️',
+        'no-results': '🔍',
+        'critical': '⚠️',
+        'network': '🌐'
+    };
+
+    const icon = errorIcons[errorType] || '❌';
+
+    resultsContainer.innerHTML = `
+        <div class="user-friendly-error">
+            <div class="error-icon">${icon}</div>
+            <div class="error-message">${message}</div>
+            <div class="error-actions">
+                <button onclick="location.reload()" class="retry-btn">🔄 Try Again</button>
+                <button onclick="clearSearchForm()" class="clear-btn">🆕 New Search</button>
+            </div>
+        </div>
+    `;
+    resultsContainer.style.display = 'block';
+}
+
+// FIX 4: Success message with details
+function showSearchSuccessMessage(dbCount, placesCount, locationSource) {
+    // Create a subtle success indicator
+    const successBanner = document.createElement('div');
+    successBanner.className = 'search-success-banner';
+    successBanner.innerHTML = `
+        <div class="success-content">
+            <span class="success-icon">✅</span>
+            <span class="success-text">
+                Found ${dbCount + placesCount} businesses
+                ${dbCount > 0 ? `(${dbCount} in database` : ''}
+                ${placesCount > 0 ? `${dbCount > 0 ? ', ' : '('}${placesCount} nearby)` : dbCount > 0 ? ')' : ''}
+            </span>
+            <button onclick="this.parentElement.parentElement.remove()" class="close-success">×</button>
+        </div>
+    `;
+
+    // Add to page temporarily
+    const mainContent = document.querySelector('main') || document.body;
+    mainContent.insertBefore(successBanner, mainContent.firstChild);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (successBanner.parentNode) {
+            successBanner.remove();
+        }
+    }, 5000);
+}
+
+// FIX 5: Clear search form function
+function clearSearchForm() {
+    const form = document.getElementById('business-search-form');
+    if (form) {
+        form.reset();
+
+        // Clear validation classes
+        const inputs = form.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.classList.remove('valid-field', 'invalid-field');
+            input.removeAttribute('data-valid');
+        });
+
+        // Clear results
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.style.display = 'none';
+        }
+
+        // Clear map markers
+        clearMarkers();
+
+        // Reset map view
+        if (map) {
+            map.setCenter(CONFIG.defaultCenter);
+            map.setZoom(CONFIG.defaultZoom);
+        }
+
+        console.log("🆕 FORM CLEARED: Search form and results cleared");
+    }
+}
+
+// FIX 6: Enhanced debugging dashboard
+function createDebugDashboard() {
+    // Remove existing dashboard
+    const existingDashboard = document.getElementById('debug-dashboard');
+    if (existingDashboard) {
+        existingDashboard.remove();
+    }
+
+    // Create comprehensive debug dashboard
+    const dashboard = document.createElement('div');
+    dashboard.id = 'debug-dashboard';
+    dashboard.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.9);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        z-index: 10000;
+        font-family: monospace;
+        font-size: 11px;
+        max-width: 350px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+
+    dashboard.innerHTML = `
+        <h4 style="margin: 0 0 10px 0; color: #4CAF50; text-align: center;">🛠️ Debug Dashboard</h4>
+        
+        <div class="debug-section">
+            <h5 style="color: #2196F3; margin: 10px 0 5px 0;">🔍 Quick Tests</h5>
+            <button onclick="testSpecificSearch('Olive Garden', false)" class="debug-btn">Test Olive Garden</button>
+            <button onclick="testSpecificSearch('The Home Depot', true)" class="debug-btn">Test Home Depot + Location</button>
+            <button onclick="testSpecificSearch('McDonald\\'s', false)" class="debug-btn">Test McDonald's</button>
+        </div>
+
+        <div class="debug-section">
+            <h5 style="color: #FF9800; margin: 10px 0 5px 0;">📊 System Status</h5>
+            <button onclick="debugBusinessSearch()" class="debug-btn">Full System Debug</button>
+            <button onclick="getChainMatchCacheStatus()" class="debug-btn">Cache Status</button>
+            <button onclick="checkMapMarkers()" class="debug-btn">Check Markers</button>
+        </div>
+
+        <div class="debug-section">
+            <h5 style="color: #9C27B0; margin: 10px 0 5px 0;">🧹 Maintenance</h5>
+            <button onclick="clearChainMatchCache()" class="debug-btn">Clear Cache</button>
+            <button onclick="clearSearchForm()" class="debug-btn">Clear Form</button>
+            <button onclick="resetMapView()" class="debug-btn">Reset Map</button>
+        </div>
+
+        <div class="debug-section">
+            <h5 style="color: #F44336; margin: 10px 0 5px 0;">🚨 Emergency</h5>
+            <button onclick="emergencyReset()" class="debug-btn danger">Emergency Reset</button>
+            <button onclick="location.reload()" class="debug-btn danger">Reload Page</button>
+        </div>
+
+        <div id="debug-status" style="margin-top: 10px; padding: 5px; background: rgba(255,255,255,0.1); border-radius: 4px; font-size: 10px;">
+            Ready for debugging
+        </div>
+
+        <button onclick="document.getElementById('debug-dashboard').remove()" 
+                style="position: absolute; top: 5px; right: 8px; background: none; border: none; color: #f44336; font-size: 16px; cursor: pointer;">×</button>
+    `;
+
+    // Add dashboard styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .debug-btn {
+            display: block;
+            width: 100%;
+            margin: 2px 0;
+            padding: 6px 8px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            transition: background 0.2s;
+        }
+        
+        .debug-btn:hover {
+            background: #555;
+        }
+        
+        .debug-btn.danger {
+            background: #d32f2f;
+            border-color: #b71c1c;
+        }
+        
+        .debug-btn.danger:hover {
+            background: #f44336;
+        }
+        
+        .debug-section {
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .debug-section:last-child {
+            border-bottom: none;
+        }
+    `;
+    document.head.appendChild(style);
+
+    document.body.appendChild(dashboard);
+    console.log("🛠️ DEBUG DASHBOARD: Created comprehensive debugging dashboard");
+}
+
+// FIX 7: Enhanced marker checking
+function checkMapMarkers() {
+    console.log("🎯 MARKER CHECK: Analyzing current markers...");
+
+    if (!markers || markers.length === 0) {
+        console.log("❌ No markers found");
+        updateDebugStatus("No markers on map");
+        return;
+    }
+
+    let databaseMarkers = 0;
+    let placesMarkers = 0;
+    let invalidMarkers = 0;
+
+    markers.forEach((marker, index) => {
+        if (!marker.business) {
+            invalidMarkers++;
+            return;
+        }
+
+        if (marker.business.isGooglePlace) {
+            placesMarkers++;
+        } else {
+            databaseMarkers++;
+        }
+
+        console.log(`   ${index + 1}. ${marker.business.bname} (${marker.business.isGooglePlace ? 'PLACES' : 'DATABASE'})`);
+    });
+
+    const summary = `${markers.length} markers: ${databaseMarkers} database, ${placesMarkers} places, ${invalidMarkers} invalid`;
+    console.log(`📊 MARKER SUMMARY: ${summary}`);
+    updateDebugStatus(summary);
+}
+
+// FIX 8: Emergency reset function
+function emergencyReset() {
+    console.log("🚨 EMERGENCY RESET: Performing complete system reset...");
+
+    try {
+        // Clear all markers
+        clearMarkers();
+
+        // Clear cache
+        if (typeof clearChainMatchCache === 'function') {
+            clearChainMatchCache();
+        }
+
+        // Clear form
+        clearSearchForm();
+
+        // Reset map
+        if (map) {
+            map.setCenter(CONFIG.defaultCenter);
+            map.setZoom(CONFIG.defaultZoom);
+        }
+
+        // Close any info windows
+        if (infoWindow) {
+            infoWindow.close();
+        }
+
+        // Clear any modals or overlays
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.paddingRight = '';
+        document.body.style.overflow = '';
+
+        // Clear any error messages
+        const errorElements = document.querySelectorAll('.error-message, .user-friendly-error, .loading-indicator');
+        errorElements.forEach(el => el.remove());
+
+        console.log("✅ EMERGENCY RESET: System reset completed");
+        updateDebugStatus("Emergency reset completed");
+
+    } catch (error) {
+        console.error("❌ EMERGENCY RESET FAILED:", error);
+        updateDebugStatus("Emergency reset failed - try page reload");
+    }
+}
+
+// FIX 9: Update debug status helper
+function updateDebugStatus(message) {
+    const statusEl = document.getElementById('debug-status');
+    if (statusEl) {
+        statusEl.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+    }
+}
+
+// FIX 10: Enhanced CSS for user-friendly messages
+function addEnhancedUserInterfaceCSS() {
+    if (!document.getElementById('enhanced-ui-css')) {
+        const style = document.createElement('style');
+        style.id = 'enhanced-ui-css';
+        style.textContent = `
+            /* User-friendly error messages */
+            .user-friendly-error {
+                text-align: center;
+                padding: 40px 20px;
+                background: linear-gradient(135deg, #fff3e0 0%, #ffccbc 100%);
+                border-radius: 12px;
+                margin: 20px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+
+            .error-icon {
+                font-size: 48px;
+                margin-bottom: 16px;
+            }
+
+            .error-message {
+                font-size: 16px;
+                color: #333;
+                margin-bottom: 20px;
+                line-height: 1.5;
+            }
+
+            .error-actions {
+                display: flex;
+                gap: 10px;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            .retry-btn, .clear-btn {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 500;
+                transition: all 0.2s;
+            }
+
+            .retry-btn {
+                background: #4CAF50;
+                color: white;
+            }
+
+            .retry-btn:hover {
+                background: #45a049;
+                transform: translateY(-1px);
+            }
+
+            .clear-btn {
+                background: #2196F3;
+                color: white;
+            }
+
+            .clear-btn:hover {
+                background: #1976D2;
+                transform: translateY(-1px);
+            }
+
+            /* Success banner */
+            .search-success-banner {
+                background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+                border: 1px solid #4caf50;
+                border-radius: 8px;
+                margin: 10px 0;
+                animation: slideInFromTop 0.5s ease-out;
+            }
+
+            .success-content {
+                display: flex;
+                align-items: center;
+                padding: 12px 16px;
+                gap: 10px;
+            }
+
+            .success-icon {
+                font-size: 18px;
+            }
+
+            .success-text {
+                flex: 1;
+                color: #2e7d32;
+                font-weight: 500;
+            }
+
+            .close-success {
+                background: none;
+                border: none;
+                font-size: 18px;
+                color: #2e7d32;
+                cursor: pointer;
+                padding: 0;
+                width: 24px;
+                height: 24px;
+            }
+
+            .close-success:hover {
+                background: rgba(76, 175, 80, 0.1);
+                border-radius: 50%;
+            }
+
+            @keyframes slideInFromTop {
+                from {
+                    opacity: 0;
+                    transform: translateY(-20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            /* Enhanced loading indicator */
+            .loading-indicator {
+                text-align: center;
+                padding: 40px 20px;
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                border-radius: 12px;
+                margin: 20px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+
+            .loading-text {
+                font-size: 18px;
+                color: #333;
+                margin-bottom: 20px;
+                font-weight: 500;
+            }
+
+            .loading-spinner {
+                width: 40px;
+                height: 40px;
+                border: 4px solid #e3f2fd;
+                border-top: 4px solid #2196f3;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
+    window.getApproximateLocation = getApproximateLocation;
+    window.showUserFriendlyError = showUserFriendlyError;
+    window.showSearchSuccessMessage = showSearchSuccessMessage;
+    window.clearSearchForm = clearSearchForm;
+    window.createDebugDashboard = createDebugDashboard;
+    window.checkMapMarkers = checkMapMarkers;
+    window.emergencyReset = emergencyReset;
+    window.updateDebugStatus = updateDebugStatus;
+    window.addEnhancedUserInterfaceCSS = addEnhancedUserInterfaceCSS;
     window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResultFixed;
     window.findMatchingChainLocallyEnhanced = findMatchingChainLocallyEnhanced;
     window.tryServerSideChainMatchingOptimized = tryServerSideChainMatchingOptimized;
@@ -8860,7 +9493,7 @@ if (typeof window !== 'undefined') {
     window.loadIncentivesForEnhancedWindow = loadIncentivesForEnhancedWindowFixed;
     window.loadChainIncentivesForDatabaseBusiness = loadChainIncentivesForDatabaseBusinessFixed;
     window.searchGooglePlacesForBusiness = searchGooglePlacesForBusinessFixed;
-    window.retrieveFromMongoDB = retrieveFromMongoDBEnhanced;
+    window.retrieveFromMongoDB = retrieveFromMongoDBWithRecovery;
     window.createBusinessMarker = createBusinessMarker;
     window.createEnhancedBusinessMarkerFixed = createEnhancedBusinessMarkerFixed;
     window.fetchBusinessIncentivesFixed = fetchBusinessIncentivesFixed;
@@ -8912,5 +9545,7 @@ if (typeof window !== 'undefined') {
     window.getSimilarBusinessTypes = getSimilarBusinessTypes;
     window.getBusinessLocation = getBusinessLocation;
     window.createSimilarBusinessMarker = createSimilarBusinessMarker;
+
+    addEnhancedUserInterfaceCSS();
 }
 
