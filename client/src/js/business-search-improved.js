@@ -6635,10 +6635,15 @@ function addBusinessRow(business, tableBody, isFromPlaces) {
  */
 function createBusinessMarker(business) {
     try {
+        console.log(`🔍 MARKER DEBUG: Creating marker for ${business.bname}`);
+        console.log(`   - isGooglePlace: ${business.isGooglePlace}`);
+        console.log(`   - _id: ${business._id}`);
+        console.log(`   - Source: ${business._id?.startsWith('google_') ? 'GOOGLE PLACES' : 'DATABASE'}`);
+
         // Validate coordinates
         if (!business.lat || !business.lng ||
             isNaN(parseFloat(business.lat)) || isNaN(parseFloat(business.lng))) {
-            console.warn(`Invalid coordinates for business: ${business.bname}`);
+            console.warn(`❌ Invalid coordinates for business: ${business.bname}`);
             return null;
         }
 
@@ -6648,19 +6653,17 @@ function createBusinessMarker(business) {
             parseFloat(business.lng)
         );
 
-        // CRITICAL: Determine if this is a database business or Google Places business
-        const isFromDatabase = !business.isGooglePlace;
+        // CRITICAL FIX: Properly determine if this is a database business
+        const isFromDatabase = !business.isGooglePlace && !business._id?.startsWith('google_');
 
-        console.log(`🏷️ Creating marker for ${business.bname}: ${isFromDatabase ? 'DATABASE (red)' : 'GOOGLE PLACES (blue)'}`);
+        // Set proper flags on business object
+        business.isFromDatabase = isFromDatabase;
+        business.isGooglePlace = !isFromDatabase;
 
-        // Ensure the business object has the correct flags
-        if (isFromDatabase) {
-            business.isGooglePlace = false;
-            business.isFromDatabase = true;
-        }
+        console.log(`🏷️ FINAL DETERMINATION: ${business.bname} → ${isFromDatabase ? 'DATABASE (RED MARKER)' : 'GOOGLE PLACES (BLUE MARKER)'}`);
 
-        // Use enhanced marker creation
-        const marker = createEnhancedBusinessMarker(business, position);
+        // Use enhanced marker creation with explicit color forcing
+        const marker = createEnhancedBusinessMarkerFixed(business, position, isFromDatabase);
 
         // Add to bounds if successful
         if (marker && bounds) {
@@ -6669,11 +6672,564 @@ function createBusinessMarker(business) {
 
         return marker;
     } catch (error) {
-        console.error("Error creating business marker:", error);
+        console.error("❌ Error creating business marker:", error);
         return null;
     }
 }
 
+async function createEnhancedBusinessMarkerFixed(business, location, forceDatabase = false) {
+    try {
+        // Import the marker library
+        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+        // Create a position object from the location
+        let position = createSafeLatLng(location);
+        if (!position) {
+            console.error("❌ Invalid position for enhanced marker:", location);
+            return createEnhancedFallbackMarker(business, location);
+        }
+
+        // CRITICAL FIX: Determine marker styling with explicit logic
+        const isFromDatabase = forceDatabase || (!business.isGooglePlace && !business._id?.startsWith('google_'));
+        const isChainLocation = !!business.chain_id;
+
+        // Choose marker color with explicit logic
+        let markerColor, markerClass;
+        if (isFromDatabase) {
+            markerColor = CONFIG.markerColors.primary; // RED for database businesses
+            markerClass = "primary database-business";
+            console.log(`🔴 RED MARKER: ${business.bname} (Database business)`);
+        } else {
+            markerColor = CONFIG.markerColors.nearby; // BLUE for Google Places
+            markerClass = "nearby google-places";
+            console.log(`🔵 BLUE MARKER: ${business.bname} (Google Places)`);
+        }
+
+        // Get business icon
+        const businessIcon = getBusinessTypeTextIcon(business.type);
+
+        // Create enhanced pin element
+        const pinElement = document.createElement('div');
+        pinElement.className = 'enhanced-custom-marker';
+        pinElement.setAttribute('title', business.bname);
+        pinElement.style.cursor = 'pointer';
+
+        // Enhanced marker HTML with explicit styling
+        pinElement.innerHTML = `
+            <div class="enhanced-marker-container">
+                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor} !important; border: 3px solid #ffffff;">
+                    <div class="enhanced-marker-icon">
+                        ${businessIcon}
+                    </div>
+                </div>
+                <div class="enhanced-marker-shadow"></div>
+                ${isChainLocation ? '<div class="chain-indicator">🔗</div>' : ''}
+                ${isFromDatabase ? '<div class="database-indicator">✓</div>' : ''}
+            </div>
+        `;
+
+        // Create the advanced marker
+        const marker = new AdvancedMarkerElement({
+            position: position,
+            map: map,
+            title: business.bname,
+            content: pinElement,
+            collisionBehavior: isFromDatabase ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
+        });
+
+        // Store the business data and flags
+        marker.business = business;
+        marker.position = position;
+        marker.isFromDatabase = isFromDatabase;
+
+        // Add click event listener
+        pinElement.addEventListener('click', function(e) {
+            console.log(`🖱️ Marker clicked: ${business.bname} (${isFromDatabase ? 'Database' : 'Google Places'})`);
+            e.stopPropagation();
+            showEnhancedInfoWindow(marker);
+        });
+
+        // Add hover effects
+        pinElement.addEventListener('mouseenter', function() {
+            pinElement.style.transform = 'scale(1.1)';
+            pinElement.style.zIndex = '1000';
+        });
+
+        pinElement.addEventListener('mouseleave', function() {
+            pinElement.style.transform = 'scale(1)';
+            pinElement.style.zIndex = 'auto';
+        });
+
+        // Add the marker to our array
+        markers.push(marker);
+        console.log(`✅ Added ${isFromDatabase ? 'DATABASE' : 'GOOGLE PLACES'} marker for ${business.bname}`);
+
+        return marker;
+    } catch (error) {
+        console.error("❌ Error creating enhanced marker:", error);
+        return createEnhancedFallbackMarker(business, location);
+    }
+}
+
+function fetchBusinessIncentivesFixed(businessId, chainId = null) {
+    if (!businessId || businessId.startsWith('google_')) {
+        console.log(`⏭️ Skipping incentives for Google Places business: ${businessId}`);
+        return;
+    }
+
+    console.log(`🎁 INCENTIVES DEBUG: Fetching for business ID: ${businessId}`);
+    console.log(`   - Chain ID: ${chainId || 'None'}`);
+
+    // Wait for DOM to be ready
+    setTimeout(() => {
+        const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+
+        if (!incentivesCell) {
+            console.error(`❌ Could not find incentives cell for business ${businessId}`);
+            console.log(`   - Looking for element ID: incentives-for-${businessId}`);
+
+            // Debug: List all incentives containers
+            const allIncentiveElements = document.querySelectorAll('[id*="incentives-for"]');
+            console.log(`🔍 Available incentive elements:`, Array.from(allIncentiveElements).map(el => el.id));
+            return;
+        }
+
+        console.log(`✅ Found incentives cell for ${businessId}`);
+        incentivesCell.innerHTML = '<span class="loading-incentives">Loading incentives...</span>';
+
+        // Determine the base URL
+        const baseURL = getBaseURL();
+        const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+
+        console.log(`🌐 Fetching incentives from: ${apiURL}`);
+
+        fetch(apiURL)
+            .then(response => {
+                console.log(`📡 Incentives API response status: ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch incentives: ${response.status} ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(`📊 Incentives data for business ${businessId}:`, data);
+
+                // Check if there are any incentives
+                if (!data.results || data.results.length === 0) {
+                    console.log(`ℹ️ No incentives found for business ${businessId}`);
+                    incentivesCell.innerHTML = '<em style="color: #666;">No incentives available</em>';
+                    return;
+                }
+
+                // Build HTML for the incentives
+                let incentivesHTML = '';
+                let activeIncentivesCount = 0;
+
+                data.results.forEach(incentive => {
+                    if (incentive.is_available) {
+                        activeIncentivesCount++;
+                        const typeLabel = getIncentiveTypeLabel(incentive.type);
+                        const otherDescription = incentive.other_description ?
+                            ` (${incentive.other_description})` : '';
+
+                        // Add a badge for chain-wide incentives
+                        const chainBadge = incentive.is_chain_wide ?
+                            '<span class="chain-badge small">Chain-wide</span>' : '';
+
+                        incentivesHTML += `
+                            <div class="incentive-item">
+                                <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
+                                ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                            </div>
+                        `;
+                    }
+                });
+
+                if (activeIncentivesCount === 0) {
+                    incentivesCell.innerHTML = '<em style="color: #666;">No active incentives found</em>';
+                } else {
+                    incentivesCell.innerHTML = incentivesHTML;
+                    console.log(`✅ Successfully loaded ${activeIncentivesCount} incentives for business ${businessId}`);
+                }
+            })
+            .catch(error => {
+                console.error(`❌ Error fetching incentives for business ${businessId}:`, error);
+                incentivesCell.innerHTML = '<span class="incentives-error">Error loading incentives</span>';
+            });
+    }, 200); // Increased delay to ensure DOM elements are ready
+}
+
+function addBusinessRowFixed(business, tableBody, isFromPlaces) {
+    if (!business) return;
+
+    // Skip parent chain businesses
+    if (business.is_chain === true) {
+        console.log(`⏭️ Skipping parent chain business in table: ${business.bname}`);
+        return;
+    }
+
+    console.log(`📝 Adding table row for: ${business.bname}`);
+    console.log(`   - Is from Places: ${isFromPlaces}`);
+    console.log(`   - Business ID: ${business._id}`);
+    console.log(`   - Is chain location: ${!!business.chain_id}`);
+
+    // Format address
+    let addressLine = '';
+    if (business.address1) {
+        addressLine = business.address2 ?
+            `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}` :
+            `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
+    } else if (business.formattedAddress) {
+        addressLine = business.formattedAddress.replace(/,/g, '<br>');
+    } else {
+        console.warn(`❌ Business ${business.bname} has no address information`);
+        return;
+    }
+
+    // Convert business type to readable label
+    const businessType = getBusinessTypeLabel(business.type);
+
+    // Check business type and create badges
+    const isChainLocation = !!business.chain_id;
+    const isGooglePlace = !!business.isGooglePlace;
+
+    // Create chain badge
+    let chainBadge = '';
+    if (isChainLocation) {
+        chainBadge = '<span class="chain-badge">Chain Location</span>';
+    }
+
+    // Create appropriate action button
+    let actionButton;
+    if (isGooglePlace) {
+        if (isChainLocation) {
+            actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.placeId || ''}', '${business.chain_id || ''}')">Add Chain Location</button>`;
+        } else {
+            actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.placeId || ''}')">Add to Database</button>`;
+        }
+    } else {
+        actionButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
+    }
+
+    // Create the row
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <th class="left_table" data-business-id="${business._id}">
+            ${business.bname} ${chainBadge}
+        </th>
+        <th class="left_table">${addressLine}</th>
+        <th class="left_table">${businessType}</th>
+        <th class="right_table" id="incentives-for-${business._id}">
+            ${isFromPlaces && !isChainLocation ? 'Not in database yet' : '<span class="loading-incentives">Loading incentives...</span>'}
+        </th>
+        <th class="center_table">${actionButton}</th>
+    `;
+
+    tableBody.appendChild(row);
+
+    // CRITICAL FIX: Handle incentives loading properly
+    if (!isGooglePlace) {
+        console.log(`🎁 Scheduling incentives load for database business: ${business.bname} (ID: ${business._id})`);
+        // Use the fixed incentives function
+        fetchBusinessIncentivesFixed(business._id, business.chain_id);
+    } else if (isChainLocation) {
+        console.log(`🔗 Scheduling chain incentives load for Google Places: ${business.bname}`);
+        fetchChainIncentivesForPlacesResult(business._id, business.chain_id);
+    } else {
+        console.log(`ℹ️ No incentives to load for non-chain Google Places: ${business.bname}`);
+    }
+}
+
+async function retrieveFromMongoDBFixed(formData, bustCache = false) {
+    try {
+        console.log("🔍 SEARCH DEBUG: Starting enhanced search with form data:", formData);
+
+        // Show loading indicator
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading">Searching for businesses...</div>';
+            resultsContainer.style.display = 'block';
+        }
+
+        // Process search location first
+        let searchLocation = null;
+
+        if (formData.useMyLocation) {
+            try {
+                updateLoadingMessage("Getting your location...");
+                searchLocation = await getUserLocation();
+                window.currentSearchLocation = searchLocation;
+                console.log(`📍 Got user location: ${searchLocation.lat}, ${searchLocation.lng}`);
+            } catch (error) {
+                console.error("❌ Error getting user location:", error);
+                hideLoadingIndicator();
+                alert("Unable to get your current location. Please try entering an address instead.");
+                return;
+            }
+        } else if (formData.address && formData.address.trim() !== '') {
+            try {
+                updateLoadingMessage("Finding location...");
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    window.currentSearchLocation = searchLocation;
+                    console.log(`📍 Geocoded location: ${searchLocation.lat}, ${searchLocation.lng}`);
+
+                    if (map && searchLocation) {
+                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                        map.setCenter(center);
+                        map.setZoom(11);
+                    }
+                } else {
+                    throw new Error(`Geocoding failed for address: ${formData.address}`);
+                }
+            } catch (error) {
+                console.error("❌ Error geocoding address:", error);
+                hideLoadingIndicator();
+                alert("We couldn't recognize that address. Please try a more specific address.");
+                return;
+            }
+        }
+
+        // Update loading message
+        updateLoadingMessage("Searching database...");
+
+        // Enhanced database search
+        const dbResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
+
+        console.log(`📊 DATABASE RESULTS: Found ${dbResults.length} businesses`);
+        dbResults.forEach((business, index) => {
+            console.log(`   ${index + 1}. ${business.bname} (ID: ${business._id}, Chain: ${business.is_chain ? 'Yes' : 'No'})`);
+        });
+
+        // Filter results properly
+        const validBusinesses = dbResults.filter(business => {
+            // Always exclude parent chains from display
+            if (business.is_chain === true) {
+                console.log(`🚫 Filtering out parent chain: ${business.bname}`);
+                return false;
+            }
+            return true;
+        });
+
+        console.log(`✅ VALID BUSINESSES: ${validBusinesses.length} after filtering`);
+
+        if (validBusinesses.length > 0) {
+            console.log("✅ Found businesses in database, displaying those");
+
+            // Ensure all database businesses are properly flagged
+            validBusinesses.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                console.log(`🏷️ Tagged as database business: ${business.bname}`);
+            });
+
+            // Hide loading indicator before displaying results
+            hideLoadingIndicator();
+
+            // Display database results
+            displayBusinessesOnMapFixed(validBusinesses);
+            displaySearchResultsFixed(validBusinesses);
+
+            console.log("✅ Database businesses displayed successfully");
+
+        } else if (formData.businessName && searchLocation) {
+            // No database results, search Google Places
+            console.log("🌐 No database businesses found, searching Google Places");
+
+            updateLoadingMessage("Searching Google Places...");
+
+            try {
+                const placesResults = await searchGooglePlacesForBusiness(formData.businessName, searchLocation);
+
+                if (placesResults && placesResults.length > 0) {
+                    console.log(`📍 Found ${placesResults.length} businesses via Google Places`);
+
+                    updateLoadingMessage("Loading results...");
+                    hideLoadingIndicator();
+
+                    displayBusinessesOnMapFixed(placesResults);
+                    displaySearchResultsFixed(placesResults);
+                } else {
+                    hideLoadingIndicator();
+                    showNoResultsMessage();
+                }
+            } catch (placesError) {
+                console.error("❌ Error searching Google Places:", placesError);
+                hideLoadingIndicator();
+                showErrorMessage("Error searching for businesses. Please try again.");
+            }
+        } else {
+            // No results found
+            hideLoadingIndicator();
+            showNoResultsMessage();
+        }
+    } catch (error) {
+        console.error("❌ Enhanced search error:", error);
+        hideLoadingIndicator();
+        showErrorMessage(`Error searching for businesses: ${error.message}`);
+    }
+}
+
+function displayBusinessesOnMapFixed(businesses) {
+    if (!map) {
+        console.log("⏳ Map not ready, storing businesses for later display");
+        pendingBusinessesToDisplay = businesses;
+        return;
+    }
+
+    console.log(`🗺️ DISPLAY DEBUG: Displaying ${businesses.length} businesses on map`);
+
+    // Clear existing markers and create new bounds
+    clearMarkers();
+    bounds = new google.maps.LatLngBounds();
+
+    // Counter for valid markers
+    let validMarkers = 0;
+    let skippedBusinesses = 0;
+
+    // Process each business
+    businesses.forEach((business, index) => {
+        try {
+            console.log(`🔄 Processing business ${index + 1}: ${business.bname}`);
+
+            // Skip parent chain businesses
+            if (business.is_chain === true) {
+                console.log(`🚫 Skipping parent chain business: ${business.bname}`);
+                skippedBusinesses++;
+                return;
+            }
+
+            // Get coordinates
+            const businessLocation = getBusinessLocation(business);
+            if (!businessLocation) {
+                console.warn(`❌ Business ${business.bname} missing coordinates`);
+                skippedBusinesses++;
+                return;
+            }
+
+            // Update business object with coordinates
+            business.lat = businessLocation.lat;
+            business.lng = businessLocation.lng;
+
+            // Create marker with explicit database flag
+            const marker = createBusinessMarker(business);
+            if (marker) {
+                validMarkers++;
+                console.log(`✅ Created marker ${validMarkers} for ${business.bname}`);
+
+                // Extend bounds
+                const position = new google.maps.LatLng(businessLocation.lat, businessLocation.lng);
+                bounds.extend(position);
+            } else {
+                console.error(`❌ Failed to create marker for ${business.bname}`);
+                skippedBusinesses++;
+            }
+        } catch (error) {
+            console.error(`❌ Error processing business ${business.bname}:`, error);
+            skippedBusinesses++;
+        }
+    });
+
+    console.log(`📊 MARKER SUMMARY: Created ${validMarkers} markers, skipped ${skippedBusinesses} businesses`);
+
+    // Update map view
+    setTimeout(() => {
+        try {
+            if (window.currentSearchLocation && validMarkers > 0) {
+                console.log("📍 Centering map on search location");
+                const searchLatLng = new google.maps.LatLng(
+                    window.currentSearchLocation.lat,
+                    window.currentSearchLocation.lng
+                );
+                map.setCenter(searchLatLng);
+                map.setZoom(12);
+            } else if (validMarkers > 0 && bounds && !bounds.isEmpty()) {
+                console.log("🎯 Fitting map to business bounds");
+                safelyFitBounds(map, bounds);
+            } else {
+                console.log("🌎 Using default map center");
+                map.setCenter(CONFIG.defaultCenter);
+                map.setZoom(CONFIG.defaultZoom);
+            }
+        } catch (error) {
+            console.error("❌ Error updating map view:", error);
+        }
+    }, 200);
+}
+
+function displaySearchResultsFixed(businesses) {
+    try {
+        console.log(`📋 RESULTS DEBUG: Displaying ${businesses.length} businesses in table`);
+
+        // Ensure loading indicator is hidden
+        hideLoadingIndicator();
+
+        const businessSearchTable = document.getElementById('business_search');
+        const searchTableContainer = document.getElementById('search_table');
+
+        if (!businessSearchTable || !searchTableContainer) {
+            console.error("❌ Required table elements not found in the DOM");
+            showErrorMessage("There was an error displaying search results. Please try again later.");
+            return;
+        }
+
+        // Get the table body
+        let tableBody = businessSearchTable.querySelector('tbody');
+        if (!tableBody) {
+            console.error("❌ Table body not found");
+            showErrorMessage("There was an error displaying search results. Please try again later.");
+            return;
+        }
+
+        // Clear existing rows
+        tableBody.innerHTML = '';
+
+        // Show the search results table
+        searchTableContainer.style.display = 'block';
+
+        // Hide the "hidden" text in the h5
+        const searchTableH5 = searchTableContainer.querySelector('h5');
+        if (searchTableH5) {
+            searchTableH5.style.display = 'none';
+        }
+
+        if (businesses.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
+            searchTableContainer.scrollIntoView({behavior: 'smooth'});
+            return;
+        }
+
+        // Filter and categorize businesses
+        const databaseBusinesses = businesses.filter(b => !b.isGooglePlace);
+        const googlePlacesBusinesses = businesses.filter(b => b.isGooglePlace);
+
+        console.log(`📊 CATEGORY DEBUG: ${databaseBusinesses.length} database, ${googlePlacesBusinesses.length} Google Places`);
+
+        // Add database businesses first (these should have red markers)
+        databaseBusinesses.forEach((business, index) => {
+            console.log(`📝 Adding database business ${index + 1}: ${business.bname}`);
+            addBusinessRowFixed(business, tableBody, false);
+        });
+
+        // Add Google Places businesses (these should have blue markers)
+        googlePlacesBusinesses.forEach((business, index) => {
+            console.log(`📝 Adding Google Places business ${index + 1}: ${business.bname}`);
+            addBusinessRowFixed(business, tableBody, true);
+        });
+
+        // Scroll to the results
+        searchTableContainer.scrollIntoView({behavior: 'smooth'});
+
+        console.log("✅ Search results displayed successfully");
+
+    } catch (error) {
+        console.error("❌ Error displaying search results:", error);
+        hideLoadingIndicator();
+        showErrorMessage("There was an error displaying the search results: " + error.message);
+    }
+}
 
 /**
  * Update the loading message
@@ -6829,22 +7385,293 @@ function hasValidCoordinates(business) {
     return false;
 }
 
+/**
+ * COMPREHENSIVE BUSINESS SEARCH DEBUGGER
+ *
+ * This tool will help identify exactly what's going wrong with:
+ * 1. Database businesses not showing as red markers
+ * 2. Incentives not loading
+ * 3. Search inconsistencies
+ */
+
+// Add this comprehensive debugger to your page
+window.debugBusinessSearch = function() {
+    console.log("🔍 ===== COMPREHENSIVE BUSINESS SEARCH DEBUG =====");
+
+    // 1. Check current search state
+    console.log("\n📊 CURRENT STATE:");
+    console.log("   - Map initialized:", !!map);
+    console.log("   - Current search location:", window.currentSearchLocation);
+    console.log("   - Total markers:", markers ? markers.length : 0);
+
+    // 2. Analyze current markers
+    if (markers && markers.length > 0) {
+        console.log("\n🎯 MARKER ANALYSIS:");
+        markers.forEach((marker, index) => {
+            const business = marker.business;
+            if (business) {
+                const isFromDatabase = !business.isGooglePlace && !business._id?.startsWith('google_');
+                const expectedColor = isFromDatabase ? 'RED' : 'BLUE';
+
+                console.log(`   ${index + 1}. ${business.bname}`);
+                console.log(`      - ID: ${business._id}`);
+                console.log(`      - isGooglePlace: ${business.isGooglePlace}`);
+                console.log(`      - isFromDatabase: ${business.isFromDatabase}`);
+                console.log(`      - Expected marker color: ${expectedColor}`);
+                console.log(`      - Chain ID: ${business.chain_id || 'None'}`);
+                console.log(`      - Coordinates: ${business.lat}, ${business.lng}`);
+            }
+        });
+    }
+
+    // 3. Check table elements
+    console.log("\n📋 TABLE ANALYSIS:");
+    const tableBody = document.querySelector('#business_search tbody');
+    if (tableBody) {
+        const rows = tableBody.querySelectorAll('tr');
+        console.log(`   - Table rows found: ${rows.length}`);
+
+        rows.forEach((row, index) => {
+            const businessName = row.querySelector('.left_table').textContent.trim();
+            const incentivesCell = row.querySelector('.right_table');
+            const businessId = row.querySelector('.left_table').getAttribute('data-business-id');
+
+            console.log(`   ${index + 1}. ${businessName}`);
+            console.log(`      - Business ID: ${businessId}`);
+            console.log(`      - Incentives cell ID: ${incentivesCell?.id}`);
+            console.log(`      - Incentives content: ${incentivesCell?.textContent.substring(0, 50)}...`);
+        });
+    } else {
+        console.log("   - No table body found");
+    }
+
+    // 4. Check for common DOM issues
+    console.log("\n🔍 DOM ANALYSIS:");
+    const incentiveElements = document.querySelectorAll('[id*="incentives-for"]');
+    console.log(`   - Total incentive elements: ${incentiveElements.length}`);
+    incentiveElements.forEach((el, index) => {
+        console.log(`      ${index + 1}. ID: ${el.id}, Content: ${el.textContent.substring(0, 30)}...`);
+    });
+
+    // 5. Test API endpoints
+    console.log("\n🌐 API TEST:");
+    testAPIEndpoints();
+
+    console.log("\n✅ Debug complete. Check the detailed output above.");
+};
+
+// Test API endpoints
+async function testAPIEndpoints() {
+    const baseURL = getBaseURL();
+
+    // Test basic business search
+    try {
+        console.log("   Testing business search API...");
+        const response = await fetch(`${baseURL}/api/business.js?operation=search&business_name=Home Depot&limit=1`);
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`   ✅ Business search API working: Found ${data.results?.length || 0} results`);
+            if (data.results && data.results.length > 0) {
+                const business = data.results[0];
+                console.log(`      - Sample business: ${business.bname} (ID: ${business._id})`);
+                console.log(`      - Is chain: ${business.is_chain}`);
+                console.log(`      - Chain ID: ${business.chain_id || 'None'}`);
+
+                // Test incentives for this business
+                console.log("   Testing incentives API...");
+                const incentivesResponse = await fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${business._id}`);
+                if (incentivesResponse.ok) {
+                    const incentivesData = await incentivesResponse.json();
+                    console.log(`   ✅ Incentives API working: Found ${incentivesData.results?.length || 0} incentives`);
+                } else {
+                    console.log(`   ❌ Incentives API failed: ${incentivesResponse.status}`);
+                }
+            }
+        } else {
+            console.log(`   ❌ Business search API failed: ${response.status}`);
+        }
+    } catch (error) {
+        console.log(`   ❌ API test failed: ${error.message}`);
+    }
+}
+
+// Enhanced search test function
+window.testSpecificSearch = function(businessName, useLocation = false) {
+    console.log(`🧪 TESTING SEARCH: "${businessName}" (Location: ${useLocation ? 'Yes' : 'No'})`);
+
+    // Clear current state
+    clearMarkers();
+
+    // Create test form data
+    const formData = {
+        businessName: businessName,
+        address: '',
+        useMyLocation: useLocation
+    };
+
+    console.log("📝 Form data:", formData);
+
+    // Run the search
+    retrieveFromMongoDBFixed(formData)
+        .then(() => {
+            console.log("✅ Search completed");
+            // Run debug after search
+            setTimeout(debugBusinessSearch, 1000);
+        })
+        .catch(error => {
+            console.error("❌ Search failed:", error);
+        });
+};
+
+// Test incentives loading specifically
+window.testIncentivesLoading = function(businessId) {
+    console.log(`🎁 TESTING INCENTIVES LOADING: ${businessId}`);
+
+    // Check if element exists
+    const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+    if (!incentivesCell) {
+        console.error(`❌ Element not found: incentives-for-${businessId}`);
+        console.log("Available incentive elements:");
+        document.querySelectorAll('[id*="incentives-for"]').forEach(el => {
+            console.log(`   - ${el.id}`);
+        });
+        return;
+    }
+
+    console.log("✅ Found incentives element");
+
+    // Test the fetch
+    fetchBusinessIncentivesFixed(businessId);
+};
+
+// Monitor API calls
+window.monitorAPICalls = function() {
+    console.log("📡 MONITORING API CALLS...");
+
+    // Intercept fetch calls
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        const url = args[0];
+        if (url.includes('/api/')) {
+            console.log(`🌐 API CALL: ${url}`);
+        }
+
+        return originalFetch.apply(this, args)
+            .then(response => {
+                if (url.includes('/api/')) {
+                    console.log(`📡 API RESPONSE: ${url} - Status: ${response.status}`);
+                }
+                return response;
+            })
+            .catch(error => {
+                if (url.includes('/api/')) {
+                    console.error(`❌ API ERROR: ${url} - ${error.message}`);
+                }
+                throw error;
+            });
+    };
+
+    console.log("✅ API monitoring enabled");
+};
+
+// Quick fix test
+window.quickFixTest = function() {
+    console.log("🔧 RUNNING QUICK FIX TEST...");
+
+    // 1. Test with Home Depot search
+    console.log("1. Testing Home Depot search...");
+    testSpecificSearch("The Home Depot", false);
+
+    // 2. Wait and test location search
+    setTimeout(() => {
+        console.log("2. Testing location-based search...");
+        testSpecificSearch("The Home Depot", true);
+    }, 3000);
+
+    // 3. Monitor APIs
+    monitorAPICalls();
+};
+
+// Add visual debugging overlay
+window.addDebugOverlay = function() {
+    // Remove existing overlay
+    const existingOverlay = document.getElementById('debug-overlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
+
+    // Create debug overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'debug-overlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        z-index: 10000;
+        font-family: monospace;
+        font-size: 12px;
+        max-width: 300px;
+        max-height: 400px;
+        overflow-y: auto;
+    `;
+
+    overlay.innerHTML = `
+        <h4 style="margin: 0 0 10px 0; color: #4CAF50;">🔧 Debug Tools</h4>
+        <button onclick="debugBusinessSearch()" style="margin: 2px; padding: 5px 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Full Debug</button><br>
+        <button onclick="quickFixTest()" style="margin: 2px; padding: 5px 10px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">Quick Fix Test</button><br>
+        <button onclick="monitorAPICalls()" style="margin: 2px; padding: 5px 10px; background: #9C27B0; color: white; border: none; border-radius: 4px; cursor: pointer;">Monitor APIs</button><br>
+        <button onclick="clearMarkers(); console.clear();" style="margin: 2px; padding: 5px 10px; background: #F44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Clear All</button><br>
+        <button onclick="document.getElementById('debug-overlay').remove();" style="margin: 2px; padding: 5px 10px; background: #607D8B; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+        <hr style="margin: 10px 0; border: 1px solid #666;">
+        <div id="debug-status">Ready</div>
+    `;
+
+    document.body.appendChild(overlay);
+    console.log("🎛️ Debug overlay added - check top right corner");
+};
+
+// Auto-start debugging on page load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(() => {
+            console.log("🚀 Business Search Debugger loaded!");
+            console.log("Run debugBusinessSearch() to start debugging");
+            console.log("Run addDebugOverlay() to add visual debug tools");
+        }, 1000);
+    });
+} else {
+    console.log("🚀 Business Search Debugger loaded!");
+    console.log("Run debugBusinessSearch() to start debugging");
+    console.log("Run addDebugOverlay() to add visual debug tools");
+}
+
 // Export functions for global access
 if (typeof window !== 'undefined') {
-    window.retrieveFromMongoDB = retrieveFromMongoDB;
+    window.createBusinessMarker = createBusinessMarker;
+    window.createEnhancedBusinessMarkerFixed = createEnhancedBusinessMarkerFixed;
+    window.fetchBusinessIncentivesFixed = fetchBusinessIncentivesFixed;
+    window.addBusinessRowFixed = addBusinessRowFixed;
+    window.retrieveFromMongoDBFixed = retrieveFromMongoDBFixed;
+    window.displayBusinessesOnMapFixed = displayBusinessesOnMapFixed;
+    window.displaySearchResultsFixed = displaySearchResultsFixed;
+    window.fetchBusinessIncentives = fetchBusinessIncentivesFixed;
+    window.addBusinessRow = addBusinessRowFixed;
+    window.retrieveFromMongoDB = retrieveFromMongoDBFixed;
+    window.displayBusinessesOnMap = displayBusinessesOnMapFixed;
+    window.displaySearchResults = displaySearchResultsFixed;
     window.supplementWithGooglePlaces = supplementWithGooglePlaces;
-    window.fetchBusinessIncentives = fetchBusinessIncentives;
-    window.addBusinessRow = addBusinessRow;
     window.createBusinessMarker = createBusinessMarker;
     window.searchDatabaseWithFuzzyMatching = searchDatabaseWithFuzzyMatching;
     window.hasValidCoordinates = hasValidCoordinates;
-    window.displayBusinessesOnMap = displayBusinessesOnMap;
     window.checkForNewlyAddedBusiness = checkForNewlyAddedBusiness;
     window.updateLoadingMessage = updateLoadingMessage;
     window.hideLoadingIndicator = hideLoadingIndicator;
     window.showNoResultsMessage = showNoResultsMessage;
     window.showErrorMessage = showErrorMessage;
-    window.displaySearchResults = displaySearchResults;
     window.addEnhancedLoadingCSS = addEnhancedLoadingCSS;
     window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResult;
     window.calculateSimilarity = calculateSimilarity;
