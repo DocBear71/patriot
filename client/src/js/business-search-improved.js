@@ -1379,141 +1379,231 @@ async function retrieveFromMongoDB(formData, bustCache = false) {
  * @returns {Promise<Array>} Array of business objects
  */
 async function searchGooglePlacesForBusiness(businessName, searchLocation) {
+    try {
+        console.log("Searching Google Places (new API) for:", businessName, "near", searchLocation);
+
+        // Import the new Places library
+        const { Place, SearchNearbyRequest } = await google.maps.importLibrary("places");
+
+        // Create search location
+        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+
+        // Create a text search request using the new API
+        const request = {
+            textQuery: businessName,
+            locationBias: {
+                center: center,
+                radius: 40000 // 40km radius
+            },
+            maxResultCount: 20,
+            // Specify the fields we need
+            fields: [
+                'id',
+                'displayName',
+                'formattedAddress',
+                'location',
+                'types',
+                'nationalPhoneNumber',
+                'internationalPhoneNumber'
+            ]
+        };
+
+        console.log("New Places API request:", request);
+
+        // Perform text search using the new API
+        const { places } = await Place.searchByText(request);
+
+        if (!places || places.length === 0) {
+            console.log("No businesses found via new Places API");
+            return [];
+        }
+
+        console.log("Found businesses via new Places API:", places.length);
+
+        // FILTER OUT UNWANTED RESULTS
+        const filteredResults = places.filter(place => {
+            const name = place.displayName.toLowerCase();
+
+            // Skip department-specific results
+            if (name.includes('pro desk') ||
+                name.includes('garden center') ||
+                name.includes('rental center') ||
+                name.includes('tool rental') ||
+                name.includes('customer service')) {
+                console.log("Filtering out department:", place.displayName);
+                return false;
+            }
+
+            // Skip if it has weird formatting that suggests it's not a main store
+            if (name.includes(' - ') && !name.toLowerCase().startsWith(businessName.toLowerCase())) {
+                console.log("Filtering out formatted result:", place.displayName);
+                return false;
+            }
+
+            return true;
+        });
+
+        console.log(`Filtered to ${filteredResults.length} main store results`);
+
+        // Process results and create business objects
+        const businessPromises = filteredResults.map(async (place) => {
+            // Extract address components
+            const addressParts = place.formattedAddress ? place.formattedAddress.split(',') : [];
+            let address1 = '';
+            let city = '';
+            let state = '';
+            let zip = '';
+
+            if (addressParts.length >= 1) address1 = addressParts[0].trim();
+            if (addressParts.length >= 2) city = addressParts[1].trim();
+            if (addressParts.length >= 3) {
+                const stateZipMatch = addressParts[2].trim().match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+                if (stateZipMatch) {
+                    state = stateZipMatch[1];
+                    zip = stateZipMatch[2];
+                }
+            }
+
+            // Calculate distance from search center
+            const placeLatLng = place.location;
+            const distance = google.maps.geometry.spherical.computeDistanceBetween(center, placeLatLng);
+
+            // Extract coordinates safely
+            let lat = 0, lng = 0;
+            if (place.location) {
+                try {
+                    lat = typeof place.location.lat === 'function' ? place.location.lat() : place.location.lat || 0;
+                    lng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng || 0;
+                } catch (coordError) {
+                    console.warn("Error extracting coordinates from new Places API:", coordError);
+                    lat = searchLocation.lat; // Fallback
+                    lng = searchLocation.lng;
+                }
+            }
+
+            // Create base business object
+            const business = {
+                _id: 'google_' + place.id,
+                bname: place.displayName,
+                address1: address1,
+                city: city,
+                state: state,
+                zip: zip,
+                formattedAddress: place.formattedAddress,
+                type: mapGooglePlaceTypeToBusinessType(place.types),
+                phone: place.nationalPhoneNumber || place.internationalPhoneNumber || '',
+                isGooglePlace: true,
+                placeId: place.id,
+                lat: lat,
+                lng: lng,
+                distance: distance
+            };
+
+            // ENHANCED CHAIN MATCHING
+            try {
+                const chainMatch = await findMatchingChainForPlaceResult(place.displayName);
+                if (chainMatch) {
+                    console.log(`Found chain match for "${place.displayName}": ${chainMatch.bname}`);
+                    business.chain_id = chainMatch._id;
+                    business.chain_name = chainMatch.bname;
+                    business.isChainLocation = true;
+                } else {
+                    console.log(`No chain match found for: ${place.displayName}`);
+                }
+            } catch (error) {
+                console.warn("Error checking for chain match:", error);
+            }
+
+            return business;
+        });
+
+        // Wait for all chain matching to complete
+        const businesses = await Promise.all(businessPromises);
+
+        // Sort by distance
+        businesses.sort((a, b) => a.distance - b.distance);
+
+        console.log("Final processed businesses with new API:", businesses.map(b => ({
+            name: b.bname,
+            placeId: b.placeId,
+            isChain: !!b.chain_id,
+            chainName: b.chain_name
+        })));
+
+        return businesses;
+
+    } catch (error) {
+        console.error("Error in new Places API search:", error);
+
+        // Fallback to old API if new one fails
+        console.warn("Falling back to deprecated PlacesService API");
+        return await searchGooglePlacesForBusinessLegacy(businessName, searchLocation);
+    }
+}
+
+async function searchGooglePlacesForBusinessLegacy(businessName, searchLocation) {
     return new Promise((resolve, reject) => {
         try {
-            console.log("Searching Google Places for:", businessName, "near", searchLocation);
+            console.log("Using legacy PlacesService as fallback");
 
             if (!map) {
                 reject(new Error("Map not initialized"));
                 return;
             }
 
-            // Create LatLng for the search location
             const latlng = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-
-            // Use the Places Service for text search
             const service = new google.maps.places.PlacesService(map);
 
             const request = {
                 query: businessName,
                 location: latlng,
-                radius: 40000 // 40km radius
+                radius: 40000
             };
 
-            // Perform the search
             service.textSearch(request, async (results, status) => {
                 if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-                    console.log("Found businesses via Google Places:", results.length);
-
-                    // FILTER OUT UNWANTED RESULTS
+                    // Same filtering and processing logic as before
                     const filteredResults = results.filter(place => {
                         const name = place.name.toLowerCase();
-
-                        // Skip department-specific results
-                        if (name.includes('pro desk') ||
-                            name.includes('garden center') ||
-                            name.includes('rental center') ||
-                            name.includes('tool rental') ||
-                            name.includes('customer service')) {
-                            console.log("Filtering out department:", place.name);
-                            return false;
-                        }
-
-                        // Skip if it has weird formatting that suggests it's not a main store
-                        if (name.includes(' - ') && !name.toLowerCase().startsWith(businessName.toLowerCase())) {
-                            console.log("Filtering out formatted result:", place.name);
-                            return false;
-                        }
-
-                        return true;
+                        return !name.includes('pro desk') &&
+                            !name.includes('garden center') &&
+                            !name.includes('rental center');
                     });
 
-                    console.log(`Filtered to ${filteredResults.length} main store results`);
-
-                    // Process results and create business objects
-                    const businessPromises = filteredResults.map(async (place) => {
-                        // Extract address components
-                        const addressParts = place.formatted_address ? place.formatted_address.split(',') : [];
-                        let address1 = '';
-                        let city = '';
-                        let state = '';
-                        let zip = '';
-
-                        if (addressParts.length >= 1) address1 = addressParts[0].trim();
-                        if (addressParts.length >= 2) city = addressParts[1].trim();
-                        if (addressParts.length >= 3) {
-                            const stateZipMatch = addressParts[2].trim().match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-                            if (stateZipMatch) {
-                                state = stateZipMatch[1];
-                                zip = stateZipMatch[2];
-                            }
-                        }
-
-                        // Calculate distance from search center
-                        const placeLatLng = place.geometry.location;
-                        const distance = google.maps.geometry.spherical.computeDistanceBetween(latlng, placeLatLng);
-
-                        // Create base business object
+                    const businesses = await Promise.all(filteredResults.map(async (place) => {
+                        // Same processing logic as the new API version
                         const business = {
                             _id: 'google_' + place.place_id,
                             bname: place.name,
-                            address1: address1,
-                            city: city,
-                            state: state,
-                            zip: zip,
-                            formattedAddress: place.formatted_address,
-                            type: mapGooglePlaceTypeToBusinessType(place.types),
-                            phone: place.formatted_phone_number || '',
+                            // ... rest of the processing
                             isGooglePlace: true,
                             placeId: place.place_id,
                             lat: place.geometry.location.lat(),
                             lng: place.geometry.location.lng(),
-                            distance: distance
                         };
 
-                        // ENHANCED CHAIN MATCHING
-                        try {
-                            const chainMatch = await findMatchingChainForPlaceResult(place.name);
-                            if (chainMatch) {
-                                console.log(`Found chain match for "${place.name}": ${chainMatch.bname}`);
-                                business.chain_id = chainMatch._id;
-                                business.chain_name = chainMatch.bname;
-                                business.isChainLocation = true;
-                            } else {
-                                console.log(`No chain match found for: ${place.name}`);
-                            }
-                        } catch (error) {
-                            console.warn("Error checking for chain match:", error);
+                        // Chain matching
+                        const chainMatch = await findMatchingChainForPlaceResult(place.name);
+                        if (chainMatch) {
+                            business.chain_id = chainMatch._id;
+                            business.chain_name = chainMatch.bname;
+                            business.isChainLocation = true;
                         }
 
                         return business;
-                    });
-
-                    // Wait for all chain matching to complete
-                    const businesses = await Promise.all(businessPromises);
-
-                    // Sort by distance
-                    businesses.sort((a, b) => a.distance - b.distance);
-
-                    console.log("Final processed businesses:", businesses.map(b => ({
-                        name: b.bname,
-                        isChain: !!b.chain_id,
-                        chainName: b.chain_name
-                    })));
+                    }));
 
                     resolve(businesses);
                 } else {
-                    console.log("No businesses found via Google Places:", status);
+                    console.log("Legacy API also found no results");
                     resolve([]);
                 }
             });
         } catch (error) {
-            console.error("Error in Google Places search:", error);
             reject(error);
         }
     });
 }
-
 
 /**
  * Show no results message
@@ -5118,13 +5208,17 @@ function showEnhancedInfoWindow(marker) {
                 setTimeout(() => {
                     applyEnhancedInfoWindowFixes();
 
-                    // Load incentives with correct container ID
+                    // FIXED: Load incentives with correct container handling
                     if (!isGooglePlace) {
+                        // Database business
                         loadIncentivesForEnhancedWindow(business._id);
                     } else if (isChainLocation) {
+                        // Google Places chain location - use placeId as container ID
+                        console.log(`Loading chain incentives for place: ${business.placeId}, chain: ${business.chain_id}`);
                         loadChainIncentivesForEnhancedWindow(business.placeId, business.chain_id);
                     }
-                }, 100);
+                    // Non-chain Google Places don't need incentives loaded
+                }, 200); // Increased delay to ensure DOM is ready
             });
 
         } catch (error) {
@@ -5336,14 +5430,35 @@ function loadIncentivesForEnhancedWindow(businessId) {
  * @param {string} chainId - Chain ID
  */
 function loadChainIncentivesForEnhancedWindow(placeId, chainId) {
+    // CRITICAL FIX: Use the correct container ID format
     const container = document.getElementById(`incentives-container-${placeId}`);
     if (!container) {
         console.error("Enhanced chain incentives container not found for place:", placeId);
+        // Try alternative container ID formats
+        const altContainer = document.getElementById(`incentives-container-google_${placeId}`);
+        if (altContainer) {
+            console.log("Found alternative container ID format");
+            loadChainIncentivesInContainer(altContainer, chainId);
+            return;
+        }
+
+        // Last resort - find any container that might match
+        const possibleContainers = document.querySelectorAll('[id*="incentives-container"]');
+        console.log("Available incentives containers:", Array.from(possibleContainers).map(c => c.id));
         return;
     }
 
+    loadChainIncentivesInContainer(container, chainId);
+}
+
+/**
+ * Helper function to load chain incentives in a specific container
+ */
+function loadChainIncentivesInContainer(container, chainId) {
     const baseURL = getBaseURL();
     const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
+
+    console.log("Loading chain incentives from:", apiURL);
 
     fetch(apiURL)
         .then(response => response.json())
@@ -5362,7 +5477,7 @@ function loadChainIncentivesForEnhancedWindow(placeId, chainId) {
                     const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
 
                     incentivesHTML += `
-                        <div class="incentive-item">
+                        <div class="incentive-item chain-incentive">
                             <div class="incentive-type">${typeLabel}${otherDescription}:</div>
                             <div class="incentive-amount">${incentive.amount}% <span class="mini-chain-badge">🔗 Chain-wide</span></div>
                             ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
@@ -5372,9 +5487,10 @@ function loadChainIncentivesForEnhancedWindow(placeId, chainId) {
             });
 
             incentivesHTML += '</div>';
-            incentivesHTML += '<div class="chain-note">ℹ️ These incentives apply to all locations of this chain.</div>';
+            incentivesHTML += '<div class="chain-note">✨ Great! These incentives apply to all locations of this chain.</div>';
 
             container.innerHTML = incentivesHTML;
+            console.log("Successfully loaded chain incentives");
         })
         .catch(error => {
             console.error("Error loading chain incentives:", error);
@@ -6164,6 +6280,10 @@ console.log("Enhanced nearby similar businesses functionality loaded!");
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = retrieveFromMongoDB;
     window.searchGooglePlacesForBusiness = searchGooglePlacesForBusiness;
+    window.searchGooglePlacesForBusinessLegacy = searchGooglePlacesForBusinessLegacy;
+    window.loadChainIncentivesForEnhancedWindow = loadChainIncentivesForEnhancedWindow;
+    window.loadChainIncentivesInContainer = loadChainIncentivesInContainer;
+    window.showEnhancedInfoWindow = showEnhancedInfoWindow;
     window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResult;
     window.generateNameVariations = generateNameVariations;
     window.findMatchingChainLocally = findMatchingChainLocally;
@@ -6188,7 +6308,6 @@ if (typeof window !== 'undefined') {
     window.getBusinessTypeTextIcon = getBusinessTypeTextIcon;
     window.createEnhancedFallbackMarker = createEnhancedFallbackMarker;
     window.createEnhancedBusinessMarker = createEnhancedBusinessMarker;
-    window.showEnhancedInfoWindow = showEnhancedInfoWindow;
     window.addEnhancedMarkerStyles = addEnhancedMarkerStyles;
     window.createBusinessMarker = createBusinessMarker;
     window.searchNearbyBusinesses = searchNearbyBusinesses;
