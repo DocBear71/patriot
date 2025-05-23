@@ -3750,42 +3750,6 @@ function fetchChainIncentivesForPlacesResult(placeId, chainId) {
 }
 
 /**
- * Get business type text icon (emoji version)
- * @param {string} businessType - Business type code
- * @returns {string} Emoji icon
- */
-function getBusinessTypeTextIcon(businessType) {
-    const iconMap = {
-        'AUTO': '🚗',
-        'BEAU': '💇',
-        'BOOK': '📚',
-        'CLTH': '👕',
-        'CONV': '🏪',
-        'DEPT': '🛍️',
-        'ELEC': '⚡',
-        'ENTR': '🎬',
-        'FURN': '🪑',
-        'FUEL': '⛽',
-        'GIFT': '🎁',
-        'GROC': '🛒',
-        'HARDW': '🔨',
-        'HEAL': '❤️',
-        'JEWL': '💎',
-        'OTHER': '🏬',
-        'RX': '💊',
-        'REST': '🍽️',
-        'RETAIL': '🛍️',
-        'SERV': '🔧',
-        'SPEC': '⭐',
-        'SPRT': '🏈',
-        'TECH': '💻',
-        'TOYS': '🎮'
-    };
-
-    return `<span style="font-size: 16px; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${iconMap[businessType] || '🏬'}</span>`;
-}
-
-/**
  * Enhanced fallback marker creation
  * @param {Object} business - Business object
  * @param {Object} location - Location object
@@ -4856,108 +4820,6 @@ function createSimilarBusinessMarker(business, position) {
 }
 
 /**
- * Update the enhanced marker creation to support forced nearby styling
- * @param {Object} business - Business object
- * @param {Object} location - Google Maps location object
- * @param {boolean} forceNearby - Force blue/nearby styling
- */
-async function createEnhancedBusinessMarker(business, location, forceNearby = false) {
-    try {
-        // Import the marker library
-        const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
-
-        // Create a position object from the location
-        let position = createSafeLatLng(location);
-        if (!position) {
-            console.error("Invalid position for enhanced marker:", location);
-            return createEnhancedFallbackMarker(business, location);
-        }
-
-        // Determine marker styling
-        const isFromDatabase = !business.isGooglePlace;
-        const isNearby = forceNearby || business.isNearby === true || business.isSimilarBusiness === true;
-
-        // Choose marker color and style
-        let markerColor, markerClass;
-        if (isNearby || business.isSimilarBusiness) {
-            markerColor = CONFIG.markerColors.nearby; // Blue for nearby/similar businesses
-            markerClass = "nearby";
-        } else if (isFromDatabase) {
-            markerColor = CONFIG.markerColors.primary; // Red for primary search results
-            markerClass = "primary";
-        } else {
-            markerColor = CONFIG.markerColors.nearby; // Blue for Google Places
-            markerClass = "nearby";
-        }
-
-        // Get business icon
-        const businessIcon = getBusinessTypeTextIcon(business.type);
-
-        // Create enhanced pin element
-        const pinElement = document.createElement('div');
-        pinElement.className = 'enhanced-custom-marker';
-        pinElement.setAttribute('title', business.bname);
-        pinElement.style.cursor = 'pointer';
-
-        // Enhanced marker HTML with better styling
-        pinElement.innerHTML = `
-            <div class="enhanced-marker-container">
-                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor};">
-                    <div class="enhanced-marker-icon">
-                        ${businessIcon}
-                    </div>
-                </div>
-                <div class="enhanced-marker-shadow"></div>
-                ${business.chain_id ? '<div class="chain-indicator">⭐</div>' : ''}
-                ${business.isSimilarBusiness ? '<div class="similar-indicator">≈</div>' : ''}
-            </div>
-        `;
-
-        // Create the advanced marker
-        const marker = new AdvancedMarkerElement({
-            position: position,
-            map: map,
-            title: business.bname,
-            content: pinElement,
-            collisionBehavior: isFromDatabase ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
-        });
-
-        // Store the business data and position
-        marker.business = business;
-        marker.position = position;
-        marker.isFromDatabase = isFromDatabase;
-        marker.isSimilarBusiness = business.isSimilarBusiness || forceNearby;
-
-        // Add click event listener
-        pinElement.addEventListener('click', function (e) {
-            console.log("Enhanced similar business marker clicked:", business.bname);
-            e.stopPropagation();
-            showEnhancedInfoWindow(marker);
-        });
-
-        // Add hover effects
-        pinElement.addEventListener('mouseenter', function () {
-            pinElement.style.transform = 'scale(1.1)';
-            pinElement.style.zIndex = '1000';
-        });
-
-        pinElement.addEventListener('mouseleave', function () {
-            pinElement.style.transform = 'scale(1)';
-            pinElement.style.zIndex = 'auto';
-        });
-
-        // Add the marker to our array
-        markers.push(marker);
-        console.log(`Added enhanced ${business.isSimilarBusiness ? 'similar business' : ''} marker for ${business.bname}`);
-
-        return marker;
-    } catch (error) {
-        console.error("Error creating enhanced marker:", error);
-        return createEnhancedFallbackMarker(business, location);
-    }
-}
-
-/**
  * Enhanced chain database with comprehensive name variations
  * This should eventually be moved to your database, but for now we'll handle it client-side
  */
@@ -5746,13 +5608,122 @@ function addBusinessRow(business, tableBody, isFromPlaces) {
 }
 
 /**
- * Enhanced createBusinessMarker to ensure database businesses get red markers
+ * Update the enhanced marker creation to support forced nearby styling
+ * @param {Object} business - Business object
+ * @param {Object} location - Google Maps location object
+ * @param forceCategory
+ */
+async function createEnhancedBusinessMarker(business, location, forceCategory = null) {
+    try {
+        // Import the marker library
+        const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
+
+        // Create a position object from the location
+        let position = createSafeLatLng(location);
+        if (!position) {
+            console.error("❌ Invalid position for enhanced marker:", location);
+            return createFallbackMarker(business, location);
+        }
+
+        // Determine marker styling based on business properties or forced category
+        const isFromDatabase = forceCategory === 'database' || (!business.isGooglePlace && !business._id?.startsWith('google_'));
+        const isChainLocation = !!business.chain_id;
+
+        // Choose marker color and style based on priority/category
+        let markerColor, markerClass, logMessage;
+
+        if (business.markerColor) {
+            // Use predefined marker color from categorization
+            markerColor = CONFIG.markerColors[business.markerColor];
+            markerClass = business.markerColor;
+            logMessage = `🎯 Using predefined color: ${business.markerColor} for ${business.bname}`;
+        } else if (forceCategory === 'database' || isFromDatabase) {
+            markerColor = CONFIG.markerColors.primary; // RED for database businesses
+            markerClass = 'primary database-business';
+            logMessage = `🔴 RED MARKER: ${business.bname} (Database business)`;
+        } else {
+            markerColor = CONFIG.markerColors.nearby; // BLUE for Google Places
+            markerClass = 'nearby google-places';
+            logMessage = `🔵 BLUE MARKER: ${business.bname} (Google Places)`;
+        }
+
+        console.log(logMessage);
+
+        // Get business icon
+        const businessIcon = getBusinessTypeTextIcon(business.type || 'OTHER');
+
+        // Create enhanced pin element
+        const pinElement = document.createElement('div');
+        pinElement.className = 'enhanced-custom-marker';
+        pinElement.setAttribute('title', business.bname);
+        pinElement.style.cursor = 'pointer';
+
+        // Enhanced marker HTML with proper styling
+        pinElement.innerHTML = `
+            <div class="enhanced-marker-container">
+                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor} !important; border: 3px solid #ffffff;">
+                    <div class="enhanced-marker-icon">
+                        ${businessIcon}
+                    </div>
+                </div>
+                <div class="enhanced-marker-shadow"></div>
+                ${isChainLocation ? '<div class="chain-indicator">🔗</div>' : ''}
+                ${isFromDatabase ? '<div class="database-indicator">✓</div>' : ''}
+            </div>
+        `;
+
+        // Create the advanced marker
+        const marker = new AdvancedMarkerElement({
+            position: position,
+            map: map,
+            title: business.bname,
+            content: pinElement,
+            collisionBehavior: isFromDatabase ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
+        });
+
+        // Store the business data and flags
+        marker.business = business;
+        marker.position = position;
+        marker.isFromDatabase = isFromDatabase;
+
+        // Add click event listener
+        pinElement.addEventListener('click', function (e) {
+            console.log(`🖱️ Marker clicked: ${business.bname} (${markerClass})`);
+            e.stopPropagation();
+            showEnhancedInfoWindow(marker);
+        });
+
+        // Add hover effects
+        pinElement.addEventListener('mouseenter', function () {
+            pinElement.style.transform = 'scale(1.1)';
+            pinElement.style.zIndex = '1000';
+        });
+
+        pinElement.addEventListener('mouseleave', function () {
+            pinElement.style.transform = 'scale(1)';
+            pinElement.style.zIndex = 'auto';
+        });
+
+        // Add the marker to our array
+        markers.push(marker);
+        console.log(`✅ Added ${markerClass.toUpperCase()} marker for ${business.bname}`);
+
+        return marker;
+    } catch (error) {
+        console.error("❌ Error creating enhanced marker:", error);
+        return createFallbackMarker(business, location);
+    }
+}
+
+/**
+ * FIXED: Updated createBusinessMarker function
  */
 function createBusinessMarker(business) {
     try {
         console.log(`🔍 MARKER DEBUG: Creating marker for ${business.bname}`);
         console.log(`   - isGooglePlace: ${business.isGooglePlace}`);
         console.log(`   - _id: ${business._id}`);
+        console.log(`   - markerColor: ${business.markerColor}`);
         console.log(`   - Source: ${business._id?.startsWith('google_') ? 'GOOGLE PLACES' : 'DATABASE'}`);
 
         // Validate coordinates
@@ -5768,7 +5739,7 @@ function createBusinessMarker(business) {
             parseFloat(business.lng)
         );
 
-        // CRITICAL FIX: Properly determine if this is a database business
+        // Determine if this is a database business
         const isFromDatabase = !business.isGooglePlace && !business._id?.startsWith('google_');
 
         // Set proper flags on business object
@@ -5777,8 +5748,8 @@ function createBusinessMarker(business) {
 
         console.log(`🏷️ FINAL DETERMINATION: ${business.bname} → ${isFromDatabase ? 'DATABASE (RED MARKER)' : 'GOOGLE PLACES (BLUE MARKER)'}`);
 
-        // Use enhanced marker creation with explicit color forcing
-        const marker = createEnhancedBusinessMarkerFixed(business, position, isFromDatabase);
+        // FIXED: Use the correct enhanced marker creation function
+        const marker = createEnhancedBusinessMarker(business, position, isFromDatabase ? 'database' : 'places');
 
         // Add to bounds if successful
         if (marker && bounds) {
@@ -5791,6 +5762,106 @@ function createBusinessMarker(business) {
         return null;
     }
 }
+
+/**
+ * Fallback marker creation for when advanced markers fail
+ */
+function createFallbackMarker(business, location) {
+    try {
+        console.log("Creating fallback marker for:", business.bname);
+
+        let position = createSafeLatLng(location);
+        if (!position && business.lat && business.lng) {
+            position = new google.maps.LatLng(
+                parseFloat(business.lat),
+                parseFloat(business.lng)
+            );
+        }
+
+        if (!position) {
+            console.error("Invalid location for fallback marker:", location);
+            return null;
+        }
+
+        // Determine marker styling
+        const isFromDatabase = !business.isGooglePlace;
+        const markerColor = isFromDatabase ? CONFIG.markerColors.primary : CONFIG.markerColors.nearby;
+
+        // Create a standard marker with custom icon
+        const marker = new google.maps.Marker({
+            position: position,
+            map: map,
+            title: business.bname,
+            icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: markerColor,
+                fillOpacity: 0.9,
+                strokeWeight: 2,
+                strokeColor: '#FFFFFF',
+                scale: isFromDatabase ? 14 : 12
+            },
+            animation: google.maps.Animation.DROP,
+            zIndex: isFromDatabase ? 1000 : 100
+        });
+
+        // Store the business data
+        marker.business = business;
+        marker.position = position;
+        marker.isFromDatabase = isFromDatabase;
+
+        // Add click event listener
+        marker.addListener('click', function () {
+            console.log("Fallback marker clicked:", business.bname);
+            showEnhancedInfoWindow(marker);
+        });
+
+        // Add the marker to our array
+        markers.push(marker);
+        console.log(`✅ Added fallback marker for ${business.bname}`);
+
+        return marker;
+    } catch (error) {
+        console.error("Error creating fallback marker:", error);
+        return null;
+    }
+}
+
+/**
+ * Get business type text icon (emoji version)
+ * @param {string} businessType - Business type code
+ * @returns {string} Emoji icon
+ */
+function getBusinessTypeTextIcon(businessType) {
+    const iconMap = {
+        'AUTO': '🚗',
+        'BEAU': '💇',
+        'BOOK': '📚',
+        'CLTH': '👕',
+        'CONV': '🏪',
+        'DEPT': '🛍️',
+        'ELEC': '⚡',
+        'ENTR': '🎬',
+        'FURN': '🪑',
+        'FUEL': '⛽',
+        'GIFT': '🎁',
+        'GROC': '🛒',
+        'HARDW': '🔨',
+        'HEAL': '❤️',
+        'JEWL': '💎',
+        'OTHER': '🏬',
+        'RX': '💊',
+        'REST': '🍽️',
+        'RETAIL': '🛍️',
+        'SERV': '🔧',
+        'SPEC': '⭐',
+        'SPRT': '🏈',
+        'TECH': '💻',
+        'TOYS': '🎮'
+    };
+
+    return `<span style="font-size: 16px; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${iconMap[businessType] || '🏬'}</span>`;
+}
+
 
 function fetchBusinessIncentivesFixed(businessId, chainId = null) {
     if (!businessId || businessId.startsWith('google_')) {
@@ -8532,6 +8603,10 @@ if (typeof window !== 'undefined') {
     // Export only the final working functions
     window.performEnhancedBusinessSearch = performEnhancedBusinessSearch;
     window.retrieveFromMongoDB = performEnhancedBusinessSearch;
+    window.createEnhancedBusinessMarker = createEnhancedBusinessMarker;
+    window.createBusinessMarker = createBusinessMarker;
+    window.createFallbackMarker = createFallbackMarker;
+    window.getBusinessTypeTextIcon = getBusinessTypeTextIcon;
     window.searchGooglePlacesForBusinessEnhanced = searchGooglePlacesForBusinessEnhanced;
     window.searchNearbyDatabaseBusinessesEnhanced = searchNearbyDatabaseBusinessesEnhanced;
     window.categorizeResultsWithFixedDuplicateDetection = categorizeResultsWithFixedDuplicateDetection;
@@ -8581,13 +8656,11 @@ if (typeof window !== 'undefined') {
     window.loadChainIncentivesForEnhancedWindow = loadChainIncentivesForEnhancedWindowFixed;
     window.loadIncentivesForEnhancedWindow = loadIncentivesForEnhancedWindowFixed;
     window.loadChainIncentivesForDatabaseBusiness = loadChainIncentivesForDatabaseBusinessFixed;
-    window.createBusinessMarker = createBusinessMarker;
     window.fetchBusinessIncentivesFixed = fetchBusinessIncentivesFixed;
     window.addBusinessRowFixed = addBusinessRowFixed;
     window.fetchBusinessIncentives = fetchBusinessIncentivesFixed;
     window.addBusinessRow = addBusinessRowFixed;
     window.supplementWithGooglePlaces = supplementWithGooglePlaces;
-    window.createBusinessMarker = createBusinessMarker;
     window.searchDatabaseWithFuzzyMatching = searchDatabaseWithFuzzyMatching;
     window.hasValidCoordinates = hasValidCoordinates;
     window.checkForNewlyAddedBusiness = checkForNewlyAddedBusiness;
@@ -8615,13 +8688,10 @@ if (typeof window !== 'undefined') {
     window.safeExtractCoordinates = safeExtractCoordinates;
     window.showInfoWindow = showInfoWindow;
     window.withErrorHandling = withErrorHandling;
-    window.createEnhancedBusinessMarker = createEnhancedBusinessMarker;
     window.showEnhancedInfoWindow = showEnhancedInfoWindow;
     window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
     window.addEnhancedMarkerStyles = addEnhancedMarkerStyles;
-    window.getBusinessTypeTextIcon = getBusinessTypeTextIcon;
     window.createEnhancedFallbackMarker = createEnhancedFallbackMarker;
-    window.createEnhancedBusinessMarker = createEnhancedBusinessMarker;
     window.addEnhancedMarkerStyles = addEnhancedMarkerStyles;
     window.searchNearbyBusinesses = searchNearbyBusinesses;
     window.getSimilarBusinessTypes = getSimilarBusinessTypes;
