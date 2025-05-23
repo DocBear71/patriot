@@ -11743,13 +11743,343 @@ async function testOliveGardenLasVegas() {
     }
 }
 
-console.log("🚀 Enhanced Places search loaded!");
-console.log("🧪 Run testOliveGardenLasVegas() to test the fix");
-console.log("🔍 Run debugLasVegasOliveGardenSearch() for detailed debugging");
+/**
+ * FIXED: Enhanced duplicate detection that doesn't treat chain locations as duplicates
+ * This fixes the issue where multiple Olive Garden locations were being filtered out
+ */
+
+/**
+ * FIXED: Create better address key that includes specific address details
+ */
+function createEnhancedAddressKey(business) {
+    const parts = [];
+
+    // Include street address as primary identifier
+    if (business.address1) {
+        parts.push(business.address1.toLowerCase().trim());
+    }
+
+    // Include city and state for additional uniqueness
+    if (business.city) parts.push(business.city.toLowerCase().trim());
+    if (business.state) parts.push(business.state.toLowerCase().trim());
+
+    // For Google Places, also include the place ID to ensure uniqueness
+    if (business.placeId) {
+        parts.push(`place_${business.placeId}`);
+    }
+
+    // For database businesses, include the database ID
+    if (business._id && !business._id.startsWith('google_')) {
+        parts.push(`db_${business._id}`);
+    }
+
+    const key = parts.join('|');
+    console.log(`🔑 ADDRESS KEY for ${business.bname}: ${key}`);
+    return key;
+}
+
+/**
+ * FIXED: Better business name comparison that allows chain locations
+ */
+function createBusinessNameKey(business) {
+    // For chain businesses, include address in the name key to allow multiple locations
+    if (business.isChainLocation || business.chain_id) {
+        const addressPart = business.address1 ? business.address1.toLowerCase().replace(/\d+/g, '').trim() : '';
+        const nameKey = `${business.bname.toLowerCase().trim()}_${addressPart}`;
+        console.log(`🏪 CHAIN NAME KEY for ${business.bname}: ${nameKey}`);
+        return nameKey;
+    }
+
+    // For non-chain businesses, use just the name
+    const nameKey = business.bname.toLowerCase().trim();
+    console.log(`🏢 REGULAR NAME KEY for ${business.bname}: ${nameKey}`);
+    return nameKey;
+}
+
+/**
+ * FIXED: Enhanced categorization that properly handles chain locations
+ */
+function categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResults, nearbyDatabaseBusinesses) {
+    console.log("🔄 FIXED CATEGORIZATION - Properly handling chain locations:");
+
+    // Start with primary results (highest priority - RED markers)
+    const finalPrimaryResults = [...primaryResults];
+    const usedAddresses = new Set();
+    const usedBusinessNames = new Set();
+
+    // Track primary result addresses with enhanced keys
+    finalPrimaryResults.forEach(business => {
+        const addressKey = createEnhancedAddressKey(business);
+        const nameKey = createBusinessNameKey(business);
+        usedAddresses.add(addressKey);
+        usedBusinessNames.add(nameKey);
+        console.log(`🔴 PRIMARY: ${business.bname} - Address: ${addressKey} - Name: ${nameKey}`);
+    });
+
+    // FIXED: Google Places results with better duplicate detection
+    const finalPlacesResults = placesResults.filter((business, index) => {
+        const addressKey = createEnhancedAddressKey(business);
+        const nameKey = createBusinessNameKey(business);
+
+        console.log(`🔍 CHECKING PLACES #${index + 1}: ${business.bname}`);
+        console.log(`   Address Key: ${addressKey}`);
+        console.log(`   Name Key: ${nameKey}`);
+
+        // Check for address duplicates (actual duplicates)
+        if (usedAddresses.has(addressKey)) {
+            console.log(`🚫 PLACES DUPLICATE: ${business.bname} (same address: ${addressKey})`);
+            return false;
+        }
+
+        // FIXED: For chain locations, only exclude if exact same name AND address
+        if (usedBusinessNames.has(nameKey)) {
+            console.log(`🚫 PLACES DUPLICATE: ${business.bname} (same name+address combination: ${nameKey})`);
+            return false;
+        }
+
+        // This is a unique location
+        usedAddresses.add(addressKey);
+        usedBusinessNames.add(nameKey);
+        console.log(`🔵 PLACES ACCEPTED: ${business.bname} at ${business.address1}`);
+        return true;
+    });
+
+    // FIXED: Nearby database businesses with same logic
+    const finalNearbyResults = nearbyDatabaseBusinesses.filter(business => {
+        const addressKey = createEnhancedAddressKey(business);
+        const nameKey = createBusinessNameKey(business);
+
+        if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
+            console.log(`🚫 NEARBY DUPLICATE: ${business.bname} (already processed)`);
+            return false;
+        }
+
+        console.log(`🟢 NEARBY ACCEPTED: ${business.bname} at ${business.address1}`);
+        return true;
+    });
+
+    console.log(`📊 FIXED CATEGORIZATION RESULTS:`);
+    console.log(`   🔴 Primary: ${finalPrimaryResults.length}`);
+    console.log(`   🔵 Places: ${finalPlacesResults.length} (was ${placesResults.length})`);
+    console.log(`   🟢 Nearby: ${finalNearbyResults.length}`);
+
+    return {
+        finalPrimaryResults,
+        finalPlacesResults,
+        finalNearbyResults
+    };
+}
+
+/**
+ * FIXED: Enhanced search function with better duplicate detection
+ */
+async function performEnhancedBusinessSearchWithFixedDuplicates(formData, bustCache = false) {
+    try {
+        console.log("🔍 FIXED SEARCH: Starting search with proper chain location handling:", formData);
+
+        // Show loading indicator
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading"><div class="loading-text">Searching for businesses...</div><div class="loading-spinner"></div></div>';
+            resultsContainer.style.display = 'block';
+        }
+
+        // Process search location (same as before)
+        let searchLocation = null;
+        let searchRadius = 30;
+
+        if (formData.useMyLocation) {
+            try {
+                updateLoadingMessage("Getting your location...");
+                searchLocation = await getUserLocation();
+                window.currentSearchLocation = searchLocation;
+            } catch (error) {
+                console.error("❌ Error getting user location:", error);
+                hideLoadingIndicator();
+                alert("Unable to get your current location. Please try entering an address instead.");
+                return;
+            }
+        } else if (formData.address && formData.address.trim() !== '') {
+            try {
+                updateLoadingMessage("Finding location...");
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    window.currentSearchLocation = searchLocation;
+
+                    if (/^\d{5}$/.test(formData.address.trim())) {
+                        searchRadius = 25;
+                        console.log("📍 ZIP CODE SEARCH: Using 25km radius");
+                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
+                        searchRadius = 30;
+                        console.log("📍 CITY SEARCH: Using 30km radius");
+                    } else {
+                        searchRadius = 20;
+                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
+                    }
+
+                    if (map && searchLocation) {
+                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                        map.setCenter(center);
+                        map.setZoom(searchRadius <= 20 ? 12 : 11);
+                    }
+                } else {
+                    throw new Error(`Geocoding failed for address: ${formData.address}`);
+                }
+            } catch (error) {
+                console.error("❌ Error geocoding address:", error);
+                hideLoadingIndicator();
+                alert("We couldn't recognize that address. Please try a more specific address.");
+                return;
+            }
+        }
+
+        // PHASE 1: Search database
+        updateLoadingMessage("Searching database...");
+        let primaryResults = [];
+
+        if (formData.businessName && formData.businessName.trim() !== '') {
+            try {
+                primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
+                primaryResults = primaryResults.filter(business => business.is_chain !== true);
+                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
+            } catch (error) {
+                console.error("❌ Primary search failed:", error);
+            }
+        }
+
+        // PHASE 2: Search Google Places
+        let placesResults = [];
+
+        if (formData.businessName && searchLocation) {
+            try {
+                updateLoadingMessage("Searching for additional locations...");
+                const placesSearchLocation = {
+                    ...searchLocation,
+                    searchRadius: Math.max(searchRadius, 35)
+                };
+                placesResults = await searchGooglePlacesForBusinessEnhanced(formData.businessName, placesSearchLocation);
+                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
+            } catch (error) {
+                console.error("❌ Places search failed:", error);
+            }
+        }
+
+        // PHASE 3: Search nearby database businesses
+        let nearbyDatabaseBusinesses = [];
+
+        const shouldSearchNearby = !formData.businessName ||
+            (primaryResults.length + placesResults.length < 8);
+
+        if (searchLocation && shouldSearchNearby) {
+            try {
+                updateLoadingMessage("Finding other nearby businesses...");
+                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinessesEnhanced(searchLocation, searchRadius, formData.businessName);
+                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
+            } catch (error) {
+                console.error("❌ Nearby database search failed:", error);
+            }
+        } else {
+            console.log("⏭️ SKIPPING nearby search - found many relevant results");
+        }
+
+        // PHASE 4: FIXED categorization with proper duplicate detection
+        const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
+            categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
+
+        // PHASE 5: Display results
+        const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
+        console.log(`📊 FIXED SEARCH RESULTS:`);
+        console.log(`   - 🔴 Primary Database (RED): ${finalPrimaryResults.length} businesses`);
+        console.log(`   - 🔵 Additional Locations (BLUE): ${finalPlacesResults.length} businesses`);
+        console.log(`   - 🟢 Other Nearby (GREEN): ${finalNearbyResults.length} businesses`);
+        console.log(`   - Total: ${allResults.length} businesses`);
+
+        if (allResults.length > 0) {
+            // Set proper flags
+            finalPrimaryResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = true;
+                business.markerColor = 'primary';
+                business.priority = 1;
+            });
+
+            finalPlacesResults.forEach(business => {
+                business.isGooglePlace = true;
+                business.isFromDatabase = false;
+                business.isPrimaryResult = false;
+                business.isRelevantPlaces = true;
+                business.markerColor = 'nearby';
+                business.priority = 2;
+            });
+
+            finalNearbyResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = false;
+                business.isNearbyDatabase = true;
+                business.markerColor = 'database';
+                business.priority = 3;
+            });
+
+            hideLoadingIndicator();
+
+            // Display results
+            displayBusinessesOnMapWithBetterPriority(allResults);
+            displaySearchResultsWithBetterPriority(allResults);
+
+            // Show success message
+            showImprovedSearchSuccessMessage(finalPrimaryResults.length, finalPlacesResults.length, finalNearbyResults.length, formData.businessName);
+
+            console.log("✅ FIXED SEARCH: Completed successfully with proper chain location handling");
+        } else {
+            hideLoadingIndicator();
+            showNoResultsMessage();
+        }
+
+    } catch (error) {
+        console.error("❌ Fixed search error:", error);
+        hideLoadingIndicator();
+        showErrorMessage(`Error searching for businesses: ${error.message}`);
+    }
+}
+
+/**
+ * Test function for the fixed search
+ */
+async function testFixedOliveGardenSearch() {
+    console.log("🧪 TESTING FIXED: Olive Garden search with proper duplicate detection");
+
+    const formData = {
+        businessName: "Olive Garden",
+        address: "89121",
+        useMyLocation: false
+    };
+
+    try {
+        clearMarkers();
+        await performEnhancedBusinessSearchWithFixedDuplicates(formData, true);
+        console.log("✅ Fixed test search completed - should now show 9+ Olive Garden locations!");
+    } catch (error) {
+        console.error("❌ Fixed test search failed:", error);
+    }
+}
+
+console.log("🚀 FIXED duplicate detection loaded!");
+console.log("🧪 Run testFixedOliveGardenSearch() to test the fix");
+console.log("📍 Should now show 9+ Olive Garden locations in Las Vegas!");
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
-    window.retrieveFromMongoDB = performEnhancedBusinessSearch;
+    window.retrieveFromMongoDB = performEnhancedBusinessSearchWithFixedDuplicates;
+    window.createEnhancedAddressKey = createEnhancedAddressKey;
+    window.createBusinessNameKey = createBusinessNameKey;
+    window.categorizeResultsWithFixedDuplicateDetection = categorizeResultsWithFixedDuplicateDetection;
+    window.performEnhancedBusinessSearchWithFixedDuplicates = performEnhancedBusinessSearchWithFixedDuplicates;
+    window.testFixedOliveGardenSearch = testFixedOliveGardenSearch;
+    window.performEnhancedBusinessSearch = performEnhancedBusinessSearchWithFixedDuplicates;
     window.searchGooglePlacesForBusinessEnhanced = searchGooglePlacesForBusinessEnhanced;
     window.processPlacesResults = processPlacesResults;
     window.searchNearbyDatabaseBusinessesEnhanced = searchNearbyDatabaseBusinessesEnhanced;
