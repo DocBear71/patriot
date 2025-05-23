@@ -20,6 +20,18 @@ const CONFIG = {
     debugMode: false        // Set to true to enable detailed debugging
 };
 
+
+const ENHANCED_CONFIG = {
+    ...CONFIG,
+    markerColors: {
+        primary: '#EA4335',      // RED - Primary search results (database)
+        nearby: '#4285F4',       // BLUE - Google Places results
+        database: '#28a745',     // GREEN - Nearby database businesses
+        chain: '#FF9800'         // ORANGE - Chain indicators
+    }
+};
+
+
 // State variables
 let map = null;
 let mapInitialized = false;
@@ -10147,7 +10159,8 @@ if (typeof window !== 'undefined') {
     window.searchNearbyBusinesses = searchNearbyBusinesses;
     window.getSimilarBusinessTypes = getSimilarBusinessTypes;
     window.getBusinessLocation = getBusinessLocation;
-    window.createSimilarBusinessMarker = createSimilarBusinessMarker;
+    window.createSimilarBusinessMarker = createSimilarBusinessMarker;;
+    window.ENHANCED_CONFIG = ENHANCED_CONFIG;
 
     addEnhancedUserInterfaceCSS();
 
