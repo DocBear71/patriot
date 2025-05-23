@@ -767,7 +767,6 @@ Click OK to continue.`;
     }
 };
 
-
 /**
  * Helper function to get chain details
  * @param {string} chainId - Chain ID
@@ -814,7 +813,6 @@ function getAddressComponent(addressComponents, type) {
 
     return component ? (component.shortText || component.short_name || '') : '';
 }
-
 
 /**
  * Extract address component from place
@@ -2335,7 +2333,6 @@ function withErrorHandling(func, funcName) {
     };
 }
 
-
 /**
  * Fix info window positioning issues
  */
@@ -2580,7 +2577,6 @@ function applyInfoWindowCSS() {
     }
 }
 
-
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.showInfoWindow = showInfoWindow;
@@ -2676,7 +2672,6 @@ window.testTailFix = function () {
         console.log("Closed info window. Click a marker to test the tail fix.");
     }
 };
-
 
 function gentlyFixInfoWindowPosition() {
     console.log("Applying gentle info window position fix...");
@@ -2834,7 +2829,6 @@ window.testInfoWindow = function () {
     console.log("If it still doesn't work, run: checkAndReportInfoWindowPosition()");
 };
 
-
 console.log("Step-by-step info window fix loaded. Run testInfoWindow() in console to reset everything.");
 
 // IMPROVED: More aggressive tail positioning fix
@@ -2976,7 +2970,6 @@ function applyInfoWindowPositioningFixes() {
     }
 }
 
-
 /**
  * Enhanced fetchBusinessIncentivesForInfoWindow function with better error handling
  * @param {string} businessId - Business ID
@@ -3080,7 +3073,6 @@ window.debugInfoWindow = function () {
 
     console.log("Ready for testing - try clicking a marker now");
 };
-
 
 /**
  * Enhanced findChainMatchesForResults function
@@ -3186,7 +3178,6 @@ function findMatchingChainLocally(placeName) {
         }
     });
 }
-
 
 /**
  * Fixed setupMapClickHandler function with proper error handling
@@ -4577,7 +4568,6 @@ function checkIfUserIsAdmin() {
     }
 }
 
-
 // Helper function to perform the actual incentives fetch
 function performIncentivesFetch(businessId, incentivesDiv) {
     const baseURL = getBaseURL();
@@ -4743,7 +4733,6 @@ function createEnhancedFallbackMarker(business, location) {
         return null;
     }
 }
-
 
 /**
  * Enhanced info window with better content organization
@@ -6460,7 +6449,6 @@ async function supplementWithGooglePlaces(businessName, searchLocation, existing
     }
 }
 
-
 /**
  * Fetch incentives for a specific business for table display
  * @param {string} businessId - Business ID
@@ -6550,7 +6538,6 @@ function fetchBusinessIncentives(businessId, chainId = null) {
             }
         });
 }
-
 
 /**
  * Helper function to add a business row to the table
@@ -11387,9 +11374,389 @@ function showImprovedSearchSuccessMessage(primaryCount, placesCount, nearbyCount
     }, 8000);
 }
 
+/**
+ * FIXED: Enhanced Google Places search with better radius and result handling
+ * This should find all Olive Garden locations in Las Vegas area
+ */
+
+async function searchGooglePlacesForBusinessEnhanced(businessName, searchLocation) {
+    try {
+        console.log("🔍 ENHANCED PLACES SEARCH: Searching for:", businessName, "near", searchLocation);
+
+        // Import the new Places library
+        const {Place} = await google.maps.importLibrary("places");
+
+        // Create search location
+        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+
+        // FIXED: Use much larger radius for metro areas like Las Vegas
+        // Las Vegas metro area is quite spread out, need at least 50km radius
+        const searchRadius = 50000; // 50km in meters (was probably too small before)
+
+        // Create a comprehensive text search request
+        const request = {
+            textQuery: businessName,
+            locationBias: {
+                center: center,
+                radius: searchRadius
+            },
+            maxResultCount: 20, // Get more results
+            fields: [
+                'id',
+                'displayName',
+                'formattedAddress',
+                'location',
+                'types',
+                'nationalPhoneNumber',
+                'internationalPhoneNumber',
+                'businessStatus' // Check if business is open
+            ]
+        };
+
+        console.log(`🌐 Enhanced Places API request with ${searchRadius/1000}km radius:`, request);
+
+        // Perform text search
+        const {places} = await Place.searchByText(request);
+
+        if (!places || places.length === 0) {
+            console.log("❌ No businesses found via enhanced Places API");
+
+            // FALLBACK: Try with even larger radius
+            console.log("🔄 FALLBACK: Trying with 75km radius...");
+            const fallbackRequest = {
+                ...request,
+                locationBias: {
+                    center: center,
+                    radius: 75000 // 75km
+                }
+            };
+
+            const {places: fallbackPlaces} = await Place.searchByText(fallbackRequest);
+            if (!fallbackPlaces || fallbackPlaces.length === 0) {
+                console.log("❌ No businesses found even with larger radius");
+                return [];
+            }
+
+            console.log(`✅ Fallback found ${fallbackPlaces.length} businesses`);
+            return await processPlacesResults(fallbackPlaces, center, businessName);
+        }
+
+        console.log(`✅ Found ${places.length} businesses via enhanced Places API`);
+        return await processPlacesResults(places, center, businessName);
+
+    } catch (error) {
+        console.error("❌ Error in enhanced Places API search:", error);
+
+        // Final fallback to your existing function
+        console.log("🔄 FINAL FALLBACK: Using existing Places search...");
+        try {
+            return await searchGooglePlacesForBusinessFixed(businessName, searchLocation);
+        } catch (fallbackError) {
+            console.error("❌ All Places search methods failed:", fallbackError);
+            return [];
+        }
+    }
+}
+
+/**
+ * Process Places API results with better filtering and validation
+ */
+async function processPlacesResults(places, searchCenter, businessName) {
+    console.log(`🔄 Processing ${places.length} Places results for "${businessName}"`);
+
+    // Filter out invalid or irrelevant results
+    const validPlaces = places.filter(place => {
+        // Skip if business is permanently closed
+        if (place.businessStatus === 'CLOSED_PERMANENTLY') {
+            console.log(`⏭️ Skipping permanently closed: ${place.displayName}`);
+            return false;
+        }
+
+        // Basic name similarity check
+        const placeName = place.displayName.toLowerCase();
+        const searchTerm = businessName.toLowerCase();
+
+        // Must contain the main search term or be very similar
+        if (!placeName.includes(searchTerm) && !searchTerm.includes(placeName)) {
+            // Additional check for common variations
+            const searchWords = searchTerm.split(' ');
+            const placeWords = placeName.split(' ');
+
+            let matchCount = 0;
+            for (const searchWord of searchWords) {
+                if (placeWords.some(placeWord =>
+                    placeWord.includes(searchWord) || searchWord.includes(placeWord)
+                )) {
+                    matchCount++;
+                }
+            }
+
+            // Must match at least half the search words
+            if (matchCount < Math.ceil(searchWords.length / 2)) {
+                console.log(`⏭️ Skipping unrelated result: ${place.displayName}`);
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    console.log(`✅ Filtered to ${validPlaces.length} valid places`);
+
+    // Process each valid place
+    const businessPromises = validPlaces.map(async (place, index) => {
+        console.log(`   ${index + 1}. Processing: ${place.displayName}`);
+
+        // Extract address components
+        const addressParts = place.formattedAddress ? place.formattedAddress.split(',') : [];
+        let address1 = '';
+        let city = '';
+        let state = '';
+        let zip = '';
+
+        if (addressParts.length >= 1) address1 = addressParts[0].trim();
+        if (addressParts.length >= 2) city = addressParts[1].trim();
+        if (addressParts.length >= 3) {
+            const stateZipMatch = addressParts[2].trim().match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+            if (stateZipMatch) {
+                state = stateZipMatch[1];
+                zip = stateZipMatch[2];
+            }
+        }
+
+        // Calculate distance from search center
+        const placeLatLng = place.location;
+        const distance = google.maps.geometry.spherical.computeDistanceBetween(searchCenter, placeLatLng);
+        const distanceKm = (distance / 1000).toFixed(1);
+
+        // Extract coordinates safely
+        let lat = 0, lng = 0;
+        if (place.location) {
+            try {
+                lat = typeof place.location.lat === 'function' ? place.location.lat() : place.location.lat || 0;
+                lng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng || 0;
+            } catch (coordError) {
+                console.warn("⚠️ Error extracting coordinates:", coordError);
+                lat = searchCenter.lat();
+                lng = searchCenter.lng();
+            }
+        }
+
+        // Create business object with enhanced data
+        const business = {
+            _id: 'google_' + place.id,
+            bname: place.displayName,
+            address1: address1,
+            city: city,
+            state: state,
+            zip: zip,
+            formattedAddress: place.formattedAddress,
+            type: mapGooglePlaceTypeToBusinessType(place.types),
+            phone: place.nationalPhoneNumber || place.internationalPhoneNumber || '',
+            isGooglePlace: true,
+            placeId: place.id,
+            lat: lat,
+            lng: lng,
+            distance: distance,
+            businessStatus: place.businessStatus
+        };
+
+        console.log(`      → ${business.bname} at ${distanceKm}km (${city}, ${state})`);
+
+        // Enhanced chain matching with rate limiting
+        try {
+            const chainMatch = await findMatchingChainForPlaceResult(place.displayName);
+            if (chainMatch) {
+                console.log(`      🔗 Chain match: ${chainMatch.bname}`);
+                business.chain_id = chainMatch._id;
+                business.chain_name = chainMatch.bname;
+                business.isChainLocation = true;
+            }
+        } catch (error) {
+            console.warn(`      ⚠️ Chain matching failed for ${place.displayName}:`, error.message);
+        }
+
+        return business;
+    });
+
+    // Wait for all processing to complete
+    const businesses = await Promise.all(businessPromises);
+
+    // Sort by distance (closest first)
+    businesses.sort((a, b) => a.distance - b.distance);
+
+    console.log(`📊 FINAL PROCESSED RESULTS: ${businesses.length} businesses`);
+    businesses.forEach((business, index) => {
+        const distanceKm = (business.distance / 1000).toFixed(1);
+        console.log(`   ${index + 1}. ${business.bname} - ${distanceKm}km - ${business.city}, ${business.state}`);
+    });
+
+    return businesses;
+}
+
+/**
+ * Enhanced nearby database search with better radius handling for metro areas
+ */
+async function searchNearbyDatabaseBusinessesEnhanced(searchLocation, radiusKm, excludeBusinessName = '') {
+    try {
+        console.log(`🏢 ENHANCED NEARBY DB SEARCH: ${radiusKm}km radius around ${searchLocation.lat}, ${searchLocation.lng}`);
+
+        const baseURL = getBaseURL();
+
+        // FIXED: Use larger radius for metro areas to find more businesses
+        const enhancedRadius = Math.max(radiusKm, 30); // Minimum 30km for metro areas
+
+        // Build API URL for location-based search
+        const params = new URLSearchParams({
+            operation: 'search',
+            lat: searchLocation.lat,
+            lng: searchLocation.lng,
+            radius: enhancedRadius,
+            limit: 100 // Increased from 50 to get more businesses
+        });
+
+        const apiURL = `${baseURL}/api/business.js?${params.toString()}`;
+        console.log(`🌐 Enhanced nearby search: ${apiURL}`);
+
+        const response = await fetch(apiURL);
+        if (!response.ok) {
+            throw new Error(`Nearby search failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        let nearbyBusinesses = data.results || [];
+
+        console.log(`📊 Raw nearby results: ${nearbyBusinesses.length} businesses`);
+
+        // Enhanced filtering
+        nearbyBusinesses = nearbyBusinesses.filter(business => {
+            // Exclude parent chains
+            if (business.is_chain === true) {
+                return false;
+            }
+
+            // IMPROVED: Better exclusion logic for primary search term
+            if (excludeBusinessName) {
+                const businessNameLower = business.bname.toLowerCase();
+                const excludeNameLower = excludeBusinessName.toLowerCase();
+
+                // More precise matching to avoid over-excluding
+                if (businessNameLower === excludeNameLower ||
+                    businessNameLower.includes(excludeNameLower) ||
+                    excludeNameLower.includes(businessNameLower)) {
+                    console.log(`🚫 EXCLUDING: ${business.bname} (matches "${excludeBusinessName}")`);
+                    return false;
+                }
+            }
+
+            // Ensure business has valid coordinates
+            if (!hasValidCoordinates(business)) {
+                console.log(`🚫 EXCLUDING: ${business.bname} (invalid coordinates)`);
+                return false;
+            }
+
+            return true;
+        });
+
+        console.log(`✅ ENHANCED NEARBY FILTER: ${nearbyBusinesses.length} businesses after filtering`);
+
+        // Log some examples of what we found
+        nearbyBusinesses.slice(0, 5).forEach((business, index) => {
+            console.log(`   ${index + 1}. ${business.bname} - ${business.city}, ${business.state}`);
+        });
+
+        return nearbyBusinesses;
+
+    } catch (error) {
+        console.error("❌ Error in enhanced nearby database search:", error);
+        return [];
+    }
+}
+
+/**
+ * Debug function to test Las Vegas Olive Garden search specifically
+ */
+async function debugLasVegasOliveGardenSearch() {
+    console.log("🧪 DEBUG: Testing Las Vegas Olive Garden search...");
+
+    // Las Vegas coordinates (89121 zip code area)
+    const lasVegasLocation = {
+        lat: 36.0395,
+        lng: -115.0610
+    };
+
+    try {
+        // Test enhanced Places search
+        console.log("1. Testing enhanced Places search...");
+        const placesResults = await searchGooglePlacesForBusinessEnhanced("Olive Garden", lasVegasLocation);
+        console.log(`   Found ${placesResults.length} Olive Garden locations via Places API`);
+
+        // Test enhanced nearby search
+        console.log("2. Testing enhanced nearby database search...");
+        const nearbyResults = await searchNearbyDatabaseBusinessesEnhanced(lasVegasLocation, 30, "Olive Garden");
+        console.log(`   Found ${nearbyResults.length} nearby database businesses`);
+
+        // Test database search
+        console.log("3. Testing database search for Olive Garden...");
+        const formData = { businessName: "Olive Garden", address: "", useMyLocation: false };
+        const dbResults = await searchDatabaseWithFuzzyMatching(formData, lasVegasLocation, false);
+        console.log(`   Found ${dbResults.length} Olive Garden locations in database`);
+
+        console.log("✅ DEBUG TEST COMPLETE");
+
+        return {
+            places: placesResults.length,
+            nearby: nearbyResults.length,
+            database: dbResults.length
+        };
+
+    } catch (error) {
+        console.error("❌ Debug test failed:", error);
+        return null;
+    }
+}
+
+/**
+ * Test function to verify the fix
+ */
+async function testOliveGardenLasVegas() {
+    console.log("🧪 TESTING: Olive Garden search in Las Vegas (89121)");
+
+    // Simulate the exact search you're doing
+    const formData = {
+        businessName: "Olive Garden",
+        address: "89121", // Las Vegas zip code
+        useMyLocation: false
+    };
+
+    try {
+        // Clear existing results
+        clearMarkers();
+
+        // Run the enhanced search
+        await performEnhancedBusinessSearch(formData, true); // bust cache
+
+        console.log("✅ Test search completed - check results!");
+
+    } catch (error) {
+        console.error("❌ Test search failed:", error);
+    }
+}
+
+console.log("🚀 Enhanced Places search loaded!");
+console.log("🧪 Run testOliveGardenLasVegas() to test the fix");
+console.log("🔍 Run debugLasVegasOliveGardenSearch() for detailed debugging");
+
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = performEnhancedBusinessSearch;
+    window.searchGooglePlacesForBusinessEnhanced = searchGooglePlacesForBusinessEnhanced;
+    window.processPlacesResults = processPlacesResults;
+    window.searchNearbyDatabaseBusinessesEnhanced = searchNearbyDatabaseBusinessesEnhanced;
+    window.debugLasVegasOliveGardenSearch = debugLasVegasOliveGardenSearch;
+    window.testOliveGardenLasVegas = testOliveGardenLasVegas;
+    window.searchGooglePlacesForBusiness = searchGooglePlacesForBusinessEnhanced;
+    window.searchNearbyDatabaseBusinesses = searchNearbyDatabaseBusinessesEnhanced;
     window.categorizeResultsWithBetterPriority = categorizeResultsWithBetterPriority;
     window.displaySearchResultsWithBetterPriority = displaySearchResultsWithBetterPriority;
     window.displayBusinessesOnMapWithBetterPriority = displayBusinessesOnMapWithBetterPriority;
@@ -11399,7 +11766,6 @@ if (typeof window !== 'undefined') {
     window.displaySearchResults = displaySearchResultsWithCategories;
     window.displayBusinessesOnMapFixed = displayBusinessesOnMapWithCategories;
     window.displaySearchResultsFixed = displaySearchResultsWithCategories;
-    window.searchNearbyDatabaseBusinesses = searchNearbyDatabaseBusinesses;
     window.categorizeFinalResults = categorizeFinalResults;
     window.createAddressKey = createAddressKey;
     window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerWithCategory;
@@ -11431,7 +11797,6 @@ if (typeof window !== 'undefined') {
     window.loadChainIncentivesForEnhancedWindow = loadChainIncentivesForEnhancedWindowFixed;
     window.loadIncentivesForEnhancedWindow = loadIncentivesForEnhancedWindowFixed;
     window.loadChainIncentivesForDatabaseBusiness = loadChainIncentivesForDatabaseBusinessFixed;
-    window.searchGooglePlacesForBusiness = searchGooglePlacesForBusinessFixed;
     window.createBusinessMarker = createBusinessMarker;
     window.createEnhancedBusinessMarkerFixed = createEnhancedBusinessMarkerFixed;
     window.fetchBusinessIncentivesFixed = fetchBusinessIncentivesFixed;
