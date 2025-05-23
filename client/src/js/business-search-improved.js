@@ -7856,7 +7856,7 @@ function buildCategoryAwareInfoWindowContent(business) {
     // Enhanced chain badge with category awareness
     let chainBadge = '';
     if (isChainLocation) {
-        const badgeColor = isPrimaryResult ? '#4285F4' : isNearbyDatabase ? '#28a745' : '#4285F4';
+        const badgeColor = isPrimaryResult ? 'rgb(66, 133, 244, 0.3)' : isNearbyDatabase ? 'rgb(40, 167, 69, 0.3)' : 'rgb(66, 133, 244, 0.3)';
         chainBadge = `<span class="enhanced-chain-badge" style="background-color: ${badgeColor};">🔗 ${business.chain_name || 'Chain Location'}</span>`;
     }
 
@@ -8444,7 +8444,7 @@ function buildCategoryAwareInfoWindowContentEnhanced(business) {
     // Enhanced chain badge with category awareness
     let chainBadge = '';
     if (isChainLocation) {
-        const badgeColor = isPrimaryResult ? '#4285F4' : isNearbyDatabase ? '#28a745' : '#4285F4';
+        const badgeColor = isPrimaryResult ? 'rgb(66, 133, 244, 0.3)' : isNearbyDatabase ? 'rgb(40, 167, 69, 0.3)' : 'rgb(66, 133, 244, 0.3)';
         chainBadge = `<span class="enhanced-chain-badge" style="background-color: ${badgeColor};">🔗 ${business.chain_name || 'Chain Location'}</span>`;
     }
 
