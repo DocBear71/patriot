@@ -4266,8 +4266,8 @@ function addEnhancedMarkerStyles() {
 
             .enhanced-chain-badge {
                 display: inline-block;
-                background: linear-gradient(45deg, #4285F4, #64B5F6);
-                color: white;
+                background: linear-gradient(45deg, rgb(66, 133, 244, 0.3), rgb(100, 181, 246, 0.3));
+                color: #000000;
                 padding: 2px 8px;
                 border-radius: 12px;
                 font-size: 11px;

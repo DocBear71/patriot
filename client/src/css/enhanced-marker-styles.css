@@ -141,8 +141,8 @@
 /* Enhanced chain badge with animation */
 .enhanced-chain-badge {
     display: inline-block;
-    background: linear-gradient(45deg, #4285F4, #64B5F6);
-    color: white;
+    background: linear-gradient(45deg,  rgb(66, 133, 244, 0.3), rgb(100, 181, 246, 0.3));
+    color: #000000;
     padding: 3px 10px;
     border-radius: 15px;
     font-size: 11px;
@@ -164,7 +164,7 @@
 /* Enhanced table styling for chain businesses */
 .chain-badge {
     display: inline-block;
-    background: linear-gradient(45deg, #4285F4, #64B5F6);
+    background: linear-gradient(45deg,  rgb(66, 133, 244, 0.3), rgb(100, 181, 246, 0.3));
     color: white;
     padding: 2px 8px;
     border-radius: 12px;
