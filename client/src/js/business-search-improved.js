@@ -1158,221 +1158,6 @@ function showNewBusinessAlert(businessName) {
 }
 
 /**
- * Enhanced retrieveFromMongoDB function to handle Google Places fallback properly
- * Replace your existing retrieveFromMongoDB function with this enhanced version
- */
-async function retrieveFromMongoDB(formData, bustCache = false) {
-    try {
-        console.log("Starting search with form data:", formData);
-
-        // Show loading indicator
-        const resultsContainer = document.getElementById('business-search-results') ||
-            document.getElementById('search_table');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '<div class="loading-indicator">Searching for businesses...</div>';
-            resultsContainer.style.display = 'block';
-        }
-
-        // Process search location first
-        let searchLocation = null;
-
-        // Check if we should use current location
-        if (formData.useMyLocation) {
-            try {
-                console.log("Getting user's location for search...");
-                searchLocation = await getUserLocation();
-                console.log("User location for search:", searchLocation);
-                window.currentSearchLocation = searchLocation;
-            } catch (error) {
-                console.error("Error getting user location:", error);
-                alert("Unable to get your current location. Please try entering an address instead.");
-                return;
-            }
-        }
-        // If address is provided, geocode it
-        else if (formData.address && formData.address.trim() !== '') {
-            try {
-                console.log("Geocoding address for search:", formData.address);
-                const geocodedLocation = await geocodeAddressClientSide(formData.address);
-
-                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
-                    searchLocation = geocodedLocation;
-                    console.log("Successfully geocoded address to:", searchLocation);
-                    window.currentSearchLocation = searchLocation;
-
-                    // Center map on the search location immediately
-                    if (map && searchLocation) {
-                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                        map.setCenter(center);
-                        map.setZoom(11); // City level zoom
-                    }
-                } else {
-                    console.warn("Client-side geocoding failed");
-                    throw new Error(`Geocoding failed for address: ${formData.address}`);
-                }
-            } catch (error) {
-                console.error("Error geocoding address:", error);
-                alert("We couldn't recognize that address. Please try a more specific address.");
-                return;
-            }
-        }
-
-        // Build API request parameters
-        const params = {};
-        if (formData.businessName && formData.businessName.trim() !== '') {
-            params.business_name = formData.businessName;
-        }
-
-        // CRITICAL FIX: Only send address if we DON'T have geocoded coordinates
-        if (formData.address && formData.address.trim() !== '' && !searchLocation) {
-            params.address = formData.address;
-        }
-
-        // Add location parameters if we have them
-        if (searchLocation && searchLocation.lat && searchLocation.lng) {
-            params.lat = searchLocation.lat;
-            params.lng = searchLocation.lng;
-            params.radius = 25; // Search radius in miles
-            console.log("Using geocoded search location:", searchLocation);
-            console.log("NOT sending address parameter to avoid server confusion");
-        } else if (formData.address && formData.address.trim() !== '') {
-            console.log("Using address-only search (no geocoding):", formData.address);
-        }
-
-        // Add cache-busting parameter if requested
-        if (bustCache) {
-            params.ts = new Date().getTime();
-        }
-
-        const queryParams = new URLSearchParams(params).toString();
-        const baseURL = getBaseURL();
-        const apiURL = `${baseURL}/api/business.js?operation=search&${queryParams}`;
-        console.log("Fixed API call:", apiURL);
-
-        const response = await fetch(apiURL, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json; charset=UTF-8',
-                'Cache-Control': bustCache ? 'no-cache, no-store, must-revalidate' : 'default',
-                'Pragma': bustCache ? 'no-cache' : 'default',
-                'Expires': bustCache ? '0' : 'default'
-            }
-        });
-
-        console.log("Response status:", response.status);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Error response:", errorText);
-            throw new Error(`Failed to retrieve data: ${response.status} ${errorText}`);
-        }
-
-        const data = await response.json();
-        console.log("Search results from database:", data);
-
-        // Clear existing markers and create fresh bounds
-        clearMarkers();
-        bounds = new google.maps.LatLngBounds();
-
-        // ENHANCED: Check if we found any nearby businesses (within 50 miles)
-        let nearbyBusinesses = [];
-        let distantBusinesses = [];
-
-        if (data.results && data.results.length > 0) {
-            data.results.forEach(business => {
-                const businessLocation = getBusinessLocation(business);
-                if (!businessLocation || !searchLocation) {
-                    distantBusinesses.push(business);
-                    return;
-                }
-
-                const businessLatLng = new google.maps.LatLng(businessLocation.lat, businessLocation.lng);
-                const searchLatLng = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                const distance = google.maps.geometry.spherical.computeDistanceBetween(businessLatLng, searchLatLng);
-                const distanceInMiles = distance * 0.000621371;
-
-                if (distanceInMiles <= 50) {
-                    nearbyBusinesses.push(business);
-                    console.log(`Found nearby business: ${business.bname} (${distanceInMiles.toFixed(1)} miles)`);
-                } else {
-                    distantBusinesses.push(business);
-                    console.log(`Found distant business: ${business.bname} (${distanceInMiles.toFixed(1)} miles)`);
-                }
-            });
-        }
-
-        console.log(`Found ${nearbyBusinesses.length} nearby and ${distantBusinesses.length} distant businesses in database`);
-
-        // If no nearby businesses found and we have a business name + location, search Google Places
-        if (nearbyBusinesses.length === 0 && formData.businessName && searchLocation) {
-            console.log("No nearby businesses in database, searching Google Places for:", formData.businessName);
-
-            try {
-                // Search Google Places for the specific business
-                const placesResults = await searchGooglePlacesForBusiness(formData.businessName, searchLocation);
-
-                if (placesResults && placesResults.length > 0) {
-                    console.log(`Found ${placesResults.length} businesses via Google Places`);
-
-                    // Combine database results with Places results
-                    const allBusinesses = [...placesResults, ...distantBusinesses];
-
-                    // Display on map and table
-                    displayBusinessesOnMap(allBusinesses);
-                    if (document.getElementById('search_table')) {
-                        displaySearchResults(allBusinesses);
-                    } else {
-                        const resultsContainer = document.getElementById('business-search-results');
-                        if (resultsContainer) {
-                            displayBusinessSearchResults(allBusinesses, resultsContainer);
-                        }
-                    }
-
-                } else {
-                    console.log("No businesses found via Google Places either");
-                    showNoResultsMessage();
-                }
-            } catch (placesError) {
-                console.error("Error searching Google Places:", placesError);
-                // Still show distant database results if Places search fails
-                if (distantBusinesses.length > 0) {
-                    displayBusinessesOnMap(distantBusinesses);
-                    displaySearchResults(distantBusinesses);
-                } else {
-                    showNoResultsMessage();
-                }
-            }
-        } else {
-            // We have nearby businesses or no location to search
-            const allBusinesses = [...nearbyBusinesses, ...distantBusinesses];
-
-            // Display businesses on map first
-            displayBusinessesOnMap(allBusinesses);
-
-            // Then display in table/list
-            if (document.getElementById('search_table')) {
-                displaySearchResults(allBusinesses);
-            } else {
-                const resultsContainer = document.getElementById('business-search-results');
-                if (resultsContainer) {
-                    displayBusinessSearchResults(allBusinesses, resultsContainer);
-                }
-            }
-
-            // Search for nearby similar businesses if we have a search location
-            if (searchLocation && allBusinesses.length > 0) {
-                const searchLatLng = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                const businessType = allBusinesses[0].type || 'OTHER';
-                searchNearbyBusinesses(searchLatLng, businessType);
-            }
-        }
-    } catch (error) {
-        console.error("Search error:", error);
-        showErrorMessage(`Error searching for businesses: ${error.message}`);
-    }
-}
-
-/**
  * Search Google Places for a specific business name near a location
  * @param {string} businessName - Name of business to search for
  * @param {Object} searchLocation - Location to search around
@@ -3735,99 +3520,6 @@ function mapGooglePlaceTypeToBusinessType(types) {
 }
 
 console.log("Google Places address parsing fix loaded successfully!");
-
-/**
- * Fixed findMatchingChainForPlaceResult with proper error handling
- * @param {string} placeName - Name of the place to match with chains
- * @returns {Promise<Object|null>} - Matching chain or null if no match
- */
-async function findMatchingChainForPlaceResult(placeName) {
-    try {
-        if (!placeName) {
-            console.warn("Empty place name provided for chain matching");
-            return null;
-        }
-
-        console.log("Checking if place matches a chain:", placeName);
-
-        // Clean the place name for better matching
-        const cleanPlaceName = placeName.trim();
-
-        // Get the base URL
-        const baseURL = getBaseURL();
-
-        try {
-            // Try server-side chain matching first with the exact name
-            const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(cleanPlaceName)}`);
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success && data.chain) {
-                    console.log("Found exact chain match:", data.chain.bname);
-                    return data.chain;
-                }
-            }
-
-            // If exact match fails, try variations
-            const variations = generateNameVariations(cleanPlaceName);
-
-            for (const variation of variations) {
-                try {
-                    const variationResponse = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(variation)}`);
-
-                    if (variationResponse.ok) {
-                        const variationData = await variationResponse.json();
-                        if (variationData.success && variationData.chain) {
-                            console.log(`Found chain match with variation "${variation}":`, variationData.chain.bname);
-                            return variationData.chain;
-                        }
-                    }
-                } catch (variationError) {
-                    console.warn(`Error testing variation "${variation}":`, variationError);
-                    continue;
-                }
-            }
-
-            // Fall back to enhanced local matching
-            return await findMatchingChainLocally(cleanPlaceName);
-
-        } catch (fetchError) {
-            console.warn("Error with chain matching API, using local matching:", fetchError.message);
-            return await findMatchingChainLocally(cleanPlaceName);
-        }
-    } catch (error) {
-        console.warn("Error finding matching chain (non-critical):", error);
-        return null;
-    }
-}
-
-/**
- * Generate name variations for better chain matching
- */
-function generateNameVariations(placeName) {
-    const variations = [];
-    const lowerName = placeName.toLowerCase();
-
-    // For "The Home Depot", try "Home Depot"
-    if (lowerName.startsWith('the ')) {
-        variations.push(placeName.substring(4));
-    }
-
-    // For "Home Depot", try "The Home Depot"
-    if (!lowerName.startsWith('the ') && !lowerName.includes('the ')) {
-        variations.push('The ' + placeName);
-    }
-
-    // Remove common suffixes
-    const suffixesToRemove = [' Store', ' Location', ' #', ' - '];
-    suffixesToRemove.forEach(suffix => {
-        if (placeName.includes(suffix)) {
-            variations.push(placeName.split(suffix)[0]);
-        }
-    });
-
-    return [...new Set(variations)]; // Remove duplicates
-}
 
 /**
  * Fixed buildInfoWindowContent function with better Google Places handling
@@ -6270,21 +5962,610 @@ async function createEnhancedBusinessMarker(business, location, forceNearby = fa
     }
 }
 
-// Export the new functions
-if (typeof window !== 'undefined') {
+/**
+ * Enhanced chain database with comprehensive name variations
+ * This should eventually be moved to your database, but for now we'll handle it client-side
+ */
+const COMPREHENSIVE_CHAIN_DATABASE = {
+    // Home Depot variations
+    'homedepot': {
+        id: '681fe0e67d92c3d3e1e2a3da',
+        canonicalName: 'The Home Depot',
+        variations: [
+            'home depot',
+            'the home depot',
+            'homedepot',
+            'home depot store',
+            'the home depot store'
+        ],
+        keywords: ['home', 'depot', 'hardware', 'improvement']
+    },
+
+    // Olive Garden variations
+    'olivegardenitalian': {
+        id: 'olive_garden_chain_id', // Replace with your actual Olive Garden chain ID
+        canonicalName: 'Olive Garden',
+        variations: [
+            'olive garden',
+            'olive garden italian restaurant',
+            'olive garden italian',
+            'olivegarden',
+            'olive garden restaurant'
+        ],
+        keywords: ['olive', 'garden', 'italian', 'restaurant', 'pasta']
+    },
+
+    // Lowe's variations
+    'lowes': {
+        id: 'lowes_chain_id',
+        canonicalName: 'Lowe\'s',
+        variations: [
+            'lowes',
+            'lowe\'s',
+            'lowes home improvement',
+            'lowe\'s home improvement',
+            'lowes companies',
+            'lowe\'s companies'
+        ],
+        keywords: ['lowes', 'lowe\'s', 'home', 'improvement', 'hardware']
+    },
+
+    // McDonald's variations
+    'mcdonalds': {
+        id: 'mcdonalds_chain_id',
+        canonicalName: 'McDonald\'s',
+        variations: [
+            'mcdonalds',
+            'mcdonald\'s',
+            'mickey d\'s',
+            'micky d\'s',
+            'mcdonalds restaurant',
+            'mcdonald\'s restaurant'
+        ],
+        keywords: ['mcdonalds', 'mcdonald\'s', 'fast', 'food', 'burger']
+    },
+
+    // Walmart variations
+    'walmart': {
+        id: 'walmart_chain_id',
+        canonicalName: 'Walmart',
+        variations: [
+            'walmart',
+            'wal-mart',
+            'walmart supercenter',
+            'wal-mart supercenter',
+            'walmart store',
+            'wal-mart store'
+        ],
+        keywords: ['walmart', 'wal-mart', 'supercenter', 'retail']
+    },
+
+    // Target variations
+    'target': {
+        id: 'target_chain_id',
+        canonicalName: 'Target',
+        variations: [
+            'target',
+            'target store',
+            'target corporation',
+            'target retail'
+        ],
+        keywords: ['target', 'retail', 'store']
+    },
+
+    // Best Buy variations
+    'bestbuy': {
+        id: 'bestbuy_chain_id',
+        canonicalName: 'Best Buy',
+        variations: [
+            'best buy',
+            'bestbuy',
+            'best buy store',
+            'bestbuy store'
+        ],
+        keywords: ['best', 'buy', 'electronics', 'tech']
+    },
+
+    // Starbucks variations
+    'starbucks': {
+        id: 'starbucks_chain_id',
+        canonicalName: 'Starbucks',
+        variations: [
+            'starbucks',
+            'starbucks coffee',
+            'starbucks corporation',
+            'starbucks store'
+        ],
+        keywords: ['starbucks', 'coffee', 'cafe']
+    }
+};
+
+/**
+ * Advanced fuzzy matching algorithm
+ * @param {string} searchTerm - The term to search for
+ * @param {string} targetTerm - The term to match against
+ * @returns {number} Similarity score between 0 and 1
+ */
+function calculateSimilarity(searchTerm, targetTerm) {
+    if (!searchTerm || !targetTerm) return 0;
+
+    const search = searchTerm.toLowerCase().trim();
+    const target = targetTerm.toLowerCase().trim();
+
+    // Exact match
+    if (search === target) return 1.0;
+
+    // One contains the other
+    if (search.includes(target) || target.includes(search)) {
+        return 0.9;
+    }
+
+    // Levenshtein distance for fuzzy matching
+    const distance = levenshteinDistance(search, target);
+    const maxLength = Math.max(search.length, target.length);
+    const similarity = 1 - (distance / maxLength);
+
+    return Math.max(0, similarity);
 }
 
-console.log("Enhanced nearby similar businesses functionality loaded!");
+/**
+ * Calculate Levenshtein distance between two strings
+ * @param {string} str1 - First string
+ * @param {string} str2 - Second string
+ * @returns {number} Edit distance
+ */
+function levenshteinDistance(str1, str2) {
+    const matrix = [];
+
+    for (let i = 0; i <= str2.length; i++) {
+        matrix[i] = [i];
+    }
+
+    for (let j = 0; j <= str1.length; j++) {
+        matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= str2.length; i++) {
+        for (let j = 1; j <= str1.length; j++) {
+            if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1, // substitution
+                    matrix[i][j - 1] + 1,     // insertion
+                    matrix[i - 1][j] + 1      // deletion
+                );
+            }
+        }
+    }
+
+    return matrix[str2.length][str1.length];
+}
+
+/**
+ * Extract key words from a business name for matching
+ * @param {string} businessName - Business name to extract keywords from
+ * @returns {Array} Array of keywords
+ */
+function extractKeywords(businessName) {
+    if (!businessName) return [];
+
+    const commonWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'about', 'into', 'over', 'after', 'store', 'restaurant', 'inc', 'llc', 'corp', 'company', 'companies'];
+
+    return businessName
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ') // Replace punctuation with spaces
+        .split(/\s+/)
+        .filter(word => word.length > 1 && !commonWords.includes(word))
+        .filter(Boolean);
+}
+
+/**
+ * Enhanced chain matching with comprehensive fuzzy logic
+ * @param {string} placeName - Name from Google Places
+ * @returns {Promise<Object|null>} Matching chain or null
+ */
+async function findMatchingChainForPlaceResult(placeName) {
+    try {
+        if (!placeName) return null;
+
+        console.log("🔍 Advanced chain matching for:", placeName);
+
+        const cleanPlaceName = placeName.trim();
+        let bestMatch = null;
+        let bestScore = 0;
+        const minimumScore = 0.7; // Threshold for accepting a match
+
+        // Step 1: Try server-side exact matches first
+        try {
+            const serverMatch = await tryServerSideChainMatching(cleanPlaceName);
+            if (serverMatch) {
+                console.log("✅ Server-side exact match found:", serverMatch.bname);
+                return serverMatch;
+            }
+        } catch (error) {
+            console.warn("Server-side matching failed, using local matching:", error.message);
+        }
+
+        // Step 2: Advanced local fuzzy matching
+        const searchKeywords = extractKeywords(cleanPlaceName);
+        console.log("🏷️ Search keywords:", searchKeywords);
+
+        for (const [key, chainData] of Object.entries(COMPREHENSIVE_CHAIN_DATABASE)) {
+            // Test against all variations
+            for (const variation of chainData.variations) {
+                const score = calculateSimilarity(cleanPlaceName, variation);
+
+                if (score > bestScore && score >= minimumScore) {
+                    bestScore = score;
+                    bestMatch = {
+                        _id: chainData.id,
+                        bname: chainData.canonicalName,
+                        matchType: 'variation',
+                        matchScore: score,
+                        matchedVariation: variation
+                    };
+                }
+            }
+
+            // Test against keywords
+            const keywordMatches = searchKeywords.filter(keyword =>
+                chainData.keywords.some(chainKeyword =>
+                    calculateSimilarity(keyword, chainKeyword) >= 0.8
+                )
+            );
+
+            if (keywordMatches.length >= 2) { // Need at least 2 keyword matches
+                const keywordScore = 0.8; // High confidence for multiple keyword matches
+
+                if (keywordScore > bestScore) {
+                    bestScore = keywordScore;
+                    bestMatch = {
+                        _id: chainData.id,
+                        bname: chainData.canonicalName,
+                        matchType: 'keywords',
+                        matchScore: keywordScore,
+                        matchedKeywords: keywordMatches
+                    };
+                }
+            }
+        }
+
+        if (bestMatch) {
+            console.log(`🎯 Best match found: "${cleanPlaceName}" → "${bestMatch.bname}" (${bestMatch.matchType}, score: ${bestMatch.matchScore.toFixed(2)})`);
+
+            // Try to get the actual chain data from your database
+            try {
+                const dbChainData = await getChainFromDatabase(bestMatch.bname);
+                if (dbChainData) {
+                    return dbChainData;
+                }
+            } catch (dbError) {
+                console.warn("Could not fetch chain from database:", dbError);
+            }
+
+            // Return our local match if database lookup fails
+            return bestMatch;
+        }
+
+        console.log("❌ No suitable chain match found for:", cleanPlaceName);
+        return null;
+
+    } catch (error) {
+        console.error("Error in advanced chain matching:", error);
+        return null;
+    }
+}
+
+/**
+ * Try server-side chain matching with variations
+ * @param {string} placeName - Place name to match
+ * @returns {Promise<Object|null>} Chain data or null
+ */
+async function tryServerSideChainMatching(placeName) {
+    const baseURL = getBaseURL();
+    const variations = generateNameVariations(placeName);
+    const allNames = [placeName, ...variations];
+
+    for (const name of allNames) {
+        try {
+            const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(name)}`);
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.chain) {
+                    console.log(`Server match found with "${name}":`, data.chain.bname);
+                    return data.chain;
+                }
+            }
+        } catch (error) {
+            continue; // Try next variation
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Get chain data from your database by name
+ * @param {string} chainName - Canonical chain name
+ * @returns {Promise<Object|null>} Chain data from database
+ */
+async function getChainFromDatabase(chainName) {
+    try {
+        const baseURL = getBaseURL();
+
+        // Try searching for the chain by name
+        const response = await fetch(`${baseURL}/api/business.js?operation=search&business_name=${encodeURIComponent(chainName)}&is_chain=true`);
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.results && data.results.length > 0) {
+                // Find the chain (not a location)
+                const chainBusiness = data.results.find(b => b.is_chain === true);
+                if (chainBusiness) {
+                    return {
+                        _id: chainBusiness._id,
+                        bname: chainBusiness.bname
+                    };
+                }
+            }
+        }
+
+        return null;
+    } catch (error) {
+        console.error("Error fetching chain from database:", error);
+        return null;
+    }
+}
+
+/**
+ * Enhanced name variations generator
+ * @param {string} placeName - Original place name
+ * @returns {Array} Array of name variations
+ */
+function generateNameVariations(placeName) {
+    const variations = [];
+    const lowerName = placeName.toLowerCase();
+
+    // Add/remove "The"
+    if (lowerName.startsWith('the ')) {
+        variations.push(placeName.substring(4));
+    } else {
+        variations.push('The ' + placeName);
+    }
+
+    // Remove common business suffixes
+    const suffixesToRemove = [
+        ' italian restaurant',
+        ' italian',
+        ' restaurant',
+        ' store',
+        ' location',
+        ' home improvement',
+        ' companies',
+        ' corporation',
+        ' corp',
+        ' inc',
+        ' llc'
+    ];
+
+    suffixesToRemove.forEach(suffix => {
+        if (lowerName.includes(suffix.toLowerCase())) {
+            variations.push(placeName.replace(new RegExp(suffix, 'gi'), '').trim());
+        }
+    });
+
+    // Add common suffixes
+    const suffixesToAdd = [
+        ' restaurant',
+        ' store'
+    ];
+
+    suffixesToAdd.forEach(suffix => {
+        if (!lowerName.includes(suffix.toLowerCase())) {
+            variations.push(placeName + suffix);
+        }
+    });
+
+    // Remove duplicates and return
+    return [...new Set(variations)].filter(v => v !== placeName);
+}
+
+/**
+ * Enhanced search function that handles partial names better
+ * @param {Object} formData - Form data with search parameters
+ * @param {boolean} bustCache - Whether to bust cache
+ */
+async function retrieveFromMongoDB(formData, bustCache = false) {
+    try {
+        console.log("🔍 Starting enhanced search with form data:", formData);
+
+        // Show loading indicator
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<div class="loading-indicator">Searching for businesses...</div>';
+            resultsContainer.style.display = 'block';
+        }
+
+        // Process search location first
+        let searchLocation = null;
+
+        if (formData.useMyLocation) {
+            try {
+                searchLocation = await getUserLocation();
+                window.currentSearchLocation = searchLocation;
+            } catch (error) {
+                console.error("Error getting user location:", error);
+                alert("Unable to get your current location. Please try entering an address instead.");
+                return;
+            }
+        } else if (formData.address && formData.address.trim() !== '') {
+            try {
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    window.currentSearchLocation = searchLocation;
+
+                    if (map && searchLocation) {
+                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                        map.setCenter(center);
+                        map.setZoom(11);
+                    }
+                } else {
+                    throw new Error(`Geocoding failed for address: ${formData.address}`);
+                }
+            } catch (error) {
+                console.error("Error geocoding address:", error);
+                alert("We couldn't recognize that address. Please try a more specific address.");
+                return;
+            }
+        }
+
+        // Enhanced database search with fuzzy matching
+        const dbResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
+
+        // Analyze results
+        let nearbyBusinesses = [];
+        let distantBusinesses = [];
+
+        if (dbResults && dbResults.length > 0) {
+            dbResults.forEach(business => {
+                const businessLocation = getBusinessLocation(business);
+                if (!businessLocation || !searchLocation) {
+                    distantBusinesses.push(business);
+                    return;
+                }
+
+                const businessLatLng = new google.maps.LatLng(businessLocation.lat, businessLocation.lng);
+                const searchLatLng = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                const distance = google.maps.geometry.spherical.computeDistanceBetween(businessLatLng, searchLatLng);
+                const distanceInMiles = distance * 0.000621371;
+
+                if (distanceInMiles <= 50) {
+                    nearbyBusinesses.push(business);
+                } else {
+                    distantBusinesses.push(business);
+                }
+            });
+        }
+
+        console.log(`📊 Database results: ${nearbyBusinesses.length} nearby, ${distantBusinesses.length} distant`);
+
+        // If no nearby businesses and we have search criteria, search Google Places
+        if (nearbyBusinesses.length === 0 && formData.businessName && searchLocation) {
+            console.log("🌐 No nearby businesses in database, searching Google Places");
+
+            try {
+                const placesResults = await searchGooglePlacesForBusiness(formData.businessName, searchLocation);
+
+                if (placesResults && placesResults.length > 0) {
+                    console.log(`📍 Found ${placesResults.length} businesses via Google Places`);
+
+                    const allBusinesses = [...placesResults, ...distantBusinesses];
+                    displayBusinessesOnMap(allBusinesses);
+                    displaySearchResults(allBusinesses);
+
+                } else {
+                    if (distantBusinesses.length > 0) {
+                        displayBusinessesOnMap(distantBusinesses);
+                        displaySearchResults(distantBusinesses);
+                    } else {
+                        showNoResultsMessage();
+                    }
+                }
+            } catch (placesError) {
+                console.error("Error searching Google Places:", placesError);
+                if (distantBusinesses.length > 0) {
+                    displayBusinessesOnMap(distantBusinesses);
+                    displaySearchResults(distantBusinesses);
+                } else {
+                    showNoResultsMessage();
+                }
+            }
+        } else {
+            // Display all results
+            const allBusinesses = [...nearbyBusinesses, ...distantBusinesses];
+            displayBusinessesOnMap(allBusinesses);
+            displaySearchResults(allBusinesses);
+
+            // Search for similar businesses
+            if (searchLocation && allBusinesses.length > 0) {
+                const searchLatLng = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                const businessType = allBusinesses[0].type || 'OTHER';
+                searchNearbyBusinesses(searchLatLng, businessType);
+            }
+        }
+    } catch (error) {
+        console.error("Enhanced search error:", error);
+        showErrorMessage(`Error searching for businesses: ${error.message}`);
+    }
+}
+
+/**
+ * Search database with fuzzy matching capabilities
+ * @param {Object} formData - Form data
+ * @param {Object} searchLocation - Search location
+ * @param {boolean} bustCache - Cache busting flag
+ * @returns {Promise<Array>} Search results
+ */
+async function searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache) {
+    const params = {};
+
+    if (formData.businessName && formData.businessName.trim() !== '') {
+        params.business_name = formData.businessName;
+    }
+
+    if (formData.address && formData.address.trim() !== '' && !searchLocation) {
+        params.address = formData.address;
+    }
+
+    if (searchLocation && searchLocation.lat && searchLocation.lng) {
+        params.lat = searchLocation.lat;
+        params.lng = searchLocation.lng;
+        params.radius = 25;
+    }
+
+    if (bustCache) {
+        params.ts = new Date().getTime();
+    }
+
+    const queryParams = new URLSearchParams(params).toString();
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/business.js?operation=search&${queryParams}`;
+
+    const response = await fetch(apiURL, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json; charset=UTF-8',
+            'Cache-Control': bustCache ? 'no-cache, no-store, must-revalidate' : 'default'
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Database search failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.results || [];
+}
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = retrieveFromMongoDB;
+    window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResult;
+    window.calculateSimilarity = calculateSimilarity;
+    window.extractKeywords = extractKeywords;
+    window.generateNameVariations = generateNameVariations;
+    window.searchDatabaseWithFuzzyMatching = searchDatabaseWithFuzzyMatching;
+    window.tryServerSideChainMatching = tryServerSideChainMatching;
+    window.getChainFromDatabase = getChainFromDatabase;
     window.searchGooglePlacesForBusiness = searchGooglePlacesForBusiness;
     window.searchGooglePlacesForBusinessLegacy = searchGooglePlacesForBusinessLegacy;
     window.loadChainIncentivesForEnhancedWindow = loadChainIncentivesForEnhancedWindow;
     window.loadChainIncentivesInContainer = loadChainIncentivesInContainer;
     window.showEnhancedInfoWindow = showEnhancedInfoWindow;
-    window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResult;
     window.generateNameVariations = generateNameVariations;
     window.findMatchingChainLocally = findMatchingChainLocally;
     window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
