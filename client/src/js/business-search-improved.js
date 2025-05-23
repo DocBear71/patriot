@@ -8190,8 +8190,10 @@ function addTableSectionHeader(tableBody, title, sectionClass) {
     tableBody.appendChild(headerRow);
 }
 
-// FIX 5: Add categorized business row
-function addCategorizedBusinessRow(business, tableBody, category) {
+/**
+ * Enhanced addCategorizedBusinessRow function to include "View on Map" for Google Places
+ */
+function addCategorizedBusinessRowEnhanced(business, tableBody, category) {
     if (!business) return;
 
     // Skip parent chain businesses
@@ -8240,18 +8242,25 @@ function addCategorizedBusinessRow(business, tableBody, category) {
     // Chain badge
     const chainBadge = business.chain_id ? '<span class="chain-badge">🔗 Chain Location</span>' : '';
 
-    // Category-specific action button
+    // ENHANCED: Category-specific action buttons with DUAL options for Google Places
     let actionButton;
     if (category === 'primary' || category === 'database') {
-        // Database businesses
+        // Database businesses - just view on map
         actionButton = `<button class="view-map-btn ${category}" onclick="focusOnMapMarker('${business._id}')">📍 View on Map</button>`;
     } else {
-        // Google Places businesses
-        if (business.chain_id) {
-            actionButton = `<button class="add-to-db-btn chain" onclick="addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">🔗 Add Chain Location</button>`;
-        } else {
-            actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.placeId}')">➕ Add to Database</button>`;
-        }
+        // ENHANCED: Google Places businesses get BOTH options
+        const businessIdForMap = business._id || business.placeId; // Use either _id or placeId for map viewing
+        let addButtonText = business.chain_id ? '🔗 Add Chain Location' : '➕ Add to Database';
+        let addButtonOnClick = business.chain_id ?
+            `addBusinessToDatabase('${business.placeId}', '${business.chain_id}')` :
+            `addBusinessToDatabase('${business.placeId}')`;
+
+        actionButton = `
+            <div class="dual-action-buttons">
+                <button class="view-map-btn places" onclick="focusOnGooglePlacesMarker('${businessIdForMap}')">📍 View on Map</button>
+                <button class="add-to-db-btn ${business.chain_id ? 'chain' : ''}" onclick="${addButtonOnClick}">${addButtonText}</button>
+            </div>
+        `;
     }
 
     // Create the row with category styling
@@ -8275,7 +8284,6 @@ function addCategorizedBusinessRow(business, tableBody, category) {
     // Load incentives for database businesses
     if (category === 'primary' || category === 'database') {
         console.log(`🎁 Scheduling incentives load for ${category} business: ${business.bname} (ID: ${business._id})`);
-        // Use the fixed incentives function
         setTimeout(() => {
             fetchBusinessIncentivesFixed(business._id, business.chain_id);
         }, 100);
@@ -8284,6 +8292,344 @@ function addCategorizedBusinessRow(business, tableBody, category) {
         fetchChainIncentivesForPlacesResult(business._id, business.chain_id);
     }
 }
+
+/**
+ * Enhanced focusOnMapMarker function to handle Google Places businesses
+ */
+window.focusOnGooglePlacesMarker = function(businessId) {
+    console.log("focusOnGooglePlacesMarker called for business ID:", businessId);
+
+    // Check if map is initialized
+    if (!mapInitialized || !map) {
+        console.error("Map not initialized yet - cannot focus on marker");
+        alert("Map is still loading. Please try again in a moment.");
+        return;
+    }
+
+    // Check if markers exist
+    if (!markers || markers.length === 0) {
+        console.warn("No markers available yet.");
+        alert("No businesses are currently displayed on the map.");
+        return;
+    }
+
+    // Find the marker for this Google Places business
+    // Could be identified by business._id, business.placeId, or formatted ID
+    const marker = markers.find(m => {
+        if (!m.business) return false;
+
+        return m.business._id === businessId ||
+            m.business.placeId === businessId ||
+            m.business._id === `google_${businessId}` ||
+            businessId.includes(m.business.placeId);
+    });
+
+    if (marker) {
+        try {
+            // Get position from marker
+            let position;
+            if (marker.getPosition && typeof marker.getPosition === 'function') {
+                position = marker.getPosition();
+            } else if (marker.position) {
+                position = marker.position;
+            } else if (marker.business && marker.business.lat && marker.business.lng) {
+                position = new google.maps.LatLng(
+                    parseFloat(marker.business.lat),
+                    parseFloat(marker.business.lng)
+                );
+            } else {
+                console.error("Could not determine marker position");
+                alert("Could not focus on this business on the map.");
+                return;
+            }
+
+            // Center the map on this marker
+            map.setCenter(position);
+            map.setZoom(16);
+
+            // Show enhanced info window (use the appropriate function based on your setup)
+            if (typeof showEnhancedInfoWindowWithCategory === 'function') {
+                showEnhancedInfoWindowWithCategory(marker);
+            } else if (typeof showEnhancedInfoWindow === 'function') {
+                showEnhancedInfoWindow(marker);
+            } else {
+                // Fallback to basic info window
+                showInfoWindow(marker);
+            }
+
+            // Scroll to the map
+            document.getElementById('map').scrollIntoView({behavior: 'smooth'});
+
+            console.log("Successfully focused on Google Places marker for business:", businessId);
+        } catch (error) {
+            console.error("Error focusing on Google Places marker:", error);
+            alert("There was an error focusing on this business on the map.");
+        }
+    } else {
+        console.warn(`No marker found for Google Places business ID: ${businessId}`);
+
+        // Try to find by business name as fallback
+        const businessNameMarker = markers.find(m =>
+            m.business && businessId.toLowerCase().includes(m.business.bname.toLowerCase())
+        );
+
+        if (businessNameMarker) {
+            console.log("Found marker by business name, focusing on that instead");
+            // Recursively call with the correct ID
+            const correctId = businessNameMarker.business._id || businessNameMarker.business.placeId;
+            window.focusOnGooglePlacesMarker(correctId);
+        } else {
+            alert("Could not find this business on the map. It may not be currently displayed.");
+        }
+    }
+};
+
+/**
+ * Enhanced info window content for Google Places with dual action buttons
+ */
+function buildCategoryAwareInfoWindowContentEnhanced(business) {
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+    const isFromDatabase = business.isFromDatabase === true;
+    const isNearbyDatabase = business.isNearbyDatabase === true;
+    const isPrimaryResult = business.isPrimaryResult === true;
+
+    // ... (address, phone, type, distance HTML - same as before)
+    let addressHTML = '';
+    if (business.address1) {
+        addressHTML = `<div class="info-address">
+            <strong>📍 Address:</strong><br>
+            ${business.address1}`;
+
+        if (business.address2) {
+            addressHTML += `<br>${business.address2}`;
+        }
+
+        const locationParts = [];
+        if (business.city) locationParts.push(business.city);
+        if (business.state) locationParts.push(business.state);
+        if (business.zip) locationParts.push(business.zip);
+
+        if (locationParts.length > 0) {
+            addressHTML += `<br>${locationParts.join(', ')}`;
+        }
+
+        addressHTML += '</div>';
+    } else if (business.formattedAddress) {
+        const addressParts = business.formattedAddress.split(',').map(part => part.trim());
+        addressHTML = `<div class="info-address">
+            <strong>📍 Address:</strong><br>`;
+
+        if (addressParts.length >= 1) {
+            addressHTML += addressParts[0];
+        }
+        if (addressParts.length >= 2) {
+            addressHTML += `<br>${addressParts.slice(1).join(', ')}`;
+        }
+
+        addressHTML += '</div>';
+    }
+
+    const phoneHTML = business.phone ?
+        `<div class="info-phone"><strong>📞 Phone:</strong> <a href="tel:${business.phone.replace(/\D/g, '')}" style="color: #4285F4; text-decoration: none;">${business.phone}</a></div>` : '';
+
+    let typeHTML = '';
+    if (business.type && business.type !== 'OTHER') {
+        typeHTML = `<div class="info-type"><strong>🏢 Type:</strong> ${getBusinessTypeLabel(business.type)}</div>`;
+    }
+
+    const distanceHTML = business.distance ?
+        `<div class="info-distance"><strong>📏 Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</div>` : '';
+
+    // Enhanced chain badge with category awareness
+    let chainBadge = '';
+    if (isChainLocation) {
+        const badgeColor = isPrimaryResult ? '#4285F4' : isNearbyDatabase ? '#28a745' : '#4285F4';
+        chainBadge = `<span class="enhanced-chain-badge" style="background-color: ${badgeColor};">🔗 ${business.chain_name || 'Chain Location'}</span>`;
+    }
+
+    // Category-aware status messaging
+    let statusHTML = '';
+    let explanationHTML = '';
+
+    if (isPrimaryResult) {
+        statusHTML = '<div class="info-status primary-result">🎯 This business matches your search and is in the Patriot Thanks database.</div>';
+    } else if (isNearbyDatabase) {
+        statusHTML = '<div class="info-status nearby-database">🏢 This business is in the Patriot Thanks database (found nearby).</div>';
+        explanationHTML = '<div class="nearby-explanation">💡 This business appeared because it\'s in your search area and already in our database.</div>';
+    } else if (isGooglePlace && isChainLocation) {
+        statusHTML = '<div class="info-status chain-match">🔗 This location appears to match a chain in our database!</div>';
+        explanationHTML = `<div class="chain-explanation">
+            ✨ Great news! This location matches <strong>${business.chain_name}</strong> in our database. 
+            Chain-wide incentives should apply to this location once added.
+        </div>`;
+    } else if (isGooglePlace) {
+        statusHTML = '<div class="info-status google-place">ℹ️ This business is not yet in the Patriot Thanks database.</div>';
+    }
+
+    // ENHANCED: Action buttons for Google Places with add option only (map viewing is handled by marker click)
+    let actionButton;
+    if (isFromDatabase) {
+        // Database business (both primary and nearby) - no need for action button in info window since it's already in database
+        actionButton = `
+            <div class="info-note">
+                <em>ℹ️ This business is already in the Patriot Thanks database. Click anywhere outside to close.</em>
+            </div>
+        `;
+    } else if (isGooglePlace && isChainLocation) {
+        // Google Places with chain match
+        actionButton = `
+            <button class="enhanced-add-btn chain-add" onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
+                🔗 Add ${business.chain_name} Location
+            </button>
+        `;
+    } else if (isGooglePlace) {
+        // Regular Google Places
+        actionButton = `
+            <button class="enhanced-add-btn" onclick="window.addBusinessToDatabase('${business.placeId}')">
+                ➕ Add to Patriot Thanks
+            </button>
+        `;
+    }
+
+    // Container ID for incentives
+    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
+
+    // Category-aware incentives messaging
+    let incentivesMessage;
+    if (isFromDatabase && isChainLocation) {
+        incentivesMessage = '<em>⏳ Loading chain incentives...</em>';
+    } else if (isFromDatabase) {
+        incentivesMessage = '<em>⏳ Loading incentives...</em>';
+    } else if (isGooglePlace && isChainLocation) {
+        incentivesMessage = '<em>⏳ Loading chain incentives...</em>';
+    } else {
+        incentivesMessage = '<em>💡 Add this business to see available incentives.</em>';
+    }
+
+    return `
+        <div class="enhanced-info-window category-aware">
+            <div class="info-header">
+                <h3>${business.bname} ${chainBadge}</h3>
+            </div>
+            
+            <div class="info-body">
+                ${addressHTML}
+                ${phoneHTML}
+                ${typeHTML}
+                ${distanceHTML}
+                ${statusHTML}
+                ${explanationHTML}
+                
+                <div class="info-incentives">
+                    <div id="incentives-container-${containerId}">
+                        ${incentivesMessage}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-actions">
+                ${actionButton}
+            </div>
+        </div>
+    `;
+}
+
+
+/**
+ * Enhanced CSS for dual action buttons
+ */
+function addDualActionButtonStyles() {
+    if (!document.getElementById('dual-action-button-styles')) {
+        const style = document.createElement('style');
+        style.id = 'dual-action-button-styles';
+        style.textContent = `
+            /* Dual action button container */
+            .dual-action-buttons {
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+                align-items: center;
+            }
+
+            /* Button styling for dual actions */
+            .dual-action-buttons .view-map-btn,
+            .dual-action-buttons .add-to-db-btn {
+                width: 100%;
+                max-width: 160px;
+                padding: 6px 10px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: 500;
+                text-align: center;
+                transition: all 0.2s ease;
+            }
+
+            /* View on Map button styling */
+            .dual-action-buttons .view-map-btn {
+                background: linear-gradient(45deg, #2196F3, #64B5F6);
+                color: white;
+                border: 1px solid #1976D2;
+            }
+
+            .dual-action-buttons .view-map-btn:hover {
+                background: linear-gradient(45deg, #1976D2, #42A5F5);
+                transform: translateY(-1px);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+
+            /* Add to Database button styling */
+            .dual-action-buttons .add-to-db-btn {
+                background: linear-gradient(45deg, #4CAF50, #81C784);
+                color: white;
+                border: 1px solid #388E3C;
+            }
+
+            .dual-action-buttons .add-to-db-btn.chain {
+                background: linear-gradient(45deg, #FF9800, #FFB74D);
+                border-color: #F57C00;
+            }
+
+            .dual-action-buttons .add-to-db-btn:hover {
+                background: linear-gradient(45deg, #388E3C, #66BB6A);
+                transform: translateY(-1px);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+
+            .dual-action-buttons .add-to-db-btn.chain:hover {
+                background: linear-gradient(45deg, #F57C00, #FFA726);
+            }
+
+            /* Responsive adjustments */
+            @media (max-width: 768px) {
+                .dual-action-buttons {
+                    gap: 3px;
+                }
+                
+                .dual-action-buttons .view-map-btn,
+                .dual-action-buttons .add-to-db-btn {
+                    font-size: 10px;
+                    padding: 5px 8px;
+                }
+            }
+
+            /* Info window note styling */
+            .info-note {
+                padding: 8px;
+                background-color: #E3F2FD;
+                border-radius: 4px;
+                text-align: center;
+                font-style: italic;
+                color: #1565C0;
+                border: 1px solid #BBDEFB;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
 
 // FIX 6: Enhanced success message with categories
 function showEnhancedSearchSuccessMessage(primaryCount, nearbyDatabaseCount, placesCount) {
@@ -10052,9 +10398,17 @@ async function debugNearbySearchOnly() {
     }
 }
 
+
+// Initialize the dual action button styles
+if (typeof document !== 'undefined') {
+    addDualActionButtonStyles();
+}
+
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = performEnhancedBusinessSearchWithNearbyFixed;
+    window.addCategorizedBusinessRow = addCategorizedBusinessRowEnhanced;
+    window.buildCategoryAwareInfoWindowContent = buildCategoryAwareInfoWindowContentEnhanced;
     window.performEnhancedBusinessSearchWithNearbyFixed = performEnhancedBusinessSearchWithNearbyFixed;
     window.searchNearbyDatabaseBusinessesWithDebugging = searchNearbyDatabaseBusinessesWithDebugging;
     window.testNearbySearchFix = testNearbySearchFix;
@@ -10085,10 +10439,8 @@ if (typeof window !== 'undefined') {
     window.createAddressKey = createAddressKey;
     window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerWithCategory;
     window.showEnhancedInfoWindowWithCategory = showEnhancedInfoWindowWithCategory;
-    window.buildCategoryAwareInfoWindowContent = buildCategoryAwareInfoWindowContent;
     window.createCategorizedBusinessMarker = createCategorizedBusinessMarker;
     window.addTableSectionHeader = addTableSectionHeader;
-    window.addCategorizedBusinessRow = addCategorizedBusinessRow;
     window.showEnhancedSearchSuccessMessage = showEnhancedSearchSuccessMessage;
     window.updateMapLegendWithCategories = updateMapLegendWithCategories;
     window.testCategorizedSearch = testCategorizedSearch;
