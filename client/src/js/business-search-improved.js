@@ -1082,27 +1082,38 @@ function checkForNewlyAddedBusiness() {
     const urlParams = new URLSearchParams(window.location.search);
     const newBusinessAdded = urlParams.get('business_added');
     const businessName = urlParams.get('business_name');
+    const businessId = urlParams.get('business_id');
 
     if (newBusinessAdded === 'true' && businessName) {
-        // Show success message
-        showNewBusinessAlert(businessName);
+        // Show enhanced success message
+        showBusinessAddedSuccessMessage(businessName, businessId);
 
-        // Pre-fill search form with the business name
+        // Clean up URL parameters
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+
+        // Pre-fill search form with the business name (but no address to get all locations)
         const businessNameField = document.getElementById('business-name');
+        const addressField = document.getElementById('address');
+
         if (businessNameField) {
             businessNameField.value = businessName;
             validateField(businessNameField, isNotEmpty);
+        }
+
+        // IMPORTANT: Clear the address field to search for all locations of this business
+        if (addressField) {
+            addressField.value = '';
         }
 
         // Automatically trigger search after a short delay
         setTimeout(() => {
             const searchForm = document.getElementById('business-search-form');
             if (searchForm) {
-                // Create and dispatch a submit event
                 const submitEvent = new Event('submit', {cancelable: true});
                 searchForm.dispatchEvent(submitEvent);
             }
-        }, 500);
+        }, 1000);
     }
 }
 
@@ -1429,11 +1440,19 @@ function displayBusinessesOnMap(businesses) {
     // Counter for valid markers
     let validMarkers = 0;
     let nearbyMarkers = 0;
+    let skippedBusinesses = 0;
 
     // Process each business
     businesses.forEach(business => {
         try {
             console.log("Processing business for map:", business.bname);
+
+            // CRITICAL FIX: Skip parent chain businesses (no physical location)
+            if (business.is_chain === true) {
+                console.log(`Skipping parent chain business: ${business.bname} (no physical location)`);
+                skippedBusinesses++;
+                return;
+            }
 
             // Handle different coordinate formats
             let lat, lng;
@@ -1448,12 +1467,21 @@ function displayBusinessesOnMap(businesses) {
                 lng = parseFloat(business.lng);
             } else {
                 console.warn(`Business ${business.bname} missing coordinates`);
+                skippedBusinesses++;
                 return;
             }
 
-            // Validate coordinates
-            if (isNaN(lat) || isNaN(lng)) {
-                console.warn(`Invalid coordinates for ${business.bname}:`, lat, lng);
+            // Enhanced coordinate validation
+            if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+                console.warn(`Invalid coordinates for ${business.bname}: lat=${lat}, lng=${lng}`);
+                skippedBusinesses++;
+                return;
+            }
+
+            // Validate coordinate ranges
+            if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+                console.warn(`Coordinates out of range for ${business.bname}: lat=${lat}, lng=${lng}`);
+                skippedBusinesses++;
                 return;
             }
 
@@ -1494,10 +1522,11 @@ function displayBusinessesOnMap(businesses) {
             }
         } catch (error) {
             console.error(`Error adding business ${business.bname} to map:`, error);
+            skippedBusinesses++;
         }
     });
 
-    console.log(`Added ${validMarkers} valid markers to the map (${nearbyMarkers} nearby)`);
+    console.log(`Added ${validMarkers} valid markers to the map (${nearbyMarkers} nearby, ${skippedBusinesses} skipped)`);
 
     // IMPROVED MAP CENTERING LOGIC
     setTimeout(() => {
@@ -1533,7 +1562,7 @@ function displayBusinessesOnMap(businesses) {
             }
             // Priority 4: Default fallback
             else {
-                console.log("Using default map center");
+                console.log("Using default map center (no valid businesses to display)");
                 map.setCenter(CONFIG.defaultCenter);
                 map.setZoom(CONFIG.defaultZoom);
             }
@@ -1542,12 +1571,6 @@ function displayBusinessesOnMap(businesses) {
         }
     }, 200);
 }
-
-// Export the enhanced functions
-if (typeof window !== 'undefined') {
-}
-
-console.log("Enhanced Las Vegas search fix loaded!");
 
 /**
  * Fixed geocodeAddressClientSide function for reliable geocoding
@@ -4456,10 +4479,26 @@ function addEnhancedLoadingCSS() {
 function addBusinessRow(business, tableBody, isFromPlaces) {
     if (!business) return;
 
-    // Format the address line
-    const addressLine = business.address2
-        ? `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}`
-        : `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
+    // CRITICAL FIX: Don't display parent chain businesses in location search results
+    if (business.is_chain === true) {
+        console.log(`Skipping parent chain business in table: ${business.bname}`);
+        return;
+    }
+
+    // Ensure we have valid address information for display
+    let addressLine = '';
+
+    if (business.address1) {
+        addressLine = business.address2 ?
+            `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}` :
+            `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
+    } else if (business.formattedAddress) {
+        addressLine = business.formattedAddress.replace(/,/g, '<br>');
+    } else {
+        // If no address available, this shouldn't be in location results
+        console.warn(`Business ${business.bname} has no address information`);
+        return;
+    }
 
     // Convert business type to readable label
     const businessType = getBusinessTypeLabel(business.type);
@@ -4469,33 +4508,23 @@ function addBusinessRow(business, tableBody, isFromPlaces) {
     const isParentChain = !!business.is_chain;
     const isGooglePlace = !!business.isGooglePlace;
 
-    // Create chain badge
+    // Create chain badge - only for chain locations, not parent chains
     let chainBadge = '';
-    if (isParentChain) {
-        chainBadge = '<span class="chain-badge">National Chain</span>';
-    } else if (isChainLocation) {
+    if (isChainLocation && !isParentChain) {
         chainBadge = '<span class="chain-badge">Chain Location</span>';
-    } else if (isFromPlaces && business.chain_name) {
-        chainBadge = `<span class="chain-badge">Potential ${business.chain_name || 'Chain'} Location</span>`;
     }
 
     // Create appropriate action button
     let actionButton;
 
-    if (isParentChain) {
-        const isAdmin = checkIfUserIsAdmin();
-        if (isAdmin) {
-            actionButton = `<button class="admin-action-btn" onclick="handleChainBusinessAction('${business._id}', true)">Admin: Edit Chain</button>`;
-        } else {
-            actionButton = `<button class="view-chain-btn" onclick="viewChainDetails('${business._id}')">View Chain Info</button>`;
-        }
-    } else if (isGooglePlace) {
+    if (isGooglePlace) {
         if (isChainLocation) {
             actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.place_data?.place_id || business.placeId || ''}', '${business.chain_id || ''}')">Add Chain Location</button>`;
         } else {
             actionButton = `<button class="add-to-db-btn" onclick="addBusinessToDatabase('${business.place_data?.place_id || business.placeId || ''}')">Add to Database</button>`;
         }
     } else {
+        // Database business - regular view on map button
         actionButton = `<button class="view-map-btn" onclick="focusOnMapMarker('${business._id}')">View on Map</button>`;
     }
 
@@ -4515,13 +4544,14 @@ function addBusinessRow(business, tableBody, isFromPlaces) {
 
     tableBody.appendChild(row);
 
-    // Handle incentives lookup
+    // Handle incentives lookup - only for actual business locations
     if (isFromPlaces && isChainLocation) {
         fetchChainIncentivesForPlacesResult(business._id, business.chain_id);
-    } else if (!isGooglePlace) {
+    } else if (!isGooglePlace && !isParentChain) {
         fetchBusinessIncentives(business._id, business.chain_id);
     }
 }
+
 
 /**
  * Fetch incentives for a specific business for table display
@@ -6689,12 +6719,65 @@ async function searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCac
     }
 
     const data = await response.json();
-    return data.results || [];
+    const rawResults = data.results || [];
+
+    // CRITICAL FIX: Filter out parent chain businesses from location-based searches
+    const filteredResults = rawResults.filter(business => {
+        // Always exclude parent chains (businesses with is_chain: true) from location searches
+        if (business.is_chain === true) {
+            console.log(`Filtering out parent chain business: ${business.bname}`);
+            return false;
+        }
+
+        // For location-based searches, ensure business has valid coordinates
+        if (searchLocation) {
+            const hasValidLocation = hasValidCoordinates(business);
+            if (!hasValidLocation) {
+                console.log(`Filtering out business without valid coordinates: ${business.bname}`);
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    console.log(`📊 Filtered ${rawResults.length} raw results to ${filteredResults.length} location businesses`);
+
+    return filteredResults;
+}
+
+/**
+ * Check if a business has valid coordinates
+ * @param {Object} business - Business object
+ * @returns {boolean} True if business has valid coordinates
+ */
+function hasValidCoordinates(business) {
+    // Check direct lat/lng fields
+    if (business.lat !== undefined && business.lng !== undefined) {
+        const lat = parseFloat(business.lat);
+        const lng = parseFloat(business.lng);
+        return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    }
+
+    // Check GeoJSON coordinates
+    if (business.location && business.location.coordinates &&
+        Array.isArray(business.location.coordinates) && business.location.coordinates.length >= 2) {
+        const lng = parseFloat(business.location.coordinates[0]);
+        const lat = parseFloat(business.location.coordinates[1]);
+        return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    }
+
+    return false;
 }
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = retrieveFromMongoDB;
+    window.searchDatabaseWithFuzzyMatching = searchDatabaseWithFuzzyMatching;
+    window.hasValidCoordinates = hasValidCoordinates;
+    window.addBusinessRow = addBusinessRow;
+    window.displayBusinessesOnMap = displayBusinessesOnMap;
+    window.checkForNewlyAddedBusiness = checkForNewlyAddedBusiness;
     window.updateLoadingMessage = updateLoadingMessage;
     window.hideLoadingIndicator = hideLoadingIndicator;
     window.showNoResultsMessage = showNoResultsMessage;
@@ -6705,7 +6788,6 @@ if (typeof window !== 'undefined') {
     window.calculateSimilarity = calculateSimilarity;
     window.extractKeywords = extractKeywords;
     window.generateNameVariations = generateNameVariations;
-    window.searchDatabaseWithFuzzyMatching = searchDatabaseWithFuzzyMatching;
     window.tryServerSideChainMatching = tryServerSideChainMatching;
     window.getChainFromDatabase = getChainFromDatabase;
     window.searchGooglePlacesForBusiness = searchGooglePlacesForBusiness;
@@ -6716,7 +6798,6 @@ if (typeof window !== 'undefined') {
     window.generateNameVariations = generateNameVariations;
     window.findMatchingChainLocally = findMatchingChainLocally;
     window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
-    window.displayBusinessesOnMap = displayBusinessesOnMap;
     window.initGoogleMap = initGoogleMap;
     window.debugMapState = debugMapState;
     window.validateField = validateField;
