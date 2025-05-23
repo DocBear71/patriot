@@ -8183,14 +8183,684 @@ function showEnhancedInfoWindowFixed(marker) {
     }, 200);
 }
 
+function buildEnhancedInfoWindowContentFixed2(business) {
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+    const isFromDatabase = !isGooglePlace;
+
+    // Enhanced address formatting
+    let addressHTML = '';
+    if (business.address1) {
+        addressHTML = `<div class="info-address">
+            <strong>📍 Address:</strong><br>
+            ${business.address1}`;
+
+        if (business.address2) {
+            addressHTML += `<br>${business.address2}`;
+        }
+
+        const locationParts = [];
+        if (business.city) locationParts.push(business.city);
+        if (business.state) locationParts.push(business.state);
+        if (business.zip) locationParts.push(business.zip);
+
+        if (locationParts.length > 0) {
+            addressHTML += `<br>${locationParts.join(', ')}`;
+        }
+
+        addressHTML += '</div>';
+    } else if (business.formattedAddress) {
+        const addressParts = business.formattedAddress.split(',').map(part => part.trim());
+        addressHTML = `<div class="info-address">
+            <strong>📍 Address:</strong><br>`;
+
+        if (addressParts.length >= 1) {
+            addressHTML += addressParts[0];
+        }
+        if (addressParts.length >= 2) {
+            addressHTML += `<br>${addressParts.slice(1).join(', ')}`;
+        }
+
+        addressHTML += '</div>';
+    }
+
+    // Phone number
+    const phoneHTML = business.phone ?
+        `<div class="info-phone"><strong>📞 Phone:</strong> <a href="tel:${business.phone.replace(/\D/g, '')}" style="color: #4285F4; text-decoration: none;">${business.phone}</a></div>` : '';
+
+    // Business type
+    let typeHTML = '';
+    if (business.type && business.type !== 'OTHER') {
+        typeHTML = `<div class="info-type"><strong>🏢 Type:</strong> ${getBusinessTypeLabel(business.type)}</div>`;
+    }
+
+    // Distance
+    const distanceHTML = business.distance ?
+        `<div class="info-distance"><strong>📏 Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</div>` : '';
+
+    // Chain badge
+    const chainBadge = isChainLocation ?
+        `<span class="enhanced-chain-badge">🔗 ${business.chain_name || 'Chain Location'}</span>` : '';
+
+    // Status and messaging
+    let statusHTML = '';
+    let chainExplanation = '';
+
+    if (isGooglePlace) {
+        if (isChainLocation) {
+            statusHTML = '<div class="info-status chain-match">🔗 This location appears to match a chain in our database!</div>';
+            chainExplanation = `<div class="chain-explanation">
+                ✨ Great news! This location matches <strong>${business.chain_name}</strong> in our database. 
+                Chain-wide incentives should apply to this location once added.
+            </div>`;
+        } else {
+            statusHTML = '<div class="info-status google-place">ℹ️ This business is not yet in the Patriot Thanks database.</div>';
+        }
+    } else {
+        statusHTML = '<div class="info-status database-business">✅ This business is in the Patriot Thanks database.</div>';
+    }
+
+    // Action button
+    let actionButton;
+    if (isGooglePlace) {
+        if (isChainLocation) {
+            actionButton = `
+                <button class="enhanced-add-btn chain-add" onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
+                    🔗 Add ${business.chain_name} Location
+                </button>
+            `;
+        } else {
+            actionButton = `
+                <button class="enhanced-add-btn" onclick="window.addBusinessToDatabase('${business.placeId}')">
+                    ➕ Add to Patriot Thanks
+                </button>
+            `;
+        }
+    } else {
+        actionButton = `
+            <button class="enhanced-view-btn" onclick="window.viewBusinessDetails('${business._id}')">
+                👁️ View Details
+            </button>
+        `;
+    }
+
+    // CRITICAL FIX: Use consistent container ID format
+    // For Google Places: use "google_" + placeId format to match table IDs
+    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
+
+    console.log(`🆔 INFO WINDOW: Using container ID: ${containerId} for business: ${business.bname}`);
+
+    // FIXED: Incentives messaging with proper chain handling
+    let incentivesMessage;
+    if (isFromDatabase && isChainLocation) {
+        incentivesMessage = '<em>⏳ Loading chain incentives...</em>';
+    } else if (isFromDatabase) {
+        incentivesMessage = '<em>⏳ Loading incentives...</em>';
+    } else if (isGooglePlace && isChainLocation) {
+        incentivesMessage = '<em>⏳ Loading chain incentives...</em>';
+    } else {
+        incentivesMessage = '<em>💡 Add this business to see available incentives.</em>';
+    }
+
+    return `
+        <div class="enhanced-info-window">
+            <div class="info-header">
+                <h3>${business.bname} ${chainBadge}</h3>
+            </div>
+            
+            <div class="info-body">
+                ${addressHTML}
+                ${phoneHTML}
+                ${typeHTML}
+                ${distanceHTML}
+                ${statusHTML}
+                ${chainExplanation}
+                
+                <div class="info-incentives">
+                    <div id="incentives-container-${containerId}">
+                        ${incentivesMessage}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-actions">
+                ${actionButton}
+            </div>
+        </div>
+    `;
+}
+
+// FIX 2: Enhanced info window display with consistent container ID handling
+function showEnhancedInfoWindowFixed2(marker) {
+    console.log("🪟 INFO WINDOW: Showing enhanced info window for:", marker.business?.bname);
+
+    if (!marker || !marker.business) {
+        console.error("❌ Invalid marker for info window");
+        return;
+    }
+
+    const business = marker.business;
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+    const isFromDatabase = !isGooglePlace;
+
+    // Close existing info window
+    if (infoWindow) {
+        infoWindow.close();
+    }
+
+    // Create new info window
+    infoWindow = new google.maps.InfoWindow({
+        maxWidth: 320,
+        disableAutoPan: false
+    });
+
+    // Build enhanced content
+    const content = buildEnhancedInfoWindowContentFixed2(business);
+
+    // Set content
+    infoWindow.setContent(content);
+
+    // Get position
+    let position = marker.position;
+    if (!position && marker.getPosition) {
+        position = marker.getPosition();
+    }
+    if (!position) {
+        position = createSafeLatLng(business);
+    }
+
+    if (!position) {
+        console.error("❌ Could not determine position for info window");
+        return;
+    }
+
+    // Pan to position
+    try {
+        map.panTo(position);
+    } catch (panError) {
+        console.warn("⚠️ Error panning to position:", panError);
+    }
+
+    // Open info window
+    setTimeout(() => {
+        try {
+            if (marker.getPosition) {
+                infoWindow.open(map, marker);
+            } else {
+                infoWindow.setPosition(position);
+                infoWindow.open(map);
+            }
+
+            console.log("✅ Info window opened successfully");
+
+            // Load incentives after DOM is ready
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
+                setTimeout(() => {
+                    applyEnhancedInfoWindowFixes();
+
+                    // FIXED: Use consistent container ID logic
+                    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
+
+                    console.log(`🎁 INCENTIVES: Loading for container ID: ${containerId}`);
+
+                    if (isFromDatabase && isChainLocation) {
+                        // Database business with chain - load chain incentives
+                        console.log(`🔗 Loading chain incentives for database business: ${business.bname}`);
+                        loadChainIncentivesForDatabaseBusinessFixed(containerId, business.chain_id);
+                    } else if (isFromDatabase) {
+                        // Database business without chain - load regular incentives
+                        console.log(`🏢 Loading regular incentives for database business: ${business.bname}`);
+                        loadIncentivesForEnhancedWindowFixed(containerId);
+                    } else if (isGooglePlace && isChainLocation) {
+                        // Google Places with chain - load chain incentives
+                        console.log(`🌐 Loading chain incentives for Google Places: ${business.bname}`);
+                        loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
+                    }
+                    // Non-chain Google Places don't need incentives loaded
+                }, 300);
+            });
+
+        } catch (error) {
+            console.error("❌ Error opening info window:", error);
+        }
+    }, 200);
+}
+
+// FIX 3: Enhanced chain incentives loading with consistent container ID
+function loadChainIncentivesForEnhancedWindowFixed(containerId, chainId) {
+    console.log(`🔗 CHAIN INCENTIVES: Loading for container ${containerId}, chain ${chainId}`);
+
+    const container = document.getElementById(`incentives-container-${containerId}`);
+    if (!container) {
+        console.error(`❌ Container not found: incentives-container-${containerId}`);
+
+        // Debug: List available containers
+        const allContainers = document.querySelectorAll('[id*="incentives-container"]');
+        console.log("🔍 Available containers:", Array.from(allContainers).map(c => c.id));
+        return;
+    }
+
+    console.log(`✅ Found container: incentives-container-${containerId}`);
+
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
+
+    console.log(`🌐 Fetching chain incentives from: ${apiURL}`);
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Chain incentives API failed: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`📊 Chain incentives data:`, data);
+
+            if (!data.results || data.results.length === 0) {
+                container.innerHTML = '<em>💭 No chain incentives available</em>';
+                return;
+            }
+
+            let incentivesHTML = '<div class="incentives-header"><strong>🎁 Chain-wide Incentives:</strong></div>';
+            incentivesHTML += '<div class="incentives-list">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+
+                    incentivesHTML += `
+                        <div class="incentive-item chain-incentive">
+                            <div class="incentive-type">${typeLabel}${otherDescription}:</div>
+                            <div class="incentive-amount">${incentive.amount}% <span class="mini-chain-badge">🔗 Chain-wide</span></div>
+                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                        </div>
+                    `;
+                }
+            });
+
+            incentivesHTML += '</div>';
+            incentivesHTML += '<div class="chain-note">✨ Great! These incentives apply to all locations of this chain.</div>';
+
+            container.innerHTML = incentivesHTML;
+
+            console.log(`✅ Successfully loaded chain incentives for ${containerId}`);
+        })
+        .catch(error => {
+            console.error(`❌ Error loading chain incentives:`, error);
+            container.innerHTML = '<em>❌ Error loading chain incentives</em>';
+        });
+}
+
+// FIX 4: Enhanced regular incentives loading
+function loadIncentivesForEnhancedWindowFixed(containerId) {
+    console.log(`🏢 REGULAR INCENTIVES: Loading for container ${containerId}`);
+
+    const container = document.getElementById(`incentives-container-${containerId}`);
+    if (!container) {
+        console.error(`❌ Container not found: incentives-container-${containerId}`);
+        return;
+    }
+
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${containerId}`;
+
+    fetch(apiURL)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.results || data.results.length === 0) {
+                container.innerHTML = '<em>💭 No incentives available</em>';
+                return;
+            }
+
+            let incentivesHTML = '<div class="incentives-header"><strong>🎁 Available Incentives:</strong></div>';
+            incentivesHTML += '<div class="incentives-list">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+                    const chainBadge = incentive.is_chain_wide ?
+                        '<span class="mini-chain-badge">🔗 Chain-wide</span>' : '';
+
+                    incentivesHTML += `
+                        <div class="incentive-item">
+                            <div class="incentive-type">${typeLabel}${otherDescription}:</div>
+                            <div class="incentive-amount">${incentive.amount}% ${chainBadge}</div>
+                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                        </div>
+                    `;
+                }
+            });
+
+            incentivesHTML += '</div>';
+            container.innerHTML = incentivesHTML;
+
+            console.log(`✅ Successfully loaded regular incentives for ${containerId}`);
+        })
+        .catch(error => {
+            console.error("❌ Error loading incentives:", error);
+            container.innerHTML = '<em>❌ Error loading incentives</em>';
+        });
+}
+
+// FIX 5: Enhanced database business chain incentives loading
+function loadChainIncentivesForDatabaseBusinessFixed(containerId, chainId) {
+    console.log(`🔗 DATABASE CHAIN INCENTIVES: Loading for container ${containerId}, chain ${chainId}`);
+
+    const container = document.getElementById(`incentives-container-${containerId}`);
+    if (!container) {
+        console.error(`❌ Container not found: incentives-container-${containerId}`);
+        return;
+    }
+
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
+
+    console.log(`🌐 Fetching database chain incentives from: ${apiURL}`);
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Chain incentives API failed: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`📊 Database chain incentives data:`, data);
+
+            if (!data.results || data.results.length === 0) {
+                container.innerHTML = '<em>💭 No chain incentives available</em>';
+                return;
+            }
+
+            let incentivesHTML = '<div class="incentives-header"><strong>🎁 Available Incentives:</strong></div>';
+            incentivesHTML += '<div class="incentives-list">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+
+                    incentivesHTML += `
+                        <div class="incentive-item chain-incentive">
+                            <div class="incentive-type">${typeLabel}${otherDescription}:</div>
+                            <div class="incentive-amount">${incentive.amount}% <span class="mini-chain-badge">🔗 Chain-wide</span></div>
+                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                        </div>
+                    `;
+                }
+            });
+
+            incentivesHTML += '</div>';
+            container.innerHTML = incentivesHTML;
+
+            console.log(`✅ Successfully loaded database chain incentives for ${containerId}`);
+        })
+        .catch(error => {
+            console.error(`❌ Error loading database chain incentives:`, error);
+            container.innerHTML = '<em>❌ Error loading chain incentives</em>';
+        });
+}
+
+// Create a cache for chain matching results
+const chainMatchCache = new Map();
+const apiCallQueue = [];
+let isProcessingQueue = false;
+
+// FIX 1: Rate-limited chain matching with caching
+async function findMatchingChainForPlaceResultFixed(placeName) {
+    try {
+        if (!placeName) return null;
+
+        console.log("🔍 CACHED CHAIN MATCHING: Checking for:", placeName);
+
+        const cleanPlaceName = placeName.trim().toLowerCase();
+
+        // Check cache first
+        if (chainMatchCache.has(cleanPlaceName)) {
+            const cachedResult = chainMatchCache.get(cleanPlaceName);
+            console.log(`💾 CACHE HIT: ${placeName} → ${cachedResult ? cachedResult.bname : 'No match'}`);
+            return cachedResult;
+        }
+
+        // Try local matching first (faster and doesn't use API)
+        const localMatch = await findMatchingChainLocallyEnhanced(placeName);
+        if (localMatch) {
+            console.log(`🏠 LOCAL MATCH: ${placeName} → ${localMatch.bname}`);
+            chainMatchCache.set(cleanPlaceName, localMatch);
+            return localMatch;
+        }
+
+        // Queue API call to avoid rate limiting
+        return new Promise((resolve) => {
+            apiCallQueue.push({
+                placeName: placeName,
+                cleanName: cleanPlaceName,
+                resolve: resolve
+            });
+
+            processApiQueue();
+        });
+
+    } catch (error) {
+        console.error("❌ Error in cached chain matching:", error);
+        return null;
+    }
+}
+
+// FIX 2: Process API queue with rate limiting
+async function processApiQueue() {
+    if (isProcessingQueue || apiCallQueue.length === 0) {
+        return;
+    }
+
+    isProcessingQueue = true;
+
+    while (apiCallQueue.length > 0) {
+        const { placeName, cleanName, resolve } = apiCallQueue.shift();
+
+        try {
+            console.log(`🌐 API QUEUE: Processing ${placeName} (${apiCallQueue.length} remaining)`);
+
+            // Try server-side matching with single call
+            const serverMatch = await tryServerSideChainMatchingOptimized(placeName);
+
+            if (serverMatch) {
+                console.log(`✅ SERVER MATCH: ${placeName} → ${serverMatch.bname}`);
+                chainMatchCache.set(cleanName, serverMatch);
+                resolve(serverMatch);
+            } else {
+                console.log(`❌ NO MATCH: ${placeName}`);
+                chainMatchCache.set(cleanName, null);
+                resolve(null);
+            }
+
+            // Rate limiting: wait 200ms between API calls
+            if (apiCallQueue.length > 0) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+        } catch (error) {
+            console.error(`❌ API queue error for ${placeName}:`, error);
+            chainMatchCache.set(cleanName, null);
+            resolve(null);
+
+            // Wait longer after error
+            if (apiCallQueue.length > 0) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+    }
+
+    isProcessingQueue = false;
+}
+
+// FIX 3: Enhanced local chain matching with more patterns
+function findMatchingChainLocallyEnhanced(placeName) {
+    return new Promise((resolve) => {
+        try {
+            if (!placeName) {
+                resolve(null);
+                return;
+            }
+
+            console.log("🏠 ENHANCED LOCAL: Matching for:", placeName);
+
+            // Enhanced chain database with more patterns
+            const enhancedChainDatabase = {
+                // Home Depot variations
+                'homedepot': {
+                    id: '681fe0e67d92c3d3e1e2a3da',
+                    name: 'The Home Depot',
+                    patterns: [
+                        /^the home depot$/i,
+                        /^home depot$/i,
+                        /^homedepot$/i,
+                        /home depot/i
+                    ]
+                },
+
+                // Olive Garden variations
+                'olivegarden': {
+                    id: '682b61ee7e3ea12414dd4665',
+                    name: 'Olive Garden',
+                    patterns: [
+                        /^olive garden$/i,
+                        /^olive garden italian restaurant$/i,
+                        /^olive garden italian$/i,
+                        /olive garden/i
+                    ]
+                },
+
+                // Lowe's variations
+                'lowes': {
+                    id: 'lowes_chain_id',
+                    name: 'Lowe\'s',
+                    patterns: [
+                        /^lowes$/i,
+                        /^lowe's$/i,
+                        /^lowes home improvement$/i,
+                        /^lowe's home improvement$/i,
+                        /lowes?/i
+                    ]
+                },
+
+                // McDonald's variations
+                'mcdonalds': {
+                    id: 'mcdonalds_chain_id',
+                    name: 'McDonald\'s',
+                    patterns: [
+                        /^mcdonalds$/i,
+                        /^mcdonald's$/i,
+                        /^mickey d's$/i,
+                        /mcdonald/i
+                    ]
+                },
+
+                // Walmart variations
+                'walmart': {
+                    id: 'walmart_chain_id',
+                    name: 'Walmart',
+                    patterns: [
+                        /^walmart$/i,
+                        /^wal-mart$/i,
+                        /^walmart supercenter$/i,
+                        /walmart/i
+                    ]
+                }
+            };
+
+            const testName = placeName.toLowerCase().trim();
+
+            // Test against all chain patterns
+            for (const [key, chain] of Object.entries(enhancedChainDatabase)) {
+                for (const pattern of chain.patterns) {
+                    if (pattern.test(testName)) {
+                        console.log(`🎯 ENHANCED LOCAL MATCH: "${placeName}" → "${chain.name}" (pattern: ${pattern})`);
+                        resolve({
+                            _id: chain.id,
+                            bname: chain.name,
+                            isLocalMatch: true
+                        });
+                        return;
+                    }
+                }
+            }
+
+            console.log(`❌ No enhanced local match for: ${placeName}`);
+            resolve(null);
+        } catch (error) {
+            console.error("❌ Error in enhanced local matching:", error);
+            resolve(null);
+        }
+    });
+}
+
+// FIX 4: Optimized server-side chain matching (single API call)
+async function tryServerSideChainMatchingOptimized(placeName) {
+    const baseURL = getBaseURL();
+
+    // Try the most likely match first - just the base name
+    const cleanName = placeName.replace(/\s+(italian\s+restaurant|restaurant|store|location|inc|llc|corp)$/i, '').trim();
+
+    try {
+        const response = await fetch(`${baseURL}/api/business.js?operation=find_matching_chain&place_name=${encodeURIComponent(cleanName)}`);
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.chain) {
+                console.log(`✅ OPTIMIZED SERVER MATCH: "${placeName}" → "${data.chain.bname}" (using "${cleanName}")`);
+                return data.chain;
+            }
+        }
+    } catch (error) {
+        console.error(`❌ Optimized server matching failed for "${cleanName}":`, error.message);
+    }
+
+    console.log(`❌ No optimized server match for: ${placeName}`);
+    return null;
+}
+
+// FIX 5: Clear cache function (for testing)
+function clearChainMatchCache() {
+    chainMatchCache.clear();
+    console.log("🧹 CACHE CLEARED: Chain match cache has been cleared");
+}
+
+// FIX 6: Cache status function (for debugging)
+function getChainMatchCacheStatus() {
+    console.log("📊 CACHE STATUS:");
+    console.log(`   - Total entries: ${chainMatchCache.size}`);
+    console.log(`   - API queue length: ${apiCallQueue.length}`);
+    console.log(`   - Processing queue: ${isProcessingQueue}`);
+
+    if (chainMatchCache.size > 0) {
+        console.log("   - Cached entries:");
+        for (const [key, value] of chainMatchCache.entries()) {
+            console.log(`     ${key} → ${value ? value.bname : 'No match'}`);
+        }
+    }
+}
+
+
 // Export functions for global access
 if (typeof window !== 'undefined') {
-    // Replace key functions
+    window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResultFixed;
+    window.findMatchingChainLocallyEnhanced = findMatchingChainLocallyEnhanced;
+    window.tryServerSideChainMatchingOptimized = tryServerSideChainMatchingOptimized;
+    window.clearChainMatchCache = clearChainMatchCache;
+    window.getChainMatchCacheStatus = getChainMatchCacheStatus;
+    window.processApiQueue = processApiQueue;
+    window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContentFixed2;
+    window.showEnhancedInfoWindow = showEnhancedInfoWindowFixed2;
+    window.loadChainIncentivesForEnhancedWindow = loadChainIncentivesForEnhancedWindowFixed;
+    window.loadIncentivesForEnhancedWindow = loadIncentivesForEnhancedWindowFixed;
+    window.loadChainIncentivesForDatabaseBusiness = loadChainIncentivesForDatabaseBusinessFixed;
     window.searchGooglePlacesForBusiness = searchGooglePlacesForBusinessFixed;
     window.retrieveFromMongoDB = retrieveFromMongoDBEnhanced;
-    window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContentFixed;
-    window.showEnhancedInfoWindow = showEnhancedInfoWindowFixed;
-    window.loadChainIncentivesForDatabaseBusiness = loadChainIncentivesForDatabaseBusiness;
     window.createBusinessMarker = createBusinessMarker;
     window.createEnhancedBusinessMarkerFixed = createEnhancedBusinessMarkerFixed;
     window.fetchBusinessIncentivesFixed = fetchBusinessIncentivesFixed;
@@ -8211,14 +8881,12 @@ if (typeof window !== 'undefined') {
     window.showNoResultsMessage = showNoResultsMessage;
     window.showErrorMessage = showErrorMessage;
     window.addEnhancedLoadingCSS = addEnhancedLoadingCSS;
-    window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResult;
     window.calculateSimilarity = calculateSimilarity;
     window.extractKeywords = extractKeywords;
     window.generateNameVariations = generateNameVariations;
     window.tryServerSideChainMatching = tryServerSideChainMatching;
     window.getChainFromDatabase = getChainFromDatabase;
     window.searchGooglePlacesForBusinessLegacy = searchGooglePlacesForBusinessLegacy;
-    window.loadChainIncentivesForEnhancedWindow = loadChainIncentivesForEnhancedWindow;
     window.loadChainIncentivesInContainer = loadChainIncentivesInContainer;
     window.generateNameVariations = generateNameVariations;
     window.findMatchingChainLocally = findMatchingChainLocally;
