@@ -10560,11 +10560,521 @@ function testCategorizedSearch(businessName, location) {
         });
 }
 
+/**
+ * FIXED: Enhanced search function with better result prioritization
+ * This prioritizes relevant Google Places results over unrelated nearby database businesses
+ */
+async function retrieveFromMongoDBWithBetterPriority(formData, bustCache = false) {
+    try {
+        console.log("🔍 ENHANCED SEARCH: Starting search with better priority logic:", formData);
 
+        // Show loading indicator
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading"><div class="loading-text">Searching for businesses...</div><div class="loading-spinner"></div></div>';
+            resultsContainer.style.display = 'block';
+        }
+
+        // Process search location
+        let searchLocation = null;
+        let searchRadius = 25; // Default radius in km
+
+        if (formData.useMyLocation) {
+            try {
+                updateLoadingMessage("Getting your location...");
+                searchLocation = await getUserLocation();
+                window.currentSearchLocation = searchLocation;
+            } catch (error) {
+                console.error("❌ Error getting user location:", error);
+                hideLoadingIndicator();
+                alert("Unable to get your current location. Please try entering an address instead.");
+                return;
+            }
+        } else if (formData.address && formData.address.trim() !== '') {
+            try {
+                updateLoadingMessage("Finding location...");
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    window.currentSearchLocation = searchLocation;
+
+                    // Determine search radius based on address type
+                    if (/^\d{5}$/.test(formData.address.trim())) {
+                        searchRadius = 15;
+                        console.log("📍 ZIP CODE SEARCH: Using 15km radius");
+                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
+                        searchRadius = 20;
+                        console.log("📍 CITY SEARCH: Using 20km radius");
+                    }
+
+                    if (map && searchLocation) {
+                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                        map.setCenter(center);
+                        map.setZoom(searchRadius <= 15 ? 12 : 11);
+                    }
+                } else {
+                    throw new Error(`Geocoding failed for address: ${formData.address}`);
+                }
+            } catch (error) {
+                console.error("❌ Error geocoding address:", error);
+                hideLoadingIndicator();
+                alert("We couldn't recognize that address. Please try a more specific address.");
+                return;
+            }
+        }
+
+        // PHASE 1: Search for primary results (specific business name search)
+        updateLoadingMessage("Searching database...");
+        let primaryResults = [];
+
+        if (formData.businessName && formData.businessName.trim() !== '') {
+            try {
+                primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
+                primaryResults = primaryResults.filter(business => business.is_chain !== true);
+                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
+            } catch (error) {
+                console.error("❌ Primary search failed:", error);
+            }
+        }
+
+        // PHASE 2: Search Google Places for primary business name (HIGHER PRIORITY NOW)
+        let placesResults = [];
+
+        if (formData.businessName && searchLocation) {
+            try {
+                updateLoadingMessage("Searching for additional locations...");
+                placesResults = await searchGooglePlacesForBusinessFixed(formData.businessName, searchLocation);
+                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
+            } catch (error) {
+                console.error("❌ Places search failed:", error);
+            }
+        }
+
+        // PHASE 3: Search for nearby database businesses (LOWER PRIORITY NOW - only if no specific business name or few results)
+        let nearbyDatabaseBusinesses = [];
+
+        // IMPROVED LOGIC: Only search for nearby businesses if:
+        // 1. No specific business name was provided, OR
+        // 2. Very few primary results were found AND user might want to see other options
+        const shouldSearchNearby = !formData.businessName ||
+            (primaryResults.length + placesResults.length < 3);
+
+        if (searchLocation && shouldSearchNearby) {
+            try {
+                updateLoadingMessage("Finding other nearby businesses...");
+                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinesses(searchLocation, searchRadius, formData.businessName);
+                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
+            } catch (error) {
+                console.error("❌ Nearby database search failed:", error);
+            }
+        } else {
+            console.log("⏭️ SKIPPING nearby search - sufficient relevant results found");
+        }
+
+        // PHASE 4: Remove duplicates and categorize with NEW PRIORITY ORDER
+        const { finalPrimaryResults, finalPlacesResults, finalNearbyResults } =
+            categorizeResultsWithBetterPriority(primaryResults, placesResults, nearbyDatabaseBusinesses);
+
+        // PHASE 5: Display all results in NEW PRIORITY ORDER
+        const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
+        console.log(`📊 IMPROVED PRIORITIZATION:`);
+        console.log(`   - 🔴 Primary Database (RED): ${finalPrimaryResults.length} businesses`);
+        console.log(`   - 🔵 Additional Locations (BLUE): ${finalPlacesResults.length} businesses`);
+        console.log(`   - 🟢 Other Nearby (GREEN): ${finalNearbyResults.length} businesses`);
+        console.log(`   - Total: ${allResults.length} businesses`);
+
+        if (allResults.length > 0) {
+            // Set proper flags for each category with NEW PRIORITY
+            finalPrimaryResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = true;
+                business.markerColor = 'primary'; // RED - highest priority
+                business.priority = 1;
+            });
+
+            finalPlacesResults.forEach(business => {
+                business.isGooglePlace = true;
+                business.isFromDatabase = false;
+                business.isPrimaryResult = false;
+                business.isRelevantPlaces = true;
+                business.markerColor = 'nearby'; // BLUE - second priority (more relevant than unrelated nearby)
+                business.priority = 2;
+            });
+
+            finalNearbyResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = false;
+                business.isNearbyDatabase = true;
+                business.markerColor = 'database'; // GREEN - third priority (least relevant)
+                business.priority = 3;
+            });
+
+            hideLoadingIndicator();
+
+            // Display results with improved priority
+            displayBusinessesOnMapWithBetterPriority(allResults);
+            displaySearchResultsWithBetterPriority(allResults);
+
+            // Show enhanced success message
+            showImprovedSearchSuccessMessage(finalPrimaryResults.length, finalPlacesResults.length, finalNearbyResults.length, formData.businessName);
+
+            console.log("✅ IMPROVED SEARCH: Completed successfully with better prioritization");
+        } else {
+            hideLoadingIndicator();
+            showNoResultsMessage();
+        }
+
+    } catch (error) {
+        console.error("❌ Enhanced search error:", error);
+        hideLoadingIndicator();
+        showErrorMessage(`Error searching for businesses: ${error.message}`);
+    }
+}
+
+/**
+ * FIXED: Categorize results with better priority logic
+ * Priority: 1) Database matches, 2) Relevant Google Places, 3) Other nearby database businesses
+ */
+function categorizeResultsWithBetterPriority(primaryResults, placesResults, nearbyDatabaseBusinesses) {
+    console.log("🔄 IMPROVED CATEGORIZATION:");
+
+    // Start with primary results (highest priority - RED markers)
+    const finalPrimaryResults = [...primaryResults];
+    const usedAddresses = new Set();
+    const usedBusinessNames = new Set();
+
+    // Track primary result addresses and names to avoid duplicates
+    finalPrimaryResults.forEach(business => {
+        const addressKey = createAddressKey(business);
+        const nameKey = business.bname.toLowerCase().trim();
+        usedAddresses.add(addressKey);
+        usedBusinessNames.add(nameKey);
+        console.log(`🔴 PRIMARY: ${business.bname} at ${addressKey}`);
+    });
+
+    // IMPROVED: Google Places results get SECOND priority (BLUE markers)
+    // These are more relevant than unrelated nearby businesses
+    const finalPlacesResults = placesResults.filter(business => {
+        const addressKey = createAddressKey(business);
+        const nameKey = business.bname.toLowerCase().trim();
+
+        if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
+            console.log(`🚫 PLACES DUPLICATE: ${business.bname} (already in database)`);
+            return false;
+        }
+
+        usedAddresses.add(addressKey);
+        usedBusinessNames.add(nameKey);
+        console.log(`🔵 RELEVANT PLACES: ${business.bname} at ${addressKey}`);
+        return true;
+    });
+
+    // IMPROVED: Nearby database businesses get THIRD priority (GREEN markers)
+    // These are least relevant since they don't match the search term
+    const finalNearbyResults = nearbyDatabaseBusinesses.filter(business => {
+        const addressKey = createAddressKey(business);
+        const nameKey = business.bname.toLowerCase().trim();
+
+        if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
+            console.log(`🚫 NEARBY DUPLICATE: ${business.bname} (already displayed)`);
+            return false;
+        }
+
+        console.log(`🟢 OTHER NEARBY: ${business.bname} at ${addressKey}`);
+        return true;
+    });
+
+    return {
+        finalPrimaryResults,
+        finalPlacesResults,
+        finalNearbyResults
+    };
+}
+
+/**
+ * FIXED: Enhanced search results display with better priority order
+ */
+function displaySearchResultsWithBetterPriority(businesses) {
+    try {
+        console.log(`📋 IMPROVED RESULTS: Displaying ${businesses.length} businesses in better priority order`);
+
+        // Ensure loading indicator is hidden
+        hideLoadingIndicator();
+
+        const businessSearchTable = document.getElementById('business_search');
+        const searchTableContainer = document.getElementById('search_table');
+
+        if (!businessSearchTable || !searchTableContainer) {
+            console.error("❌ Required table elements not found in the DOM");
+            showErrorMessage("There was an error displaying search results. Please try again later.");
+            return;
+        }
+
+        // Get the table body
+        let tableBody = businessSearchTable.querySelector('tbody');
+        if (!tableBody) {
+            console.error("❌ Table body not found");
+            showErrorMessage("There was an error displaying search results. Please try again later.");
+            return;
+        }
+
+        // Clear existing rows
+        tableBody.innerHTML = '';
+
+        // Show the search results table
+        searchTableContainer.style.display = 'block';
+
+        // Hide the "hidden" text in the h5
+        const searchTableH5 = searchTableContainer.querySelector('h5');
+        if (searchTableH5) {
+            searchTableH5.style.display = 'none';
+        }
+
+        if (businesses.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
+            searchTableContainer.scrollIntoView({behavior: 'smooth'});
+            return;
+        }
+
+        // IMPROVED: Categorize businesses by NEW priority order
+        const primaryBusinesses = businesses.filter(b => b.priority === 1); // Database matches
+        const relevantPlacesBusinesses = businesses.filter(b => b.priority === 2); // Relevant Google Places
+        const nearbyDatabaseBusinesses = businesses.filter(b => b.priority === 3); // Other nearby businesses
+
+        console.log(`📊 IMPROVED TABLE CATEGORIES:`);
+        console.log(`   - 🔴 Primary Database Results: ${primaryBusinesses.length}`);
+        console.log(`   - 🔵 Additional Relevant Locations: ${relevantPlacesBusinesses.length}`);
+        console.log(`   - 🟢 Other Nearby Businesses: ${nearbyDatabaseBusinesses.length}`);
+
+        // Add section headers and businesses in IMPROVED priority order
+        let rowIndex = 0;
+
+        // SECTION 1: Primary Search Results (RED) - Highest Priority
+        if (primaryBusinesses.length > 0) {
+            addTableSectionHeader(tableBody, `🎯 Database Results (${primaryBusinesses.length})`, 'primary-section');
+            primaryBusinesses.forEach((business, index) => {
+                console.log(`📝 Adding primary business ${index + 1}: ${business.bname}`);
+                addCategorizedBusinessRow(business, tableBody, 'primary');
+                rowIndex++;
+            });
+        }
+
+        // SECTION 2: Additional Relevant Locations (BLUE) - Second Priority
+        if (relevantPlacesBusinesses.length > 0) {
+            addTableSectionHeader(tableBody, `📍 Additional Locations Found (${relevantPlacesBusinesses.length})`, 'places-section');
+            relevantPlacesBusinesses.forEach((business, index) => {
+                console.log(`📝 Adding relevant Places business ${index + 1}: ${business.bname}`);
+                addCategorizedBusinessRow(business, tableBody, 'places');
+                rowIndex++;
+            });
+        }
+
+        // SECTION 3: Other Nearby Database Businesses (GREEN) - Third Priority
+        if (nearbyDatabaseBusinesses.length > 0) {
+            addTableSectionHeader(tableBody, `🏢 Other Nearby Businesses (${nearbyDatabaseBusinesses.length})`, 'database-section');
+            nearbyDatabaseBusinesses.forEach((business, index) => {
+                console.log(`📝 Adding nearby database business ${index + 1}: ${business.bname}`);
+                addCategorizedBusinessRow(business, tableBody, 'database');
+                rowIndex++;
+            });
+        }
+
+        // Scroll to the results
+        searchTableContainer.scrollIntoView({behavior: 'smooth'});
+
+        console.log(`✅ Improved priority search results displayed: ${rowIndex} total rows`);
+
+    } catch (error) {
+        console.error("❌ Error displaying improved priority search results:", error);
+        hideLoadingIndicator();
+        showErrorMessage("There was an error displaying the search results: " + error.message);
+    }
+}
+
+/**
+ * FIXED: Display businesses on map with better priority (same marker colors, better order)
+ */
+function displayBusinessesOnMapWithBetterPriority(businesses) {
+    if (!map) {
+        console.log("⏳ Map not ready, storing businesses for later display");
+        pendingBusinessesToDisplay = businesses;
+        return;
+    }
+
+    console.log(`🗺️ IMPROVED MAP DISPLAY: Displaying ${businesses.length} businesses with better priority`);
+
+    // Clear existing markers and create new bounds
+    clearMarkers();
+    bounds = new google.maps.LatLngBounds();
+
+    // Counters for each priority category
+    let primaryMarkers = 0;
+    let relevantPlacesMarkers = 0;
+    let nearbyDatabaseMarkers = 0;
+    let skippedBusinesses = 0;
+
+    // Sort businesses by priority to ensure proper display order
+    const sortedBusinesses = [...businesses].sort((a, b) => (a.priority || 999) - (b.priority || 999));
+
+    // Process each business with improved priority handling
+    sortedBusinesses.forEach((business, index) => {
+        try {
+            console.log(`🔄 Processing business ${index + 1}/${sortedBusinesses.length}: ${business.bname} (Priority: ${business.priority})`);
+
+            // Skip parent chain businesses
+            if (business.is_chain === true) {
+                console.log(`🚫 Skipping parent chain business: ${business.bname}`);
+                skippedBusinesses++;
+                return;
+            }
+
+            // Get coordinates
+            const businessLocation = getBusinessLocation(business);
+            if (!businessLocation) {
+                console.warn(`❌ Business ${business.bname} missing coordinates`);
+                skippedBusinesses++;
+                return;
+            }
+
+            // Update business object with coordinates
+            business.lat = businessLocation.lat;
+            business.lng = businessLocation.lng;
+
+            // Create categorized marker with priority awareness
+            const marker = createCategorizedBusinessMarker(business);
+            if (marker) {
+                // Count by priority category
+                switch (business.priority) {
+                    case 1:
+                        primaryMarkers++;
+                        break;
+                    case 2:
+                        relevantPlacesMarkers++;
+                        break;
+                    case 3:
+                        nearbyDatabaseMarkers++;
+                        break;
+                    default:
+                        nearbyDatabaseMarkers++; // fallback
+                        break;
+                }
+
+                console.log(`✅ Created priority ${business.priority} marker for ${business.bname}`);
+
+                // Extend bounds
+                const position = new google.maps.LatLng(businessLocation.lat, businessLocation.lng);
+                bounds.extend(position);
+            } else {
+                console.error(`❌ Failed to create marker for ${business.bname}`);
+                skippedBusinesses++;
+            }
+        } catch (error) {
+            console.error(`❌ Error processing business ${business.bname}:`, error);
+            skippedBusinesses++;
+        }
+    });
+
+    console.log(`📊 IMPROVED PRIORITY MARKER SUMMARY:`);
+    console.log(`   - 🔴 Priority 1 - Database Results (RED): ${primaryMarkers} markers`);
+    console.log(`   - 🔵 Priority 2 - Additional Locations (BLUE): ${relevantPlacesMarkers} markers`);
+    console.log(`   - 🟢 Priority 3 - Other Nearby (GREEN): ${nearbyDatabaseMarkers} markers`);
+    console.log(`   - ❌ Skipped: ${skippedBusinesses} businesses`);
+    console.log(`   - ✅ Total Created: ${primaryMarkers + relevantPlacesMarkers + nearbyDatabaseMarkers} markers`);
+
+    // Update map view with intelligent centering
+    setTimeout(() => {
+        try {
+            if (window.currentSearchLocation && (primaryMarkers > 0 || relevantPlacesMarkers > 0)) {
+                console.log("📍 Centering map on search location with relevant results");
+                const searchLatLng = new google.maps.LatLng(
+                    window.currentSearchLocation.lat,
+                    window.currentSearchLocation.lng
+                );
+                map.setCenter(searchLatLng);
+                map.setZoom(12);
+            } else if (primaryMarkers + relevantPlacesMarkers + nearbyDatabaseMarkers > 0 && bounds && !bounds.isEmpty()) {
+                console.log("🎯 Fitting map to all business bounds");
+                safelyFitBounds(map, bounds);
+            } else {
+                console.log("🌎 Using default map center");
+                map.setCenter(CONFIG.defaultCenter);
+                map.setZoom(CONFIG.defaultZoom);
+            }
+        } catch (error) {
+            console.error("❌ Error updating map view:", error);
+        }
+    }, 200);
+}
+
+/**
+ * FIXED: Enhanced success message with better priority explanation
+ */
+function showImprovedSearchSuccessMessage(primaryCount, placesCount, nearbyCount, searchTerm) {
+    // Create enhanced success banner
+    const successBanner = document.createElement('div');
+    successBanner.className = 'enhanced-search-success-banner';
+
+    let message = `Found ${primaryCount + placesCount + nearbyCount} businesses`;
+
+    if (searchTerm) {
+        message += ` for "${searchTerm}"`;
+    }
+
+    message += ': ';
+
+    const parts = [];
+
+    if (primaryCount > 0) {
+        parts.push(`<span class="success-primary">${primaryCount} in database</span>`);
+    }
+    if (placesCount > 0) {
+        parts.push(`<span class="success-places">${placesCount} additional location${placesCount !== 1 ? 's' : ''}</span>`);
+    }
+    if (nearbyCount > 0) {
+        parts.push(`<span class="success-database">${nearbyCount} other nearby</span>`);
+    }
+
+    message += parts.join(', ');
+
+    successBanner.innerHTML = `
+        <div class="enhanced-success-content">
+            <span class="success-icon">✅</span>
+            <span class="success-text">${message}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="close-success">×</button>
+        </div>
+        <div class="success-legend">
+            <span class="legend-item"><span class="legend-dot red"></span>Database Results</span>
+            <span class="legend-item"><span class="legend-dot blue"></span>Additional Locations</span>
+            <span class="legend-item"><span class="legend-dot green"></span>Other Nearby</span>
+        </div>
+    `;
+
+    // Add to page
+    const mainContent = document.querySelector('main') || document.body;
+    mainContent.insertBefore(successBanner, mainContent.firstChild);
+
+    // Auto-remove after 8 seconds
+    setTimeout(() => {
+        if (successBanner.parentNode) {
+            successBanner.remove();
+        }
+    }, 8000);
+}
+
+// Export the improved functions for global access
+if (typeof window !== 'undefined') {
+}
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
-    window.retrieveFromMongoDB = retrieveFromMongoDBWithNearbyDetection;
+    window.retrieveFromMongoDB = retrieveFromMongoDBWithBetterPriority;
+    window.categorizeResultsWithBetterPriority = categorizeResultsWithBetterPriority;
+    window.displaySearchResultsWithBetterPriority = displaySearchResultsWithBetterPriority;
+    window.displayBusinessesOnMapWithBetterPriority = displayBusinessesOnMapWithBetterPriority;
+    window.showImprovedSearchSuccessMessage = showImprovedSearchSuccessMessage;
     window.displayBusinessesOnMap = displayBusinessesOnMapWithCategories;
     window.displaySearchResults = displaySearchResultsWithCategories;
     window.displayBusinessesOnMapFixed = displayBusinessesOnMapWithCategories;
