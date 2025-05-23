@@ -473,6 +473,233 @@
         }
     });
 
+    // Function to handle successful business addition and return to search
+    function handleBusinessAddedSuccessfully(businessName, businessId) {
+        // Check if we should return to search page
+        const returnUrl = sessionStorage.getItem('returnToSearch');
+
+        if (returnUrl) {
+            // Clear the return URL from storage
+            sessionStorage.removeItem('returnToSearch');
+            sessionStorage.removeItem('newBusinessData');
+
+            // Create success message with return info
+            const successMessage = `✅ Success! "${businessName}" has been added to the Patriot Thanks database.\n\nYou will now be returned to your search results.`;
+
+            alert(successMessage);
+
+            // Add parameters to the return URL to show success
+            const returnUrlWithParams = new URL(returnUrl);
+            returnUrlWithParams.searchParams.set('business_added', 'true');
+            returnUrlWithParams.searchParams.set('business_name', businessName);
+            returnUrlWithParams.searchParams.set('business_id', businessId);
+
+            // Redirect back to search page
+            window.location.href = returnUrlWithParams.toString();
+        } else {
+            // Normal success handling if not returning to search
+            alert(`✅ Success! "${businessName}" has been added to the Patriot Thanks database.`);
+        }
+    }
+
+    /**
+     * Enhanced checkForNewlyAddedBusiness function for search page
+     * Add this to your business-search page to handle returns from add business
+     */
+    function checkForNewlyAddedBusiness() {
+        // Check URL parameters for a newly added business
+        const urlParams = new URLSearchParams(window.location.search);
+        const newBusinessAdded = urlParams.get('business_added');
+        const businessName = urlParams.get('business_name');
+        const businessId = urlParams.get('business_id');
+
+        if (newBusinessAdded === 'true' && businessName) {
+            // Show enhanced success message
+            showBusinessAddedSuccessMessage(businessName, businessId);
+
+            // Clean up URL parameters
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+
+            // If we have a business name, pre-fill search form and trigger search
+            if (businessName) {
+                const businessNameField = document.getElementById('business-name');
+                if (businessNameField) {
+                    businessNameField.value = businessName;
+                    validateField(businessNameField, isNotEmpty);
+                }
+
+                // Automatically trigger search after a short delay
+                setTimeout(() => {
+                    const searchForm = document.getElementById('business-search-form');
+                    if (searchForm) {
+                        const submitEvent = new Event('submit', {cancelable: true});
+                        searchForm.dispatchEvent(submitEvent);
+                    }
+                }, 1000); // Give user time to see the success message
+            }
+        }
+    }
+
+    /**
+     * Show enhanced success message for newly added business
+     * @param {string} businessName - Name of the added business
+     * @param {string} businessId - ID of the added business
+     */
+    function showBusinessAddedSuccessMessage(businessName, businessId) {
+        // Create enhanced alert container
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-success business-added-alert';
+        alertDiv.role = 'alert';
+        alertDiv.style.marginBottom = '20px';
+        alertDiv.style.animation = 'slideInFromTop 0.6s ease-out';
+
+        // Add alert content with enhanced messaging
+        alertDiv.innerHTML = `
+        <div class="success-icon">✅</div>
+        <div class="success-content">
+            <h4><strong>Business Successfully Added!</strong></h4>
+            <p>"<strong>${businessName}</strong>" has been added to the Patriot Thanks database.</p>
+            <p>Searching for this business now to show you the updated results...</p>
+            <div class="success-actions">
+                <button type="button" class="btn btn-sm btn-outline-success" onclick="viewBusinessDetails('${businessId}')">
+                    View Business Details
+                </button>
+                <button type="button" class="close-success-btn" onclick="this.parentElement.parentElement.parentElement.remove()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        </div>
+    `;
+
+        // Add enhanced styles
+        const style = document.createElement('style');
+        style.textContent = `
+        .business-added-alert {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border: 2px solid #28a745;
+            color: #155724;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            position: relative;
+        }
+
+        .success-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+            margin-top: 5px;
+        }
+
+        .success-content {
+            flex: 1;
+        }
+
+        .success-content h4 {
+            margin: 0 0 10px 0;
+            color: #155724;
+            font-size: 18px;
+        }
+
+        .success-content p {
+            margin: 5px 0;
+            line-height: 1.4;
+        }
+
+        .success-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .close-success-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #155724;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .close-success-btn:hover {
+            opacity: 1;
+        }
+
+        .btn-outline-success {
+            color: #28a745;
+            border-color: #28a745;
+            background: transparent;
+            padding: 5px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn-outline-success:hover {
+            background-color: #28a745;
+            color: white;
+        }
+
+        @keyframes slideInFromTop {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+        }
+    `;
+        document.head.appendChild(style);
+
+        // Insert alert at the top of the main content
+        const mainContent = document.querySelector('main') || document.body;
+        const firstChild = mainContent.firstElementChild;
+        mainContent.insertBefore(alertDiv, firstChild);
+
+        // Auto-remove after 10 seconds with fade out
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.style.animation = 'fadeOut 0.5s ease-in';
+                setTimeout(() => {
+                    if (alertDiv.parentNode) {
+                        alertDiv.remove();
+                    }
+                }, 500);
+            }
+        }, 10000);
+    }
+
+    // Export functions for use
+    if (typeof window !== 'undefined') {
+        window.handleBusinessAddedSuccessfully = handleBusinessAddedSuccessfully;
+        window.checkForNewlyAddedBusiness = checkForNewlyAddedBusiness;
+        window.showBusinessAddedSuccessMessage = showBusinessAddedSuccessMessage;
+    }
+
+    console.log("📋 Enhanced business add/return flow loaded!");
+
 </script>
 </body>
 </html>

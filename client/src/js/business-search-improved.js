@@ -644,7 +644,7 @@ function getUserLocation() {
 }
 
 /**
- * Add a business to the database
+ * Enhanced addBusinessToDatabase function with better user messaging and modern Places API
  * @param {string} placeId - Google Place ID
  * @param {string} chainId - Optional chain ID if this place is part of a chain
  */
@@ -652,89 +652,109 @@ window.addBusinessToDatabase = async function(placeId, chainId = null) {
     console.log("Adding place to database:", placeId, "Chain ID:", chainId);
 
     try {
-        // Use the Places Service to get details
-        const service = new google.maps.places.PlacesService(map);
+        // Import the new Places library instead of using deprecated PlacesService
+        const { Place } = await google.maps.importLibrary("places");
 
-        const request = {
-            placeId: placeId,
-            fields: ['name', 'formatted_address', 'formatted_phone_number', 'geometry', 'address_components']
+        // Create a Place instance with the clicked place ID
+        const place = new Place({
+            id: placeId
+        });
+
+        // Fetch place details using the new API
+        await place.fetchFields({
+            fields: [
+                'displayName',
+                'formattedAddress',
+                'addressComponents',
+                'location',
+                'nationalPhoneNumber',
+                'internationalPhoneNumber'
+            ]
+        });
+
+        console.log("Place details retrieved with new API:", place);
+
+        // Extract address components
+        const addressComponents = {};
+        if (place.addressComponents) {
+            for (const component of place.addressComponents) {
+                for (const type of component.types) {
+                    addressComponents[type] = component.shortText || component.longText;
+                }
+            }
+        }
+
+        // Format the business data
+        const businessData = {
+            name: place.displayName || '',
+            address1: (addressComponents.street_number || '') + ' ' + (addressComponents.route || ''),
+            city: addressComponents.locality || '',
+            state: addressComponents.administrative_area_level_1 || '',
+            zip: addressComponents.postal_code || '',
+            phone: place.nationalPhoneNumber || place.internationalPhoneNumber || '',
+            placeId: place.id,
+            formattedAddress: place.formattedAddress,
+
+            // Store coordinates for later use
+            lat: place.location?.lat() || 0,
+            lng: place.location?.lng() || 0,
+
+            // Add this for proper GeoJSON formatting
+            location: {
+                type: 'Point',
+                coordinates: [
+                    place.location?.lng() || 0,
+                    place.location?.lat() || 0
+                ]
+            }
         };
 
-        service.getDetails(request, async (place, status) => {
-            if (status !== google.maps.places.PlacesServiceStatus.OK || !place) {
-                console.error("Error fetching place details:", status);
-                alert("Sorry, we couldn't retrieve the details for this business. Please try again or add it manually.");
-                return;
-            }
+        // Enhanced messaging for chain locations
+        let redirectMessage = '';
+        let chainMessage = '';
 
-            console.log("Place details retrieved:", place);
-
-            // Extract address components
-            const addressComponents = {};
-            if (place.address_components) {
-                for (const component of place.address_components) {
-                    for (const type of component.types) {
-                        addressComponents[type] = component.short_name;
-                    }
+        if (chainId) {
+            try {
+                // Get chain name from the server
+                const chain = await getChainDetails(chainId);
+                if (chain && chain.bname) {
+                    businessData.chain_name = chain.bname;
+                    chainMessage = `This business will be added as a location of ${chain.bname}. Chain-wide incentives already apply to this location.`;
+                } else {
+                    chainMessage = "This business will be added as a chain location. Chain-wide incentives may apply.";
                 }
+            } catch (error) {
+                console.error("Error getting chain details:", error);
+                chainMessage = "This business will be added as a chain location.";
             }
+        }
 
-            // Format the business data
-            const businessData = {
-                name: place.name || '',
-                address1: (addressComponents.street_number || '') + ' ' + (addressComponents.route || ''),
-                city: addressComponents.locality || '',
-                state: addressComponents.administrative_area_level_1 || '',
-                zip: addressComponents.postal_code || '',
-                phone: place.formatted_phone_number || '',
-                placeId: place.place_id,
-                formattedAddress: place.formatted_address, // Save the full formatted address
+        // Enhanced redirect messaging
+        redirectMessage = `
+${chainMessage ? chainMessage + '\n\n' : ''}You will now be redirected to the "Add Business" page where the form will be pre-filled with this business information.
 
-                // Store coordinates for later use
-                lat: place.geometry?.location.lat() || 0,
-                lng: place.geometry?.location.lng() || 0,
+After you complete adding the business, you will be returned to this search page.
 
-                // Add this for proper GeoJSON formatting
-                location: {
-                    type: 'Point',
-                    coordinates: [
-                        place.geometry?.location.lng() || 0,
-                        place.geometry?.location.lat() || 0
-                    ]
-                }
-            };
+Click OK to continue.`;
 
-            // If this is a chain location, add chain data
-            if (chainId) {
-                businessData.chain_id = chainId;
-
-                try {
-                    // Get chain name from the server
-                    const chain = await getChainDetails(chainId);
-                    if (chain && chain.bname) {
-                        businessData.chain_name = chain.bname;
-                    }
-                } catch (error) {
-                    console.error("Error getting chain details:", error);
-                }
-
-                // Add extra message for chain location
-                alert("This business will be added as a location of " +
-                    (businessData.chain_name || "the chain") +
-                    ". Chain-wide incentives already apply to this location.");
-            }
-
+        // Show enhanced alert with better messaging
+        if (confirm(redirectMessage)) {
             // Store in sessionStorage for the add business page to use
             sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
 
+            // Store return URL for after business is added
+            sessionStorage.setItem('returnToSearch', window.location.href);
+
             // Redirect to add business page
             window.location.href = 'business-add.html?prefill=true';
-        });
+        }
+
     } catch (error) {
         console.error("Error in addBusinessToDatabase:", error);
-        alert("Sorry, we couldn't add this business to the database. Please try again or add it manually.");
+        alert("Sorry, we couldn't retrieve the business information. Please try again or add it manually.");
     }
 };
+
 
 /**
  * Helper function to get chain details
@@ -1388,18 +1408,6 @@ async function searchGooglePlacesForBusinessLegacy(businessName, searchLocation)
             reject(error);
         }
     });
-}
-
-/**
- * Show no results message
- */
-function showNoResultsMessage() {
-    const resultsContainer = document.getElementById('business-search-results') ||
-        document.getElementById('search_table');
-    if (resultsContainer) {
-        resultsContainer.innerHTML = '<div class="error-message">No businesses found matching your search criteria in this area.</div>';
-        resultsContainer.style.display = 'block';
-    }
 }
 
 /**
@@ -2539,12 +2547,7 @@ function applyInfoWindowCSS() {
     }
 }
 
-// Apply CSS fixes when script loads
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-        applyInfoWindowCSS();
-    }, 500);
-});
+
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
@@ -2798,12 +2801,6 @@ window.testInfoWindow = function() {
     console.log("If it still doesn't work, run: checkAndReportInfoWindowPosition()");
 };
 
-// Auto-setup when DOM loads
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-        applyCSSOnlyTailFix();
-    }, 500);
-});
 
 console.log("Step-by-step info window fix loaded. Run testInfoWindow() in console to reset everything.");
 
@@ -2946,12 +2943,6 @@ function applyInfoWindowPositioningFixes() {
     }
 }
 
-// Apply fixes when DOM loads
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-        applyInfoWindowPositioningFixes();
-    }, 500);
-});
 
 /**
  * Enhanced fetchBusinessIncentivesForInfoWindow function with better error handling
@@ -3057,12 +3048,6 @@ window.debugInfoWindow = function() {
     console.log("Ready for testing - try clicking a marker now");
 };
 
-// Auto-apply the minimal CSS when this script loads
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-        removeProblematicInfoWindowCSS();
-    }, 1000);
-});
 
 /**
  * Enhanced findChainMatchesForResults function
@@ -3687,29 +3672,6 @@ function getPlaceTypeLabel(types) {
 }
 
 /**
- * Show error message in appropriate container
- * @param {string} message - Error message to display
- * @param {HTMLElement} container - Optional specific container
- */
-function showErrorMessage(message, container) {
-    const targetContainer = container || document.getElementById('search_table');
-    if (targetContainer) {
-        targetContainer.style.display = 'block';
-
-        const tableBody = targetContainer.querySelector('tbody');
-        if (tableBody) {
-            tableBody.innerHTML = `<tr><td colspan="5" class="text-center error-message">${message}</td></tr>`;
-        } else {
-            targetContainer.innerHTML = `<div class="error-message">${message}</div>`;
-        }
-
-        targetContainer.scrollIntoView({behavior: 'smooth'});
-    } else {
-        alert(message);
-    }
-}
-
-/**
  * Initialize the Google Map
  */
 window.initGoogleMap = function() {
@@ -4269,6 +4231,10 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         applyInfoWindowPositioningFixes();
         applyMapHeightFix();
+        applyInfoWindowCSS();
+        applyCSSOnlyTailFix();
+        applyInfoWindowPositioningFixes();
+        removeProblematicInfoWindowCSS();
     }, 500);
 
     // Add existing custom styles
@@ -4326,12 +4292,15 @@ function validateField(field, validationFn) {
  */
 function displaySearchResults(businesses) {
     try {
+        // Ensure loading indicator is hidden
+        hideLoadingIndicator();
+
         const businessSearchTable = document.getElementById('business_search');
         const searchTableContainer = document.getElementById('search_table');
 
         if (!businessSearchTable || !searchTableContainer) {
             console.error("Required elements not found in the DOM");
-            alert("There was an error displaying search results. Please try again later.");
+            showErrorMessage("There was an error displaying search results. Please try again later.");
             return;
         }
 
@@ -4340,7 +4309,7 @@ function displaySearchResults(businesses) {
 
         if (!tableBody) {
             console.error("Table body not found within business_search table");
-            alert("There was an error displaying search results. Please try again later.");
+            showErrorMessage("There was an error displaying search results. Please try again later.");
             return;
         }
 
@@ -4396,9 +4365,87 @@ function displaySearchResults(businesses) {
 
     } catch (error) {
         console.error("Error displaying search results: ", error);
-        alert("There was an error displaying the search results: " + error.message);
+        hideLoadingIndicator();
+        showErrorMessage("There was an error displaying the search results: " + error.message);
     }
 }
+
+/**
+ * Enhanced CSS for better loading indicators
+ */
+function addEnhancedLoadingCSS() {
+    if (!document.getElementById('enhanced-loading-css')) {
+        const style = document.createElement('style');
+        style.id = 'enhanced-loading-css';
+        style.textContent = `
+            .loading-indicator {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 30px 20px;
+                text-align: center;
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                border-radius: 8px;
+                margin: 20px 0;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+
+            .loading-text {
+                font-size: 16px;
+                color: #333;
+                margin-bottom: 15px;
+                font-weight: 500;
+            }
+
+            .loading-spinner {
+                width: 40px;
+                height: 40px;
+                border: 4px solid #f3f3f3;
+                border-top: 4px solid #4285F4;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+
+            /* Enhanced error messages */
+            .error-message {
+                color: #721c24;
+                padding: 20px;
+                background: linear-gradient(135deg, #f8d7da 0%, #f1b0b7 100%);
+                border: 1px solid #f5c6cb;
+                border-radius: 8px;
+                margin: 20px 0;
+                text-align: center;
+                font-weight: 500;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+
+            /* Fade in animation for results */
+            .search-results-container {
+                animation: fadeIn 0.5s ease-in;
+            }
+
+            @keyframes fadeIn {
+                from { 
+                    opacity: 0; 
+                    transform: translateY(20px); 
+                }
+                to { 
+                    opacity: 1; 
+                    transform: translateY(0); 
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
 
 /**
  * Helper function to add a business row to the table
@@ -6385,7 +6432,7 @@ async function retrieveFromMongoDB(formData, bustCache = false) {
         const resultsContainer = document.getElementById('business-search-results') ||
             document.getElementById('search_table');
         if (resultsContainer) {
-            resultsContainer.innerHTML = '<div class="loading-indicator">Searching for businesses...</div>';
+            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading">Searching for businesses...</div>';
             resultsContainer.style.display = 'block';
         }
 
@@ -6394,15 +6441,22 @@ async function retrieveFromMongoDB(formData, bustCache = false) {
 
         if (formData.useMyLocation) {
             try {
+                // Update loading message
+                updateLoadingMessage("Getting your location...");
+
                 searchLocation = await getUserLocation();
                 window.currentSearchLocation = searchLocation;
             } catch (error) {
                 console.error("Error getting user location:", error);
+                hideLoadingIndicator();
                 alert("Unable to get your current location. Please try entering an address instead.");
                 return;
             }
         } else if (formData.address && formData.address.trim() !== '') {
             try {
+                // Update loading message
+                updateLoadingMessage("Finding location...");
+
                 const geocodedLocation = await geocodeAddressClientSide(formData.address);
                 if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
                     searchLocation = geocodedLocation;
@@ -6418,10 +6472,14 @@ async function retrieveFromMongoDB(formData, bustCache = false) {
                 }
             } catch (error) {
                 console.error("Error geocoding address:", error);
+                hideLoadingIndicator();
                 alert("We couldn't recognize that address. Please try a more specific address.");
                 return;
             }
         }
+
+        // Update loading message
+        updateLoadingMessage("Searching database...");
 
         // Enhanced database search with fuzzy matching
         const dbResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
@@ -6457,36 +6515,60 @@ async function retrieveFromMongoDB(formData, bustCache = false) {
         if (nearbyBusinesses.length === 0 && formData.businessName && searchLocation) {
             console.log("🌐 No nearby businesses in database, searching Google Places");
 
+            // Update loading message
+            updateLoadingMessage("Searching Google Places...");
+
             try {
                 const placesResults = await searchGooglePlacesForBusiness(formData.businessName, searchLocation);
 
                 if (placesResults && placesResults.length > 0) {
                     console.log(`📍 Found ${placesResults.length} businesses via Google Places`);
 
+                    // Update loading message
+                    updateLoadingMessage("Loading results...");
+
                     const allBusinesses = [...placesResults, ...distantBusinesses];
+
+                    // Hide loading indicator before displaying results
+                    hideLoadingIndicator();
+
                     displayBusinessesOnMap(allBusinesses);
                     displaySearchResults(allBusinesses);
 
                 } else {
                     if (distantBusinesses.length > 0) {
+                        updateLoadingMessage("Loading results...");
+
+                        // Hide loading indicator before displaying results
+                        hideLoadingIndicator();
+
                         displayBusinessesOnMap(distantBusinesses);
                         displaySearchResults(distantBusinesses);
                     } else {
+                        hideLoadingIndicator();
                         showNoResultsMessage();
                     }
                 }
             } catch (placesError) {
                 console.error("Error searching Google Places:", placesError);
+                hideLoadingIndicator();
+
                 if (distantBusinesses.length > 0) {
                     displayBusinessesOnMap(distantBusinesses);
                     displaySearchResults(distantBusinesses);
                 } else {
-                    showNoResultsMessage();
+                    showErrorMessage("Error searching for businesses. Please try again.");
                 }
             }
         } else {
             // Display all results
+            updateLoadingMessage("Loading results...");
+
             const allBusinesses = [...nearbyBusinesses, ...distantBusinesses];
+
+            // Hide loading indicator before displaying results
+            hideLoadingIndicator();
+
             displayBusinessesOnMap(allBusinesses);
             displaySearchResults(allBusinesses);
 
@@ -6499,7 +6581,66 @@ async function retrieveFromMongoDB(formData, bustCache = false) {
         }
     } catch (error) {
         console.error("Enhanced search error:", error);
+        hideLoadingIndicator();
         showErrorMessage(`Error searching for businesses: ${error.message}`);
+    }
+}
+
+/**
+ * Update the loading message
+ * @param {string} message - New loading message
+ */
+function updateLoadingMessage(message) {
+    const loadingIndicator = document.getElementById('main-loading');
+    if (loadingIndicator) {
+        loadingIndicator.innerHTML = `<div class="loading-text">${message}</div><div class="loading-spinner"></div>`;
+    }
+}
+
+/**
+ * Hide the loading indicator
+ */
+function hideLoadingIndicator() {
+    const loadingIndicator = document.getElementById('main-loading');
+    if (loadingIndicator) {
+        loadingIndicator.remove();
+    }
+
+    // Also hide any other loading indicators that might be present
+    const allLoadingIndicators = document.querySelectorAll('.loading-indicator');
+    allLoadingIndicators.forEach(indicator => {
+        if (indicator.id === 'main-loading' || indicator.textContent.includes('Searching')) {
+            indicator.remove();
+        }
+    });
+}
+
+/**
+ * Enhanced showNoResultsMessage with proper loading cleanup
+ */
+function showNoResultsMessage() {
+    hideLoadingIndicator();
+
+    const resultsContainer = document.getElementById('business-search-results') ||
+        document.getElementById('search_table');
+    if (resultsContainer) {
+        resultsContainer.innerHTML = '<div class="error-message">No businesses found matching your search criteria in this area.</div>';
+        resultsContainer.style.display = 'block';
+    }
+}
+
+/**
+ * Enhanced showErrorMessage with proper loading cleanup
+ * @param {string} message - Error message to display
+ */
+function showErrorMessage(message) {
+    hideLoadingIndicator();
+
+    const resultsContainer = document.getElementById('business-search-results') ||
+        document.getElementById('search_table');
+    if (resultsContainer) {
+        resultsContainer.innerHTML = `<div class="error-message">${message}</div>`;
+        resultsContainer.style.display = 'block';
     }
 }
 
@@ -6554,6 +6695,12 @@ async function searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCac
 // Export functions for global access
 if (typeof window !== 'undefined') {
     window.retrieveFromMongoDB = retrieveFromMongoDB;
+    window.updateLoadingMessage = updateLoadingMessage;
+    window.hideLoadingIndicator = hideLoadingIndicator;
+    window.showNoResultsMessage = showNoResultsMessage;
+    window.showErrorMessage = showErrorMessage;
+    window.displaySearchResults = displaySearchResults;
+    window.addEnhancedLoadingCSS = addEnhancedLoadingCSS;
     window.findMatchingChainForPlaceResult = findMatchingChainForPlaceResult;
     window.calculateSimilarity = calculateSimilarity;
     window.extractKeywords = extractKeywords;
@@ -6569,9 +6716,7 @@ if (typeof window !== 'undefined') {
     window.generateNameVariations = generateNameVariations;
     window.findMatchingChainLocally = findMatchingChainLocally;
     window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
-    window.showNoResultsMessage = showNoResultsMessage;
     window.displayBusinessesOnMap = displayBusinessesOnMap;
-    window.displaySearchResults = displaySearchResults;
     window.initGoogleMap = initGoogleMap;
     window.debugMapState = debugMapState;
     window.validateField = validateField;
