@@ -4,6 +4,7 @@
  */
 
 // Configuration constants
+// Configuration constants
 const CONFIG = {
     mapId: 'ebe8ec43a7bc252d',
     defaultCenter: {lat: 39.8283, lng: -98.5795}, // Center of US
@@ -14,20 +15,10 @@ const CONFIG = {
         database: '#28a745',     // GREEN - Nearby database businesses
         chain: '#FF9800'         // ORANGE - Chain indicators
     },
-    geocodeDelay: 200,      // Delay between geocoding requests (ms)
-    imageLoadDelay: 1000,   // Delay for image loading retry (ms)
-    maxNearbyDistance: 20000, // Maximum distance for nearby businesses (meters)
-    debugMode: false        // Set to true to enable detailed debugging
-};
-
-const ENHANCED_CONFIG = {
-    ...CONFIG,
-    markerColors: {
-        primary: '#EA4335',      // RED - Primary search results (database)
-        nearby: '#4285F4',       // BLUE - Google Places results
-        database: '#28a745',     // GREEN - Nearby database businesses
-        chain: '#FF9800'         // ORANGE - Chain indicators
-    }
+    geocodeDelay: 200,
+    imageLoadDelay: 1000,
+    maxNearbyDistance: 20000,
+    debugMode: false
 };
 
 // State variables
@@ -39,8 +30,15 @@ let bounds = null;
 let pendingBusinessesToDisplay = [];
 let currentSearchLocation = null;
 
-// Cache for place data to reduce API calls
+// Cache for place data and chain matching
 const placeCache = new Map();
+const chainMatchCache = new Map();
+const apiCallQueue = [];
+let isProcessingQueue = false;
+
+// Global flags
+let googleMapsInitializing = false;
+let googleMapsInitialized = false;
 
 /**
  * Clear markers from the map
@@ -50,13 +48,131 @@ function clearMarkers() {
         markers = [];
         return;
     }
-
     markers.forEach(marker => {
         if (marker) {
             marker.map = null;
         }
     });
     markers = [];
+}
+
+/**
+ * Validate a position object to ensure it has valid coordinates
+ * @param {Object} position - Position object to validate
+ * @returns {boolean} True if position is valid
+ */
+function isValidPosition(position) {
+    if (!position) return false;
+
+    let lat, lng;
+    if (position instanceof google.maps.LatLng) {
+        try {
+            lat = position.lat();
+            lng = position.lng();
+        } catch (error) {
+            return false;
+        }
+    } else if (typeof position.lat === 'function' && typeof position.lng === 'function') {
+        try {
+            lat = position.lat();
+            lng = position.lng();
+        } catch (error) {
+            return false;
+        }
+    } else if (position.lat !== undefined && position.lng !== undefined) {
+        lat = parseFloat(position.lat);
+        lng = parseFloat(position.lng);
+    } else {
+        return false;
+    }
+
+    return !isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng) &&
+        Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+}
+
+/**
+ * Create a safe LatLng object from various position formats
+ * @param {Object} position - Position object in various formats
+ * @returns {google.maps.LatLng|null} Google LatLng object or null if invalid
+ */
+function createSafeLatLng(position) {
+    if (!position) return null;
+
+    try {
+        if (position instanceof google.maps.LatLng) {
+            return isValidPosition(position) ? position : null;
+        }
+
+        let lat, lng;
+        if (typeof position.lat === 'function' && typeof position.lng === 'function') {
+            lat = position.lat();
+            lng = position.lng();
+        } else if (position.lat !== undefined && position.lng !== undefined) {
+            lat = parseFloat(position.lat);
+            lng = parseFloat(position.lng);
+        } else if (Array.isArray(position) && position.length >= 2) {
+            lat = parseFloat(position[0]);
+            lng = parseFloat(position[1]);
+        } else {
+            return null;
+        }
+
+        if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng) ||
+            Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+            return null;
+        }
+
+        return new google.maps.LatLng(lat, lng);
+    } catch (error) {
+        console.error("Error creating LatLng:", error);
+        return null;
+    }
+}
+
+
+/**
+ * Safe implementation of the fitBounds function
+ * @param {google.maps.Map} mapObj - Google Maps object
+ * @param {google.maps.LatLngBounds} boundsObj - Bounds object
+ * @param {number} defaultZoom - Default zoom level if bounds fail
+ * @returns {boolean} True if bounds were successfully fitted
+ */
+
+function safelyFitBounds(mapObj, boundsObj, defaultZoom = 11) {
+    if (!mapObj || !boundsObj) return false;
+
+    try {
+        const ne = boundsObj.getNorthEast();
+        const sw = boundsObj.getSouthWest();
+
+        if (!ne || !sw || isNaN(ne.lat()) || isNaN(ne.lng()) ||
+            isNaN(sw.lat()) || isNaN(sw.lng()) || boundsObj.isEmpty()) {
+            return false;
+        }
+
+        mapObj.fitBounds(boundsObj);
+
+        google.maps.event.addListenerOnce(mapObj, 'bounds_changed', function () {
+            const zoomLevel = mapObj.getZoom();
+            if (zoomLevel > 16) {
+                mapObj.setZoom(16);
+            } else if (zoomLevel < 4) {
+                mapObj.setZoom(4);
+            }
+        });
+
+        return true;
+    } catch (error) {
+        console.error("Error fitting bounds:", error);
+        try {
+            if (defaultZoom !== undefined) {
+                mapObj.setZoom(defaultZoom);
+            }
+        } catch (zoomError) {
+            console.error("Error setting fallback zoom:", zoomError);
+        }
+        return false;
+    }
 }
 
 /**
@@ -148,119 +264,6 @@ function debugMapState() {
 }
 
 /**
- * Validate a position object to ensure it has valid coordinates
- * @param {Object} position - Position object to validate
- * @returns {boolean} True if position is valid
- */
-function isValidPosition(position) {
-    if (!position) {
-        console.warn("Position is null or undefined");
-        return false;
-    }
-
-    let lat, lng;
-
-    if (position instanceof google.maps.LatLng) {
-        try {
-            lat = position.lat();
-            lng = position.lng();
-        } catch (error) {
-            console.warn("Error getting lat/lng from LatLng:", error);
-            return false;
-        }
-    } else if (typeof position.lat === 'function' && typeof position.lng === 'function') {
-        try {
-            lat = position.lat();
-            lng = position.lng();
-        } catch (error) {
-            console.warn("Error calling lat/lng functions:", error);
-            return false;
-        }
-    } else if (position.lat !== undefined && position.lng !== undefined) {
-        lat = parseFloat(position.lat);
-        lng = parseFloat(position.lng);
-    } else {
-        console.warn("Position does not have lat/lng properties");
-        return false;
-    }
-
-    // Check for NaN, Infinity, or out of range values
-    if (isNaN(lat) || isNaN(lng)) {
-        console.warn("Position has NaN coordinates:", lat, lng);
-        return false;
-    }
-
-    if (!isFinite(lat) || !isFinite(lng)) {
-        console.warn("Position has non-finite coordinates:", lat, lng);
-        return false;
-    }
-
-    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-        console.warn("Position coordinates out of range:", lat, lng);
-        return false;
-    }
-
-    return true;
-}
-
-/**
- * Create a safe LatLng object from various position formats
- * @param {Object} position - Position object in various formats
- * @returns {google.maps.LatLng|null} Google LatLng object or null if invalid
- */
-function createSafeLatLng(position) {
-    if (!position) {
-        return null;
-    }
-
-    try {
-        if (position instanceof google.maps.LatLng) {
-            // Already a LatLng, just validate it
-            if (isValidPosition(position)) {
-                return position;
-            }
-            return null;
-        }
-
-        let lat, lng;
-
-        if (typeof position.lat === 'function' && typeof position.lng === 'function') {
-            lat = position.lat();
-            lng = position.lng();
-        } else if (position.lat !== undefined && position.lng !== undefined) {
-            lat = parseFloat(position.lat);
-            lng = parseFloat(position.lng);
-        } else if (position.latitude !== undefined && position.longitude !== undefined) {
-            lat = parseFloat(position.latitude);
-            lng = parseFloat(position.longitude);
-        } else if (Array.isArray(position) && position.length >= 2) {
-            lat = parseFloat(position[0]);
-            lng = parseFloat(position[1]);
-        } else {
-            console.warn("Position format not recognized:", position);
-            return null;
-        }
-
-        // Validate the coordinates
-        if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) {
-            console.warn("Invalid coordinates:", lat, lng);
-            return null;
-        }
-
-        if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-            console.warn("Coordinates out of range:", lat, lng);
-            return null;
-        }
-
-        // Create a new LatLng object
-        return new google.maps.LatLng(lat, lng);
-    } catch (error) {
-        console.error("Error creating LatLng:", error);
-        return null;
-    }
-}
-
-/**
  * Safely center the map on a position
  * @param {google.maps.Map} mapObj - Google Maps object
  * @param {Object} position - Position to center on
@@ -290,77 +293,6 @@ function safelySetCenter(mapObj, position, zoom) {
         return false;
     }
 }
-
-/**
- * Safe implementation of the fitBounds function
- * @param {google.maps.Map} mapObj - Google Maps object
- * @param {google.maps.LatLngBounds} boundsObj - Bounds object
- * @param {number} defaultZoom - Default zoom level if bounds fail
- * @returns {boolean} True if bounds were successfully fitted
- */
-function safelyFitBounds(mapObj, boundsObj, defaultZoom = 11) {
-    if (!mapObj || !boundsObj) {
-        return false;
-    }
-
-    try {
-        // Validate bounds
-        const ne = boundsObj.getNorthEast();
-        const sw = boundsObj.getSouthWest();
-
-        if (!ne || !sw || isNaN(ne.lat()) || isNaN(ne.lng()) || isNaN(sw.lat()) || isNaN(sw.lng())) {
-            console.warn("Invalid bounds for fitBounds:", boundsObj);
-            return false;
-        }
-
-        if (boundsObj.isEmpty()) {
-            console.warn("Empty bounds, not fitting");
-            return false;
-        }
-
-        // All looks good, try to fit the bounds
-        mapObj.fitBounds(boundsObj);
-
-        // Add a listener to adjust zoom if it's too close
-        google.maps.event.addListenerOnce(mapObj, 'bounds_changed', function () {
-            const zoomLevel = mapObj.getZoom();
-            if (zoomLevel > 16) {
-                mapObj.setZoom(16);
-            } else if (zoomLevel < 4) {
-                mapObj.setZoom(4);
-            }
-        });
-
-        return true;
-    } catch (error) {
-        console.error("Error fitting bounds:", error);
-
-        // Try to set a default zoom as fallback
-        try {
-            if (defaultZoom !== undefined) {
-                mapObj.setZoom(defaultZoom);
-            }
-        } catch (zoomError) {
-            console.error("Error setting fallback zoom:", zoomError);
-        }
-
-        return false;
-    }
-}
-
-/**
- * Create a new clean bounds object
- * @returns {google.maps.LatLngBounds} New bounds object
- */
-function createNewBounds() {
-    return new google.maps.LatLngBounds();
-}
-
-// Global flag to track if Google Maps is being initialized
-let googleMapsInitializing = false;
-
-// Global flag to track if Google Maps is already initialized
-let googleMapsInitialized = false;
 
 // Function to safely initialize Google Maps once
 function ensureGoogleMapsInitialized() {
@@ -624,7 +556,6 @@ function addChainBadgeStyles() {
 
 /**
  * Get the user's current location
- * @returns {Promise<{lat: number, lng: number}>} Location coordinates
  */
 function getUserLocation() {
     return new Promise((resolve, reject) => {
@@ -635,13 +566,9 @@ function getUserLocation() {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
                     };
-                    console.log("Got user location:", userLocation);
                     resolve(userLocation);
                 },
-                error => {
-                    console.warn("Error getting location:", error);
-                    reject(error);
-                },
+                error => reject(error),
                 {
                     enableHighAccuracy: true,
                     timeout: 5000,
@@ -649,10 +576,18 @@ function getUserLocation() {
                 }
             );
         } else {
-            console.warn("Geolocation not supported by this browser");
             reject(new Error("Geolocation not supported"));
         }
     });
+}
+
+/**
+ * Get base URL
+ */
+function getBaseURL() {
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? `https://${window.location.host}`
+        : window.location.origin;
 }
 
 /**
@@ -799,38 +734,6 @@ async function getChainDetails(chainId) {
 }
 
 /**
- * Helper function to extract address components (same as used in addBusinessToDatabase)
- * @param {Array} addressComponents - Array of address components from Google Places
- * @param {string} type - Component type to extract
- * @returns {string} Extracted component text
- */
-function getAddressComponent(addressComponents, type) {
-    if (!addressComponents || !Array.isArray(addressComponents)) return '';
-
-    const component = addressComponents.find(
-        component => component.types && component.types.includes(type)
-    );
-
-    return component ? (component.shortText || component.short_name || '') : '';
-}
-
-/**
- * Extract address component from place
- * @param {Object} place - Google Place object
- * @param {string} type - Component type to extract
- * @returns {string} Extracted component text
- */
-function getAddressComponentFromPlace(place, type) {
-    if (!place.addressComponents) return '';
-
-    const component = place.addressComponents.find(
-        component => component.types.includes(type)
-    );
-
-    return component ? component.shortText : '';
-}
-
-/**
  * Convert business type codes to readable labels
  * @param {string} typeCode - Business type code
  * @returns {string} Readable type label
@@ -881,16 +784,6 @@ function getIncentiveTypeLabel(typeCode) {
     };
 
     return types[typeCode] || typeCode;
-}
-
-/**
- * Get base URL based on environment
- * @returns {string} Base URL
- */
-function getBaseURL() {
-    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? `https://${window.location.host}`
-        : window.location.origin;
 }
 
 /**
@@ -1125,77 +1018,6 @@ function checkForNewlyAddedBusiness() {
             }
         }, 1000);
     }
-}
-
-/**
- * Show alert when a new business is added
- * @param {string} businessName - Name of the newly added business
- */
-function showNewBusinessAlert(businessName) {
-    // Create alert container
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-success';
-    alertDiv.role = 'alert';
-    alertDiv.style.marginBottom = '20px';
-    alertDiv.style.animation = 'fadeIn 0.5s';
-
-    // Add alert content
-    alertDiv.innerHTML = `
-        <strong>Success!</strong> "${businessName}" has been added to the database. 
-        Searching for this business now...
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
-    `;
-
-    // Add inline styles if needed
-    alertDiv.style.backgroundColor = '#d4edda';
-    alertDiv.style.border = '1px solid #c3e6cb';
-    alertDiv.style.color = '#155724';
-    alertDiv.style.borderRadius = '4px';
-    alertDiv.style.padding = '12px 20px';
-
-    // Add close button functionality
-    const closeButton = alertDiv.querySelector('.close');
-    if (closeButton) {
-        closeButton.style.float = 'right';
-        closeButton.style.fontSize = '20px';
-        closeButton.style.fontWeight = 'bold';
-        closeButton.style.lineHeight = '20px';
-        closeButton.style.color = '#155724';
-        closeButton.style.opacity = '0.5';
-        closeButton.style.cursor = 'pointer';
-
-        closeButton.addEventListener('click', function () {
-            alertDiv.remove();
-        });
-    }
-
-    // Add animation styles
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeOut {
-            from { opacity: 1; transform: translateY(0); }
-            to { opacity: 0; transform: translateY(-10px); }
-        }
-    `;
-    document.head.appendChild(style);
-
-    // Insert alert at the top of the main content
-    const mainContent = document.querySelector('main') || document.body;
-    mainContent.insertBefore(alertDiv, mainContent.firstChild);
-
-    // Auto-remove after 8 seconds
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.style.animation = 'fadeOut 0.5s';
-            setTimeout(() => alertDiv.remove(), 500);
-        }
-    }, 8000);
 }
 
 /**
@@ -1629,238 +1451,6 @@ async function geocodeAddressClientSide(address) {
     });
 }
 
-/**
- * Search Google Places for a specific business name
- * @param {string} businessName - Name of business to search for
- * @param {Object} searchLocation - Location to search around
- */
-async function searchGooglePlacesForSpecificBusiness(businessName, searchLocation) {
-    try {
-        console.log("Searching specifically for:", businessName);
-
-        // Make map visible
-        const mapContainer = document.getElementById('map');
-        if (mapContainer) {
-            mapContainer.style.display = 'block';
-            mapContainer.style.height = '500px';
-        }
-
-        // Show loading indicator
-        const loadingDiv = document.createElement('div');
-        loadingDiv.id = 'map-loading';
-        loadingDiv.className = 'loading-indicator';
-        loadingDiv.innerHTML = 'Searching for businesses...';
-        mapContainer.appendChild(loadingDiv);
-
-        // Create LatLng for the search location
-        const latlng = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-
-        // Center map on the search location
-        map.setCenter(latlng);
-        map.setZoom(11);
-
-        // Use the Places Service for text search
-        const service = new google.maps.places.PlacesService(map);
-
-        const request = {
-            query: businessName,
-            location: latlng,
-            radius: 50000 // 50km radius
-        };
-
-        // Perform the search
-        service.textSearch(request, (results, status) => {
-            // Remove loading indicator
-            const loadingElement = document.getElementById('map-loading');
-            if (loadingElement) loadingElement.remove();
-
-            if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-                console.log("Found specific businesses:", results.length);
-
-                // Process results and create business objects
-                const businesses = results.map(place => {
-                    return {
-                        _id: 'google_' + place.place_id,
-                        bname: place.name,
-                        address1: place.formatted_address || '',
-                        city: '',
-                        state: '',
-                        zip: '',
-                        isGooglePlace: true,
-                        placeId: place.place_id,
-                        lat: place.geometry.location.lat(),
-                        lng: place.geometry.location.lng()
-                    };
-                });
-
-                // Add markers and display results
-                businesses.forEach(business => {
-                    createBusinessMarker(business);
-                });
-
-                displaySearchResults(businesses);
-            } else {
-                console.log("No specific businesses found:", status);
-                // Fall back to regular search
-                searchGooglePlaces({businessName: businessName}, searchLocation);
-            }
-        });
-    } catch (error) {
-        console.error("Error in specific business search:", error);
-        // Fall back to regular search
-        searchGooglePlaces({businessName: businessName}, searchLocation);
-    }
-}
-
-/**
- * Enhanced searchGooglePlaces function
- * @param {Object} formData - Form data with search parameters
- * @param {Object} searchLocation - Location to search around
- */
-async function searchGooglePlaces(formData, searchLocation = null) {
-    try {
-        console.log("Searching Google Places for:", formData);
-
-        // Make map visible
-        const mapContainer = document.getElementById('map');
-        if (mapContainer) {
-            mapContainer.style.display = 'block';
-            mapContainer.style.height = '500px';
-        }
-
-        // Clear existing markers and create new bounds
-        clearMarkers();
-        bounds = new google.maps.LatLngBounds();
-
-        // Build search query
-        let searchQuery = '';
-        if (formData.businessName) searchQuery += formData.businessName;
-        if (formData.address) searchQuery += ' ' + formData.address;
-        searchQuery = searchQuery.trim();
-
-        // Show loading indicator
-        const loadingDiv = document.createElement('div');
-        loadingDiv.id = 'map-loading';
-        loadingDiv.className = 'loading-indicator';
-        loadingDiv.innerHTML = 'Searching for businesses...';
-        mapContainer.appendChild(loadingDiv);
-
-        // Use provided search location or get user location
-        let placesLocation;
-        if (searchLocation) {
-            placesLocation = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-            bounds.extend(placesLocation);
-            map.setCenter(placesLocation);
-            map.setZoom(12);
-        } else {
-            // Use default US center
-            placesLocation = new google.maps.LatLng(CONFIG.defaultCenter.lat, CONFIG.defaultCenter.lng);
-            bounds.extend(placesLocation);
-            console.log("Using default US center for search");
-        }
-
-        try {
-            // Use Places Service for text search
-            const service = new google.maps.places.PlacesService(map);
-
-            const request = {
-                query: searchQuery,
-                location: placesLocation,
-                radius: 40000 // 40km search radius
-            };
-
-            service.textSearch(request, (results, status) => {
-                // Remove loading indicator
-                const loadingElement = document.getElementById('map-loading');
-                if (loadingElement) loadingElement.remove();
-
-                if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-                    console.log("Found places via Places API:", results.length);
-
-                    // Process the results
-                    const businessResults = results.map(place => {
-                        // Extract address components
-                        const addressParts = place.formatted_address ? place.formatted_address.split(',') : [];
-                        let address1 = '';
-                        let city = '';
-                        let state = '';
-                        let zip = '';
-
-                        if (addressParts.length >= 1) address1 = addressParts[0].trim();
-                        if (addressParts.length >= 2) city = addressParts[1].trim();
-                        if (addressParts.length >= 3) {
-                            const stateZip = addressParts[2].trim().split(' ');
-                            if (stateZip.length >= 1) state = stateZip[0].trim();
-                            if (stateZip.length >= 2) zip = stateZip[1].trim();
-                        }
-
-                        // Calculate distance from search center
-                        const placeLatLng = place.geometry.location;
-                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            placesLocation,
-                            placeLatLng
-                        );
-
-                        // Create business object
-                        const business = {
-                            _id: 'google_' + place.place_id,
-                            bname: place.name,
-                            address1: address1,
-                            city: city,
-                            state: state,
-                            zip: zip,
-                            formattedAddress: place.formatted_address,
-                            type: mapGooglePlaceTypeToBusinessType(place.types),
-                            phone: place.formatted_phone_number || '',
-                            isGooglePlace: true,
-                            placeId: place.place_id,
-                            lat: place.geometry.location.lat(),
-                            lng: place.geometry.location.lng(),
-                            distance: distance
-                        };
-
-                        // Add marker
-                        createBusinessMarker(business);
-
-                        // Extend bounds
-                        bounds.extend(placeLatLng);
-
-                        return business;
-                    });
-
-                    // Check for chain matches
-                    findChainMatchesForResults(businessResults).then(() => {
-                        // Sort by distance
-                        businessResults.sort((a, b) => a.distance - b.distance);
-
-                        // Display results
-                        displaySearchResults(businessResults);
-
-                        // Fit map bounds
-                        if (bounds && !bounds.isEmpty()) {
-                            safelyFitBounds(map, bounds);
-                        }
-                    });
-                } else {
-                    console.log("No places found via Places API:", status);
-                    showErrorMessage('No businesses found matching your search criteria.');
-                }
-            });
-        } catch (error) {
-            console.error("Error searching places:", error);
-
-            // Remove loading indicator
-            const loadingElement = document.getElementById('map-loading');
-            if (loadingElement) loadingElement.remove();
-
-            showErrorMessage(`Error searching for businesses: ${error.message}`);
-        }
-    } catch (error) {
-        console.error("Error in searchGooglePlaces:", error);
-        showErrorMessage(`Error searching for businesses: ${error.message}`);
-    }
-}
-
 function applyMapHeightFix() {
     // Check if styles already applied
     if (!document.getElementById('map-height-fix')) {
@@ -1956,186 +1546,6 @@ const mapHeightCSS = `
     height: 24px !important;
 }
 `;
-
-/**
- * Show info window for a business marker
- * @param {Object} marker - The marker that was clicked
- */
-function showBusinessInfoWindow(marker) {
-    if (!marker || !marker.business) {
-        console.error("Invalid marker or missing business data");
-        return;
-    }
-
-    const business = marker.business;
-    console.log("Showing info window for business:", business.bname);
-
-    // Create info window if needed
-    if (!infoWindow) {
-        infoWindow = new google.maps.InfoWindow({
-            maxWidth: 320,
-            disableAutoPan: false
-        });
-    }
-
-    // Check if this is a Google Places result
-    const isGooglePlace = business.isGooglePlace === true;
-    const isChainLocation = !!business.chain_id;
-
-    // Format address
-    const addressText = business.address1 ?
-        `<p><strong>Address:</strong><br>${business.address1}${business.city ? ', ' + business.city : ''}${business.state ? ', ' + business.state : ''}${business.zip ? ' ' + business.zip : ''}</p>` :
-        '';
-
-    // Create chain badge if applicable
-    const chainBadge = isChainLocation ?
-        `<span style="display:inline-block; background-color:#4285F4; color:white; padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:5px;">${business.chain_name || 'Chain Location'}</span>` :
-        '';
-
-    // Determine action button
-    let actionButton;
-    if (isGooglePlace) {
-        if (isChainLocation) {
-            actionButton = `
-                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; margin-top:10px;" 
-                        onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
-                    Add to Database
-                </button>
-            `;
-        } else {
-            actionButton = `
-                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; margin-top:10px;" 
-                        onclick="window.addBusinessToDatabase('${business.placeId}')">
-                    Add to Patriot Thanks
-                </button>
-            `;
-        }
-    } else {
-        actionButton = `
-            <button style="background-color:#4285F4; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; margin-top:10px;" 
-                    onclick="window.viewBusinessDetails('${business._id}')">
-                View Details
-            </button>
-        `;
-    }
-
-    // Build content
-    const content = `
-        <div style="max-width:300px; font-family:Arial,sans-serif;">
-            <h3 style="margin-top:0; margin-bottom:8px; font-size:16px;">${business.bname} ${chainBadge}</h3>
-            ${addressText}
-            <div id="incentives-container-${business._id || business.placeId}">
-                <p><em>Loading incentives...</em></p>
-            </div>
-            <div style="text-align:right;">
-                ${actionButton}
-            </div>
-        </div>
-    `;
-
-    // Set content and open
-    infoWindow.setContent(content);
-    infoWindow.open(map, marker);
-
-    // Load incentives after window is open
-    if (isGooglePlace && isChainLocation) {
-        fetchChainIncentivesForInfoWindow(business.placeId, business.chain_id, true);
-    } else if (!isGooglePlace) {
-        fetchBusinessIncentivesForInfoWindow(business._id);
-    } else {
-        const incentivesDiv = document.getElementById(`incentives-container-${business._id || business.placeId}`);
-        if (incentivesDiv) {
-            incentivesDiv.innerHTML = `<p><em>This business is not yet in the Patriot Thanks database.</em></p>`;
-        }
-    }
-}
-
-/**
- * Fetch chain incentives for a Google Places result - simple version
- * @param {string} placeId - Google Place ID
- * @param {string} chainId - Chain ID in database
- * @param {boolean} isNativeInfoWindow - Whether using native Google InfoWindow
- */
-function fetchChainIncentivesForInfoWindow(placeId, chainId, isNativeInfoWindow = false) {
-    if (!chainId) {
-        console.error("No chain ID provided for fetching incentives");
-        return;
-    }
-
-    // Get container element ID based on info window type
-    const containerSelector = isNativeInfoWindow ?
-        `incentives-container-${placeId}` :
-        `info-window-incentives-${placeId}`;
-
-    // Get incentives container
-    const incentivesDiv = document.getElementById(containerSelector);
-    if (!incentivesDiv) {
-        console.error(`Could not find incentives div for place ${placeId}`);
-        return;
-    }
-
-    // Determine the base URL
-    const baseURL = getBaseURL();
-
-    // Build API URL
-    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
-
-    console.log("Fetching chain incentives from:", apiURL);
-
-    fetch(apiURL)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to fetch chain incentives: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log(`Chain incentives data for place ${placeId}:`, data);
-
-            // Check if there are any incentives
-            if (!data.results || data.results.length === 0) {
-                incentivesDiv.innerHTML = '<p><strong>Chain Incentives:</strong> No incentives found</p>';
-                return;
-            }
-
-            // Build HTML for incentives
-            let incentivesHTML = '<p><strong>Chain Incentives:</strong></p><ul style="margin:8px 0; padding-left:20px;">';
-
-            data.results.forEach(incentive => {
-                if (incentive.is_available) {
-                    const typeLabel = getIncentiveTypeLabel(incentive.type);
-                    const otherDescription = incentive.other_description ?
-                        ` (${incentive.other_description})` : '';
-
-                    // All chain incentives should have the chain badge
-                    const chainBadge = '<span style="display:inline-block; background-color:#4285F4; color:white; padding:1px 4px; border-radius:4px; font-size:0.7em; margin-left:5px;">Chain-wide</span>';
-
-                    incentivesHTML += `
-                        <li>
-                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
-                            ${incentive.information ? `<div style="font-size:13px; color:#555; margin-top:2px;">${incentive.information}</div>` : ''}
-                        </li>
-                    `;
-                }
-            });
-
-            incentivesHTML += '</ul>';
-
-            // Add explanation for chain locations
-            incentivesHTML += `
-                <div style="margin-top:10px; font-style:italic; color:#666; font-size:12px;">
-                    This location matches ${data.chain_info ? data.chain_info.bname : 'a chain'} in our database.
-                    Chain-wide incentives apply to all locations.
-                </div>
-            `;
-
-            incentivesDiv.innerHTML = incentivesHTML;
-        })
-        .catch(error => {
-            console.error(`Error fetching chain incentives: ${error}`);
-            incentivesDiv.innerHTML = '<p><strong>Chain Incentives:</strong> Error loading incentives</p>';
-        });
-}
 
 /**
  * Safely extract coordinates from various Google Maps objects
@@ -2577,56 +1987,6 @@ function applyInfoWindowCSS() {
     }
 }
 
-// Export functions for global access
-if (typeof window !== 'undefined') {
-    window.showInfoWindow = showInfoWindow;
-    window.fixInfoWindowPositioning = fixInfoWindowPositioning;
-}
-
-function applyTargetedTailFix() {
-    console.log("Applying targeted tail fix...");
-
-    const tailElement = document.querySelector('.gm-style-iw-t');
-    if (tailElement) {
-        const currentStyles = window.getComputedStyle(tailElement);
-        console.log("Current tail positioning:", {
-            bottom: currentStyles.bottom,
-            right: currentStyles.right,
-            left: currentStyles.left,
-            width: currentStyles.width,
-            height: currentStyles.height
-        });
-
-        // Store original values for comparison
-        const originalBottom = currentStyles.bottom;
-        const originalRight = currentStyles.right;
-
-        // Apply the minimal fix - just center the tail at the bottom
-        tailElement.style.setProperty('bottom', '0px', 'important');
-        tailElement.style.setProperty('left', '50%', 'important');
-        tailElement.style.setProperty('right', 'auto', 'important');
-        tailElement.style.setProperty('transform', 'translateX(-50%)', 'important');
-
-        console.log(`Applied tail fix: changed bottom from ${originalBottom} to 0px, right from ${originalRight} to auto`);
-
-        // Check the result
-        setTimeout(() => {
-            const newRect = document.querySelector('.gm-style-iw-c').getBoundingClientRect();
-            console.log("Info window position after tail fix:", newRect);
-
-            const newTailStyles = window.getComputedStyle(tailElement);
-            console.log("New tail positioning:", {
-                bottom: newTailStyles.bottom,
-                right: newTailStyles.right,
-                left: newTailStyles.left,
-                transform: newTailStyles.transform
-            });
-        }, 50);
-    } else {
-        console.log("No tail element found for fixing");
-    }
-}
-
 function applyCSSOnlyTailFix() {
     if (!document.getElementById('css-only-tail-fix')) {
         const style = document.createElement('style');
@@ -2650,104 +2010,6 @@ function applyCSSOnlyTailFix() {
         document.head.appendChild(style);
         console.log("Applied CSS-only tail fix");
     }
-}
-
-// Test function for the tail fix specifically
-window.testTailFix = function () {
-    console.log("Testing tail fix...");
-
-    // Remove any existing fix
-    const existingFix = document.getElementById('css-only-tail-fix');
-    if (existingFix) {
-        existingFix.remove();
-        console.log("Removed existing tail fix");
-    }
-
-    // Apply the CSS fix
-    applyCSSOnlyTailFix();
-
-    // Close and reopen info window to test
-    if (infoWindow) {
-        infoWindow.close();
-        console.log("Closed info window. Click a marker to test the tail fix.");
-    }
-};
-
-function gentlyFixInfoWindowPosition() {
-    console.log("Applying gentle info window position fix...");
-
-    const tailElement = document.querySelector('.gm-style-iw-t');
-    if (tailElement) {
-        const currentStyles = window.getComputedStyle(tailElement);
-        console.log("Current tail styles:", {
-            bottom: currentStyles.bottom,
-            right: currentStyles.right,
-            left: currentStyles.left,
-            position: currentStyles.position
-        });
-
-        // Only fix if it has the problematic positioning
-        if (currentStyles.bottom === '34px' && currentStyles.right === '0px') {
-            console.log("Found problematic tail positioning, applying gentle fix...");
-
-            // Just change the bottom value, leave everything else alone
-            tailElement.style.bottom = '0px';
-
-            console.log("Applied gentle fix - changed bottom from 34px to 0px");
-
-            // Check if this fixes the positioning
-            setTimeout(() => {
-                const iwElement = document.querySelector('.gm-style-iw-c');
-                if (iwElement) {
-                    const rect = iwElement.getBoundingClientRect();
-                    console.log("Info window position after gentle fix:", rect);
-                }
-            }, 100);
-        }
-    }
-}
-
-// Function to check and report info window position without changing anything
-function checkAndReportInfoWindowPosition() {
-    console.log("=== INFO WINDOW POSITION REPORT ===");
-
-    const iwContainer = document.querySelector('.gm-style-iw-c');
-    const iwContent = document.querySelector('.gm-style-iw-d');
-    const tailElement = document.querySelector('.gm-style-iw-t');
-
-    if (iwContainer) {
-        const rect = iwContainer.getBoundingClientRect();
-        const styles = window.getComputedStyle(iwContainer);
-
-        console.log("Container position:", rect);
-        console.log("Container visibility:", styles.visibility);
-        console.log("Container display:", styles.display);
-        console.log("Container opacity:", styles.opacity);
-        console.log("Container transform:", styles.transform);
-
-        // Determine status
-        const isVisible = rect.width > 0 && rect.height > 0;
-        const isInViewport = rect.top >= 0 && rect.top <= window.innerHeight &&
-            rect.left >= 0 && rect.left <= window.innerWidth;
-
-        console.log("Is visible:", isVisible);
-        console.log("Is in viewport:", isInViewport);
-
-        if (!isInViewport && tailElement) {
-            const tailStyles = window.getComputedStyle(tailElement);
-            console.log("Tail styles:", {
-                bottom: tailStyles.bottom,
-                right: tailStyles.right,
-                left: tailStyles.left,
-                width: tailStyles.width,
-                height: tailStyles.height
-            });
-        }
-    } else {
-        console.log("No info window container found");
-    }
-
-    console.log("=== END REPORT ===");
 }
 
 // Remove any existing aggressive CSS that might be hiding things
@@ -2807,96 +2069,6 @@ function applyBasicInfoWindowCSS() {
         `;
         document.head.appendChild(style);
         console.log("Applied basic info window CSS");
-    }
-}
-
-// Test function you can call from console
-window.testInfoWindow = function () {
-    console.log("=== TESTING INFO WINDOW SETUP ===");
-
-    // Remove aggressive CSS
-    removeAggressiveCSS();
-
-    // Apply basic CSS
-    applyBasicInfoWindowCSS();
-
-    // Close any existing info window
-    if (infoWindow) {
-        infoWindow.close();
-    }
-
-    console.log("Reset complete. Try clicking a marker now.");
-    console.log("If it still doesn't work, run: checkAndReportInfoWindowPosition()");
-};
-
-console.log("Step-by-step info window fix loaded. Run testInfoWindow() in console to reset everything.");
-
-// IMPROVED: More aggressive tail positioning fix
-function fixInfoWindowTailPositioning() {
-    console.log("Attempting to fix info window tail positioning");
-
-    // Find the tail element that's causing the problem
-    const tailElement = document.querySelector('.gm-style-iw-t');
-
-    if (tailElement) {
-        console.log("Found info window tail element, applying aggressive fixes");
-
-        // Remove the problematic inline styles completely
-        tailElement.style.removeProperty('bottom');
-        tailElement.style.removeProperty('right');
-        tailElement.style.removeProperty('left');
-        tailElement.style.removeProperty('top');
-
-        // Force correct positioning with maximum specificity
-        tailElement.style.setProperty('position', 'absolute', 'important');
-        tailElement.style.setProperty('bottom', '0px', 'important');
-        tailElement.style.setProperty('right', 'auto', 'important');
-        tailElement.style.setProperty('left', '50%', 'important');
-        tailElement.style.setProperty('top', 'auto', 'important');
-        tailElement.style.setProperty('transform', 'translateX(-50%)', 'important');
-        tailElement.style.setProperty('width', '20px', 'important');
-        tailElement.style.setProperty('height', '15px', 'important');
-
-        console.log("Applied positioning fixes to tail element");
-
-        // Also fix the main info window container if it has problematic transforms
-        const iwContainer = document.querySelector('.gm-style-iw-c');
-        if (iwContainer) {
-            // Reset any problematic transforms that might be positioning it off-screen
-            const currentTransform = window.getComputedStyle(iwContainer).transform;
-            console.log("Current info window transform:", currentTransform);
-
-            // If the transform is moving it way off screen, reset it
-            if (currentTransform && currentTransform.includes('matrix')) {
-                const rect = iwContainer.getBoundingClientRect();
-                if (rect.top < -100 || rect.top > window.innerHeight + 100) {
-                    console.log("Info window positioned off-screen, attempting to reset transform");
-                    iwContainer.style.setProperty('transform', 'none', 'important');
-
-                    // Give it a moment then restore a reasonable transform if needed
-                    setTimeout(() => {
-                        const newRect = iwContainer.getBoundingClientRect();
-                        console.log("Info window position after transform reset:", newRect);
-                    }, 100);
-                }
-            }
-        }
-
-        // Fix the tail connector as well
-        const tailConnector = document.querySelector('.gm-style-iw-tc');
-        if (tailConnector) {
-            tailConnector.style.setProperty('top', 'auto', 'important');
-            tailConnector.style.setProperty('bottom', '-15px', 'important');
-            tailConnector.style.setProperty('left', '50%', 'important');
-            tailConnector.style.setProperty('right', 'auto', 'important');
-            tailConnector.style.setProperty('transform', 'translateX(-50%)', 'important');
-            console.log("Fixed tail connector positioning");
-        }
-
-        return true;
-    } else {
-        console.warn("Could not find tail element to fix");
-        return false;
     }
 }
 
@@ -2968,6 +2140,70 @@ function applyInfoWindowPositioningFixes() {
         document.head.appendChild(style);
         console.log("Applied final info window positioning fixes");
     }
+}
+
+/**
+ * FINAL: Enhanced address key creation
+ */
+function createEnhancedAddressKey(business) {
+    const parts = [];
+    if (business.address1) parts.push(business.address1.toLowerCase().trim());
+    if (business.city) parts.push(business.city.toLowerCase().trim());
+    if (business.state) parts.push(business.state.toLowerCase().trim());
+    if (business.placeId) parts.push(`place_${business.placeId}`);
+    if (business._id && !business._id.startsWith('google_')) parts.push(`db_${business._id}`);
+    return parts.join('|');
+}
+
+/**
+ * FINAL: Enhanced business name key for chains
+ */
+function createBusinessNameKey(business) {
+    if (business.isChainLocation || business.chain_id) {
+        const addressPart = business.address1 ? business.address1.toLowerCase().replace(/\d+/g, '').trim() : '';
+        return `${business.bname.toLowerCase().trim()}_${addressPart}`;
+    }
+    return business.bname.toLowerCase().trim();
+}
+
+/**
+ * FINAL: Fixed categorization with proper duplicate detection
+ */
+function categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResults, nearbyDatabaseBusinesses) {
+    const finalPrimaryResults = [...primaryResults];
+    const usedAddresses = new Set();
+    const usedBusinessNames = new Set();
+
+    // Track primary results
+    finalPrimaryResults.forEach(business => {
+        const addressKey = createEnhancedAddressKey(business);
+        const nameKey = createBusinessNameKey(business);
+        usedAddresses.add(addressKey);
+        usedBusinessNames.add(nameKey);
+    });
+
+    // Filter Places results
+    const finalPlacesResults = placesResults.filter(business => {
+        const addressKey = createEnhancedAddressKey(business);
+        const nameKey = createBusinessNameKey(business);
+
+        if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
+            return false;
+        }
+
+        usedAddresses.add(addressKey);
+        usedBusinessNames.add(nameKey);
+        return true;
+    });
+
+    // Filter nearby results
+    const finalNearbyResults = nearbyDatabaseBusinesses.filter(business => {
+        const addressKey = createEnhancedAddressKey(business);
+        const nameKey = createBusinessNameKey(business);
+        return !usedAddresses.has(addressKey) && !usedBusinessNames.has(nameKey);
+    });
+
+    return { finalPrimaryResults, finalPlacesResults, finalNearbyResults };
 }
 
 /**
@@ -3060,19 +2296,6 @@ function removeProblematicInfoWindowCSS() {
 
     console.log("Applied minimal info window CSS");
 }
-
-// Call this to reset and test
-window.debugInfoWindow = function () {
-    console.log("Starting info window debug...");
-    removeProblematicInfoWindowCSS();
-
-    // Close any existing info window
-    if (infoWindow) {
-        infoWindow.close();
-    }
-
-    console.log("Ready for testing - try clicking a marker now");
-};
 
 /**
  * Enhanced findChainMatchesForResults function
@@ -3528,8 +2751,6 @@ function mapGooglePlaceTypeToBusinessType(types) {
     return 'OTHER';
 }
 
-console.log("Google Places address parsing fix loaded successfully!");
-
 /**
  * Fixed buildInfoWindowContent function with better Google Places handling
  * @param {Object} business - Business object
@@ -3904,26 +3125,6 @@ function setupMarkerClickPriority() {
         }
     }, {passive: false});
 }
-
-window.debugEnhancedMarkers = function () {
-    console.log("=== ENHANCED MARKER DEBUG ===");
-    console.log("Total markers:", markers.length);
-
-    markers.forEach((marker, index) => {
-        console.log(`Marker ${index}:`, {
-            business: marker.business?.bname,
-            isFromDatabase: marker.isFromDatabase,
-            position: marker.position,
-            hasAdvancedMarker: marker instanceof google.maps.marker?.AdvancedMarkerElement
-        });
-    });
-
-    console.log("Enhanced styles loaded:", !!document.getElementById('enhanced-marker-styles'));
-    console.log("=== END DEBUG ===");
-};
-
-console.log("Enhanced marker integration loaded successfully!");
-console.log("Run debugEnhancedMarkers() in console to check marker status");
 
 /**
  * Initialize additional map features
@@ -4545,86 +3746,6 @@ function fetchChainIncentivesForPlacesResult(placeId, chainId) {
             if (incentivesCell) {
                 incentivesCell.innerHTML = 'Not in database yet';
             }
-        });
-}
-
-/**
- * Check if the current user is an admin
- * @returns {boolean} True if user is admin
- */
-function checkIfUserIsAdmin() {
-    try {
-        // Get session data from localStorage
-        const sessionData = localStorage.getItem('patriotThanksSession');
-        if (!sessionData) return false;
-
-        const session = JSON.parse(sessionData);
-
-        // Check if user has admin privileges
-        return (session.user && (session.user.isAdmin === true || session.user.level === 'Admin'));
-    } catch (error) {
-        console.error("Error checking admin status:", error);
-        return false;
-    }
-}
-
-// Helper function to perform the actual incentives fetch
-function performIncentivesFetch(businessId, incentivesDiv) {
-    const baseURL = getBaseURL();
-    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
-
-    console.log("Fetching incentives from:", apiURL);
-
-    fetch(apiURL)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to fetch incentives: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log(`Incentives data for business ${businessId}:`, data);
-
-            // Check if there are any incentives
-            if (!data.results || data.results.length === 0) {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No incentives found</p>';
-                return;
-            }
-
-            // Build HTML for incentives
-            let incentivesHTML = '<p><strong>Incentives:</strong></p><ul style="margin:8px 0; padding-left:20px;">';
-
-            data.results.forEach(incentive => {
-                if (incentive.is_available) {
-                    const typeLabel = getIncentiveTypeLabel(incentive.type);
-                    const otherDescription = incentive.other_description ?
-                        ` (${incentive.other_description})` : '';
-
-                    // Add chain badge for chain-wide incentives
-                    const chainBadge = incentive.is_chain_wide ?
-                        '<span style="display:inline-block; background-color:#4285F4; color:white; padding:1px 4px; border-radius:4px; font-size:0.7em; margin-left:5px;">Chain-wide</span>' :
-                        '';
-
-                    incentivesHTML += `
-                        <li>
-                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
-                            ${incentive.information ? `<div style="font-size:13px; color:#555; margin-top:2px;">${incentive.information}</div>` : ''}
-                        </li>
-                    `;
-                }
-            });
-
-            incentivesHTML += '</ul>';
-
-            if (incentivesHTML === '<p><strong>Incentives:</strong></p><ul style="margin:8px 0; padding-left:20px;"></ul>') {
-                incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> No active incentives found</p>';
-            } else {
-                incentivesDiv.innerHTML = incentivesHTML;
-            }
-        })
-        .catch(error => {
-            console.error(`Error fetching incentives for info window: ${error}`);
-            incentivesDiv.innerHTML = '<p><strong>Incentives:</strong> Error loading incentives</p>';
         });
 }
 
@@ -6671,100 +5792,6 @@ function createBusinessMarker(business) {
     }
 }
 
-async function createEnhancedBusinessMarkerFixed(business, location, forceDatabase = false) {
-    try {
-        // Import the marker library
-        const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
-
-        // Create a position object from the location
-        let position = createSafeLatLng(location);
-        if (!position) {
-            console.error("❌ Invalid position for enhanced marker:", location);
-            return createEnhancedFallbackMarker(business, location);
-        }
-
-        // CRITICAL FIX: Determine marker styling with explicit logic
-        const isFromDatabase = forceDatabase || (!business.isGooglePlace && !business._id?.startsWith('google_'));
-        const isChainLocation = !!business.chain_id;
-
-        // Choose marker color with explicit logic
-        let markerColor, markerClass;
-        if (isFromDatabase) {
-            markerColor = CONFIG.markerColors.primary; // RED for database businesses
-            markerClass = "primary database-business";
-            console.log(`🔴 RED MARKER: ${business.bname} (Database business)`);
-        } else {
-            markerColor = CONFIG.markerColors.nearby; // BLUE for Google Places
-            markerClass = "nearby google-places";
-            console.log(`🔵 BLUE MARKER: ${business.bname} (Google Places)`);
-        }
-
-        // Get business icon
-        const businessIcon = getBusinessTypeTextIcon(business.type);
-
-        // Create enhanced pin element
-        const pinElement = document.createElement('div');
-        pinElement.className = 'enhanced-custom-marker';
-        pinElement.setAttribute('title', business.bname);
-        pinElement.style.cursor = 'pointer';
-
-        // Enhanced marker HTML with explicit styling
-        pinElement.innerHTML = `
-            <div class="enhanced-marker-container">
-                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor} !important; border: 3px solid #ffffff;">
-                    <div class="enhanced-marker-icon">
-                        ${businessIcon}
-                    </div>
-                </div>
-                <div class="enhanced-marker-shadow"></div>
-                ${isChainLocation ? '<div class="chain-indicator">🔗</div>' : ''}
-                ${isFromDatabase ? '<div class="database-indicator">✓</div>' : ''}
-            </div>
-        `;
-
-        // Create the advanced marker
-        const marker = new AdvancedMarkerElement({
-            position: position,
-            map: map,
-            title: business.bname,
-            content: pinElement,
-            collisionBehavior: isFromDatabase ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
-        });
-
-        // Store the business data and flags
-        marker.business = business;
-        marker.position = position;
-        marker.isFromDatabase = isFromDatabase;
-
-        // Add click event listener
-        pinElement.addEventListener('click', function (e) {
-            console.log(`🖱️ Marker clicked: ${business.bname} (${isFromDatabase ? 'Database' : 'Google Places'})`);
-            e.stopPropagation();
-            showEnhancedInfoWindow(marker);
-        });
-
-        // Add hover effects
-        pinElement.addEventListener('mouseenter', function () {
-            pinElement.style.transform = 'scale(1.1)';
-            pinElement.style.zIndex = '1000';
-        });
-
-        pinElement.addEventListener('mouseleave', function () {
-            pinElement.style.transform = 'scale(1)';
-            pinElement.style.zIndex = 'auto';
-        });
-
-        // Add the marker to our array
-        markers.push(marker);
-        console.log(`✅ Added ${isFromDatabase ? 'DATABASE' : 'GOOGLE PLACES'} marker for ${business.bname}`);
-
-        return marker;
-    } catch (error) {
-        console.error("❌ Error creating enhanced marker:", error);
-        return createEnhancedFallbackMarker(business, location);
-    }
-}
-
 function fetchBusinessIncentivesFixed(businessId, chainId = null) {
     if (!businessId || businessId.startsWith('google_')) {
         console.log(`⏭️ Skipping incentives for Google Places business: ${businessId}`);
@@ -6934,297 +5961,6 @@ function addBusinessRowFixed(business, tableBody, isFromPlaces) {
     }
 }
 
-async function retrieveFromMongoDBFixed(formData, bustCache = false) {
-    try {
-        console.log("🔍 SEARCH DEBUG: Starting enhanced search with form data:", formData);
-
-        // Show loading indicator
-        const resultsContainer = document.getElementById('business-search-results') ||
-            document.getElementById('search_table');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading">Searching for businesses...</div>';
-            resultsContainer.style.display = 'block';
-        }
-
-        // Process search location first
-        let searchLocation = null;
-
-        if (formData.useMyLocation) {
-            try {
-                updateLoadingMessage("Getting your location...");
-                searchLocation = await getUserLocation();
-                window.currentSearchLocation = searchLocation;
-                console.log(`📍 Got user location: ${searchLocation.lat}, ${searchLocation.lng}`);
-            } catch (error) {
-                console.error("❌ Error getting user location:", error);
-                hideLoadingIndicator();
-                alert("Unable to get your current location. Please try entering an address instead.");
-                return;
-            }
-        } else if (formData.address && formData.address.trim() !== '') {
-            try {
-                updateLoadingMessage("Finding location...");
-                const geocodedLocation = await geocodeAddressClientSide(formData.address);
-                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
-                    searchLocation = geocodedLocation;
-                    window.currentSearchLocation = searchLocation;
-                    console.log(`📍 Geocoded location: ${searchLocation.lat}, ${searchLocation.lng}`);
-
-                    if (map && searchLocation) {
-                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                        map.setCenter(center);
-                        map.setZoom(11);
-                    }
-                } else {
-                    throw new Error(`Geocoding failed for address: ${formData.address}`);
-                }
-            } catch (error) {
-                console.error("❌ Error geocoding address:", error);
-                hideLoadingIndicator();
-                alert("We couldn't recognize that address. Please try a more specific address.");
-                return;
-            }
-        }
-
-        // Update loading message
-        updateLoadingMessage("Searching database...");
-
-        // Enhanced database search
-        const dbResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
-
-        console.log(`📊 DATABASE RESULTS: Found ${dbResults.length} businesses`);
-        dbResults.forEach((business, index) => {
-            console.log(`   ${index + 1}. ${business.bname} (ID: ${business._id}, Chain: ${business.is_chain ? 'Yes' : 'No'})`);
-        });
-
-        // Filter results properly
-        const validBusinesses = dbResults.filter(business => {
-            // Always exclude parent chains from display
-            if (business.is_chain === true) {
-                console.log(`🚫 Filtering out parent chain: ${business.bname}`);
-                return false;
-            }
-            return true;
-        });
-
-        console.log(`✅ VALID BUSINESSES: ${validBusinesses.length} after filtering`);
-
-        if (validBusinesses.length > 0) {
-            console.log("✅ Found businesses in database, displaying those");
-
-            // Ensure all database businesses are properly flagged
-            validBusinesses.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-                console.log(`🏷️ Tagged as database business: ${business.bname}`);
-            });
-
-            // Hide loading indicator before displaying results
-            hideLoadingIndicator();
-
-            // Display database results
-            displayBusinessesOnMapFixed(validBusinesses);
-            displaySearchResultsFixed(validBusinesses);
-
-            console.log("✅ Database businesses displayed successfully");
-
-        } else if (formData.businessName && searchLocation) {
-            // No database results, search Google Places
-            console.log("🌐 No database businesses found, searching Google Places");
-
-            updateLoadingMessage("Searching Google Places...");
-
-            try {
-                const placesResults = await searchGooglePlacesForBusiness(formData.businessName, searchLocation);
-
-                if (placesResults && placesResults.length > 0) {
-                    console.log(`📍 Found ${placesResults.length} businesses via Google Places`);
-
-                    updateLoadingMessage("Loading results...");
-                    hideLoadingIndicator();
-
-                    displayBusinessesOnMapFixed(placesResults);
-                    displaySearchResultsFixed(placesResults);
-                } else {
-                    hideLoadingIndicator();
-                    showNoResultsMessage();
-                }
-            } catch (placesError) {
-                console.error("❌ Error searching Google Places:", placesError);
-                hideLoadingIndicator();
-                showErrorMessage("Error searching for businesses. Please try again.");
-            }
-        } else {
-            // No results found
-            hideLoadingIndicator();
-            showNoResultsMessage();
-        }
-    } catch (error) {
-        console.error("❌ Enhanced search error:", error);
-        hideLoadingIndicator();
-        showErrorMessage(`Error searching for businesses: ${error.message}`);
-    }
-}
-
-function displayBusinessesOnMapFixed(businesses) {
-    if (!map) {
-        console.log("⏳ Map not ready, storing businesses for later display");
-        pendingBusinessesToDisplay = businesses;
-        return;
-    }
-
-    console.log(`🗺️ DISPLAY DEBUG: Displaying ${businesses.length} businesses on map`);
-
-    // Clear existing markers and create new bounds
-    clearMarkers();
-    bounds = new google.maps.LatLngBounds();
-
-    // Counter for valid markers
-    let validMarkers = 0;
-    let skippedBusinesses = 0;
-
-    // Process each business
-    businesses.forEach((business, index) => {
-        try {
-            console.log(`🔄 Processing business ${index + 1}: ${business.bname}`);
-
-            // Skip parent chain businesses
-            if (business.is_chain === true) {
-                console.log(`🚫 Skipping parent chain business: ${business.bname}`);
-                skippedBusinesses++;
-                return;
-            }
-
-            // Get coordinates
-            const businessLocation = getBusinessLocation(business);
-            if (!businessLocation) {
-                console.warn(`❌ Business ${business.bname} missing coordinates`);
-                skippedBusinesses++;
-                return;
-            }
-
-            // Update business object with coordinates
-            business.lat = businessLocation.lat;
-            business.lng = businessLocation.lng;
-
-            // Create marker with explicit database flag
-            const marker = createBusinessMarker(business);
-            if (marker) {
-                validMarkers++;
-                console.log(`✅ Created marker ${validMarkers} for ${business.bname}`);
-
-                // Extend bounds
-                const position = new google.maps.LatLng(businessLocation.lat, businessLocation.lng);
-                bounds.extend(position);
-            } else {
-                console.error(`❌ Failed to create marker for ${business.bname}`);
-                skippedBusinesses++;
-            }
-        } catch (error) {
-            console.error(`❌ Error processing business ${business.bname}:`, error);
-            skippedBusinesses++;
-        }
-    });
-
-    console.log(`📊 MARKER SUMMARY: Created ${validMarkers} markers, skipped ${skippedBusinesses} businesses`);
-
-    // Update map view
-    setTimeout(() => {
-        try {
-            if (window.currentSearchLocation && validMarkers > 0) {
-                console.log("📍 Centering map on search location");
-                const searchLatLng = new google.maps.LatLng(
-                    window.currentSearchLocation.lat,
-                    window.currentSearchLocation.lng
-                );
-                map.setCenter(searchLatLng);
-                map.setZoom(12);
-            } else if (validMarkers > 0 && bounds && !bounds.isEmpty()) {
-                console.log("🎯 Fitting map to business bounds");
-                safelyFitBounds(map, bounds);
-            } else {
-                console.log("🌎 Using default map center");
-                map.setCenter(CONFIG.defaultCenter);
-                map.setZoom(CONFIG.defaultZoom);
-            }
-        } catch (error) {
-            console.error("❌ Error updating map view:", error);
-        }
-    }, 200);
-}
-
-function displaySearchResultsFixed(businesses) {
-    try {
-        console.log(`📋 RESULTS DEBUG: Displaying ${businesses.length} businesses in table`);
-
-        // Ensure loading indicator is hidden
-        hideLoadingIndicator();
-
-        const businessSearchTable = document.getElementById('business_search');
-        const searchTableContainer = document.getElementById('search_table');
-
-        if (!businessSearchTable || !searchTableContainer) {
-            console.error("❌ Required table elements not found in the DOM");
-            showErrorMessage("There was an error displaying search results. Please try again later.");
-            return;
-        }
-
-        // Get the table body
-        let tableBody = businessSearchTable.querySelector('tbody');
-        if (!tableBody) {
-            console.error("❌ Table body not found");
-            showErrorMessage("There was an error displaying search results. Please try again later.");
-            return;
-        }
-
-        // Clear existing rows
-        tableBody.innerHTML = '';
-
-        // Show the search results table
-        searchTableContainer.style.display = 'block';
-
-        // Hide the "hidden" text in the h5
-        const searchTableH5 = searchTableContainer.querySelector('h5');
-        if (searchTableH5) {
-            searchTableH5.style.display = 'none';
-        }
-
-        if (businesses.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No businesses found matching your search criteria.</td></tr>';
-            searchTableContainer.scrollIntoView({behavior: 'smooth'});
-            return;
-        }
-
-        // Filter and categorize businesses
-        const databaseBusinesses = businesses.filter(b => !b.isGooglePlace);
-        const googlePlacesBusinesses = businesses.filter(b => b.isGooglePlace);
-
-        console.log(`📊 CATEGORY DEBUG: ${databaseBusinesses.length} database, ${googlePlacesBusinesses.length} Google Places`);
-
-        // Add database businesses first (these should have red markers)
-        databaseBusinesses.forEach((business, index) => {
-            console.log(`📝 Adding database business ${index + 1}: ${business.bname}`);
-            addBusinessRowFixed(business, tableBody, false);
-        });
-
-        // Add Google Places businesses (these should have blue markers)
-        googlePlacesBusinesses.forEach((business, index) => {
-            console.log(`📝 Adding Google Places business ${index + 1}: ${business.bname}`);
-            addBusinessRowFixed(business, tableBody, true);
-        });
-
-        // Scroll to the results
-        searchTableContainer.scrollIntoView({behavior: 'smooth'});
-
-        console.log("✅ Search results displayed successfully");
-
-    } catch (error) {
-        console.error("❌ Error displaying search results:", error);
-        hideLoadingIndicator();
-        showErrorMessage("There was an error displaying the search results: " + error.message);
-    }
-}
-
 /**
  * Update the loading message
  * @param {string} message - New loading message
@@ -7236,16 +5972,10 @@ function updateLoadingMessage(message) {
     }
 }
 
-/**
- * Hide the loading indicator
- */
 function hideLoadingIndicator() {
     const loadingIndicator = document.getElementById('main-loading');
-    if (loadingIndicator) {
-        loadingIndicator.remove();
-    }
+    if (loadingIndicator) loadingIndicator.remove();
 
-    // Also hide any other loading indicators that might be present
     const allLoadingIndicators = document.querySelectorAll('.loading-indicator');
     allLoadingIndicators.forEach(indicator => {
         if (indicator.id === 'main-loading' || indicator.textContent.includes('Searching')) {
@@ -7254,29 +5984,18 @@ function hideLoadingIndicator() {
     });
 }
 
-/**
- * Enhanced showNoResultsMessage with proper loading cleanup
- */
 function showNoResultsMessage() {
     hideLoadingIndicator();
-
-    const resultsContainer = document.getElementById('business-search-results') ||
-        document.getElementById('search_table');
+    const resultsContainer = document.getElementById('business-search-results') || document.getElementById('search_table');
     if (resultsContainer) {
         resultsContainer.innerHTML = '<div class="error-message">No businesses found matching your search criteria in this area.</div>';
         resultsContainer.style.display = 'block';
     }
 }
 
-/**
- * Enhanced showErrorMessage with proper loading cleanup
- * @param {string} message - Error message to display
- */
 function showErrorMessage(message) {
     hideLoadingIndicator();
-
-    const resultsContainer = document.getElementById('business-search-results') ||
-        document.getElementById('search_table');
+    const resultsContainer = document.getElementById('business-search-results') || document.getElementById('search_table');
     if (resultsContainer) {
         resultsContainer.innerHTML = `<div class="error-message">${message}</div>`;
         resultsContainer.style.display = 'block';
@@ -7377,804 +6096,6 @@ function hasValidCoordinates(business) {
     }
 
     return false;
-}
-
-/**
- * COMPREHENSIVE BUSINESS SEARCH DEBUGGER
- *
- * This tool will help identify exactly what's going wrong with:
- * 1. Database businesses not showing as red markers
- * 2. Incentives not loading
- * 3. Search inconsistencies
- */
-
-// Add this comprehensive debugger to your page
-window.debugBusinessSearch = function () {
-    console.log("🔍 ===== COMPREHENSIVE BUSINESS SEARCH DEBUG =====");
-
-    // 1. Check current search state
-    console.log("\n📊 CURRENT STATE:");
-    console.log("   - Map initialized:", !!map);
-    console.log("   - Current search location:", window.currentSearchLocation);
-    console.log("   - Total markers:", markers ? markers.length : 0);
-
-    // 2. Analyze current markers
-    if (markers && markers.length > 0) {
-        console.log("\n🎯 MARKER ANALYSIS:");
-        markers.forEach((marker, index) => {
-            const business = marker.business;
-            if (business) {
-                const isFromDatabase = !business.isGooglePlace && !business._id?.startsWith('google_');
-                const expectedColor = isFromDatabase ? 'RED' : 'BLUE';
-
-                console.log(`   ${index + 1}. ${business.bname}`);
-                console.log(`      - ID: ${business._id}`);
-                console.log(`      - isGooglePlace: ${business.isGooglePlace}`);
-                console.log(`      - isFromDatabase: ${business.isFromDatabase}`);
-                console.log(`      - Expected marker color: ${expectedColor}`);
-                console.log(`      - Chain ID: ${business.chain_id || 'None'}`);
-                console.log(`      - Coordinates: ${business.lat}, ${business.lng}`);
-            }
-        });
-    }
-
-    // 3. Check table elements
-    console.log("\n📋 TABLE ANALYSIS:");
-    const tableBody = document.querySelector('#business_search tbody');
-    if (tableBody) {
-        const rows = tableBody.querySelectorAll('tr');
-        console.log(`   - Table rows found: ${rows.length}`);
-
-        rows.forEach((row, index) => {
-            const businessName = row.querySelector('.left_table').textContent.trim();
-            const incentivesCell = row.querySelector('.right_table');
-            const businessId = row.querySelector('.left_table').getAttribute('data-business-id');
-
-            console.log(`   ${index + 1}. ${businessName}`);
-            console.log(`      - Business ID: ${businessId}`);
-            console.log(`      - Incentives cell ID: ${incentivesCell?.id}`);
-            console.log(`      - Incentives content: ${incentivesCell?.textContent.substring(0, 50)}...`);
-        });
-    } else {
-        console.log("   - No table body found");
-    }
-
-    // 4. Check for common DOM issues
-    console.log("\n🔍 DOM ANALYSIS:");
-    const incentiveElements = document.querySelectorAll('[id*="incentives-for"]');
-    console.log(`   - Total incentive elements: ${incentiveElements.length}`);
-    incentiveElements.forEach((el, index) => {
-        console.log(`      ${index + 1}. ID: ${el.id}, Content: ${el.textContent.substring(0, 30)}...`);
-    });
-
-    // 5. Test API endpoints
-    console.log("\n🌐 API TEST:");
-    testAPIEndpoints();
-
-    console.log("\n✅ Debug complete. Check the detailed output above.");
-};
-
-// Test API endpoints
-async function testAPIEndpoints() {
-    const baseURL = getBaseURL();
-
-    // Test basic business search
-    try {
-        console.log("   Testing business search API...");
-        const response = await fetch(`${baseURL}/api/business.js?operation=search&business_name=Home Depot&limit=1`);
-        if (response.ok) {
-            const data = await response.json();
-            console.log(`   ✅ Business search API working: Found ${data.results?.length || 0} results`);
-            if (data.results && data.results.length > 0) {
-                const business = data.results[0];
-                console.log(`      - Sample business: ${business.bname} (ID: ${business._id})`);
-                console.log(`      - Is chain: ${business.is_chain}`);
-                console.log(`      - Chain ID: ${business.chain_id || 'None'}`);
-
-                // Test incentives for this business
-                console.log("   Testing incentives API...");
-                const incentivesResponse = await fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${business._id}`);
-                if (incentivesResponse.ok) {
-                    const incentivesData = await incentivesResponse.json();
-                    console.log(`   ✅ Incentives API working: Found ${incentivesData.results?.length || 0} incentives`);
-                } else {
-                    console.log(`   ❌ Incentives API failed: ${incentivesResponse.status}`);
-                }
-            }
-        } else {
-            console.log(`   ❌ Business search API failed: ${response.status}`);
-        }
-    } catch (error) {
-        console.log(`   ❌ API test failed: ${error.message}`);
-    }
-}
-
-// Enhanced search test function
-window.testSpecificSearch = function (businessName, useLocation = false) {
-    console.log(`🧪 TESTING SEARCH: "${businessName}" (Location: ${useLocation ? 'Yes' : 'No'})`);
-
-    // Clear current state
-    clearMarkers();
-
-    // Create test form data
-    const formData = {
-        businessName: businessName,
-        address: '',
-        useMyLocation: useLocation
-    };
-
-    console.log("📝 Form data:", formData);
-
-    // Run the search
-    retrieveFromMongoDBFixed(formData)
-        .then(() => {
-            console.log("✅ Search completed");
-            // Run debug after search
-            setTimeout(debugBusinessSearch, 1000);
-        })
-        .catch(error => {
-            console.error("❌ Search failed:", error);
-        });
-};
-
-// Test incentives loading specifically
-window.testIncentivesLoading = function (businessId) {
-    console.log(`🎁 TESTING INCENTIVES LOADING: ${businessId}`);
-
-    // Check if element exists
-    const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
-    if (!incentivesCell) {
-        console.error(`❌ Element not found: incentives-for-${businessId}`);
-        console.log("Available incentive elements:");
-        document.querySelectorAll('[id*="incentives-for"]').forEach(el => {
-            console.log(`   - ${el.id}`);
-        });
-        return;
-    }
-
-    console.log("✅ Found incentives element");
-
-    // Test the fetch
-    fetchBusinessIncentivesFixed(businessId);
-};
-
-// Monitor API calls
-window.monitorAPICalls = function () {
-    console.log("📡 MONITORING API CALLS...");
-
-    // Intercept fetch calls
-    const originalFetch = window.fetch;
-    window.fetch = function (...args) {
-        const url = args[0];
-        if (url.includes('/api/')) {
-            console.log(`🌐 API CALL: ${url}`);
-        }
-
-        return originalFetch.apply(this, args)
-            .then(response => {
-                if (url.includes('/api/')) {
-                    console.log(`📡 API RESPONSE: ${url} - Status: ${response.status}`);
-                }
-                return response;
-            })
-            .catch(error => {
-                if (url.includes('/api/')) {
-                    console.error(`❌ API ERROR: ${url} - ${error.message}`);
-                }
-                throw error;
-            });
-    };
-
-    console.log("✅ API monitoring enabled");
-};
-
-// Quick fix test
-window.quickFixTest = function () {
-    console.log("🔧 RUNNING QUICK FIX TEST...");
-
-    // 1. Test with Home Depot search
-    console.log("1. Testing Home Depot search...");
-    testSpecificSearch("The Home Depot", false);
-
-    // 2. Wait and test location search
-    setTimeout(() => {
-        console.log("2. Testing location-based search...");
-        testSpecificSearch("The Home Depot", true);
-    }, 3000);
-
-    // 3. Monitor APIs
-    monitorAPICalls();
-};
-
-// Add visual debugging overlay
-window.addDebugOverlay = function () {
-    // Remove existing overlay
-    const existingOverlay = document.getElementById('debug-overlay');
-    if (existingOverlay) {
-        existingOverlay.remove();
-    }
-
-    // Create debug overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'debug-overlay';
-    overlay.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        background: rgba(0,0,0,0.8);
-        color: white;
-        padding: 15px;
-        border-radius: 8px;
-        z-index: 10000;
-        font-family: monospace;
-        font-size: 12px;
-        max-width: 300px;
-        max-height: 400px;
-        overflow-y: auto;
-    `;
-
-    overlay.innerHTML = `
-        <h4 style="margin: 0 0 10px 0; color: #4CAF50;">🔧 Debug Tools</h4>
-        <button onclick="debugBusinessSearch()" style="margin: 2px; padding: 5px 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Full Debug</button><br>
-        <button onclick="quickFixTest()" style="margin: 2px; padding: 5px 10px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">Quick Fix Test</button><br>
-        <button onclick="monitorAPICalls()" style="margin: 2px; padding: 5px 10px; background: #9C27B0; color: white; border: none; border-radius: 4px; cursor: pointer;">Monitor APIs</button><br>
-        <button onclick="clearMarkers(); console.clear();" style="margin: 2px; padding: 5px 10px; background: #F44336; color: white; border: none; border-radius: 4px; cursor: pointer;">Clear All</button><br>
-        <button onclick="document.getElementById('debug-overlay').remove();" style="margin: 2px; padding: 5px 10px; background: #607D8B; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
-        <hr style="margin: 10px 0; border: 1px solid #666;">
-        <div id="debug-status">Ready</div>
-    `;
-
-    document.body.appendChild(overlay);
-    console.log("🎛️ Debug overlay added - check top right corner");
-};
-
-// Auto-start debugging on page load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-        setTimeout(() => {
-            console.log("🚀 Business Search Debugger loaded!");
-            console.log("Run debugBusinessSearch() to start debugging");
-            console.log("Run addDebugOverlay() to add visual debug tools");
-        }, 1000);
-    });
-} else {
-    console.log("🚀 Business Search Debugger loaded!");
-    console.log("Run debugBusinessSearch() to start debugging");
-    console.log("Run addDebugOverlay() to add visual debug tools");
-}
-
-async function searchGooglePlacesForBusinessFixed(businessName, searchLocation) {
-    try {
-        console.log("🔍 PLACES SEARCH: Searching Google Places for:", businessName, "near", searchLocation);
-
-        // Import the new Places library
-        const {Place} = await google.maps.importLibrary("places");
-
-        // Create search location
-        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-
-        // Create a text search request using the new API
-        const request = {
-            textQuery: businessName,
-            locationBias: {
-                center: center,
-                radius: 25000 // 25km radius for better coverage
-            },
-            maxResultCount: 20,
-            fields: [
-                'id',
-                'displayName',
-                'formattedAddress',
-                'location',
-                'types',
-                'nationalPhoneNumber',
-                'internationalPhoneNumber'
-            ]
-        };
-
-        console.log("🌐 Places API request:", request);
-
-        // Perform text search using the new API
-        const {places} = await Place.searchByText(request);
-
-        if (!places || places.length === 0) {
-            console.log("❌ No businesses found via Places API");
-            return [];
-        }
-
-        console.log(`✅ Found ${places.length} businesses via Places API`);
-
-        // Process results and create business objects
-        const businessPromises = places.map(async (place) => {
-            // Extract address components
-            const addressParts = place.formattedAddress ? place.formattedAddress.split(',') : [];
-            let address1 = '';
-            let city = '';
-            let state = '';
-            let zip = '';
-
-            if (addressParts.length >= 1) address1 = addressParts[0].trim();
-            if (addressParts.length >= 2) city = addressParts[1].trim();
-            if (addressParts.length >= 3) {
-                const stateZipMatch = addressParts[2].trim().match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-                if (stateZipMatch) {
-                    state = stateZipMatch[1];
-                    zip = stateZipMatch[2];
-                }
-            }
-
-            // Calculate distance from search center
-            const placeLatLng = place.location;
-            const distance = google.maps.geometry.spherical.computeDistanceBetween(center, placeLatLng);
-
-            // Extract coordinates safely
-            let lat = 0, lng = 0;
-            if (place.location) {
-                try {
-                    lat = typeof place.location.lat === 'function' ? place.location.lat() : place.location.lat || 0;
-                    lng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng || 0;
-                } catch (coordError) {
-                    console.warn("⚠️ Error extracting coordinates:", coordError);
-                    lat = searchLocation.lat;
-                    lng = searchLocation.lng;
-                }
-            }
-
-            // Create base business object
-            const business = {
-                _id: 'google_' + place.id,
-                bname: place.displayName,
-                address1: address1,
-                city: city,
-                state: state,
-                zip: zip,
-                formattedAddress: place.formattedAddress,
-                type: mapGooglePlaceTypeToBusinessType(place.types),
-                phone: place.nationalPhoneNumber || place.internationalPhoneNumber || '',
-                isGooglePlace: true,
-                placeId: place.id,
-                lat: lat,
-                lng: lng,
-                distance: distance
-            };
-
-            // ENHANCED CHAIN MATCHING
-            try {
-                const chainMatch = await findMatchingChainForPlaceResult(place.displayName);
-                if (chainMatch) {
-                    console.log(`🔗 CHAIN MATCH: "${place.displayName}" matches "${chainMatch.bname}"`);
-                    business.chain_id = chainMatch._id;
-                    business.chain_name = chainMatch.bname;
-                    business.isChainLocation = true;
-                } else {
-                    console.log(`❌ No chain match for: ${place.displayName}`);
-                }
-            } catch (error) {
-                console.warn("⚠️ Error checking for chain match:", error);
-            }
-
-            return business;
-        });
-
-        // Wait for all chain matching to complete
-        const businesses = await Promise.all(businessPromises);
-
-        // Sort by distance
-        businesses.sort((a, b) => a.distance - b.distance);
-
-        console.log(`📊 FINAL PLACES RESULTS: ${businesses.length} businesses processed`);
-        businesses.forEach((business, index) => {
-            console.log(`   ${index + 1}. ${business.bname} (Chain: ${business.isChainLocation ? business.chain_name : 'No'})`);
-        });
-
-        return businesses;
-
-    } catch (error) {
-        console.error("❌ Error in Places API search:", error);
-        return [];
-    }
-}
-
-function loadChainIncentivesForDatabaseBusiness(businessId, chainId) {
-    if (!businessId || !chainId) {
-        console.log("⏭️ Missing business or chain ID for incentives loading");
-        return;
-    }
-
-    console.log(`🔗 CHAIN INCENTIVES: Loading for database business ${businessId}, chain ${chainId}`);
-
-    const container = document.getElementById(`incentives-container-${businessId}`);
-    if (!container) {
-        console.error(`❌ Container not found: incentives-container-${businessId}`);
-        return;
-    }
-
-    const baseURL = getBaseURL();
-    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`;
-
-    console.log(`🌐 Fetching chain incentives from: ${apiURL}`);
-
-    fetch(apiURL)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Chain incentives API failed: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log(`📊 Chain incentives data:`, data);
-
-            if (!data.results || data.results.length === 0) {
-                container.innerHTML = '<em>💭 No chain incentives available</em>';
-                return;
-            }
-
-            let incentivesHTML = '<div class="incentives-header"><strong>🎁 Available Incentives:</strong></div>';
-            incentivesHTML += '<div class="incentives-list">';
-
-            data.results.forEach(incentive => {
-                if (incentive.is_available) {
-                    const typeLabel = getIncentiveTypeLabel(incentive.type);
-                    const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
-
-                    incentivesHTML += `
-                        <div class="incentive-item chain-incentive">
-                            <div class="incentive-type">${typeLabel}${otherDescription}:</div>
-                            <div class="incentive-amount">${incentive.amount}% <span class="mini-chain-badge">🔗 Chain-wide</span></div>
-                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
-                        </div>
-                    `;
-                }
-            });
-
-            incentivesHTML += '</div>';
-            container.innerHTML = incentivesHTML;
-
-            console.log(`✅ Successfully loaded chain incentives for ${businessId}`);
-        })
-        .catch(error => {
-            console.error(`❌ Error loading chain incentives:`, error);
-            container.innerHTML = '<em>❌ Error loading chain incentives</em>';
-        });
-}
-
-function buildEnhancedInfoWindowContentFixed(business) {
-    const isGooglePlace = business.isGooglePlace === true;
-    const isChainLocation = !!business.chain_id;
-    const isFromDatabase = !isGooglePlace;
-
-    // Enhanced address formatting
-    let addressHTML = '';
-    if (business.address1) {
-        addressHTML = `<div class="info-address">
-            <strong>📍 Address:</strong><br>
-            ${business.address1}`;
-
-        if (business.address2) {
-            addressHTML += `<br>${business.address2}`;
-        }
-
-        const locationParts = [];
-        if (business.city) locationParts.push(business.city);
-        if (business.state) locationParts.push(business.state);
-        if (business.zip) locationParts.push(business.zip);
-
-        if (locationParts.length > 0) {
-            addressHTML += `<br>${locationParts.join(', ')}`;
-        }
-
-        addressHTML += '</div>';
-    } else if (business.formattedAddress) {
-        const addressParts = business.formattedAddress.split(',').map(part => part.trim());
-        addressHTML = `<div class="info-address">
-            <strong>📍 Address:</strong><br>`;
-
-        if (addressParts.length >= 1) {
-            addressHTML += addressParts[0];
-        }
-        if (addressParts.length >= 2) {
-            addressHTML += `<br>${addressParts.slice(1).join(', ')}`;
-        }
-
-        addressHTML += '</div>';
-    }
-
-    // Phone number
-    const phoneHTML = business.phone ?
-        `<div class="info-phone"><strong>📞 Phone:</strong> <a href="tel:${business.phone.replace(/\D/g, '')}" style="color: #4285F4; text-decoration: none;">${business.phone}</a></div>` : '';
-
-    // Business type
-    let typeHTML = '';
-    if (business.type && business.type !== 'OTHER') {
-        typeHTML = `<div class="info-type"><strong>🏢 Type:</strong> ${getBusinessTypeLabel(business.type)}</div>`;
-    }
-
-    // Distance
-    const distanceHTML = business.distance ?
-        `<div class="info-distance"><strong>📏 Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</div>` : '';
-
-    // Chain badge
-    const chainBadge = isChainLocation ?
-        `<span class="enhanced-chain-badge">🔗 ${business.chain_name || 'Chain Location'}</span>` : '';
-
-    // Status and messaging
-    let statusHTML = '';
-    let chainExplanation = '';
-
-    if (isGooglePlace) {
-        if (isChainLocation) {
-            statusHTML = '<div class="info-status chain-match">🔗 This location appears to match a chain in our database!</div>';
-            chainExplanation = `<div class="chain-explanation">
-                ✨ Great news! This location matches <strong>${business.chain_name}</strong> in our database. 
-                Chain-wide incentives should apply to this location once added.
-            </div>`;
-        } else {
-            statusHTML = '<div class="info-status google-place">ℹ️ This business is not yet in the Patriot Thanks database.</div>';
-        }
-    } else {
-        statusHTML = '<div class="info-status database-business">✅ This business is in the Patriot Thanks database.</div>';
-    }
-
-    // Action button
-    let actionButton;
-    if (isGooglePlace) {
-        if (isChainLocation) {
-            actionButton = `
-                <button class="enhanced-add-btn chain-add" onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
-                    🔗 Add ${business.chain_name} Location
-                </button>
-            `;
-        } else {
-            actionButton = `
-                <button class="enhanced-add-btn" onclick="window.addBusinessToDatabase('${business.placeId}')">
-                    ➕ Add to Patriot Thanks
-                </button>
-            `;
-        }
-    } else {
-        actionButton = `
-            <button class="enhanced-view-btn" onclick="window.viewBusinessDetails('${business._id}')">
-                👁️ View Details
-            </button>
-        `;
-    }
-
-    // Container ID
-    const containerId = business._id || business.placeId;
-
-    // FIXED: Incentives messaging with proper chain handling
-    let incentivesMessage;
-    if (isFromDatabase && isChainLocation) {
-        incentivesMessage = '<em>⏳ Loading chain incentives...</em>';
-    } else if (isFromDatabase) {
-        incentivesMessage = '<em>⏳ Loading incentives...</em>';
-    } else if (isGooglePlace && isChainLocation) {
-        incentivesMessage = '<em>⏳ Loading chain incentives...</em>';
-    } else {
-        incentivesMessage = '<em>💡 Add this business to see available incentives.</em>';
-    }
-
-    return `
-        <div class="enhanced-info-window">
-            <div class="info-header">
-                <h3>${business.bname} ${chainBadge}</h3>
-            </div>
-            
-            <div class="info-body">
-                ${addressHTML}
-                ${phoneHTML}
-                ${typeHTML}
-                ${distanceHTML}
-                ${statusHTML}
-                ${chainExplanation}
-                
-                <div class="info-incentives">
-                    <div id="incentives-container-${containerId}">
-                        ${incentivesMessage}
-                    </div>
-                </div>
-            </div>
-            
-            <div class="info-actions">
-                ${actionButton}
-            </div>
-        </div>
-    `;
-}
-
-async function retrieveFromMongoDBEnhanced(formData, bustCache = false) {
-    try {
-        console.log("🔍 ENHANCED SEARCH: Starting search with form data:", formData);
-
-        // Show loading indicator
-        const resultsContainer = document.getElementById('business-search-results') ||
-            document.getElementById('search_table');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading">Searching for businesses...</div>';
-            resultsContainer.style.display = 'block';
-        }
-
-        // Process search location
-        let searchLocation = null;
-
-        if (formData.useMyLocation) {
-            try {
-                updateLoadingMessage("Getting your location...");
-                searchLocation = await getUserLocation();
-                window.currentSearchLocation = searchLocation;
-            } catch (error) {
-                console.error("❌ Error getting user location:", error);
-                hideLoadingIndicator();
-                alert("Unable to get your current location. Please try entering an address instead.");
-                return;
-            }
-        } else if (formData.address && formData.address.trim() !== '') {
-            try {
-                updateLoadingMessage("Finding location...");
-                const geocodedLocation = await geocodeAddressClientSide(formData.address);
-                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
-                    searchLocation = geocodedLocation;
-                    window.currentSearchLocation = searchLocation;
-
-                    if (map && searchLocation) {
-                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                        map.setCenter(center);
-                        map.setZoom(11);
-                    }
-                } else {
-                    throw new Error(`Geocoding failed for address: ${formData.address}`);
-                }
-            } catch (error) {
-                console.error("❌ Error geocoding address:", error);
-                hideLoadingIndicator();
-                alert("We couldn't recognize that address. Please try a more specific address.");
-                return;
-            }
-        }
-
-        // Search database first
-        updateLoadingMessage("Searching database...");
-        const dbResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
-
-        // Filter out parent chains
-        const validDbBusinesses = dbResults.filter(business => business.is_chain !== true);
-        console.log(`📊 DATABASE: Found ${validDbBusinesses.length} valid businesses`);
-
-        // Search Google Places if we have a business name and location
-        let placesResults = [];
-        if (formData.businessName && searchLocation) {
-            updateLoadingMessage("Searching Google Places...");
-            placesResults = await searchGooglePlacesForBusinessFixed(formData.businessName, searchLocation);
-            console.log(`📊 PLACES: Found ${placesResults.length} businesses`);
-        }
-
-        // CRITICAL FIX: Combine results properly
-        const allResults = [...validDbBusinesses, ...placesResults];
-        console.log(`📊 TOTAL: Combined ${allResults.length} businesses (${validDbBusinesses.length} database + ${placesResults.length} places)`);
-
-        if (allResults.length > 0) {
-            // Ensure proper business flags
-            validDbBusinesses.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-            });
-
-            placesResults.forEach(business => {
-                business.isGooglePlace = true;
-                business.isFromDatabase = false;
-            });
-
-            hideLoadingIndicator();
-
-            // Display on map and in table
-            displayBusinessesOnMapFixed(allResults);
-            displaySearchResultsFixed(allResults);
-
-            console.log("✅ Search completed successfully");
-        } else {
-            hideLoadingIndicator();
-            showNoResultsMessage();
-        }
-
-    } catch (error) {
-        console.error("❌ Enhanced search error:", error);
-        hideLoadingIndicator();
-        showErrorMessage(`Error searching for businesses: ${error.message}`);
-    }
-}
-
-function showEnhancedInfoWindowFixed(marker) {
-    console.log("🪟 INFO WINDOW: Showing enhanced info window for:", marker.business?.bname);
-
-    if (!marker || !marker.business) {
-        console.error("❌ Invalid marker for info window");
-        return;
-    }
-
-    const business = marker.business;
-    const isGooglePlace = business.isGooglePlace === true;
-    const isChainLocation = !!business.chain_id;
-    const isFromDatabase = !isGooglePlace;
-
-    // Close existing info window
-    if (infoWindow) {
-        infoWindow.close();
-    }
-
-    // Create new info window
-    infoWindow = new google.maps.InfoWindow({
-        maxWidth: 320,
-        disableAutoPan: false
-    });
-
-    // Build enhanced content
-    const content = buildEnhancedInfoWindowContentFixed(business);
-
-    // Set content
-    infoWindow.setContent(content);
-
-    // Get position
-    let position = marker.position;
-    if (!position && marker.getPosition) {
-        position = marker.getPosition();
-    }
-    if (!position) {
-        position = createSafeLatLng(business);
-    }
-
-    if (!position) {
-        console.error("❌ Could not determine position for info window");
-        return;
-    }
-
-    // Pan to position
-    try {
-        map.panTo(position);
-    } catch (panError) {
-        console.warn("⚠️ Error panning to position:", panError);
-    }
-
-    // Open info window
-    setTimeout(() => {
-        try {
-            if (marker.getPosition) {
-                infoWindow.open(map, marker);
-            } else {
-                infoWindow.setPosition(position);
-                infoWindow.open(map);
-            }
-
-            console.log("✅ Info window opened successfully");
-
-            // Load incentives after DOM is ready
-            google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
-                setTimeout(() => {
-                    applyEnhancedInfoWindowFixes();
-
-                    // FIXED: Proper incentives loading logic
-                    const containerId = business._id || business.placeId;
-
-                    if (isFromDatabase && isChainLocation) {
-                        // Database business with chain - load chain incentives
-                        console.log(`🔗 Loading chain incentives for database business: ${business.bname}`);
-                        loadChainIncentivesForDatabaseBusiness(containerId, business.chain_id);
-                    } else if (isFromDatabase) {
-                        // Database business without chain - load regular incentives
-                        console.log(`🏢 Loading regular incentives for database business: ${business.bname}`);
-                        loadIncentivesForEnhancedWindow(containerId);
-                    } else if (isGooglePlace && isChainLocation) {
-                        // Google Places with chain - load chain incentives
-                        console.log(`🌐 Loading chain incentives for Google Places: ${business.bname}`);
-                        loadChainIncentivesForEnhancedWindow(business.placeId, business.chain_id);
-                    }
-                    // Non-chain Google Places don't need incentives loaded
-                }, 300);
-            });
-
-        } catch (error) {
-            console.error("❌ Error opening info window:", error);
-        }
-    }, 200);
 }
 
 function buildEnhancedInfoWindowContentFixed2(business) {
@@ -8599,11 +6520,6 @@ function loadChainIncentivesForDatabaseBusinessFixed(containerId, chainId) {
         });
 }
 
-// Create a cache for chain matching results
-const chainMatchCache = new Map();
-const apiCallQueue = [];
-let isProcessingQueue = false;
-
 // FIX 1: Rate-limited chain matching with caching
 async function findMatchingChainForPlaceResultFixed(placeName) {
     try {
@@ -8836,179 +6752,6 @@ function getChainMatchCacheStatus() {
         for (const [key, value] of chainMatchCache.entries()) {
             console.log(`     ${key} → ${value ? value.bname : 'No match'}`);
         }
-    }
-}
-
-async function retrieveFromMongoDBWithRecovery(formData, bustCache = false) {
-    try {
-        console.log("🔍 SEARCH WITH RECOVERY: Starting enhanced search:", formData);
-
-        // Show loading with recovery messaging
-        const resultsContainer = document.getElementById('business-search-results') ||
-            document.getElementById('search_table');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading"><div class="loading-text">Searching for businesses...</div><div class="loading-spinner"></div></div>';
-            resultsContainer.style.display = 'block';
-        }
-
-        // Process search location with enhanced error handling
-        let searchLocation = null;
-        let locationSource = 'none';
-
-        if (formData.useMyLocation) {
-            try {
-                updateLoadingMessage("Getting your location...");
-                searchLocation = await getUserLocation();
-                window.currentSearchLocation = searchLocation;
-                locationSource = 'geolocation';
-                console.log(`📍 LOCATION SOURCE: ${locationSource} - ${searchLocation.lat}, ${searchLocation.lng}`);
-            } catch (error) {
-                console.error("❌ Geolocation failed:", error);
-
-                // Fallback: try to use IP-based location
-                try {
-                    updateLoadingMessage("Using approximate location...");
-                    searchLocation = await getApproximateLocation();
-                    if (searchLocation) {
-                        window.currentSearchLocation = searchLocation;
-                        locationSource = 'approximate';
-                        console.log(`📍 FALLBACK LOCATION: ${locationSource}`);
-                    }
-                } catch (fallbackError) {
-                    console.error("❌ Fallback location failed:", fallbackError);
-                }
-
-                if (!searchLocation) {
-                    hideLoadingIndicator();
-                    showUserFriendlyError("location", "Unable to determine your location. Please try entering a city or zip code instead.");
-                    return;
-                }
-            }
-        } else if (formData.address && formData.address.trim() !== '') {
-            try {
-                updateLoadingMessage("Finding location...");
-                const geocodedLocation = await geocodeAddressClientSide(formData.address);
-                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
-                    searchLocation = geocodedLocation;
-                    window.currentSearchLocation = searchLocation;
-                    locationSource = 'geocoded';
-                    console.log(`📍 LOCATION SOURCE: ${locationSource} - ${formData.address}`);
-
-                    if (map && searchLocation) {
-                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                        map.setCenter(center);
-                        map.setZoom(11);
-                    }
-                } else {
-                    throw new Error(`Geocoding failed for: ${formData.address}`);
-                }
-            } catch (error) {
-                console.error("❌ Geocoding failed:", error);
-                hideLoadingIndicator();
-                showUserFriendlyError("geocoding", `We couldn't find "${formData.address}". Please try a more specific address like "Las Vegas, NV" or "89121".`);
-                return;
-            }
-        }
-
-        // Enhanced database search with retry logic
-        updateLoadingMessage("Searching database...");
-        let dbResults = [];
-        let dbSearchSuccess = false;
-
-        try {
-            dbResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
-            dbSearchSuccess = true;
-            console.log(`📊 DATABASE SUCCESS: Found ${dbResults.length} businesses`);
-        } catch (dbError) {
-            console.error("❌ Database search failed:", dbError);
-
-            // Try simplified search as fallback
-            try {
-                console.log("🔄 RETRY: Attempting simplified database search...");
-                const simplifiedFormData = {
-                    businessName: formData.businessName,
-                    address: '',
-                    useMyLocation: false
-                };
-                dbResults = await searchDatabaseWithFuzzyMatching(simplifiedFormData, null, bustCache);
-                dbSearchSuccess = true;
-                console.log(`📊 SIMPLIFIED SEARCH SUCCESS: Found ${dbResults.length} businesses`);
-            } catch (retryError) {
-                console.error("❌ Simplified search also failed:", retryError);
-                // Continue with empty results
-            }
-        }
-
-        // Filter results properly
-        const validDbBusinesses = dbResults.filter(business => business.is_chain !== true);
-        console.log(`✅ VALID DB BUSINESSES: ${validDbBusinesses.length} after filtering`);
-
-        // Enhanced Google Places search with error recovery
-        let placesResults = [];
-        let placesSearchSuccess = false;
-
-        if (formData.businessName && searchLocation) {
-            updateLoadingMessage("Searching Google Places...");
-
-            try {
-                placesResults = await searchGooglePlacesForBusinessFixed(formData.businessName, searchLocation);
-                placesSearchSuccess = true;
-                console.log(`📊 PLACES SUCCESS: Found ${placesResults.length} businesses`);
-            } catch (placesError) {
-                console.error("❌ Places search failed:", placesError);
-
-                // Continue without Places results
-                console.log("⚠️ Continuing with database results only");
-            }
-        }
-
-        // Combine and display results
-        const allResults = [...validDbBusinesses, ...placesResults];
-        console.log(`📊 TOTAL RESULTS: ${allResults.length} (${validDbBusinesses.length} database + ${placesResults.length} places)`);
-
-        if (allResults.length > 0) {
-            // Ensure proper business flags
-            validDbBusinesses.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-            });
-
-            placesResults.forEach(business => {
-                business.isGooglePlace = true;
-                business.isFromDatabase = false;
-            });
-
-            hideLoadingIndicator();
-
-            // Display results
-            displayBusinessesOnMapFixed(allResults);
-            displaySearchResultsFixed(allResults);
-
-            // Show success message with details
-            showSearchSuccessMessage(validDbBusinesses.length, placesResults.length, locationSource);
-
-            console.log("✅ SEARCH WITH RECOVERY: Completed successfully");
-        } else {
-            hideLoadingIndicator();
-
-            // Enhanced no results message based on what was attempted
-            let noResultsMessage = "No businesses found matching your search.";
-
-            if (!dbSearchSuccess && !placesSearchSuccess) {
-                noResultsMessage = "Unable to search for businesses at this time. Please check your internet connection and try again.";
-            } else if (formData.businessName && !searchLocation) {
-                noResultsMessage = `No businesses named "${formData.businessName}" found. Try adding a location or searching for a more general term.`;
-            } else if (searchLocation && !formData.businessName) {
-                noResultsMessage = "No businesses found in this area. Try expanding your search with a business name.";
-            }
-
-            showUserFriendlyError("no-results", noResultsMessage);
-        }
-
-    } catch (error) {
-        console.error("❌ CRITICAL SEARCH ERROR:", error);
-        hideLoadingIndicator();
-        showUserFriendlyError("critical", "Something went wrong with the search. Please try refreshing the page and searching again.");
     }
 }
 
@@ -9460,392 +7203,6 @@ function addEnhancedUserInterfaceCSS() {
             }
         `;
         document.head.appendChild(style);
-    }
-}
-
-async function retrieveFromMongoDBWithNearbyDetection(formData, bustCache = false) {
-    try {
-        console.log("🔍 ENHANCED SEARCH: Starting search with nearby database detection:", formData);
-
-        // Show loading indicator
-        const resultsContainer = document.getElementById('business-search-results') ||
-            document.getElementById('search_table');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading"><div class="loading-text">Searching for businesses...</div><div class="loading-spinner"></div></div>';
-            resultsContainer.style.display = 'block';
-        }
-
-        // Process search location
-        let searchLocation = null;
-        let searchRadius = 25; // Default radius in km
-
-        if (formData.useMyLocation) {
-            try {
-                updateLoadingMessage("Getting your location...");
-                searchLocation = await getUserLocation();
-                window.currentSearchLocation = searchLocation;
-            } catch (error) {
-                console.error("❌ Error getting user location:", error);
-                hideLoadingIndicator();
-                alert("Unable to get your current location. Please try entering an address instead.");
-                return;
-            }
-        } else if (formData.address && formData.address.trim() !== '') {
-            try {
-                updateLoadingMessage("Finding location...");
-                const geocodedLocation = await geocodeAddressClientSide(formData.address);
-                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
-                    searchLocation = geocodedLocation;
-                    window.currentSearchLocation = searchLocation;
-
-                    // Determine search radius based on address type
-                    if (/^\d{5}$/.test(formData.address.trim())) {
-                        // ZIP code search - larger radius
-                        searchRadius = 15;
-                        console.log("📍 ZIP CODE SEARCH: Using 15km radius");
-                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
-                        // City search - medium radius
-                        searchRadius = 20;
-                        console.log("📍 CITY SEARCH: Using 20km radius");
-                    }
-
-                    if (map && searchLocation) {
-                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                        map.setCenter(center);
-                        map.setZoom(searchRadius <= 15 ? 12 : 11);
-                    }
-                } else {
-                    throw new Error(`Geocoding failed for address: ${formData.address}`);
-                }
-            } catch (error) {
-                console.error("❌ Error geocoding address:", error);
-                hideLoadingIndicator();
-                alert("We couldn't recognize that address. Please try a more specific address.");
-                return;
-            }
-        }
-
-        // PHASE 1: Search for primary results (specific business name search)
-        updateLoadingMessage("Searching database...");
-        let primaryResults = [];
-
-        if (formData.businessName && formData.businessName.trim() !== '') {
-            try {
-                primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
-                primaryResults = primaryResults.filter(business => business.is_chain !== true);
-                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
-            } catch (error) {
-                console.error("❌ Primary search failed:", error);
-            }
-        }
-
-        // PHASE 2: Search for nearby database businesses (location-based)
-        let nearbyDatabaseBusinesses = [];
-
-        if (searchLocation) {
-            try {
-                updateLoadingMessage("Finding nearby businesses in database...");
-                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinesses(searchLocation, searchRadius, formData.businessName);
-                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} nearby database businesses`);
-            } catch (error) {
-                console.error("❌ Nearby database search failed:", error);
-            }
-        }
-
-        // PHASE 3: Search Google Places for primary business name
-        let placesResults = [];
-
-        if (formData.businessName && searchLocation) {
-            try {
-                updateLoadingMessage("Searching Google Places...");
-                placesResults = await searchGooglePlacesForBusinessFixed(formData.businessName, searchLocation);
-                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} Google Places businesses`);
-            } catch (error) {
-                console.error("❌ Places search failed:", error);
-            }
-        }
-
-        // PHASE 4: Remove duplicates and categorize results
-        const {finalPrimaryResults, finalNearbyResults, finalPlacesResults} =
-            categorizeFinalResults(primaryResults, nearbyDatabaseBusinesses, placesResults);
-
-        // PHASE 5: Display all results
-        const allResults = [...finalPrimaryResults, ...finalNearbyResults, ...finalPlacesResults];
-        console.log(`📊 FINAL CATEGORIZATION:`);
-        console.log(`   - Primary (RED): ${finalPrimaryResults.length} businesses`);
-        console.log(`   - Nearby Database (GREEN): ${finalNearbyResults.length} businesses`);
-        console.log(`   - Google Places (BLUE): ${finalPlacesResults.length} businesses`);
-        console.log(`   - Total: ${allResults.length} businesses`);
-
-        if (allResults.length > 0) {
-            // Set proper flags for each category
-            finalPrimaryResults.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-                business.isPrimaryResult = true;
-                business.markerColor = 'primary'; // RED
-            });
-
-            finalNearbyResults.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-                business.isPrimaryResult = false;
-                business.isNearbyDatabase = true;
-                business.markerColor = 'database'; // GREEN
-            });
-
-            finalPlacesResults.forEach(business => {
-                business.isGooglePlace = true;
-                business.isFromDatabase = false;
-                business.isPrimaryResult = false;
-                business.markerColor = 'nearby'; // BLUE
-            });
-
-            hideLoadingIndicator();
-
-            // Display results with enhanced markers
-            displayBusinessesOnMapWithCategories(allResults);
-            displaySearchResultsWithCategories(allResults);
-
-            // Show enhanced success message
-            showEnhancedSearchSuccessMessage(finalPrimaryResults.length, finalNearbyResults.length, finalPlacesResults.length);
-
-            console.log("✅ ENHANCED SEARCH: Completed successfully with nearby detection");
-        } else {
-            hideLoadingIndicator();
-            showNoResultsMessage();
-        }
-
-    } catch (error) {
-        console.error("❌ Enhanced search error:", error);
-        hideLoadingIndicator();
-        showErrorMessage(`Error searching for businesses: ${error.message}`);
-    }
-}
-
-// FIX 2: Search for nearby database businesses
-async function searchNearbyDatabaseBusinesses(searchLocation, radiusKm, excludeBusinessName = '') {
-    try {
-        const baseURL = getBaseURL();
-
-        // Build API URL for location-based search
-        const params = new URLSearchParams({
-            operation: 'search',
-            lat: searchLocation.lat,
-            lng: searchLocation.lng,
-            radius: radiusKm,
-            limit: 50 // Get more businesses for nearby detection
-        });
-
-        const apiURL = `${baseURL}/api/business.js?${params.toString()}`;
-        console.log(`🌐 NEARBY DATABASE SEARCH: ${apiURL}`);
-
-        const response = await fetch(apiURL);
-        if (!response.ok) {
-            throw new Error(`Nearby search failed: ${response.status}`);
-        }
-
-        const data = await response.json();
-        let nearbyBusinesses = data.results || [];
-
-        // Filter out parent chains and the primary search business name
-        nearbyBusinesses = nearbyBusinesses.filter(business => {
-            // Exclude parent chains
-            if (business.is_chain === true) {
-                return false;
-            }
-
-            // Exclude if it matches the primary search term (to avoid duplicates)
-            if (excludeBusinessName && business.bname.toLowerCase().includes(excludeBusinessName.toLowerCase())) {
-                console.log(`🚫 EXCLUDING PRIMARY MATCH: ${business.bname} (matches "${excludeBusinessName}")`);
-                return false;
-            }
-
-            return true;
-        });
-
-        console.log(`✅ NEARBY DATABASE FILTER: ${nearbyBusinesses.length} nearby businesses after filtering`);
-
-        return nearbyBusinesses;
-
-    } catch (error) {
-        console.error("❌ Error searching nearby database businesses:", error);
-        return [];
-    }
-}
-
-// FIX 3: Categorize and deduplicate final results
-function categorizeFinalResults(primaryResults, nearbyDatabaseBusinesses, placesResults) {
-    console.log("🔄 CATEGORIZING RESULTS:");
-
-    // Start with primary results (highest priority)
-    const finalPrimaryResults = [...primaryResults];
-    const usedAddresses = new Set();
-    const usedBusinessNames = new Set();
-
-    // Track primary result addresses and names to avoid duplicates
-    finalPrimaryResults.forEach(business => {
-        const addressKey = createAddressKey(business);
-        const nameKey = business.bname.toLowerCase().trim();
-        usedAddresses.add(addressKey);
-        usedBusinessNames.add(nameKey);
-        console.log(`🔴 PRIMARY: ${business.bname} at ${addressKey}`);
-    });
-
-    // Filter nearby database businesses (remove duplicates with primary)
-    const finalNearbyResults = nearbyDatabaseBusinesses.filter(business => {
-        const addressKey = createAddressKey(business);
-        const nameKey = business.bname.toLowerCase().trim();
-
-        if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
-            console.log(`🚫 NEARBY DUPLICATE: ${business.bname} (already in primary results)`);
-            return false;
-        }
-
-        usedAddresses.add(addressKey);
-        usedBusinessNames.add(nameKey);
-        console.log(`🟢 NEARBY DB: ${business.bname} at ${addressKey}`);
-        return true;
-    });
-
-    // Filter Google Places results (remove duplicates with database businesses)
-    const finalPlacesResults = placesResults.filter(business => {
-        const addressKey = createAddressKey(business);
-        const nameKey = business.bname.toLowerCase().trim();
-
-        if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
-            console.log(`🚫 PLACES DUPLICATE: ${business.bname} (already in database)`);
-            return false;
-        }
-
-        console.log(`🔵 PLACES: ${business.bname} at ${addressKey}`);
-        return true;
-    });
-
-    return {
-        finalPrimaryResults,
-        finalNearbyResults,
-        finalPlacesResults
-    };
-}
-
-// FIX 4: Create address key for duplicate detection
-function createAddressKey(business) {
-    // Create a normalized address string for comparison
-    const parts = [];
-
-    if (business.address1) parts.push(business.address1.toLowerCase().trim());
-    if (business.city) parts.push(business.city.toLowerCase().trim());
-    if (business.state) parts.push(business.state.toLowerCase().trim());
-    if (business.zip) parts.push(business.zip.trim());
-
-    return parts.join('|');
-}
-
-// FIX 5: Enhanced marker creation with category support
-async function createEnhancedBusinessMarkerWithCategory(business, location) {
-    try {
-        // Import the marker library
-        const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
-
-        // Create a position object from the location
-        let position = createSafeLatLng(location);
-        if (!position) {
-            console.error("❌ Invalid position for enhanced marker:", location);
-            return createEnhancedFallbackMarker(business, location);
-        }
-
-        // Determine marker styling based on category
-        const markerColor = business.markerColor || 'nearby';
-        const colorValue = ENHANCED_CONFIG.markerColors[markerColor];
-
-        let markerClass = '';
-        let logMessage = '';
-
-        switch (markerColor) {
-            case 'primary':
-                markerClass = 'primary database-business';
-                logMessage = `🔴 RED MARKER: ${business.bname} (Primary search result)`;
-                break;
-            case 'database':
-                markerClass = 'database nearby-database';
-                logMessage = `🟢 GREEN MARKER: ${business.bname} (Nearby database business)`;
-                break;
-            case 'nearby':
-            default:
-                markerClass = 'nearby google-places';
-                logMessage = `🔵 BLUE MARKER: ${business.bname} (Google Places)`;
-                break;
-        }
-
-        console.log(logMessage);
-
-        // Get business icon
-        const businessIcon = getBusinessTypeTextIcon(business.type);
-
-        // Create enhanced pin element
-        const pinElement = document.createElement('div');
-        pinElement.className = 'enhanced-custom-marker';
-        pinElement.setAttribute('title', business.bname);
-        pinElement.style.cursor = 'pointer';
-
-        // Enhanced marker HTML with category-specific styling
-        pinElement.innerHTML = `
-            <div class="enhanced-marker-container">
-                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${colorValue} !important; border: 3px solid #ffffff;">
-                    <div class="enhanced-marker-icon">
-                        ${businessIcon}
-                    </div>
-                </div>
-                <div class="enhanced-marker-shadow"></div>
-                ${business.chain_id ? '<div class="chain-indicator">🔗</div>' : ''}
-                ${business.isFromDatabase ? '<div class="database-indicator">✓</div>' : ''}
-                ${business.isNearbyDatabase ? '<div class="nearby-database-indicator">🏢</div>' : ''}
-            </div>
-        `;
-
-        // Create the advanced marker
-        const marker = new AdvancedMarkerElement({
-            position: position,
-            map: map,
-            title: business.bname,
-            content: pinElement,
-            collisionBehavior: business.isPrimaryResult ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
-        });
-
-        // Store the business data and flags
-        marker.business = business;
-        marker.position = position;
-        marker.isFromDatabase = business.isFromDatabase;
-        marker.isPrimaryResult = business.isPrimaryResult;
-        marker.isNearbyDatabase = business.isNearbyDatabase;
-
-        // Add click event listener
-        pinElement.addEventListener('click', function (e) {
-            console.log(`🖱️ Marker clicked: ${business.bname} (${business.markerColor})`);
-            e.stopPropagation();
-            showEnhancedInfoWindowWithCategory(marker);
-        });
-
-        // Add hover effects
-        pinElement.addEventListener('mouseenter', function () {
-            pinElement.style.transform = 'scale(1.1)';
-            pinElement.style.zIndex = '1000';
-        });
-
-        pinElement.addEventListener('mouseleave', function () {
-            pinElement.style.transform = 'scale(1)';
-            pinElement.style.zIndex = 'auto';
-        });
-
-        // Add the marker to our array
-        markers.push(marker);
-        console.log(`✅ Added ${markerColor.toUpperCase()} marker for ${business.bname}`);
-
-        return marker;
-    } catch (error) {
-        console.error("❌ Error creating enhanced marker with category:", error);
-        return createEnhancedFallbackMarker(business, location);
     }
 }
 
@@ -10512,45 +7869,12 @@ function updateMapLegendWithCategories() {
     mapContainer.appendChild(legend);
 }
 
-// FIX 8: Test function for the new categorized system
-function testCategorizedSearch(businessName, location) {
-    console.log(`🧪 TESTING CATEGORIZED SEARCH: "${businessName}" in ${location || 'current area'}`);
-
-    const formData = {
-        businessName: businessName || '',
-        address: location || '',
-        useMyLocation: !location
-    };
-
-    console.log("📝 Test form data:", formData);
-
-    // Clear current results
-    clearMarkers();
-
-    // Run the enhanced search
-    retrieveFromMongoDBWithNearbyDetection(formData)
-        .then(() => {
-            console.log("✅ Categorized search test completed");
-
-            // Update legend
-            setTimeout(() => {
-                updateMapLegendWithCategories();
-            }, 1000);
-        })
-        .catch(error => {
-            console.error("❌ Categorized search test failed:", error);
-        });
-}
-
 /**
- * FIXED: Enhanced search function with better result prioritization
- * This prioritizes relevant Google Places results over unrelated nearby database businesses
+ * FINAL: Main enhanced business search function
  */
-async function retrieveFromMongoDBWithBetterPriority(formData, bustCache = false) {
+async function performEnhancedBusinessSearch(formData, bustCache = false) {
     try {
-        console.log("🔍 ENHANCED SEARCH: Starting search with better priority logic:", formData);
-
-        // Show loading indicator
+        // Show loading
         const resultsContainer = document.getElementById('business-search-results') ||
             document.getElementById('search_table');
         if (resultsContainer) {
@@ -10560,129 +7884,74 @@ async function retrieveFromMongoDBWithBetterPriority(formData, bustCache = false
 
         // Process search location
         let searchLocation = null;
-        let searchRadius = 30; // Default radius in km - increased for better coverage
+        let searchRadius = 30;
 
         if (formData.useMyLocation) {
-            try {
-                updateLoadingMessage("Getting your location...");
-                searchLocation = await getUserLocation();
-                window.currentSearchLocation = searchLocation;
-            } catch (error) {
-                console.error("❌ Error getting user location:", error);
-                hideLoadingIndicator();
-                alert("Unable to get your current location. Please try entering an address instead.");
-                return;
-            }
+            updateLoadingMessage("Getting your location...");
+            searchLocation = await getUserLocation();
+            window.currentSearchLocation = searchLocation;
         } else if (formData.address && formData.address.trim() !== '') {
-            try {
-                updateLoadingMessage("Finding location...");
-                const geocodedLocation = await geocodeAddressClientSide(formData.address);
-                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
-                    searchLocation = geocodedLocation;
-                    window.currentSearchLocation = searchLocation;
+            updateLoadingMessage("Finding location...");
+            const geocodedLocation = await geocodeAddressClientSide(formData.address);
+            if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                searchLocation = geocodedLocation;
+                window.currentSearchLocation = searchLocation;
 
-                    // FIXED: Better radius logic for different area types
-                    if (/^\d{5}$/.test(formData.address.trim())) {
-                        // ZIP code search - use larger radius for metro areas
-                        searchRadius = 25; // Increased from 15km to cover metro areas better
-                        console.log("📍 ZIP CODE SEARCH: Using 25km radius for better metro coverage");
-                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
-                        // City search - use even larger radius
-                        searchRadius = 30;
-                        console.log("📍 CITY SEARCH: Using 30km radius");
-                    } else {
-                        // Address search - moderate radius
-                        searchRadius = 20;
-                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
-                    }
-
-                    if (map && searchLocation) {
-                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                        map.setCenter(center);
-                        map.setZoom(searchRadius <= 20 ? 12 : 11);
-                    }
+                if (/^\d{5}$/.test(formData.address.trim())) {
+                    searchRadius = 25;
+                } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
+                    searchRadius = 30;
                 } else {
-                    throw new Error(`Geocoding failed for address: ${formData.address}`);
+                    searchRadius = 20;
                 }
-            } catch (error) {
-                console.error("❌ Error geocoding address:", error);
-                hideLoadingIndicator();
-                alert("We couldn't recognize that address. Please try a more specific address.");
-                return;
+
+                if (map && searchLocation) {
+                    const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                    map.setCenter(center);
+                    map.setZoom(searchRadius <= 20 ? 12 : 11);
+                }
+            } else {
+                throw new Error(`Geocoding failed for address: ${formData.address}`);
             }
         }
 
-        // PHASE 1: Search for primary results (specific business name search)
+        // Search database
         updateLoadingMessage("Searching database...");
         let primaryResults = [];
-
         if (formData.businessName && formData.businessName.trim() !== '') {
-            try {
-                primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
-                primaryResults = primaryResults.filter(business => business.is_chain !== true);
-                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
-            } catch (error) {
-                console.error("❌ Primary search failed:", error);
-            }
+            primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
+            primaryResults = primaryResults.filter(business => business.is_chain !== true);
         }
 
-        // PHASE 2: Search Google Places for primary business name (HIGHER PRIORITY NOW)
+        // Search Google Places
         let placesResults = [];
-
         if (formData.businessName && searchLocation) {
-            try {
-                updateLoadingMessage("Searching for additional locations...");
-                // Use larger radius for Google Places to get more comprehensive results
-                const placesSearchLocation = {
-                    ...searchLocation,
-                    searchRadius: Math.max(searchRadius, 35) // Ensure at least 35km for Places search
-                };
-                placesResults = await searchGooglePlacesForBusinessWithRadius(formData.businessName, placesSearchLocation);
-                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
-            } catch (error) {
-                console.error("❌ Places search failed:", error);
-            }
+            updateLoadingMessage("Searching for additional locations...");
+            const placesSearchLocation = { ...searchLocation, searchRadius: Math.max(searchRadius, 35) };
+            placesResults = await searchGooglePlacesForBusinessEnhanced(formData.businessName, placesSearchLocation);
         }
 
-        // PHASE 3: Search for nearby database businesses (LOWER PRIORITY NOW - but still search for context)
+        // Always search nearby when location available
         let nearbyDatabaseBusinesses = [];
-
-        // IMPROVED LOGIC: Search for nearby businesses to provide context, but with lower priority
-        // Only skip if we have a very specific search with many results
-        const shouldSearchNearby = !formData.businessName ||
-            (primaryResults.length + placesResults.length < 8); // Increased threshold
-
-        if (searchLocation && shouldSearchNearby) {
-            try {
-                updateLoadingMessage("Finding other nearby businesses...");
-                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinesses(searchLocation, searchRadius, formData.businessName);
-                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
-            } catch (error) {
-                console.error("❌ Nearby database search failed:", error);
-            }
-        } else {
-            console.log("⏭️ SKIPPING nearby search - found many relevant results");
+        if (searchLocation) {
+            updateLoadingMessage("Finding other nearby businesses in database...");
+            nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinessesEnhanced(searchLocation, searchRadius, formData.businessName);
         }
 
-        // PHASE 4: Remove duplicates and categorize with NEW PRIORITY ORDER
+        // Categorize results
         const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
-            categorizeResultsWithBetterPriority(primaryResults, placesResults, nearbyDatabaseBusinesses);
+            categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
 
-        // PHASE 5: Display all results in NEW PRIORITY ORDER
+        // Display results
         const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
-        console.log(`📊 IMPROVED PRIORITIZATION:`);
-        console.log(`   - 🔴 Primary Database (RED): ${finalPrimaryResults.length} businesses`);
-        console.log(`   - 🔵 Additional Locations (BLUE): ${finalPlacesResults.length} businesses`);
-        console.log(`   - 🟢 Other Nearby (GREEN): ${finalNearbyResults.length} businesses`);
-        console.log(`   - Total: ${allResults.length} businesses`);
 
         if (allResults.length > 0) {
-            // Set proper flags for each category with NEW PRIORITY
+            // Set flags
             finalPrimaryResults.forEach(business => {
                 business.isGooglePlace = false;
                 business.isFromDatabase = true;
                 business.isPrimaryResult = true;
-                business.markerColor = 'primary'; // RED - highest priority
+                business.markerColor = 'primary';
                 business.priority = 1;
             });
 
@@ -10691,7 +7960,7 @@ async function retrieveFromMongoDBWithBetterPriority(formData, bustCache = false
                 business.isFromDatabase = false;
                 business.isPrimaryResult = false;
                 business.isRelevantPlaces = true;
-                business.markerColor = 'nearby'; // BLUE - second priority (more relevant than unrelated nearby)
+                business.markerColor = 'nearby';
                 business.priority = 2;
             });
 
@@ -10700,408 +7969,24 @@ async function retrieveFromMongoDBWithBetterPriority(formData, bustCache = false
                 business.isFromDatabase = true;
                 business.isPrimaryResult = false;
                 business.isNearbyDatabase = true;
-                business.markerColor = 'database'; // GREEN - third priority (least relevant)
+                business.markerColor = 'database';
                 business.priority = 3;
             });
 
             hideLoadingIndicator();
-
-            // Display results with improved priority
             displayBusinessesOnMapWithBetterPriority(allResults);
             displaySearchResultsWithBetterPriority(allResults);
-
-            // Show enhanced success message
             showImprovedSearchSuccessMessage(finalPrimaryResults.length, finalPlacesResults.length, finalNearbyResults.length, formData.businessName);
-
-            console.log("✅ IMPROVED SEARCH: Completed successfully with better prioritization");
         } else {
             hideLoadingIndicator();
             showNoResultsMessage();
         }
 
     } catch (error) {
-        console.error("❌ Enhanced search error:", error);
+        console.error("Enhanced search error:", error);
         hideLoadingIndicator();
         showErrorMessage(`Error searching for businesses: ${error.message}`);
     }
-}
-
-/**
- * FIXED: Enhanced Google Places search with configurable radius
- */
-async function searchGooglePlacesForBusinessWithRadius(businessName, searchLocationWithRadius) {
-    try {
-        console.log("🔍 ENHANCED PLACES SEARCH: Searching for:", businessName, "near", searchLocationWithRadius);
-
-        // Import the new Places library
-        const {Place} = await google.maps.importLibrary("places");
-
-        // Create search location
-        const center = new google.maps.LatLng(searchLocationWithRadius.lat, searchLocationWithRadius.lng);
-
-        // Use the enhanced radius
-        const searchRadius = (searchLocationWithRadius.searchRadius || 35) * 1000; // Convert km to meters, default 35km
-
-        // Create a text search request using the new API with larger radius
-        const request = {
-            textQuery: businessName,
-            locationBias: {
-                center: center,
-                radius: searchRadius // Use enhanced radius
-            },
-            maxResultCount: 20,
-            fields: [
-                'id',
-                'displayName',
-                'formattedAddress',
-                'location',
-                'types',
-                'nationalPhoneNumber',
-                'internationalPhoneNumber'
-            ]
-        };
-
-        console.log(`🌐 Enhanced Places API request with ${searchRadius / 1000}km radius:`, request);
-
-        // Perform text search using the new API
-        const {places} = await Place.searchByText(request);
-
-        if (!places || places.length === 0) {
-            console.log("❌ No businesses found via enhanced Places API");
-            return [];
-        }
-
-        console.log(`✅ Found ${places.length} businesses via enhanced Places API`);
-
-        // Process results and create business objects
-        const businessPromises = places.map(async (place) => {
-            // Extract address components
-            const addressParts = place.formattedAddress ? place.formattedAddress.split(',') : [];
-            let address1 = '';
-            let city = '';
-            let state = '';
-            let zip = '';
-
-            if (addressParts.length >= 1) address1 = addressParts[0].trim();
-            if (addressParts.length >= 2) city = addressParts[1].trim();
-            if (addressParts.length >= 3) {
-                const stateZipMatch = addressParts[2].trim().match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-                if (stateZipMatch) {
-                    state = stateZipMatch[1];
-                    zip = stateZipMatch[2];
-                }
-            }
-
-            // Calculate distance from search center
-            const placeLatLng = place.location;
-            const distance = google.maps.geometry.spherical.computeDistanceBetween(center, placeLatLng);
-
-            // Extract coordinates safely
-            let lat = 0, lng = 0;
-            if (place.location) {
-                try {
-                    lat = typeof place.location.lat === 'function' ? place.location.lat() : place.location.lat || 0;
-                    lng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng || 0;
-                } catch (coordError) {
-                    console.warn("⚠️ Error extracting coordinates:", coordError);
-                    lat = searchLocationWithRadius.lat;
-                    lng = searchLocationWithRadius.lng;
-                }
-            }
-
-            // Create base business object
-            const business = {
-                _id: 'google_' + place.id,
-                bname: place.displayName,
-                address1: address1,
-                city: city,
-                state: state,
-                zip: zip,
-                formattedAddress: place.formattedAddress,
-                type: mapGooglePlaceTypeToBusinessType(place.types),
-                phone: place.nationalPhoneNumber || place.internationalPhoneNumber || '',
-                isGooglePlace: true,
-                placeId: place.id,
-                lat: lat,
-                lng: lng,
-                distance: distance
-            };
-
-            // Enhanced chain matching
-            try {
-                const chainMatch = await findMatchingChainForPlaceResult(place.displayName);
-                if (chainMatch) {
-                    console.log(`🔗 CHAIN MATCH: "${place.displayName}" matches "${chainMatch.bname}"`);
-                    business.chain_id = chainMatch._id;
-                    business.chain_name = chainMatch.bname;
-                    business.isChainLocation = true;
-                } else {
-                    console.log(`❌ No chain match for: ${place.displayName}`);
-                }
-            } catch (error) {
-                console.warn("⚠️ Error checking for chain match:", error);
-            }
-
-            return business;
-        });
-
-        // Wait for all chain matching to complete
-        const businesses = await Promise.all(businessPromises);
-
-        // Sort by distance
-        businesses.sort((a, b) => a.distance - b.distance);
-
-        console.log(`📊 ENHANCED PLACES RESULTS: ${businesses.length} businesses processed with ${searchRadius / 1000}km radius`);
-        businesses.forEach((business, index) => {
-            const distanceKm = (business.distance / 1000).toFixed(1);
-            console.log(`   ${index + 1}. ${business.bname} (${distanceKm}km away, Chain: ${business.isChainLocation ? business.chain_name : 'No'})`);
-        });
-
-        return businesses;
-
-    } catch (error) {
-        console.error("❌ Error in enhanced Places API search:", error);
-        // FIXED: Fallback with correct parameter format
-        const fallbackLocation = {
-            lat: searchLocationWithRadius.lat,
-            lng: searchLocationWithRadius.lng
-        };
-        return await searchGooglePlacesForBusinessFixed(businessName, fallbackLocation);
-    }
-}
-
-/**
- * MAIN ENHANCED BUSINESS SEARCH FUNCTION
- * This is where your main search logic should go
- */
-async function performEnhancedBusinessSearch(formData, bustCache = false) {
-    try {
-        // Process search location
-        let searchLocation = null;
-        let searchRadius = 30; // Default radius in km - increased for better coverage
-
-        if (formData.useMyLocation) {
-            try {
-                updateLoadingMessage("Getting your location...");
-                searchLocation = await getUserLocation();
-                window.currentSearchLocation = searchLocation;
-            } catch (error) {
-                console.error("❌ Error getting user location:", error);
-                hideLoadingIndicator();
-                alert("Unable to get your current location. Please try entering an address instead.");
-                return;
-            }
-        } else if (formData.address && formData.address.trim() !== '') {
-            try {
-                updateLoadingMessage("Finding location...");
-                const geocodedLocation = await geocodeAddressClientSide(formData.address);
-                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
-                    searchLocation = geocodedLocation;
-                    window.currentSearchLocation = searchLocation;
-
-                    // FIXED: Better radius logic for different area types
-                    if (/^\d{5}$/.test(formData.address.trim())) {
-                        // ZIP code search - use larger radius for metro areas
-                        searchRadius = 25; // Increased from 15km to cover metro areas better
-                        console.log("📍 ZIP CODE SEARCH: Using 25km radius for better metro coverage");
-                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
-                        // City search - use even larger radius
-                        searchRadius = 30;
-                        console.log("📍 CITY SEARCH: Using 30km radius");
-                    } else {
-                        // Address search - moderate radius
-                        searchRadius = 20;
-                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
-                    }
-
-                    if (map && searchLocation) {
-                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                        map.setCenter(center);
-                        map.setZoom(searchRadius <= 20 ? 12 : 11);
-                    }
-                } else {
-                    throw new Error(`Geocoding failed for address: ${formData.address}`);
-                }
-            } catch (error) {
-                console.error("❌ Error geocoding address:", error);
-                hideLoadingIndicator();
-                alert("We couldn't recognize that address. Please try a more specific address.");
-                return;
-            }
-        }
-
-        // PHASE 1: Search for primary results (specific business name search)
-        updateLoadingMessage("Searching database...");
-        let primaryResults = [];
-
-        if (formData.businessName && formData.businessName.trim() !== '') {
-            try {
-                primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
-                primaryResults = primaryResults.filter(business => business.is_chain !== true);
-                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
-            } catch (error) {
-                console.error("❌ Primary search failed:", error);
-            }
-        }
-
-        // PHASE 2: Search Google Places for primary business name (HIGHER PRIORITY NOW)
-        let placesResults = [];
-
-        if (formData.businessName && searchLocation) {
-            try {
-                updateLoadingMessage("Searching for additional locations...");
-                // Use larger radius for Google Places to get more comprehensive results
-                const placesSearchLocation = {
-                    ...searchLocation,
-                    searchRadius: Math.max(searchRadius, 35) // Ensure at least 35km for Places search
-                };
-                placesResults = await searchGooglePlacesForBusinessWithRadius(formData.businessName, placesSearchLocation);
-                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
-            } catch (error) {
-                console.error("❌ Places search failed:", error);
-            }
-        }
-
-        // PHASE 3: Search for nearby database businesses (LOWER PRIORITY NOW - but still search for context)
-        let nearbyDatabaseBusinesses = [];
-
-        // IMPROVED LOGIC: Search for nearby businesses to provide context, but with lower priority
-        // Only skip if we have a very specific search with many results
-        const shouldSearchNearby = !formData.businessName ||
-            (primaryResults.length + placesResults.length < 8); // Increased threshold
-
-        if (searchLocation && shouldSearchNearby) {
-            try {
-                updateLoadingMessage("Finding other nearby businesses...");
-                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinesses(searchLocation, searchRadius, formData.businessName);
-                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
-            } catch (error) {
-                console.error("❌ Nearby database search failed:", error);
-            }
-        } else {
-            console.log("⏭️ SKIPPING nearby search - found many relevant results");
-        }
-
-        // PHASE 4: Remove duplicates and categorize with NEW PRIORITY ORDER
-        const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
-            categorizeResultsWithBetterPriority(primaryResults, placesResults, nearbyDatabaseBusinesses);
-
-        // PHASE 5: Display all results in NEW PRIORITY ORDER
-        const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
-        console.log(`📊 IMPROVED PRIORITIZATION:`);
-        console.log(`   - 🔴 Primary Database (RED): ${finalPrimaryResults.length} businesses`);
-        console.log(`   - 🔵 Additional Locations (BLUE): ${finalPlacesResults.length} businesses`);
-        console.log(`   - 🟢 Other Nearby (GREEN): ${finalNearbyResults.length} businesses`);
-        console.log(`   - Total: ${allResults.length} businesses`);
-
-        if (allResults.length > 0) {
-            // Set proper flags for each category with NEW PRIORITY
-            finalPrimaryResults.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-                business.isPrimaryResult = true;
-                business.markerColor = 'primary'; // RED - highest priority
-                business.priority = 1;
-            });
-
-            finalPlacesResults.forEach(business => {
-                business.isGooglePlace = true;
-                business.isFromDatabase = false;
-                business.isPrimaryResult = false;
-                business.isRelevantPlaces = true;
-                business.markerColor = 'nearby'; // BLUE - second priority (more relevant than unrelated nearby)
-                business.priority = 2;
-            });
-
-            finalNearbyResults.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-                business.isPrimaryResult = false;
-                business.isNearbyDatabase = true;
-                business.markerColor = 'database'; // GREEN - third priority (least relevant)
-                business.priority = 3;
-            });
-
-            hideLoadingIndicator();
-
-            // Display results with improved priority
-            displayBusinessesOnMapWithBetterPriority(allResults);
-            displaySearchResultsWithBetterPriority(allResults);
-
-            // Show enhanced success message
-            showImprovedSearchSuccessMessage(finalPrimaryResults.length, finalPlacesResults.length, finalNearbyResults.length, formData.businessName);
-
-            console.log("✅ IMPROVED SEARCH: Completed successfully with better prioritization");
-        } else {
-            hideLoadingIndicator();
-            showNoResultsMessage();
-        }
-
-    } catch (error) {
-        console.error("❌ Enhanced search error:", error);
-        hideLoadingIndicator();
-        showErrorMessage(`Error searching for businesses: ${error.message}`);
-    }
-}
-
-/**
- * FIXED: Categorize results with better priority logic
- * Priority: 1) Database matches, 2) Relevant Google Places, 3) Other nearby database businesses
- */
-function categorizeResultsWithBetterPriority(primaryResults, placesResults, nearbyDatabaseBusinesses) {
-    console.log("🔄 IMPROVED CATEGORIZATION:");
-
-    // Start with primary results (highest priority - RED markers)
-    const finalPrimaryResults = [...primaryResults];
-    const usedAddresses = new Set();
-    const usedBusinessNames = new Set();
-
-    // Track primary result addresses and names to avoid duplicates
-    finalPrimaryResults.forEach(business => {
-        const addressKey = createAddressKey(business);
-        const nameKey = business.bname.toLowerCase().trim();
-        usedAddresses.add(addressKey);
-        usedBusinessNames.add(nameKey);
-        console.log(`🔴 PRIMARY: ${business.bname} at ${addressKey}`);
-    });
-
-    // IMPROVED: Google Places results get SECOND priority (BLUE markers)
-    // These are more relevant than unrelated nearby businesses
-    const finalPlacesResults = placesResults.filter(business => {
-        const addressKey = createAddressKey(business);
-        const nameKey = business.bname.toLowerCase().trim();
-
-        if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
-            console.log(`🚫 PLACES DUPLICATE: ${business.bname} (already in database)`);
-            return false;
-        }
-
-        usedAddresses.add(addressKey);
-        usedBusinessNames.add(nameKey);
-        console.log(`🔵 RELEVANT PLACES: ${business.bname} at ${addressKey}`);
-        return true;
-    });
-
-    // IMPROVED: Nearby database businesses get THIRD priority (GREEN markers)
-    // These are least relevant since they don't match the search term
-    const finalNearbyResults = nearbyDatabaseBusinesses.filter(business => {
-        const addressKey = createAddressKey(business);
-        const nameKey = business.bname.toLowerCase().trim();
-
-        if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
-            console.log(`🚫 NEARBY DUPLICATE: ${business.bname} (already displayed)`);
-            return false;
-        }
-
-        console.log(`🟢 OTHER NEARBY: ${business.bname} at ${addressKey}`);
-        return true;
-    });
-
-    return {
-        finalPrimaryResults,
-        finalPlacesResults,
-        finalNearbyResults
-    };
 }
 
 /**
@@ -11375,110 +8260,52 @@ function showImprovedSearchSuccessMessage(primaryCount, placesCount, nearbyCount
 }
 
 /**
- * FIXED: Enhanced Google Places search with better radius and result handling
- * This should find all Olive Garden locations in Las Vegas area
+ * FINAL: Enhanced Google Places search with proper radius
  */
-
 async function searchGooglePlacesForBusinessEnhanced(businessName, searchLocation) {
     try {
-        console.log("🔍 ENHANCED PLACES SEARCH: Searching for:", businessName, "near", searchLocation);
-
-        // Import the new Places library
         const {Place} = await google.maps.importLibrary("places");
-
-        // Create search location
         const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+        const searchRadius = 50000; // 50km
 
-        // FIXED: Use much larger radius for metro areas like Las Vegas
-        // Las Vegas metro area is quite spread out, need at least 50km radius
-        const searchRadius = 50000; // 50km in meters (was probably too small before)
-
-        // Create a comprehensive text search request
         const request = {
             textQuery: businessName,
-            locationBias: {
-                center: center,
-                radius: searchRadius
-            },
-            maxResultCount: 20, // Get more results
-            fields: [
-                'id',
-                'displayName',
-                'formattedAddress',
-                'location',
-                'types',
-                'nationalPhoneNumber',
-                'internationalPhoneNumber',
-                'businessStatus' // Check if business is open
-            ]
+            locationBias: { center: center, radius: searchRadius },
+            maxResultCount: 20,
+            fields: ['id', 'displayName', 'formattedAddress', 'location', 'types',
+                'nationalPhoneNumber', 'internationalPhoneNumber', 'businessStatus']
         };
 
-        console.log(`🌐 Enhanced Places API request with ${searchRadius/1000}km radius:`, request);
-
-        // Perform text search
         const {places} = await Place.searchByText(request);
-
         if (!places || places.length === 0) {
-            console.log("❌ No businesses found via enhanced Places API");
-
-            // FALLBACK: Try with even larger radius
-            console.log("🔄 FALLBACK: Trying with 75km radius...");
+            // Fallback with larger radius
             const fallbackRequest = {
                 ...request,
-                locationBias: {
-                    center: center,
-                    radius: 75000 // 75km
-                }
+                locationBias: { center: center, radius: 75000 }
             };
-
             const {places: fallbackPlaces} = await Place.searchByText(fallbackRequest);
-            if (!fallbackPlaces || fallbackPlaces.length === 0) {
-                console.log("❌ No businesses found even with larger radius");
-                return [];
-            }
-
-            console.log(`✅ Fallback found ${fallbackPlaces.length} businesses`);
+            if (!fallbackPlaces || fallbackPlaces.length === 0) return [];
             return await processPlacesResults(fallbackPlaces, center, businessName);
         }
 
-        console.log(`✅ Found ${places.length} businesses via enhanced Places API`);
         return await processPlacesResults(places, center, businessName);
-
     } catch (error) {
-        console.error("❌ Error in enhanced Places API search:", error);
-
-        // Final fallback to your existing function
-        console.log("🔄 FINAL FALLBACK: Using existing Places search...");
-        try {
-            return await searchGooglePlacesForBusinessFixed(businessName, searchLocation);
-        } catch (fallbackError) {
-            console.error("❌ All Places search methods failed:", fallbackError);
-            return [];
-        }
+        console.error("Error in Places API search:", error);
+        return [];
     }
 }
 
 /**
- * Process Places API results with better filtering and validation
+ * Process Places API results
  */
 async function processPlacesResults(places, searchCenter, businessName) {
-    console.log(`🔄 Processing ${places.length} Places results for "${businessName}"`);
-
-    // Filter out invalid or irrelevant results
     const validPlaces = places.filter(place => {
-        // Skip if business is permanently closed
-        if (place.businessStatus === 'CLOSED_PERMANENTLY') {
-            console.log(`⏭️ Skipping permanently closed: ${place.displayName}`);
-            return false;
-        }
+        if (place.businessStatus === 'CLOSED_PERMANENTLY') return false;
 
-        // Basic name similarity check
         const placeName = place.displayName.toLowerCase();
         const searchTerm = businessName.toLowerCase();
 
-        // Must contain the main search term or be very similar
         if (!placeName.includes(searchTerm) && !searchTerm.includes(placeName)) {
-            // Additional check for common variations
             const searchWords = searchTerm.split(' ');
             const placeWords = placeName.split(' ');
 
@@ -11491,28 +8318,14 @@ async function processPlacesResults(places, searchCenter, businessName) {
                 }
             }
 
-            // Must match at least half the search words
-            if (matchCount < Math.ceil(searchWords.length / 2)) {
-                console.log(`⏭️ Skipping unrelated result: ${place.displayName}`);
-                return false;
-            }
+            if (matchCount < Math.ceil(searchWords.length / 2)) return false;
         }
-
         return true;
     });
 
-    console.log(`✅ Filtered to ${validPlaces.length} valid places`);
-
-    // Process each valid place
-    const businessPromises = validPlaces.map(async (place, index) => {
-        console.log(`   ${index + 1}. Processing: ${place.displayName}`);
-
-        // Extract address components
+    const businessPromises = validPlaces.map(async (place) => {
         const addressParts = place.formattedAddress ? place.formattedAddress.split(',') : [];
-        let address1 = '';
-        let city = '';
-        let state = '';
-        let zip = '';
+        let address1 = '', city = '', state = '', zip = '';
 
         if (addressParts.length >= 1) address1 = addressParts[0].trim();
         if (addressParts.length >= 2) city = addressParts[1].trim();
@@ -11524,739 +8337,92 @@ async function processPlacesResults(places, searchCenter, businessName) {
             }
         }
 
-        // Calculate distance from search center
-        const placeLatLng = place.location;
-        const distance = google.maps.geometry.spherical.computeDistanceBetween(searchCenter, placeLatLng);
-        const distanceKm = (distance / 1000).toFixed(1);
+        const distance = google.maps.geometry.spherical.computeDistanceBetween(searchCenter, place.location);
 
-        // Extract coordinates safely
         let lat = 0, lng = 0;
         if (place.location) {
             try {
                 lat = typeof place.location.lat === 'function' ? place.location.lat() : place.location.lat || 0;
                 lng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng || 0;
             } catch (coordError) {
-                console.warn("⚠️ Error extracting coordinates:", coordError);
                 lat = searchCenter.lat();
                 lng = searchCenter.lng();
             }
         }
 
-        // Create business object with enhanced data
         const business = {
             _id: 'google_' + place.id,
             bname: place.displayName,
-            address1: address1,
-            city: city,
-            state: state,
-            zip: zip,
+            address1, city, state, zip,
             formattedAddress: place.formattedAddress,
             type: mapGooglePlaceTypeToBusinessType(place.types),
             phone: place.nationalPhoneNumber || place.internationalPhoneNumber || '',
             isGooglePlace: true,
             placeId: place.id,
-            lat: lat,
-            lng: lng,
-            distance: distance,
+            lat, lng, distance,
             businessStatus: place.businessStatus
         };
 
-        console.log(`      → ${business.bname} at ${distanceKm}km (${city}, ${state})`);
-
-        // Enhanced chain matching with rate limiting
         try {
             const chainMatch = await findMatchingChainForPlaceResult(place.displayName);
             if (chainMatch) {
-                console.log(`      🔗 Chain match: ${chainMatch.bname}`);
                 business.chain_id = chainMatch._id;
                 business.chain_name = chainMatch.bname;
                 business.isChainLocation = true;
             }
         } catch (error) {
-            console.warn(`      ⚠️ Chain matching failed for ${place.displayName}:`, error.message);
+            console.warn(`Chain matching failed for ${place.displayName}:`, error.message);
         }
 
         return business;
     });
 
-    // Wait for all processing to complete
     const businesses = await Promise.all(businessPromises);
-
-    // Sort by distance (closest first)
     businesses.sort((a, b) => a.distance - b.distance);
-
-    console.log(`📊 FINAL PROCESSED RESULTS: ${businesses.length} businesses`);
-    businesses.forEach((business, index) => {
-        const distanceKm = (business.distance / 1000).toFixed(1);
-        console.log(`   ${index + 1}. ${business.bname} - ${distanceKm}km - ${business.city}, ${business.state}`);
-    });
-
     return businesses;
 }
 
 /**
- * Enhanced nearby database search with better radius handling for metro areas
+ * FINAL: Enhanced nearby database search
  */
 async function searchNearbyDatabaseBusinessesEnhanced(searchLocation, radiusKm, excludeBusinessName = '') {
     try {
-        console.log(`🏢 ENHANCED NEARBY DB SEARCH: ${radiusKm}km radius around ${searchLocation.lat}, ${searchLocation.lng}`);
-
         const baseURL = getBaseURL();
+        const enhancedRadius = Math.max(radiusKm, 30);
 
-        // FIXED: Use larger radius for metro areas to find more businesses
-        const enhancedRadius = Math.max(radiusKm, 30); // Minimum 30km for metro areas
-
-        // Build API URL for location-based search
         const params = new URLSearchParams({
             operation: 'search',
             lat: searchLocation.lat,
             lng: searchLocation.lng,
             radius: enhancedRadius,
-            limit: 100 // Increased from 50 to get more businesses
+            limit: 100
         });
 
-        const apiURL = `${baseURL}/api/business.js?${params.toString()}`;
-        console.log(`🌐 Enhanced nearby search: ${apiURL}`);
-
-        const response = await fetch(apiURL);
-        if (!response.ok) {
-            throw new Error(`Nearby search failed: ${response.status}`);
-        }
+        const response = await fetch(`${baseURL}/api/business.js?${params.toString()}`);
+        if (!response.ok) throw new Error(`Nearby search failed: ${response.status}`);
 
         const data = await response.json();
         let nearbyBusinesses = data.results || [];
 
-        console.log(`📊 Raw nearby results: ${nearbyBusinesses.length} businesses`);
+        return nearbyBusinesses.filter(business => {
+            if (business.is_chain === true) return false;
 
-        // Enhanced filtering
-        nearbyBusinesses = nearbyBusinesses.filter(business => {
-            // Exclude parent chains
-            if (business.is_chain === true) {
-                return false;
-            }
-
-            // IMPROVED: Better exclusion logic for primary search term
             if (excludeBusinessName) {
                 const businessNameLower = business.bname.toLowerCase();
                 const excludeNameLower = excludeBusinessName.toLowerCase();
 
-                // More precise matching to avoid over-excluding
                 if (businessNameLower === excludeNameLower ||
                     businessNameLower.includes(excludeNameLower) ||
                     excludeNameLower.includes(businessNameLower)) {
-                    console.log(`🚫 EXCLUDING: ${business.bname} (matches "${excludeBusinessName}")`);
                     return false;
                 }
             }
 
-            // Ensure business has valid coordinates
-            if (!hasValidCoordinates(business)) {
-                console.log(`🚫 EXCLUDING: ${business.bname} (invalid coordinates)`);
-                return false;
-            }
-
-            return true;
+            return hasValidCoordinates(business);
         });
-
-        console.log(`✅ ENHANCED NEARBY FILTER: ${nearbyBusinesses.length} businesses after filtering`);
-
-        // Log some examples of what we found
-        nearbyBusinesses.slice(0, 5).forEach((business, index) => {
-            console.log(`   ${index + 1}. ${business.bname} - ${business.city}, ${business.state}`);
-        });
-
-        return nearbyBusinesses;
-
     } catch (error) {
-        console.error("❌ Error in enhanced nearby database search:", error);
+        console.error("Error in nearby database search:", error);
         return [];
-    }
-}
-
-/**
- * Debug function to test Las Vegas Olive Garden search specifically
- */
-async function debugLasVegasOliveGardenSearch() {
-    console.log("🧪 DEBUG: Testing Las Vegas Olive Garden search...");
-
-    // Las Vegas coordinates (89121 zip code area)
-    const lasVegasLocation = {
-        lat: 36.0395,
-        lng: -115.0610
-    };
-
-    try {
-        // Test enhanced Places search
-        console.log("1. Testing enhanced Places search...");
-        const placesResults = await searchGooglePlacesForBusinessEnhanced("Olive Garden", lasVegasLocation);
-        console.log(`   Found ${placesResults.length} Olive Garden locations via Places API`);
-
-        // Test enhanced nearby search
-        console.log("2. Testing enhanced nearby database search...");
-        const nearbyResults = await searchNearbyDatabaseBusinessesEnhanced(lasVegasLocation, 30, "Olive Garden");
-        console.log(`   Found ${nearbyResults.length} nearby database businesses`);
-
-        // Test database search
-        console.log("3. Testing database search for Olive Garden...");
-        const formData = { businessName: "Olive Garden", address: "", useMyLocation: false };
-        const dbResults = await searchDatabaseWithFuzzyMatching(formData, lasVegasLocation, false);
-        console.log(`   Found ${dbResults.length} Olive Garden locations in database`);
-
-        console.log("✅ DEBUG TEST COMPLETE");
-
-        return {
-            places: placesResults.length,
-            nearby: nearbyResults.length,
-            database: dbResults.length
-        };
-
-    } catch (error) {
-        console.error("❌ Debug test failed:", error);
-        return null;
-    }
-}
-
-/**
- * Test function to verify the fix
- */
-async function testOliveGardenLasVegas() {
-    console.log("🧪 TESTING: Olive Garden search in Las Vegas (89121)");
-
-    // Simulate the exact search you're doing
-    const formData = {
-        businessName: "Olive Garden",
-        address: "89121", // Las Vegas zip code
-        useMyLocation: false
-    };
-
-    try {
-        // Clear existing results
-        clearMarkers();
-
-        // Run the enhanced search
-        await performEnhancedBusinessSearch(formData, true); // bust cache
-
-        console.log("✅ Test search completed - check results!");
-
-    } catch (error) {
-        console.error("❌ Test search failed:", error);
-    }
-}
-
-/**
- * FIXED: Enhanced duplicate detection that doesn't treat chain locations as duplicates
- * This fixes the issue where multiple Olive Garden locations were being filtered out
- */
-
-/**
- * FIXED: Create better address key that includes specific address details
- */
-function createEnhancedAddressKey(business) {
-    const parts = [];
-
-    // Include street address as primary identifier
-    if (business.address1) {
-        parts.push(business.address1.toLowerCase().trim());
-    }
-
-    // Include city and state for additional uniqueness
-    if (business.city) parts.push(business.city.toLowerCase().trim());
-    if (business.state) parts.push(business.state.toLowerCase().trim());
-
-    // For Google Places, also include the place ID to ensure uniqueness
-    if (business.placeId) {
-        parts.push(`place_${business.placeId}`);
-    }
-
-    // For database businesses, include the database ID
-    if (business._id && !business._id.startsWith('google_')) {
-        parts.push(`db_${business._id}`);
-    }
-
-    const key = parts.join('|');
-    console.log(`🔑 ADDRESS KEY for ${business.bname}: ${key}`);
-    return key;
-}
-
-/**
- * FIXED: Better business name comparison that allows chain locations
- */
-function createBusinessNameKey(business) {
-    // For chain businesses, include address in the name key to allow multiple locations
-    if (business.isChainLocation || business.chain_id) {
-        const addressPart = business.address1 ? business.address1.toLowerCase().replace(/\d+/g, '').trim() : '';
-        const nameKey = `${business.bname.toLowerCase().trim()}_${addressPart}`;
-        console.log(`🏪 CHAIN NAME KEY for ${business.bname}: ${nameKey}`);
-        return nameKey;
-    }
-
-    // For non-chain businesses, use just the name
-    const nameKey = business.bname.toLowerCase().trim();
-    console.log(`🏢 REGULAR NAME KEY for ${business.bname}: ${nameKey}`);
-    return nameKey;
-}
-
-/**
- * FIXED: Enhanced categorization that properly handles chain locations
- */
-function categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResults, nearbyDatabaseBusinesses) {
-    console.log("🔄 FIXED CATEGORIZATION - Properly handling chain locations:");
-
-    // Start with primary results (highest priority - RED markers)
-    const finalPrimaryResults = [...primaryResults];
-    const usedAddresses = new Set();
-    const usedBusinessNames = new Set();
-
-    // Track primary result addresses with enhanced keys
-    finalPrimaryResults.forEach(business => {
-        const addressKey = createEnhancedAddressKey(business);
-        const nameKey = createBusinessNameKey(business);
-        usedAddresses.add(addressKey);
-        usedBusinessNames.add(nameKey);
-        console.log(`🔴 PRIMARY: ${business.bname} - Address: ${addressKey} - Name: ${nameKey}`);
-    });
-
-    // FIXED: Google Places results with better duplicate detection
-    const finalPlacesResults = placesResults.filter((business, index) => {
-        const addressKey = createEnhancedAddressKey(business);
-        const nameKey = createBusinessNameKey(business);
-
-        console.log(`🔍 CHECKING PLACES #${index + 1}: ${business.bname}`);
-        console.log(`   Address Key: ${addressKey}`);
-        console.log(`   Name Key: ${nameKey}`);
-
-        // Check for address duplicates (actual duplicates)
-        if (usedAddresses.has(addressKey)) {
-            console.log(`🚫 PLACES DUPLICATE: ${business.bname} (same address: ${addressKey})`);
-            return false;
-        }
-
-        // FIXED: For chain locations, only exclude if exact same name AND address
-        if (usedBusinessNames.has(nameKey)) {
-            console.log(`🚫 PLACES DUPLICATE: ${business.bname} (same name+address combination: ${nameKey})`);
-            return false;
-        }
-
-        // This is a unique location
-        usedAddresses.add(addressKey);
-        usedBusinessNames.add(nameKey);
-        console.log(`🔵 PLACES ACCEPTED: ${business.bname} at ${business.address1}`);
-        return true;
-    });
-
-    // FIXED: Nearby database businesses with same logic
-    const finalNearbyResults = nearbyDatabaseBusinesses.filter(business => {
-        const addressKey = createEnhancedAddressKey(business);
-        const nameKey = createBusinessNameKey(business);
-
-        if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
-            console.log(`🚫 NEARBY DUPLICATE: ${business.bname} (already processed)`);
-            return false;
-        }
-
-        console.log(`🟢 NEARBY ACCEPTED: ${business.bname} at ${business.address1}`);
-        return true;
-    });
-
-    console.log(`📊 FIXED CATEGORIZATION RESULTS:`);
-    console.log(`   🔴 Primary: ${finalPrimaryResults.length}`);
-    console.log(`   🔵 Places: ${finalPlacesResults.length} (was ${placesResults.length})`);
-    console.log(`   🟢 Nearby: ${finalNearbyResults.length}`);
-
-    return {
-        finalPrimaryResults,
-        finalPlacesResults,
-        finalNearbyResults
-    };
-}
-
-/**
- * FIXED: Enhanced search function with better duplicate detection
- */
-async function performEnhancedBusinessSearchWithFixedDuplicates(formData, bustCache = false) {
-    try {
-        console.log("🔍 FIXED SEARCH: Starting search with proper chain location handling:", formData);
-
-        // Show loading indicator
-        const resultsContainer = document.getElementById('business-search-results') ||
-            document.getElementById('search_table');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading"><div class="loading-text">Searching for businesses...</div><div class="loading-spinner"></div></div>';
-            resultsContainer.style.display = 'block';
-        }
-
-        // Process search location (same as before)
-        let searchLocation = null;
-        let searchRadius = 30;
-
-        if (formData.useMyLocation) {
-            try {
-                updateLoadingMessage("Getting your location...");
-                searchLocation = await getUserLocation();
-                window.currentSearchLocation = searchLocation;
-            } catch (error) {
-                console.error("❌ Error getting user location:", error);
-                hideLoadingIndicator();
-                alert("Unable to get your current location. Please try entering an address instead.");
-                return;
-            }
-        } else if (formData.address && formData.address.trim() !== '') {
-            try {
-                updateLoadingMessage("Finding location...");
-                const geocodedLocation = await geocodeAddressClientSide(formData.address);
-                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
-                    searchLocation = geocodedLocation;
-                    window.currentSearchLocation = searchLocation;
-
-                    if (/^\d{5}$/.test(formData.address.trim())) {
-                        searchRadius = 25;
-                        console.log("📍 ZIP CODE SEARCH: Using 25km radius");
-                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
-                        searchRadius = 30;
-                        console.log("📍 CITY SEARCH: Using 30km radius");
-                    } else {
-                        searchRadius = 20;
-                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
-                    }
-
-                    if (map && searchLocation) {
-                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                        map.setCenter(center);
-                        map.setZoom(searchRadius <= 20 ? 12 : 11);
-                    }
-                } else {
-                    throw new Error(`Geocoding failed for address: ${formData.address}`);
-                }
-            } catch (error) {
-                console.error("❌ Error geocoding address:", error);
-                hideLoadingIndicator();
-                alert("We couldn't recognize that address. Please try a more specific address.");
-                return;
-            }
-        }
-
-        // PHASE 1: Search database
-        updateLoadingMessage("Searching database...");
-        let primaryResults = [];
-
-        if (formData.businessName && formData.businessName.trim() !== '') {
-            try {
-                primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
-                primaryResults = primaryResults.filter(business => business.is_chain !== true);
-                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
-            } catch (error) {
-                console.error("❌ Primary search failed:", error);
-            }
-        }
-
-        // PHASE 2: Search Google Places
-        let placesResults = [];
-
-        if (formData.businessName && searchLocation) {
-            try {
-                updateLoadingMessage("Searching for additional locations...");
-                const placesSearchLocation = {
-                    ...searchLocation,
-                    searchRadius: Math.max(searchRadius, 35)
-                };
-                placesResults = await searchGooglePlacesForBusinessEnhanced(formData.businessName, placesSearchLocation);
-                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
-            } catch (error) {
-                console.error("❌ Places search failed:", error);
-            }
-        }
-
-        // PHASE 3: Search nearby database businesses
-        let nearbyDatabaseBusinesses = [];
-
-        const shouldSearchNearby = !formData.businessName ||
-            (primaryResults.length + placesResults.length < 8);
-
-        if (searchLocation && shouldSearchNearby) {
-            try {
-                updateLoadingMessage("Finding other nearby businesses...");
-                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinessesEnhanced(searchLocation, searchRadius, formData.businessName);
-                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
-            } catch (error) {
-                console.error("❌ Nearby database search failed:", error);
-            }
-        } else {
-            console.log("⏭️ SKIPPING nearby search - found many relevant results");
-        }
-
-        // PHASE 4: FIXED categorization with proper duplicate detection
-        const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
-            categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
-
-        // PHASE 5: Display results
-        const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
-        console.log(`📊 FIXED SEARCH RESULTS:`);
-        console.log(`   - 🔴 Primary Database (RED): ${finalPrimaryResults.length} businesses`);
-        console.log(`   - 🔵 Additional Locations (BLUE): ${finalPlacesResults.length} businesses`);
-        console.log(`   - 🟢 Other Nearby (GREEN): ${finalNearbyResults.length} businesses`);
-        console.log(`   - Total: ${allResults.length} businesses`);
-
-        if (allResults.length > 0) {
-            // Set proper flags
-            finalPrimaryResults.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-                business.isPrimaryResult = true;
-                business.markerColor = 'primary';
-                business.priority = 1;
-            });
-
-            finalPlacesResults.forEach(business => {
-                business.isGooglePlace = true;
-                business.isFromDatabase = false;
-                business.isPrimaryResult = false;
-                business.isRelevantPlaces = true;
-                business.markerColor = 'nearby';
-                business.priority = 2;
-            });
-
-            finalNearbyResults.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-                business.isPrimaryResult = false;
-                business.isNearbyDatabase = true;
-                business.markerColor = 'database';
-                business.priority = 3;
-            });
-
-            hideLoadingIndicator();
-
-            // Display results
-            displayBusinessesOnMapWithBetterPriority(allResults);
-            displaySearchResultsWithBetterPriority(allResults);
-
-            // Show success message
-            showImprovedSearchSuccessMessage(finalPrimaryResults.length, finalPlacesResults.length, finalNearbyResults.length, formData.businessName);
-
-            console.log("✅ FIXED SEARCH: Completed successfully with proper chain location handling");
-        } else {
-            hideLoadingIndicator();
-            showNoResultsMessage();
-        }
-
-    } catch (error) {
-        console.error("❌ Fixed search error:", error);
-        hideLoadingIndicator();
-        showErrorMessage(`Error searching for businesses: ${error.message}`);
-    }
-}
-
-/**
- * Test function for the fixed search
- */
-async function testFixedOliveGardenSearch() {
-    console.log("🧪 TESTING FIXED: Olive Garden search with proper duplicate detection");
-
-    const formData = {
-        businessName: "Olive Garden",
-        address: "89121",
-        useMyLocation: false
-    };
-
-    try {
-        clearMarkers();
-        await performEnhancedBusinessSearchWithFixedDuplicates(formData, true);
-        console.log("✅ Fixed test search completed - should now show 9+ Olive Garden locations!");
-    } catch (error) {
-        console.error("❌ Fixed test search failed:", error);
-    }
-}
-
-/**
- * FIXED: Always search for nearby database businesses to show green markers
- * The previous logic was skipping nearby searches when many results were found
- */
-
-/**
- * FIXED: Enhanced search function that ALWAYS searches for nearby database businesses
- */
-async function performEnhancedBusinessSearchWithNearbyFixed(formData, bustCache = false) {
-    try {
-        console.log("🔍 NEARBY FIXED SEARCH: Starting search with guaranteed nearby search:", formData);
-
-        // Show loading indicator
-        const resultsContainer = document.getElementById('business-search-results') ||
-            document.getElementById('search_table');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading"><div class="loading-text">Searching for businesses...</div><div class="loading-spinner"></div></div>';
-            resultsContainer.style.display = 'block';
-        }
-
-        // Process search location (same as before)
-        let searchLocation = null;
-        let searchRadius = 30;
-
-        if (formData.useMyLocation) {
-            try {
-                updateLoadingMessage("Getting your location...");
-                searchLocation = await getUserLocation();
-                window.currentSearchLocation = searchLocation;
-            } catch (error) {
-                console.error("❌ Error getting user location:", error);
-                hideLoadingIndicator();
-                alert("Unable to get your current location. Please try entering an address instead.");
-                return;
-            }
-        } else if (formData.address && formData.address.trim() !== '') {
-            try {
-                updateLoadingMessage("Finding location...");
-                const geocodedLocation = await geocodeAddressClientSide(formData.address);
-                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
-                    searchLocation = geocodedLocation;
-                    window.currentSearchLocation = searchLocation;
-
-                    if (/^\d{5}$/.test(formData.address.trim())) {
-                        searchRadius = 25;
-                        console.log("📍 ZIP CODE SEARCH: Using 25km radius");
-                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
-                        searchRadius = 30;
-                        console.log("📍 CITY SEARCH: Using 30km radius");
-                    } else {
-                        searchRadius = 20;
-                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
-                    }
-
-                    if (map && searchLocation) {
-                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
-                        map.setCenter(center);
-                        map.setZoom(searchRadius <= 20 ? 12 : 11);
-                    }
-                } else {
-                    throw new Error(`Geocoding failed for address: ${formData.address}`);
-                }
-            } catch (error) {
-                console.error("❌ Error geocoding address:", error);
-                hideLoadingIndicator();
-                alert("We couldn't recognize that address. Please try a more specific address.");
-                return;
-            }
-        }
-
-        // PHASE 1: Search database for primary results
-        updateLoadingMessage("Searching database...");
-        let primaryResults = [];
-
-        if (formData.businessName && formData.businessName.trim() !== '') {
-            try {
-                primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
-                primaryResults = primaryResults.filter(business => business.is_chain !== true);
-                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
-            } catch (error) {
-                console.error("❌ Primary search failed:", error);
-            }
-        }
-
-        // PHASE 2: Search Google Places
-        let placesResults = [];
-
-        if (formData.businessName && searchLocation) {
-            try {
-                updateLoadingMessage("Searching for additional locations...");
-                const placesSearchLocation = {
-                    ...searchLocation,
-                    searchRadius: Math.max(searchRadius, 35)
-                };
-                placesResults = await searchGooglePlacesForBusinessEnhanced(formData.businessName, placesSearchLocation);
-                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
-            } catch (error) {
-                console.error("❌ Places search failed:", error);
-            }
-        }
-
-        // PHASE 3: FIXED - ALWAYS search for nearby database businesses when we have a location
-        let nearbyDatabaseBusinesses = [];
-
-        if (searchLocation) {
-            try {
-                updateLoadingMessage("Finding other nearby businesses in database...");
-
-                // FIXED: Always search nearby, but adjust the approach based on results
-                console.log(`🔍 ALWAYS SEARCHING nearby businesses for context and completeness`);
-
-                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinessesEnhanced(searchLocation, searchRadius, formData.businessName);
-                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
-
-                // Log what we found for debugging
-                if (nearbyDatabaseBusinesses.length > 0) {
-                    console.log("🏢 NEARBY BUSINESSES FOUND:");
-                    nearbyDatabaseBusinesses.slice(0, 10).forEach((business, index) => {
-                        console.log(`   ${index + 1}. ${business.bname} (${business.type}) - ${business.city}, ${business.state}`);
-                    });
-                } else {
-                    console.log("❌ No nearby database businesses found - this seems unusual for Las Vegas");
-                }
-
-            } catch (error) {
-                console.error("❌ Nearby database search failed:", error);
-            }
-        } else {
-            console.log("⏭️ No search location available - cannot search for nearby businesses");
-        }
-
-        // PHASE 4: Enhanced categorization with fixed duplicate detection
-        const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
-            categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
-
-        // PHASE 5: Display results
-        const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
-        console.log(`📊 NEARBY FIXED SEARCH RESULTS:`);
-        console.log(`   - 🔴 Primary Database (RED): ${finalPrimaryResults.length} businesses`);
-        console.log(`   - 🔵 Additional Locations (BLUE): ${finalPlacesResults.length} businesses`);
-        console.log(`   - 🟢 Other Nearby Database (GREEN): ${finalNearbyResults.length} businesses`);
-        console.log(`   - Total: ${allResults.length} businesses`);
-
-        if (allResults.length > 0) {
-            // Set proper flags
-            finalPrimaryResults.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-                business.isPrimaryResult = true;
-                business.markerColor = 'primary';
-                business.priority = 1;
-            });
-
-            finalPlacesResults.forEach(business => {
-                business.isGooglePlace = true;
-                business.isFromDatabase = false;
-                business.isPrimaryResult = false;
-                business.isRelevantPlaces = true;
-                business.markerColor = 'nearby';
-                business.priority = 2;
-            });
-
-            finalNearbyResults.forEach(business => {
-                business.isGooglePlace = false;
-                business.isFromDatabase = true;
-                business.isPrimaryResult = false;
-                business.isNearbyDatabase = true;
-                business.markerColor = 'database';
-                business.priority = 3;
-            });
-
-            hideLoadingIndicator();
-
-            // Display results
-            displayBusinessesOnMapWithBetterPriority(allResults);
-            displaySearchResultsWithBetterPriority(allResults);
-
-            // Show enhanced success message
-            showImprovedSearchSuccessMessage(finalPrimaryResults.length, finalPlacesResults.length, finalNearbyResults.length, formData.businessName);
-
-            console.log("✅ NEARBY FIXED SEARCH: Completed successfully with guaranteed nearby search");
-        } else {
-            hideLoadingIndicator();
-            showNoResultsMessage();
-        }
-
-    } catch (error) {
-        console.error("❌ Nearby fixed search error:", error);
-        hideLoadingIndicator();
-        showErrorMessage(`Error searching for businesses: ${error.message}`);
     }
 }
 
@@ -12357,88 +8523,37 @@ async function searchNearbyDatabaseBusinessesWithDebugging(searchLocation, radiu
     }
 }
 
-/**
- * Test function for the nearby search fix
- */
-async function testNearbySearchFix() {
-    console.log("🧪 TESTING NEARBY SEARCH FIX: Should find Home Depot in Las Vegas");
-
-    const formData = {
-        businessName: "Olive Garden",
-        address: "89121",
-        useMyLocation: false
-    };
-
-    try {
-        clearMarkers();
-        await performEnhancedBusinessSearchWithNearbyFixed(formData, true);
-        console.log("✅ Nearby search fix test completed - should now show Home Depot in green!");
-    } catch (error) {
-        console.error("❌ Nearby search fix test failed:", error);
-    }
-}
-
-/**
- * Debug nearby search specifically
- */
-async function debugNearbySearchOnly() {
-    console.log("🔍 DEBUGGING: Nearby search only for Las Vegas");
-
-    // Las Vegas coordinates
-    const lasVegasLocation = {
-        lat: 36.1165487,
-        lng: -115.0881146
-    };
-
-    try {
-        const nearbyResults = await searchNearbyDatabaseBusinessesWithDebugging(lasVegasLocation, 30, "Olive Garden");
-        console.log(`📊 NEARBY DEBUG RESULTS: Found ${nearbyResults.length} nearby businesses`);
-        return nearbyResults;
-    } catch (error) {
-        console.error("❌ Nearby debug failed:", error);
-        return [];
-    }
-}
-
 console.log("🚀 NEARBY SEARCH FIX loaded!");
-console.log("🧪 Run testNearbySearchFix() to test the complete fix");
 console.log("🔍 Run debugNearbySearchOnly() to debug just the nearby search");
 console.log("📍 Should now show: 1 red (Cedar Rapids), 9 blue (Las Vegas Olive Gardens), + green (Home Depot, etc.)");
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
-    window.retrieveFromMongoDB = performEnhancedBusinessSearchWithNearbyFixed;
-    window.performEnhancedBusinessSearchWithNearbyFixed = performEnhancedBusinessSearchWithNearbyFixed;
-    window.searchNearbyDatabaseBusinessesWithDebugging = searchNearbyDatabaseBusinessesWithDebugging;
-    window.testNearbySearchFix = testNearbySearchFix;
-    window.debugNearbySearchOnly = debugNearbySearchOnly;
-    window.performEnhancedBusinessSearch = performEnhancedBusinessSearchWithNearbyFixed;
-
-    // Also override the nearby search function for better debugging
-    window.searchNearbyDatabaseBusinessesEnhanced = searchNearbyDatabaseBusinessesWithDebugging;
+    // Export only the final working functions
+    window.performEnhancedBusinessSearch = performEnhancedBusinessSearch;
+    window.retrieveFromMongoDB = performEnhancedBusinessSearch;
+    window.searchGooglePlacesForBusinessEnhanced = searchGooglePlacesForBusinessEnhanced;
+    window.searchNearbyDatabaseBusinessesEnhanced = searchNearbyDatabaseBusinessesEnhanced;
+    window.categorizeResultsWithFixedDuplicateDetection = categorizeResultsWithFixedDuplicateDetection;
     window.createEnhancedAddressKey = createEnhancedAddressKey;
     window.createBusinessNameKey = createBusinessNameKey;
-    window.categorizeResultsWithFixedDuplicateDetection = categorizeResultsWithFixedDuplicateDetection;
-    window.performEnhancedBusinessSearchWithFixedDuplicates = performEnhancedBusinessSearchWithFixedDuplicates;
-    window.testFixedOliveGardenSearch = testFixedOliveGardenSearch;
-    window.searchGooglePlacesForBusinessEnhanced = searchGooglePlacesForBusinessEnhanced;
+    window.clearMarkers = clearMarkers;
+    window.getUserLocation = getUserLocation;
+    window.getBaseURL = getBaseURL;
+    window.isValidPosition = isValidPosition;
+    window.createSafeLatLng = createSafeLatLng;
+    window.safelyFitBounds = safelyFitBounds;
+    window.searchNearbyDatabaseBusinessesWithDebugging = searchNearbyDatabaseBusinessesWithDebugging;
     window.processPlacesResults = processPlacesResults;
-    window.debugLasVegasOliveGardenSearch = debugLasVegasOliveGardenSearch;
-    window.testOliveGardenLasVegas = testOliveGardenLasVegas;
     window.searchGooglePlacesForBusiness = searchGooglePlacesForBusinessEnhanced;
     window.searchNearbyDatabaseBusinesses = searchNearbyDatabaseBusinessesEnhanced;
-    window.categorizeResultsWithBetterPriority = categorizeResultsWithBetterPriority;
     window.displaySearchResultsWithBetterPriority = displaySearchResultsWithBetterPriority;
     window.displayBusinessesOnMapWithBetterPriority = displayBusinessesOnMapWithBetterPriority;
     window.showImprovedSearchSuccessMessage = showImprovedSearchSuccessMessage;
-    window.searchGooglePlacesForBusinessWithRadius = searchGooglePlacesForBusinessWithRadius;
     window.displayBusinessesOnMap = displayBusinessesOnMapWithCategories;
     window.displaySearchResults = displaySearchResultsWithCategories;
     window.displayBusinessesOnMapFixed = displayBusinessesOnMapWithCategories;
     window.displaySearchResultsFixed = displaySearchResultsWithCategories;
-    window.categorizeFinalResults = categorizeFinalResults;
-    window.createAddressKey = createAddressKey;
-    window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerWithCategory;
     window.showEnhancedInfoWindowWithCategory = showEnhancedInfoWindowWithCategory;
     window.buildCategoryAwareInfoWindowContent = buildCategoryAwareInfoWindowContent;
     window.createCategorizedBusinessMarker = createCategorizedBusinessMarker;
@@ -12446,7 +8561,6 @@ if (typeof window !== 'undefined') {
     window.addCategorizedBusinessRow = addCategorizedBusinessRow;
     window.showEnhancedSearchSuccessMessage = showEnhancedSearchSuccessMessage;
     window.updateMapLegendWithCategories = updateMapLegendWithCategories;
-    window.testCategorizedSearch = testCategorizedSearch;
     window.getApproximateLocation = getApproximateLocation;
     window.showUserFriendlyError = showUserFriendlyError;
     window.showSearchSuccessMessage = showSearchSuccessMessage;
@@ -12468,7 +8582,6 @@ if (typeof window !== 'undefined') {
     window.loadIncentivesForEnhancedWindow = loadIncentivesForEnhancedWindowFixed;
     window.loadChainIncentivesForDatabaseBusiness = loadChainIncentivesForDatabaseBusinessFixed;
     window.createBusinessMarker = createBusinessMarker;
-    window.createEnhancedBusinessMarkerFixed = createEnhancedBusinessMarkerFixed;
     window.fetchBusinessIncentivesFixed = fetchBusinessIncentivesFixed;
     window.addBusinessRowFixed = addBusinessRowFixed;
     window.fetchBusinessIncentives = fetchBusinessIncentivesFixed;
@@ -12514,7 +8627,6 @@ if (typeof window !== 'undefined') {
     window.getSimilarBusinessTypes = getSimilarBusinessTypes;
     window.getBusinessLocation = getBusinessLocation;
     window.createSimilarBusinessMarker = createSimilarBusinessMarker;
-    window.ENHANCED_CONFIG = ENHANCED_CONFIG;
 
     addEnhancedUserInterfaceCSS();
 
