@@ -913,7 +913,7 @@ function initBusinessSearch() {
 
     // Modify the form submission handler to check map initialization
     if (findBusiness) {
-        findBusiness.addEventListener('submit', function (event) {
+        findBusiness.addEventListener('submit', async function (event) {
             // Prevent the form from submitting immediately
             event.preventDefault();
 
@@ -934,11 +934,11 @@ function initBusinessSearch() {
             // Check if map is initialized
             if (!mapInitialized) {
                 console.warn("Map not initialized yet. Will initialize and display businesses after map loads.");
-                ensureGoogleMapsInitialized().then(() => {
+                ensureGoogleMapsInitialized().then(async () => {
                     // Clear existing map markers
                     clearMarkers();
                     // Submit the data to MongoDB
-                    retrieveFromMongoDB(formData);
+                    await performEnhancedBusinessSearch(formData, false);
                 }).catch(error => {
                     console.error("Failed to initialize Google Maps:", error);
                     alert("There was a problem loading the map. Please try refreshing the page.");
@@ -954,7 +954,7 @@ function initBusinessSearch() {
                 }
 
                 // Submit the data to MongoDB
-                retrieveFromMongoDB(formData);
+                await performEnhancedBusinessSearch(formData, false);
             }
         });
     } else {
@@ -1040,7 +1040,7 @@ function addRefreshButton() {
     refreshButton.style.cursor = 'pointer';
 
     // Add click handler
-    refreshButton.addEventListener('click', function () {
+    refreshButton.addEventListener('click', async function () {
         // Get current form data
         const businessName = document.getElementById('business-name')?.value || '';
         const address = document.getElementById('address')?.value || '';
@@ -1066,7 +1066,7 @@ function addRefreshButton() {
         this.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Refreshing...';
 
         // Submit the data to MongoDB with cache-busting
-        retrieveFromMongoDB(formData, true);
+        await performEnhancedBusinessSearch(formData, false);
 
         // Restore button text after a short delay
         setTimeout(() => {
@@ -10884,7 +10884,8 @@ async function searchGooglePlacesForBusinessWithRadius(businessName, searchLocat
 }
 
 /**
- * MAIN SEARCH FUNCTION - This should be separate from the Places search function
+ * MAIN ENHANCED BUSINESS SEARCH FUNCTION
+ * This is where your main search logic should go
  */
 async function performEnhancedBusinessSearch(formData, bustCache = false) {
     try {
@@ -11055,6 +11056,7 @@ async function performEnhancedBusinessSearch(formData, bustCache = false) {
         showErrorMessage(`Error searching for businesses: ${error.message}`);
     }
 }
+
 /**
  * FIXED: Categorize results with better priority logic
  * Priority: 1) Database matches, 2) Relevant Google Places, 3) Other nearby database businesses
@@ -11387,7 +11389,7 @@ function showImprovedSearchSuccessMessage(primaryCount, placesCount, nearbyCount
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
-    window.retrieveFromMongoDB = retrieveFromMongoDBWithBetterPriority;
+    window.retrieveFromMongoDB = performEnhancedBusinessSearch;
     window.categorizeResultsWithBetterPriority = categorizeResultsWithBetterPriority;
     window.displaySearchResultsWithBetterPriority = displaySearchResultsWithBetterPriority;
     window.displayBusinessesOnMapWithBetterPriority = displayBusinessesOnMapWithBetterPriority;
