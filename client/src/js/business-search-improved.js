@@ -651,12 +651,13 @@ function getUserLocation() {
         }
     });
 }
+
 /**
- * UPDATED: Enhanced addBusinessToDatabase function with automatic chain linking
+ * UPDATED: Enhanced addBusinessToDatabase function with proper chain incentive inheritance
  * This replaces the existing function in business-search-improved.js
  */
 window.addBusinessToDatabase = async function (placeId, chainId = null) {
-    console.log("🔗 AUTO CHAIN LINKING: Adding place to database with automatic chain association:", placeId, "Chain ID:", chainId);
+    console.log("🔗 CHAIN INCENTIVE FIX: Adding place to database with proper chain inheritance:", placeId, "Chain ID:", chainId);
 
     try {
         // Import the new Places library
@@ -712,23 +713,29 @@ window.addBusinessToDatabase = async function (placeId, chainId = null) {
             }
         };
 
-        // ENHANCED: Auto chain linking logic
+        // ENHANCED: Chain information with proper inheritance
         let chainInfo = null;
         let chainMessage = '';
 
         if (chainId) {
             // Chain was explicitly provided (from chain matching)
             try {
-                chainInfo = await getChainDetails(chainId);
+                // FIXED: Get full chain details from chains API
+                chainInfo = await getChainDetailsFromChainsAPI(chainId);
                 if (chainInfo) {
-                    // ADD CHAIN LINKING DATA TO BUSINESS
+                    // ADD COMPLETE CHAIN LINKING DATA TO BUSINESS
                     businessData.chain_id = chainId;
-                    businessData.chain_name = chainInfo.chain_name || chainInfo.bname;
+                    businessData.chain_name = chainInfo.chain_name;
                     businessData.is_chain_location = true;
 
-                    chainMessage = `🔗 AUTOMATIC CHAIN LINKING: This business will be automatically linked to ${businessData.chain_name}!\n\n✨ Benefits:\n• Chain-wide incentives will automatically apply\n• Easier management through chain system\n• Consistent branding and information\n\n`;
+                    // CRITICAL FIX: Inherit universal_incentives from chain
+                    businessData.universal_incentives = chainInfo.universal_incentives;
 
-                    console.log(`✅ AUTO CHAIN LINK: ${businessData.name} → ${businessData.chain_name} (ID: ${chainId})`);
+                    chainMessage = `🔗 CHAIN INCENTIVE INHERITANCE: This business will inherit chain settings!\n\n✨ Chain Benefits:\n• Chain Name: ${chainInfo.chain_name}\n• Universal Incentives: ${chainInfo.universal_incentives ? 'YES - Chain incentives will apply' : 'No'}\n• Automatic chain-wide incentive access\n• Consistent branding and information\n\n`;
+
+                    console.log(`✅ CHAIN INHERITANCE: ${businessData.name} → ${businessData.chain_name}`);
+                    console.log(`   - Chain ID: ${chainId}`);
+                    console.log(`   - Universal Incentives: ${businessData.universal_incentives}`);
                 } else {
                     console.warn(`⚠️ Chain details not found for ID: ${chainId}`);
                 }
@@ -741,14 +748,22 @@ window.addBusinessToDatabase = async function (placeId, chainId = null) {
             try {
                 const autoChainMatch = await findMatchingChainForPlaceResult(place.displayName);
                 if (autoChainMatch) {
-                    chainInfo = autoChainMatch;
-                    businessData.chain_id = autoChainMatch._id;
-                    businessData.chain_name = autoChainMatch.chain_name || autoChainMatch.bname;
-                    businessData.is_chain_location = true;
+                    // Get full chain details for auto-detected chain
+                    chainInfo = await getChainDetailsFromChainsAPI(autoChainMatch._id);
+                    if (chainInfo) {
+                        businessData.chain_id = autoChainMatch._id;
+                        businessData.chain_name = chainInfo.chain_name;
+                        businessData.is_chain_location = true;
 
-                    chainMessage = `🎯 CHAIN DETECTED: We automatically detected that this business matches ${businessData.chain_name}!\n\n✨ Benefits:\n• Chain-wide incentives will automatically apply\n• No manual linking required\n• Consistent management\n\n`;
+                        // CRITICAL FIX: Inherit universal_incentives from auto-detected chain
+                        businessData.universal_incentives = chainInfo.universal_incentives;
 
-                    console.log(`🎯 AUTO CHAIN DETECTION: ${businessData.name} → ${businessData.chain_name} (ID: ${businessData.chain_id})`);
+                        chainMessage = `🎯 AUTO CHAIN DETECTION: We detected this matches ${businessData.chain_name}!\n\n✨ Auto Chain Benefits:\n• Chain Name: ${chainInfo.chain_name}\n• Universal Incentives: ${chainInfo.universal_incentives ? 'YES - Chain incentives will apply automatically' : 'No'}\n• No manual linking required\n• Automatic incentive inheritance\n\n`;
+
+                        console.log(`🎯 AUTO CHAIN DETECTION: ${businessData.name} → ${businessData.chain_name}`);
+                        console.log(`   - Chain ID: ${businessData.chain_id}`);
+                        console.log(`   - Universal Incentives: ${businessData.universal_incentives}`);
+                    }
                 } else {
                     console.log("ℹ️ No chain match found for auto-detection");
                 }
@@ -757,10 +772,15 @@ window.addBusinessToDatabase = async function (placeId, chainId = null) {
             }
         }
 
-        // Enhanced redirect messaging
+        // Enhanced redirect messaging with chain incentive information
         const redirectMessage = `${chainMessage}You will now be redirected to the "Add Business" page where the form will be pre-filled with this business information.
 
-${chainInfo ? '🔗 Chain association will be automatically included!' : ''}
+${chainInfo ? `🔗 Chain association and incentive inheritance will be automatically included!
+
+📋 Chain Details:
+• Name: ${chainInfo.chain_name}
+• Universal Incentives: ${chainInfo.universal_incentives ? 'Enabled' : 'Disabled'}
+• Business Type: ${chainInfo.business_type}` : ''}
 
 After you complete adding the business, you will be returned to this search page.
 
@@ -768,7 +788,7 @@ Click OK to continue.`;
 
         // Show enhanced alert
         if (confirm(redirectMessage)) {
-            // Store business data with chain information
+            // Store business data with complete chain information
             sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
             sessionStorage.setItem('returnToSearch', window.location.href);
 
@@ -777,6 +797,7 @@ Click OK to continue.`;
                 sessionStorage.setItem('autoChainLinking', JSON.stringify({
                     chainId: businessData.chain_id,
                     chainName: businessData.chain_name,
+                    universalIncentives: businessData.universal_incentives,
                     autoDetected: !chainId,
                     message: chainMessage
                 }));
@@ -787,11 +808,51 @@ Click OK to continue.`;
         }
 
     } catch (error) {
-        console.error("❌ Error in enhanced addBusinessToDatabase:", error);
+        console.error("❌ Error in enhanced addBusinessToDatabase with chain inheritance:", error);
         alert("Sorry, we couldn't retrieve the business information. Please try again or add it manually.");
     }
 };
 
+/**
+ * UPDATED: Get complete chain details from chains API
+ * @param {string} chainId - Chain ID
+ * @returns {Promise<Object>} - Complete chain details including universal_incentives
+ */
+async function getChainDetailsFromChainsAPI(chainId) {
+    if (!chainId) return null;
+
+    const baseURL = getBaseURL();
+
+    try {
+        // Use chains API to get complete chain information
+        const response = await fetch(`${baseURL}/api/chains.js?operation=get&id=${chainId}`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to get chain details: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.chain) {
+            console.log("📊 Complete chain details retrieved:", data.chain);
+
+            // Return complete chain information
+            return {
+                _id: data.chain._id,
+                chain_name: data.chain.chain_name,
+                business_type: data.chain.business_type,
+                universal_incentives: data.chain.universal_incentives, // CRITICAL: Include this
+                status: data.chain.status,
+                incentives: data.chain.incentives || []
+            };
+        }
+
+        return null;
+    } catch (error) {
+        console.error("Error getting complete chain details:", error);
+        return null;
+    }
+}
 
 /**
  * UPDATED: Get chain details using the new chains API

@@ -1503,3 +1503,191 @@ async function handleAdminDeleteBusiness(req, res) {
         return res.status(500).json({ message: 'Server error deleting business: ' + error.message });
     }
 }
+
+/**
+ * UPDATED: Enhanced business add operation with proper chain inheritance
+ * Add this to your business API's add operation handler
+ */
+
+// In your business.js API file, update the add operation handler:
+async function handleAddBusiness(req, res) {
+    console.log("🏢 BUSINESS ADD: Enhanced add with chain inheritance");
+
+    try {
+        const businessData = req.body;
+        console.log("📝 Business data received:", businessData);
+
+        // Validate required fields
+        if (!businessData.name || !businessData.address1) {
+            return res.status(400).json({ message: 'Business name and address are required' });
+        }
+
+        // ENHANCED: Handle chain inheritance
+        let chainInheritanceData = {};
+
+        if (businessData.chain_id) {
+            console.log(`🔗 CHAIN INHERITANCE: Processing chain ID ${businessData.chain_id}`);
+
+            try {
+                // Get chain details from chains collection
+                const Chain = mongoose.model('Chain'); // Your chains model
+                const chainDetails = await Chain.findById(businessData.chain_id);
+
+                if (chainDetails) {
+                    console.log(`✅ Chain found: ${chainDetails.chain_name}`);
+                    console.log(`   - Universal Incentives: ${chainDetails.universal_incentives}`);
+
+                    // CRITICAL FIX: Inherit chain properties
+                    chainInheritanceData = {
+                        chain_id: businessData.chain_id,
+                        chain_name: chainDetails.chain_name,
+                        is_chain_location: true,
+                        // CRITICAL: Inherit universal_incentives from parent chain
+                        universal_incentives: chainDetails.universal_incentives
+                    };
+
+                    console.log(`🔗 Chain inheritance data:`, chainInheritanceData);
+                } else {
+                    console.warn(`⚠️ Chain not found for ID: ${businessData.chain_id}`);
+                }
+            } catch (chainError) {
+                console.error("❌ Error getting chain details for inheritance:", chainError);
+            }
+        }
+
+        // Create the business document with inherited chain properties
+        const newBusiness = {
+            bname: businessData.name,
+            address1: businessData.address1,
+            address2: businessData.address2 || '',
+            city: businessData.city || '',
+            state: businessData.state || '',
+            zip: businessData.zip || '',
+            phone: businessData.phone || '',
+            type: businessData.type || 'OTHER',
+            status: 'active',
+
+            // Location data
+            location: businessData.location || {
+                type: 'Point',
+                coordinates: [
+                    parseFloat(businessData.lng) || 0,
+                    parseFloat(businessData.lat) || 0
+                ]
+            },
+
+            // ENHANCED: Include all chain inheritance data
+            ...chainInheritanceData,
+
+            // Set universal_incentives from chain or default to false
+            universal_incentives: chainInheritanceData.universal_incentives || false,
+
+            // Metadata
+            created_by: req.user?.id || 'system',
+            created_at: new Date(),
+            updated_at: new Date()
+        };
+
+        console.log("💾 Final business document to save:", newBusiness);
+
+        // Save the business
+        const Business = mongoose.model('Business'); // Your business model
+        const savedBusiness = await Business.create(newBusiness);
+
+        console.log(`✅ Business saved successfully: ${savedBusiness._id}`);
+        console.log(`   - Chain ID: ${savedBusiness.chain_id || 'None'}`);
+        console.log(`   - Universal Incentives: ${savedBusiness.universal_incentives}`);
+
+        return res.status(201).json({
+            success: true,
+            message: 'Business added successfully',
+            businessId: savedBusiness._id,
+            chainInfo: chainInheritanceData.chain_id ? {
+                chainId: chainInheritanceData.chain_id,
+                chainName: chainInheritanceData.chain_name,
+                universalIncentives: chainInheritanceData.universal_incentives
+            } : null
+        });
+
+    } catch (error) {
+        console.error("❌ Error in enhanced business add:", error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error adding business: ' + error.message
+        });
+    }
+}
+
+/**
+ * UPDATED: Enhanced incentive retrieval with proper chain inheritance handling
+ * This should replace your existing incentive retrieval logic
+ */
+async function getBusinessIncentivesWithChainInheritance(businessId) {
+    console.log(`🎁 ENHANCED INCENTIVES: Getting incentives for business ${businessId}`);
+
+    try {
+        const Business = mongoose.model('Business');
+        const business = await Business.findById(businessId);
+
+        if (!business) {
+            console.error(`❌ Business not found: ${businessId}`);
+            return [];
+        }
+
+        console.log(`📊 Business details for incentives:`);
+        console.log(`   - Name: ${business.bname}`);
+        console.log(`   - Chain ID: ${business.chain_id || 'None'}`);
+        console.log(`   - Universal Incentives: ${business.universal_incentives}`);
+        console.log(`   - Is Chain Location: ${business.is_chain_location || false}`);
+
+        // If this is a chain location with universal incentives enabled
+        if (business.chain_id && business.universal_incentives) {
+            console.log(`🔗 CHAIN INCENTIVES: Loading chain incentives for ${business.bname}`);
+
+            try {
+                const Chain = mongoose.model('Chain');
+                const chainDetails = await Chain.findById(business.chain_id);
+
+                if (chainDetails && chainDetails.incentives && chainDetails.incentives.length > 0) {
+                    // Convert chain incentives to standard format
+                    const chainIncentives = chainDetails.incentives
+                        .filter(incentive => incentive.is_active)
+                        .map(incentive => ({
+                            _id: incentive._id,
+                            business_id: businessId, // Associate with this location
+                            is_available: incentive.is_active,
+                            type: incentive.type,
+                            amount: incentive.amount,
+                            information: incentive.information,
+                            other_description: incentive.other_description,
+                            created_at: incentive.created_date,
+                            is_chain_wide: true // Mark as chain-wide
+                        }));
+
+                    console.log(`✅ Found ${chainIncentives.length} chain incentives for ${business.bname}`);
+                    return chainIncentives;
+                } else {
+                    console.log(`❌ No active chain incentives found for chain ${business.chain_id}`);
+                    return [];
+                }
+            } catch (chainError) {
+                console.error("❌ Error loading chain incentives:", chainError);
+                return [];
+            }
+        } else {
+            // Check for location-specific incentives
+            const Incentive = mongoose.model('Incentive');
+            const locationIncentives = await Incentive.find({
+                business_id: businessId,
+                is_available: true
+            });
+
+            console.log(`📍 Found ${locationIncentives.length} location-specific incentives`);
+            return locationIncentives;
+        }
+
+    } catch (error) {
+        console.error("❌ Error in getBusinessIncentivesWithChainInheritance:", error);
+        return [];
+    }
+}
