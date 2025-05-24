@@ -183,6 +183,32 @@
         }
     }, 10000);
 </script>
+<script>
+    // Enhanced viewBusinessIncentives override for chain support
+    window.viewBusinessIncentives = function(selectedBusiness) {
+        console.log("Enhanced viewBusinessIncentives called with business: ", selectedBusiness);
+
+        // Show the business info section
+        const businessInfoSection = document.getElementById('business-info-section');
+        if (businessInfoSection) {
+            businessInfoSection.style.display = 'block';
+        }
+
+        // Set the business ID in the hidden field
+        const selectedBusinessIdField = document.getElementById('selected-business-id');
+        if (selectedBusinessIdField) {
+            selectedBusinessIdField.value = selectedBusiness._id || '';
+        }
+
+        // Populate the business information fields
+        populateBusinessInfo(selectedBusiness);
+
+        // Use enhanced fetch that handles both local and chain incentives
+        if (selectedBusiness && selectedBusiness._id) {
+            window.enhancedFetchIncentives(selectedBusiness._id, selectedBusiness.bname, selectedBusiness);
+        }
+    };
+</script>
 <style>
     /* Additional styles for search results and incentives display */
     .results-table {

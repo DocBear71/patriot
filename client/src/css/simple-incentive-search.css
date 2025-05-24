@@ -213,3 +213,72 @@
         font-size: 11px;
     }
 }
+
+/* Enhanced styles for chain incentive badges */
+.chain-badge {
+    background-color: #4285F4;
+    color: white;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 12px;
+    display: inline-block;
+    font-weight: normal;
+}
+
+.location-badge {
+    background-color: #34A853;
+    color: white;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 12px;
+    display: inline-block;
+    font-weight: normal;
+}
+
+/* Results table styling for incentives display */
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.results-table th,
+.results-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.results-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+    text-align: center;
+}
+
+.results-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.results-table tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* Incentives section styling */
+#incentives-section {
+    border: 2px solid #000;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+#incentives-section legend h3 {
+    margin: 0;
+    color: #333;
+}
+
+/* Error styling */
+.error {
+    color: red;
+    font-weight: bold;
+    text-align: center;
+    margin: 10px 0;
+}
