@@ -2238,12 +2238,12 @@ function findMatchingChainLocally(placeName) {
                 {
                     name: 'The Home Depot',
                     variations: ['the home depot', 'home depot', 'homedepot'],
-                    id: '681fe0e67d92c3d3e1e2a3da' // Your actual chain ID from the logs
+                    id: '6831163b09ee562f96d2a573' // Your actual chain ID from the logs
                 },
                 {
                     name: 'Lowe\'s',
                     variations: ['lowes', 'lowe\'s', 'lowes home improvement', 'lowe\'s home improvement'],
-                    id: 'lowes_chain_id'
+                    id: '6831163b09ee562f96d2a572'
                 },
                 {
                     name: 'Walmart',
@@ -4841,7 +4841,7 @@ async function createEnhancedBusinessMarker(business, location, forceNearby = fa
 let COMPREHENSIVE_CHAIN_DATABASE_UPDATED = {
     // Home Depot variations
     'homedepot': {
-        id: '681fe0e67d92c3d3e1e2a3da', // Your actual Home Depot chain ID
+        id: '6831163b09ee562f96d2a573', // Your actual Home Depot chain ID
         canonicalName: 'The Home Depot',
         variations: [
             'home depot',
@@ -4855,7 +4855,7 @@ let COMPREHENSIVE_CHAIN_DATABASE_UPDATED = {
 
     // Olive Garden variations
     'olivegardenitalian': {
-        id: '682b61ee7e3ea12414dd4665', // Your actual Olive Garden chain ID
+        id: '6831163b09ee562f96d2a574', // Your actual Olive Garden chain ID
         canonicalName: 'Olive Garden',
         variations: [
             'olive garden',
@@ -4869,7 +4869,7 @@ let COMPREHENSIVE_CHAIN_DATABASE_UPDATED = {
 
     // Add other chains as needed
     'lowes': {
-        id: 'lowes_chain_id',
+        id: '6831163b09ee562f96d2a572',
         canonicalName: 'Lowe\'s',
         variations: [
             'lowes',
@@ -4888,7 +4888,7 @@ let COMPREHENSIVE_CHAIN_DATABASE_UPDATED = {
 let COMPREHENSIVE_CHAIN_DATABASE = {
     // Home Depot variations
     'homedepot': {
-        id: '681fe0e67d92c3d3e1e2a3da',
+        id: '6831163b09ee562f96d2a573',
         canonicalName: 'The Home Depot',
         variations: [
             'home depot',
@@ -4902,7 +4902,7 @@ let COMPREHENSIVE_CHAIN_DATABASE = {
 
     // Olive Garden variations
     'olivegardenitalian': {
-        id: 'olive_garden_chain_id', // Replace with your actual Olive Garden chain ID
+        id: '6831163b09ee562f96d2a574', // Replace with your actual Olive Garden chain ID
         canonicalName: 'Olive Garden',
         variations: [
             'olive garden',
@@ -4916,7 +4916,7 @@ let COMPREHENSIVE_CHAIN_DATABASE = {
 
     // Lowe's variations
     'lowes': {
-        id: 'lowes_chain_id',
+        id: '6831163b09ee562f96d2a572',
         canonicalName: 'Lowe\'s',
         variations: [
             'lowes',
