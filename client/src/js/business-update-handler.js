@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Define the selectBusinessForUpdate function in the global scope for business-search.js
-    window.selectBusinessForUpdateHandler = function(businessData) {
+    window.selectBusinessForUpdate = function(businessData) {
         console.log("selectBusinessForUpdate called with: ", businessData);
 
         // Store the selected business data for later use
@@ -127,6 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Show the business info section
+        const businessInfoSection = document.getElementById('business-info-section');
         if (businessInfoSection) {
             businessInfoSection.style.display = 'block';
         }
@@ -154,7 +155,9 @@ document.addEventListener('DOMContentLoaded', function() {
         populateSelectField('status', businessData.status || 'active');
 
         // Scroll to the form
-        businessInfoSection.scrollIntoView({ behavior: 'smooth' });
+        if (businessInfoSection) {
+            businessInfoSection.scrollIntoView({ behavior: 'smooth' });
+        }
     };
 
     // Function to update a business in the database
@@ -502,14 +505,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // IMPROVED: Properly set up the business selection handler for the update page
     // Override the handler in business-search.js
-    window.handleBusinessSelection = function(selectedBusiness) {
-        // Call our selectBusinessForUpdate function directly
-        if (typeof window.selectBusinessForUpdate === 'function') {
-            window.selectBusinessForUpdate(selectedBusiness);
-        } else {
-            console.error("selectBusinessForUpdate function not found");
-        }
-    };
 });
 
 /**
