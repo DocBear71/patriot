@@ -16,57 +16,7 @@ try {
     // Models will be initialized later if not available
 }
 
-// ENHANCED: Chain model for separate collection with better indexing
-let Chain;
-
-const chainSchema = new mongoose.Schema({
-    chain_name: { type: String, required: true, trim: true },
-    business_type: { type: String, required: true },
-    universal_incentives: { type: Boolean, default: true },
-    status: { type: String, default: 'active', enum: ['active', 'inactive'] },
-
-    // Corporate information (optional)
-    corporate_info: {
-        headquarters: String,
-        website: String,
-        phone: String,
-        description: String
-    },
-
-    // Chain-wide incentives stored directly in the chain document
-    incentives: [{
-        type: { type: String, required: true, enum: ['VT', 'AD', 'FR', 'SP', 'OT'] },
-        amount: { type: Number, required: true, min: 0, max: 100 },
-        description: String,
-        other_description: String, // For "OT" type
-        information: String,
-        discount_type: { type: String, default: 'percentage', enum: ['percentage', 'dollar'] },
-        is_active: { type: Boolean, default: true },
-        created_date: { type: Date, default: Date.now },
-        created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-    }],
-
-    // Metadata
-    created_date: { type: Date, default: Date.now },
-    updated_date: { type: Date, default: Date.now },
-    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-});
-
-// Create indexes for better performance
-chainSchema.index({ chain_name: 1 });
-chainSchema.index({ business_type: 1 });
-chainSchema.index({ status: 1 });
-chainSchema.index({ 'incentives.type': 1 });
-chainSchema.index({ 'incentives.is_active': 1 });
-
-// Initialize Chain model
-try {
-    Chain = mongoose.model('Chain');
-} catch (error) {
-    Chain = mongoose.model('Chain', chainSchema, 'patriot_thanks_chains');
-    console.log('✅ Chain model initialized for patriot_thanks_chains collection');
-}
+const Chain = require('../models/Chain');
 
 /**
  * Helper to verify admin access

@@ -4,49 +4,7 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 let Business = require('../models/Business');
 let User = require('../models/User');
-
-// Chain model for separate collection
-let Chain;
-const chainSchema = new mongoose.Schema({
-    chain_name: { type: String, required: true, trim: true },
-    business_type: { type: String, required: true },
-    universal_incentives: { type: Boolean, default: true },
-    status: { type: String, default: 'active', enum: ['active', 'inactive'] },
-
-    // Corporate information (optional)
-    corporate_info: {
-        headquarters: String,
-        website: String,
-        phone: String,
-        description: String
-    },
-
-    // Chain-wide incentives stored directly in the chain document
-    incentives: [{
-        type: { type: String, required: true, enum: ['VT', 'AD', 'FR', 'SP', 'OT'] },
-        amount: { type: Number, required: true, min: 0, max: 100 },
-        description: String,
-        other_description: String,
-        information: String,
-        discount_type: { type: String, default: 'percentage', enum: ['percentage', 'dollar'] },
-        is_active: { type: Boolean, default: true },
-        created_date: { type: Date, default: Date.now },
-        created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-    }],
-
-    // Metadata
-    created_date: { type: Date, default: Date.now },
-    updated_date: { type: Date, default: Date.now },
-    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-});
-
-// Initialize Chain model
-try {
-    Chain = mongoose.model('Chain');
-} catch (error) {
-    Chain = mongoose.model('Chain', chainSchema, 'patriot_thanks_chains');
-}
+let Chain = require('../models/Chain');
 
 /**
  * Consolidated business API handler
@@ -180,10 +138,11 @@ async function verifyAdminToken(req) {
 }
 
 /**
- * FIXED: Handle admin listing of businesses with separated chains support
+ * FINAL FIX: Handle admin listing of businesses with separated chains support
+ * Replace your existing handleAdminListBusinesses function with this one
  */
 async function handleAdminListBusinesses(req, res) {
-    console.log("🏢 ADMIN LIST BUSINESSES: Fixed for separated chains");
+    console.log("🏢 ADMIN LIST BUSINESSES: Using dedicated Chain model");
 
     // Verify admin token
     const auth = await verifyAdminToken(req);
@@ -202,135 +161,106 @@ async function handleAdminListBusinesses(req, res) {
         const skip = (page - 1) * limit;
         const includeChains = req.query.include_chains === 'true';
 
-        console.log(`📊 Query params: page=${page}, limit=${limit}, includeChains=${includeChains}`);
-
-        // Build query for regular businesses (locations only, not chain parents)
+        // Build query for regular businesses (exclude chain parents)
         const businessQuery = {
-            // FIXED: Exclude chain parent businesses - they're now in separate collection
-            is_chain: { $ne: true }
+            $or: [
+                { is_chain: { $exists: false } },
+                { is_chain: false },
+                { is_chain: null }
+            ]
         };
 
-        // Search filter for businesses
+        // Add search filters
         if (req.query.search) {
             const searchRegex = new RegExp(req.query.search, 'i');
-            businessQuery.$or = [
-                { bname: searchRegex },
-                { address1: searchRegex },
-                { city: searchRegex },
-                { state: searchRegex },
-                { zip: searchRegex },
-                { phone: searchRegex }
+            businessQuery.$and = [
+                businessQuery.$or ? { $or: businessQuery.$or } : {},
+                {
+                    $or: [
+                        { bname: searchRegex },
+                        { address1: searchRegex },
+                        { city: searchRegex },
+                        { state: searchRegex },
+                        { zip: searchRegex },
+                        { phone: searchRegex }
+                    ]
+                }
             ];
+            delete businessQuery.$or;
         }
 
-        // Category filter for businesses
-        if (req.query.category) {
-            businessQuery.type = req.query.category;
-        }
+        if (req.query.category) businessQuery.type = req.query.category;
+        if (req.query.status) businessQuery.status = req.query.status;
 
-        // Status filter for businesses
-        if (req.query.status) {
-            businessQuery.status = req.query.status;
-        }
-
-        console.log("🔍 Business query:", JSON.stringify(businessQuery, null, 2));
-
-        // Count total businesses (excluding chain parents)
+        // Get businesses
         const businessTotal = await Business.countDocuments(businessQuery);
-        console.log(`📈 Found ${businessTotal} regular businesses`);
+        const businessLimit = includeChains ? Math.floor(limit * 0.7) : limit;
 
-        // Find businesses with pagination
         let businesses = await Business.find(businessQuery)
             .sort({ created_at: -1 })
             .skip(skip)
-            .limit(includeChains ? Math.floor(limit * 0.7) : limit) // Reserve space for chains if needed
+            .limit(businessLimit)
             .lean();
-
-        console.log(`📍 Retrieved ${businesses.length} businesses from database`);
 
         let chains = [];
         let chainTotal = 0;
 
-        // FIXED: Get chains from separate collection if requested
+        // ✅ Get chains using the dedicated model - much simpler!
         if (includeChains) {
-            console.log("🔗 CHAINS: Fetching from separate collection");
+            console.log("🔗 CHAINS: Using dedicated Chain model");
 
             try {
-                // Build query for chains
                 const chainQuery = { status: 'active' };
-
                 if (req.query.search) {
                     chainQuery.chain_name = new RegExp(req.query.search, 'i');
                 }
 
-                // Count total chains
-                chainTotal = await Chain.countDocuments(chainQuery);
-                console.log(`🔗 Found ${chainTotal} chains`);
+                // Use the static method from the Chain model
+                const chainsWithCounts = await Chain.getWithLocationCounts(chainQuery);
 
-                // Get chains (limit to remaining space)
-                const chainLimit = limit - businesses.length;
-                if (chainLimit > 0) {
-                    chains = await Chain.find(chainQuery)
-                        .sort({ created_date: -1 })
-                        .limit(chainLimit)
-                        .lean();
+                chainTotal = chainsWithCounts.length;
 
-                    // Convert chains to business-like format for consistent display
-                    chains = chains.map(chain => ({
-                        _id: chain._id,
-                        bname: chain.chain_name,
-                        address1: 'Chain Headquarters',
-                        address2: '',
-                        city: chain.corporate_info?.headquarters || 'N/A',
-                        state: '',
-                        zip: '',
-                        phone: chain.corporate_info?.phone || 'N/A',
-                        type: chain.business_type,
-                        status: chain.status,
-                        created_at: chain.created_date,
-                        created_by: chain.created_by,
-                        is_chain: true, // Mark as chain for display
-                        chain_name: chain.chain_name,
-                        location_count: 0 // Will be populated below
-                    }));
+                // Convert to business-like format
+                chains = chainsWithCounts.slice(0, limit - businesses.length).map(chain => ({
+                    _id: chain._id,
+                    bname: chain.chain_name,
+                    address1: 'Chain Headquarters',
+                    city: chain.corporate_info?.headquarters || 'N/A',
+                    type: chain.business_type,
+                    status: chain.status,
+                    created_at: chain.created_date,
+                    created_by: chain.created_by,
+                    is_chain: true,
+                    chain_name: chain.chain_name,
+                    location_count: chain.location_count
+                }));
 
-                    console.log(`🔗 Retrieved ${chains.length} chains from separate collection`);
-
-                    // Get location counts for each chain
-                    for (let i = 0; i < chains.length; i++) {
-                        const locationCount = await Business.countDocuments({
-                            chain_id: chains[i]._id
-                        });
-                        chains[i].location_count = locationCount;
-                        console.log(`   - ${chains[i].chain_name}: ${locationCount} locations`);
-                    }
-                }
+                console.log(`✅ Retrieved ${chains.length} chains`);
             } catch (chainError) {
                 console.error("❌ Error fetching chains:", chainError);
-                // Continue without chains if there's an error
+                chains = [];
+                chainTotal = 0;
             }
         }
 
-        // Combine businesses and chains
+        // Combine and return results
         const allBusinesses = [...businesses, ...chains];
         const total = businessTotal + chainTotal;
 
-        console.log(`📊 FINAL RESULTS: ${allBusinesses.length} items (${businesses.length} businesses + ${chains.length} chains)`);
-
-        // Get user information for each business/chain
-        const userIds = allBusinesses
-            .map(item => item.created_by)
-            .filter(id => id);
-
+        // Get user information
+        const userIds = allBusinesses.map(item => item.created_by).filter(id => id);
         let users = [];
 
         if (userIds.length > 0) {
-            users = await User.find({
-                _id: { $in: userIds }
-            }).select('_id fname lname email').lean();
+            try {
+                users = await User.find({ _id: { $in: userIds } })
+                    .select('_id fname lname email').lean();
+            } catch (userError) {
+                console.error("❌ Error fetching users:", userError);
+            }
         }
 
-        // Create a map of user IDs to user details for quick lookup
+        // Map user data
         const userMap = {};
         users.forEach(user => {
             userMap[user._id.toString()] = {
@@ -339,7 +269,7 @@ async function handleAdminListBusinesses(req, res) {
             };
         });
 
-        // Add user details to each business/chain
+        // Add user details
         const enrichedBusinesses = allBusinesses.map(item => {
             if (item.created_by && userMap[item.created_by.toString()]) {
                 item.createdByUser = userMap[item.created_by.toString()];
@@ -347,10 +277,9 @@ async function handleAdminListBusinesses(req, res) {
             return item;
         });
 
-        // Calculate total pages based on combined total
         const totalPages = Math.ceil(total / limit);
 
-        console.log(`✅ ADMIN LIST SUCCESS: Returning ${enrichedBusinesses.length} items`);
+        console.log(`✅ SUCCESS: Returning ${enrichedBusinesses.length} items`);
 
         return res.status(200).json({
             businesses: enrichedBusinesses,

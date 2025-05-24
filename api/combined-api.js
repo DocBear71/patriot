@@ -5,113 +5,11 @@ const connect = require('../config/db');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const { ObjectId } = mongoose.Types;
-
-// Initialize models with error handling
-let User, AdminCode, Business, Incentive, Chain;
-
-try {
-    User = mongoose.model('User');
-    AdminCode = mongoose.model('AdminCode');
-    Business = mongoose.model('Business');
-    Incentive = mongoose.model('Incentive');
-    Chain = mongoose.model('Chain');
-} catch (error) {
-    // Define schemas if models aren't registered yet
-
-    // AdminCode schema
-    const adminCodeSchema = new mongoose.Schema({
-        code: String,
-        description: String,
-        expiration: Date,
-        created_at: { type: Date, default: Date.now }
-    });
-
-    // User schema (simplified version)
-    const userSchema = new mongoose.Schema({
-        fname: String,
-        lname: String,
-        email: String,
-        password: String,
-        isAdmin: Boolean,
-        level: String
-    });
-
-    // Chain schema - ADDED TO FIX THE ERROR
-    const chainSchema = new mongoose.Schema({
-        chain_name: { type: String, required: true, trim: true },
-        business_type: { type: String, required: true },
-        universal_incentives: { type: Boolean, default: true },
-        status: { type: String, default: 'active', enum: ['active', 'inactive'] },
-
-        // Corporate information (optional)
-        corporate_info: {
-            headquarters: String,
-            website: String,
-            phone: String,
-            description: String
-        },
-
-        // Chain-wide incentives stored directly in the chain document
-        incentives: [{
-            type: { type: String, required: true, enum: ['VT', 'AD', 'FR', 'SP', 'OT'] },
-            amount: { type: Number, required: true, min: 0, max: 100 },
-            description: String,
-            other_description: String, // For "OT" type
-            information: String,
-            discount_type: { type: String, default: 'percentage', enum: ['percentage', 'dollar'] },
-            is_active: { type: Boolean, default: true },
-            created_date: { type: Date, default: Date.now },
-            created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-        }],
-
-        // Metadata
-        created_date: { type: Date, default: Date.now },
-        updated_date: { type: Date, default: Date.now },
-        created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-    });
-
-    // Create indexes for better performance
-    chainSchema.index({ chain_name: 1 });
-    chainSchema.index({ business_type: 1 });
-    chainSchema.index({ status: 1 });
-    chainSchema.index({ 'incentives.type': 1 });
-
-    // Initialize models that aren't already registered
-    if (!AdminCode) {
-        try {
-            AdminCode = mongoose.model('AdminCode');
-        } catch (error) {
-            AdminCode = mongoose.model('AdminCode', adminCodeSchema, 'admin_codes');
-        }
-    }
-
-    if (!User) {
-        try {
-            User = mongoose.model('User');
-        } catch (error) {
-            User = mongoose.model('User', userSchema, 'users');
-        }
-    }
-
-    // FIXED: Initialize Chain model
-    if (!Chain) {
-        try {
-            Chain = mongoose.model('Chain');
-        } catch (error) {
-            Chain = mongoose.model('Chain', chainSchema, 'patriot_thanks_chains');
-            console.log('✅ Chain model initialized in combined-api.js');
-        }
-    }
-
-    // Try to import models for Business and Incentive
-    try {
-        if (!Business) Business = require('../models/Business');
-        if (!Incentive) Incentive = require('../models/Incentive');
-    } catch (importError) {
-        console.error('Error importing Business or Incentive models:', importError);
-    }
-}
+const User = require('../models/User');
+const AdminCode = require('../models/AdminCode');
+const Business = require('../models/Business');
+const Incentive = require('../models/Incentive');
+const Chain = require('../models/Chain');
 
 /**
  * Helper to verify admin access
