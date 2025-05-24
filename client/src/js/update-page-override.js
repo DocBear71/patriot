@@ -3,10 +3,12 @@
  * Prevents business-search-improved.js from initializing Google Maps on the update page
  */
 
-// Override functions that try to initialize Google Maps
+// Set a flag immediately to indicate this is an update page
+window.isUpdatePage = true;
+
 console.log("Update page override: Preventing Google Maps initialization");
 
-// Define dummy functions to prevent map initialization
+// Override functions that try to initialize Google Maps
 window.ensureGoogleMapsInitialized = function() {
     console.log("Override: Blocking Google Maps initialization on update page");
     return Promise.resolve();
@@ -25,51 +27,9 @@ if (typeof window.getGoogleMapsApiKey !== 'function') {
     };
 }
 
-// Override displayBusinessesOnMap to prevent map operations
+// Override map-related functions
 window.displayBusinessesOnMap = function(businesses) {
     console.log("Override: Skipping map display on update page");
-    return;
-};
-
-// Override ALL search-related functions to use update-specific versions
-window.performEnhancedBusinessSearch = function(formData, bustCache = false) {
-    console.log("Override: Redirecting to update-specific search");
-    if (typeof window.performUpdateBusinessSearch === 'function') {
-        return window.performUpdateBusinessSearch(formData);
-    }
-    return Promise.resolve();
-};
-
-window.performEnhancedBusinessSearchWithNearbyFixed = function(formData, bustCache = false) {
-    console.log("Override: Redirecting enhanced search to update-specific search");
-    if (typeof window.performUpdateBusinessSearch === 'function') {
-        return window.performUpdateBusinessSearch(formData);
-    }
-    return Promise.resolve();
-};
-
-window.retrieveFromMongoDB = function(formData, bustCache = false) {
-    console.log("Override: Redirecting retrieveFromMongoDB to update-specific search");
-    if (typeof window.performUpdateBusinessSearch === 'function') {
-        return window.performUpdateBusinessSearch(formData);
-    }
-    return Promise.resolve();
-};
-
-// Override display functions
-window.displaySearchResults = function(businesses) {
-    console.log("Override: Redirecting to update display function");
-    if (typeof window.displayUpdateSearchResults === 'function') {
-        return window.displayUpdateSearchResults(businesses);
-    }
-    return;
-};
-
-window.displaySearchResultsWithBetterPriority = function(businesses) {
-    console.log("Override: Redirecting priority display to update display");
-    if (typeof window.displayUpdateSearchResults === 'function') {
-        return window.displayUpdateSearchResults(businesses);
-    }
     return;
 };
 
@@ -81,10 +41,6 @@ window.displayBusinessesOnMapWithBetterPriority = function(businesses) {
     return;
 };
 
-// Set a flag to indicate this is an update page
-window.isUpdatePage = true;
-
-// Override any other map-related functions that might cause issues
 window.clearMarkers = function() {
     console.log("Override: No markers to clear on update page");
     return;
@@ -100,7 +56,7 @@ window.focusOnMapMarker = function() {
     return;
 };
 
-// Override success/error message functions to prevent issues
+// Override success/error message functions
 window.showImprovedSearchSuccessMessage = function() {
     console.log("Override: Skipping success message on update page");
     return;
@@ -129,8 +85,10 @@ window.showErrorMessage = function(message) {
     return;
 };
 
-// Prevent any map container from being created
+// CRITICAL: Override the search and display functions AFTER DOM loads
 document.addEventListener('DOMContentLoaded', function() {
+    console.log("Override: DOM loaded, applying comprehensive overrides");
+
     // Remove any map containers that might have been created
     const mapContainers = document.querySelectorAll('#map, #map-container, .map-container');
     mapContainers.forEach(container => {
@@ -138,5 +96,105 @@ document.addEventListener('DOMContentLoaded', function() {
         container.remove();
     });
 
-    console.log("Update page override: Initialization complete");
+    // Wait a moment for other scripts to load, then apply aggressive overrides
+    setTimeout(function() {
+        console.log("Override: Applying aggressive function overrides");
+
+        // Override ALL search-related functions aggressively
+        window.performEnhancedBusinessSearch = function(formData, bustCache = false) {
+            console.log("Override: Redirecting to update-specific search");
+            if (typeof window.performUpdateBusinessSearch === 'function') {
+                return window.performUpdateBusinessSearch(formData);
+            }
+            return Promise.resolve();
+        };
+
+        window.performEnhancedBusinessSearchWithNearbyFixed = function(formData, bustCache = false) {
+            console.log("Override: Redirecting enhanced search to update-specific search");
+            if (typeof window.performUpdateBusinessSearch === 'function') {
+                return window.performUpdateBusinessSearch(formData);
+            }
+            return Promise.resolve();
+        };
+
+        window.retrieveFromMongoDB = function(formData, bustCache = false) {
+            console.log("Override: Redirecting retrieveFromMongoDB to update-specific search");
+            if (typeof window.performUpdateBusinessSearch === 'function') {
+                return window.performUpdateBusinessSearch(formData);
+            }
+            return Promise.resolve();
+        };
+
+        // Override display functions aggressively
+        window.displaySearchResults = function(businesses) {
+            console.log("Override: Redirecting to update display function");
+            if (typeof window.displayUpdateSearchResults === 'function') {
+                return window.displayUpdateSearchResults(businesses);
+            }
+            return;
+        };
+
+        window.displaySearchResultsWithBetterPriority = function(businesses) {
+            console.log("Override: Redirecting priority display to update display");
+            if (typeof window.displayUpdateSearchResults === 'function') {
+                return window.displayUpdateSearchResults(businesses);
+            }
+            return;
+        };
+
+        // Override any remaining problematic functions
+        window.hideLoadingIndicator = function() {
+            console.log("Override: Using update-specific loading indicator management");
+            if (typeof window.hideUpdateLoadingIndicator === 'function') {
+                window.hideUpdateLoadingIndicator();
+            }
+        };
+
+        window.updateLoadingMessage = function(message) {
+            console.log("Override: Using update-specific loading message");
+            if (typeof window.showUpdateLoadingIndicator === 'function') {
+                window.showUpdateLoadingIndicator(message);
+            }
+        };
+
+        console.log("Override: All aggressive overrides applied");
+    }, 100);
+
+    // Apply another round of overrides after all scripts have loaded
+    setTimeout(function() {
+        console.log("Override: Final round of overrides");
+
+        // Ensure the search form uses update search
+        const searchForm = document.getElementById('business-search-form');
+        if (searchForm) {
+            console.log("Override: Ensuring search form uses update search functionality");
+
+            // Remove any existing event listeners
+            searchForm.onsubmit = null;
+
+            // Add our own event listener
+            searchForm.addEventListener('submit', function(event) {
+                event.preventDefault();
+                console.log("Override: Search form submitted, using update search");
+
+                const businessName = document.getElementById('business-name')?.value || '';
+                const address = document.getElementById('address')?.value || '';
+
+                if (!businessName && !address) {
+                    alert("Please enter either a business name or an address to search");
+                    return;
+                }
+
+                const formData = { businessName, address };
+
+                if (typeof window.performUpdateBusinessSearch === 'function') {
+                    window.performUpdateBusinessSearch(formData);
+                } else {
+                    console.error("Update search function not available");
+                }
+            });
+        }
+
+        console.log("Override: Final initialization complete");
+    }, 500);
 });
