@@ -1,4 +1,4 @@
-// api/chains.js - New dedicated chains API
+// api/chains.js - Enhanced dedicated chains API with better inheritance support
 const connect = require('../config/db');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
@@ -16,7 +16,7 @@ try {
     // Models will be initialized later if not available
 }
 
-// NEW: Chain model for separate collection
+// ENHANCED: Chain model for separate collection with better indexing
 let Chain;
 
 const chainSchema = new mongoose.Schema({
@@ -40,6 +40,7 @@ const chainSchema = new mongoose.Schema({
         description: String,
         other_description: String, // For "OT" type
         information: String,
+        discount_type: { type: String, default: 'percentage', enum: ['percentage', 'dollar'] },
         is_active: { type: Boolean, default: true },
         created_date: { type: Date, default: Date.now },
         created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
@@ -57,12 +58,14 @@ chainSchema.index({ chain_name: 1 });
 chainSchema.index({ business_type: 1 });
 chainSchema.index({ status: 1 });
 chainSchema.index({ 'incentives.type': 1 });
+chainSchema.index({ 'incentives.is_active': 1 });
 
 // Initialize Chain model
 try {
     Chain = mongoose.model('Chain');
 } catch (error) {
     Chain = mongoose.model('Chain', chainSchema, 'patriot_thanks_chains');
+    console.log('✅ Chain model initialized for patriot_thanks_chains collection');
 }
 
 /**
@@ -101,7 +104,7 @@ module.exports = async (req, res) => {
     }
 
     const { operation } = req.query;
-    console.log(`Chains API called with operation: ${operation || 'none'}, method: ${req.method}`);
+    console.log(`🔗 CHAINS API: ${operation || 'none'} (${req.method})`);
 
     try {
         await connect;
@@ -121,6 +124,8 @@ module.exports = async (req, res) => {
                 return await handleAddChainIncentive(req, res);
             case 'remove_incentive':
                 return await handleRemoveChainIncentive(req, res);
+            case 'update_incentive':
+                return await handleUpdateChainIncentive(req, res);
             case 'get_incentives':
                 return await handleGetChainIncentives(req, res);
             case 'add_location':
@@ -133,60 +138,120 @@ module.exports = async (req, res) => {
                 return await handleSearchChains(req, res);
             case 'find_match':
                 return await handleFindChainMatch(req, res);
+            case 'sync_locations':
+                return await handleSyncChainLocations(req, res);
+            case 'bulk_update_universal_incentives':
+                return await handleBulkUpdateUniversalIncentives(req, res);
             default:
                 if (req.method === 'GET') {
                     return res.status(200).json({
                         message: 'Chains API is available',
                         operations: [
                             'list', 'get', 'create', 'update', 'delete',
-                            'add_incentive', 'remove_incentive', 'get_incentives',
-                            'search', 'add_location', 'remove_location', 'get_locations'
+                            'add_incentive', 'remove_incentive', 'update_incentive', 'get_incentives',
+                            'search', 'add_location', 'remove_location', 'get_locations',
+                            'sync_locations', 'bulk_update_universal_incentives'
                         ]
                     });
                 }
                 return res.status(400).json({ message: 'Invalid operation' });
         }
     } catch (error) {
-        console.error(`Error in chains API (${operation || 'unknown'}):`, error);
+        console.error(`❌ Error in chains API (${operation || 'unknown'}):`, error);
         return res.status(500).json({ message: 'Server error: ' + error.message });
     }
 };
 
 /**
- * List all chains with location counts
+ * ENHANCED: List all chains with location counts and better stats
  */
 async function handleListChains(req, res) {
+    console.log("📋 CHAINS: Listing all chains with enhanced stats");
+
     try {
-        const chains = await Chain.find({ status: 'active' })
+        // Build query
+        const query = { status: 'active' };
+
+        // Add search filter if provided
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search, 'i');
+            query.$or = [
+                { chain_name: searchRegex },
+                { business_type: searchRegex }
+            ];
+        }
+
+        // Add type filter if provided
+        if (req.query.business_type) {
+            query.business_type = req.query.business_type;
+        }
+
+        console.log("🔍 Chain query:", JSON.stringify(query, null, 2));
+
+        const chains = await Chain.find(query)
             .sort({ chain_name: 1 })
             .lean();
 
-        // Get location counts for each chain
-        const chainsWithCounts = await Promise.all(
+        console.log(`📊 Found ${chains.length} chains in database`);
+
+        // Get enhanced stats for each chain
+        const chainsWithStats = await Promise.all(
             chains.map(async (chain) => {
-                const locationCount = await Business.countDocuments({ chain_id: chain._id });
-                return {
-                    ...chain,
-                    location_count: locationCount,
-                    incentive_count: chain.incentives ? chain.incentives.filter(i => i.is_active).length : 0
-                };
+                try {
+                    // Count total locations
+                    const locationCount = await Business.countDocuments({ chain_id: chain._id });
+
+                    // Count locations with universal incentives enabled
+                    const universalEnabledCount = await Business.countDocuments({
+                        chain_id: chain._id,
+                        universal_incentives: true
+                    });
+
+                    // Count active chain incentives
+                    const activeIncentiveCount = chain.incentives ?
+                        chain.incentives.filter(i => i.is_active !== false).length : 0;
+
+                    console.log(`   - ${chain.chain_name}: ${locationCount} locations, ${universalEnabledCount} with universal incentives, ${activeIncentiveCount} chain incentives`);
+
+                    return {
+                        ...chain,
+                        location_count: locationCount,
+                        universal_enabled_count: universalEnabledCount,
+                        incentive_count: activeIncentiveCount,
+                        // Flag if there are locations without universal incentives enabled
+                        needs_sync: locationCount > 0 && universalEnabledCount < locationCount
+                    };
+                } catch (statsError) {
+                    console.error(`❌ Error getting stats for chain ${chain.chain_name}:`, statsError);
+                    return {
+                        ...chain,
+                        location_count: 0,
+                        universal_enabled_count: 0,
+                        incentive_count: 0,
+                        needs_sync: false
+                    };
+                }
             })
         );
 
+        console.log(`✅ CHAINS: Returning ${chainsWithStats.length} chains with enhanced stats`);
+
         return res.status(200).json({
             success: true,
-            chains: chainsWithCounts
+            chains: chainsWithStats
         });
     } catch (error) {
-        console.error('Error listing chains:', error);
+        console.error('❌ Error listing chains:', error);
         return res.status(500).json({ message: 'Error retrieving chains: ' + error.message });
     }
 }
 
 /**
- * Get specific chain details with locations
+ * ENHANCED: Get specific chain details with locations and inheritance status
  */
 async function handleGetChain(req, res) {
+    console.log("🔍 CHAINS: Getting specific chain details");
+
     try {
         const { id } = req.query;
         if (!id) {
@@ -198,20 +263,35 @@ async function handleGetChain(req, res) {
             return res.status(404).json({ message: 'Chain not found' });
         }
 
-        // Get all locations for this chain
+        console.log(`📊 Chain found: ${chain.chain_name}`);
+
+        // Get all locations for this chain with inheritance status
         const locations = await Business.find({ chain_id: id })
-            .select('bname address1 address2 city state zip phone')
+            .select('bname address1 address2 city state zip phone universal_incentives created_at')
             .lean();
+
+        console.log(`📍 Found ${locations.length} locations for chain ${chain.chain_name}`);
+
+        // Analyze inheritance status
+        const inheritanceStats = {
+            total_locations: locations.length,
+            universal_enabled: locations.filter(loc => loc.universal_incentives === true).length,
+            universal_disabled: locations.filter(loc => loc.universal_incentives === false).length,
+            universal_undefined: locations.filter(loc => loc.universal_incentives === undefined).length
+        };
+
+        console.log("🔗 Inheritance stats:", inheritanceStats);
 
         return res.status(200).json({
             success: true,
             chain: {
                 ...chain,
-                locations: locations
+                locations: locations,
+                inheritance_stats: inheritanceStats
             }
         });
     } catch (error) {
-        console.error('Error getting chain:', error);
+        console.error('❌ Error getting chain:', error);
         return res.status(500).json({ message: 'Error retrieving chain: ' + error.message });
     }
 }
@@ -220,6 +300,8 @@ async function handleGetChain(req, res) {
  * Create new chain
  */
 async function handleCreateChain(req, res) {
+    console.log("➕ CHAINS: Creating new chain");
+
     const adminCheck = await verifyAdminAccess(req);
     if (!adminCheck.success) {
         return res.status(adminCheck.status).json({ message: adminCheck.message });
@@ -257,21 +339,25 @@ async function handleCreateChain(req, res) {
 
         const result = await newChain.save();
 
+        console.log(`✅ Chain created: ${result.chain_name} (ID: ${result._id})`);
+
         return res.status(201).json({
             success: true,
             message: 'Chain created successfully',
             chain: result
         });
     } catch (error) {
-        console.error('Error creating chain:', error);
+        console.error('❌ Error creating chain:', error);
         return res.status(500).json({ message: 'Error creating chain: ' + error.message });
     }
 }
 
 /**
- * Update chain
+ * ENHANCED: Update chain with location sync option
  */
 async function handleUpdateChain(req, res) {
+    console.log("✏️ CHAINS: Updating chain");
+
     const adminCheck = await verifyAdminAccess(req);
     if (!adminCheck.success) {
         return res.status(adminCheck.status).json({ message: adminCheck.message });
@@ -282,7 +368,7 @@ async function handleUpdateChain(req, res) {
     }
 
     try {
-        const { _id, chain_name, business_type, universal_incentives, corporate_info } = req.body;
+        const { _id, chain_name, business_type, universal_incentives, corporate_info, sync_locations } = req.body;
 
         if (!_id) {
             return res.status(400).json({ message: 'Chain ID is required' });
@@ -304,13 +390,33 @@ async function handleUpdateChain(req, res) {
             return res.status(404).json({ message: 'Chain not found' });
         }
 
+        console.log(`✅ Chain updated: ${result.chain_name}`);
+
+        // ENHANCED: Optionally sync universal_incentives to all locations
+        if (sync_locations && universal_incentives !== undefined) {
+            console.log(`🔄 Syncing universal_incentives=${universal_incentives} to all locations`);
+
+            const syncResult = await Business.updateMany(
+                { chain_id: _id },
+                {
+                    $set: {
+                        universal_incentives: universal_incentives,
+                        updated_at: new Date()
+                    }
+                }
+            );
+
+            console.log(`✅ Synced universal_incentives to ${syncResult.modifiedCount} locations`);
+        }
+
         return res.status(200).json({
             success: true,
             message: 'Chain updated successfully',
-            chain: result
+            chain: result,
+            locations_synced: sync_locations ? true : false
         });
     } catch (error) {
-        console.error('Error updating chain:', error);
+        console.error('❌ Error updating chain:', error);
         return res.status(500).json({ message: 'Error updating chain: ' + error.message });
     }
 }
@@ -319,6 +425,8 @@ async function handleUpdateChain(req, res) {
  * Delete chain (removes chain references from businesses)
  */
 async function handleDeleteChain(req, res) {
+    console.log("🗑️ CHAINS: Deleting chain");
+
     const adminCheck = await verifyAdminAccess(req);
     if (!adminCheck.success) {
         return res.status(adminCheck.status).json({ message: adminCheck.message });
@@ -334,30 +442,38 @@ async function handleDeleteChain(req, res) {
             return res.status(400).json({ message: 'Chain ID is required' });
         }
 
+        // Get chain details before deletion
+        const chain = await Chain.findById(_id);
+        if (!chain) {
+            return res.status(404).json({ message: 'Chain not found' });
+        }
+
         // Remove chain references from all businesses
-        await Business.updateMany(
+        const updateResult = await Business.updateMany(
             { chain_id: _id },
             {
                 $unset: {
                     chain_id: 1,
-                    chain_name: 1
+                    chain_name: 1,
+                    universal_incentives: 1
                 }
             }
         );
 
+        console.log(`🔄 Removed chain references from ${updateResult.modifiedCount} locations`);
+
         // Delete the chain
         const result = await Chain.findByIdAndDelete(_id);
 
-        if (!result) {
-            return res.status(404).json({ message: 'Chain not found' });
-        }
+        console.log(`✅ Chain deleted: ${chain.chain_name}`);
 
         return res.status(200).json({
             success: true,
-            message: 'Chain deleted successfully'
+            message: 'Chain deleted successfully',
+            locations_updated: updateResult.modifiedCount
         });
     } catch (error) {
-        console.error('Error deleting chain:', error);
+        console.error('❌ Error deleting chain:', error);
         return res.status(500).json({ message: 'Error deleting chain: ' + error.message });
     }
 }
@@ -366,6 +482,8 @@ async function handleDeleteChain(req, res) {
  * Add incentive to chain
  */
 async function handleAddChainIncentive(req, res) {
+    console.log("🎁 CHAINS: Adding incentive to chain");
+
     const adminCheck = await verifyAdminAccess(req);
     if (!adminCheck.success) {
         return res.status(adminCheck.status).json({ message: adminCheck.message });
@@ -376,7 +494,7 @@ async function handleAddChainIncentive(req, res) {
     }
 
     try {
-        const { chain_id, type, amount, description, other_description, information } = req.body;
+        const { chain_id, type, amount, description, other_description, information, discount_type } = req.body;
 
         if (!chain_id || !type || amount === undefined) {
             return res.status(400).json({ message: 'Chain ID, type, and amount are required' });
@@ -389,6 +507,7 @@ async function handleAddChainIncentive(req, res) {
             description: description || '',
             other_description: type === 'OT' ? (other_description || '') : '',
             information: information || '',
+            discount_type: discount_type || 'percentage',
             is_active: true,
             created_date: new Date(),
             created_by: adminCheck.userId
@@ -410,14 +529,76 @@ async function handleAddChainIncentive(req, res) {
             return res.status(404).json({ message: 'Chain not found' });
         }
 
+        console.log(`✅ Incentive added to chain ${result.chain_name}: ${type} ${amount}%`);
+
         return res.status(201).json({
             success: true,
             message: 'Incentive added to chain successfully',
             incentive: newIncentive
         });
     } catch (error) {
-        console.error('Error adding chain incentive:', error);
+        console.error('❌ Error adding chain incentive:', error);
         return res.status(500).json({ message: 'Error adding incentive: ' + error.message });
+    }
+}
+
+/**
+ * NEW: Update chain incentive
+ */
+async function handleUpdateChainIncentive(req, res) {
+    console.log("✏️ CHAINS: Updating chain incentive");
+
+    const adminCheck = await verifyAdminAccess(req);
+    if (!adminCheck.success) {
+        return res.status(adminCheck.status).json({ message: adminCheck.message });
+    }
+
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    try {
+        const { chain_id, incentive_id, type, amount, description, other_description, information, discount_type, is_active } = req.body;
+
+        if (!chain_id || !incentive_id) {
+            return res.status(400).json({ message: 'Chain ID and incentive ID are required' });
+        }
+
+        // Build update object for the specific incentive
+        const incentiveUpdate = {};
+        if (type !== undefined) incentiveUpdate['incentives.$.type'] = type;
+        if (amount !== undefined) incentiveUpdate['incentives.$.amount'] = parseFloat(amount);
+        if (description !== undefined) incentiveUpdate['incentives.$.description'] = description;
+        if (information !== undefined) incentiveUpdate['incentives.$.information'] = information;
+        if (discount_type !== undefined) incentiveUpdate['incentives.$.discount_type'] = discount_type;
+        if (is_active !== undefined) incentiveUpdate['incentives.$.is_active'] = is_active;
+        if (type === 'OT' && other_description !== undefined) {
+            incentiveUpdate['incentives.$.other_description'] = other_description;
+        }
+
+        // Add metadata
+        incentiveUpdate['updated_date'] = new Date();
+        incentiveUpdate['updated_by'] = adminCheck.userId;
+
+        const result = await Chain.findOneAndUpdate(
+            { _id: chain_id, 'incentives._id': incentive_id },
+            { $set: incentiveUpdate },
+            { new: true }
+        );
+
+        if (!result) {
+            return res.status(404).json({ message: 'Chain or incentive not found' });
+        }
+
+        console.log(`✅ Chain incentive updated in ${result.chain_name}`);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Chain incentive updated successfully'
+        });
+    } catch (error) {
+        console.error('❌ Error updating chain incentive:', error);
+        return res.status(500).json({ message: 'Error updating incentive: ' + error.message });
     }
 }
 
@@ -425,6 +606,8 @@ async function handleAddChainIncentive(req, res) {
  * Remove incentive from chain
  */
 async function handleRemoveChainIncentive(req, res) {
+    console.log("🗑️ CHAINS: Removing incentive from chain");
+
     const adminCheck = await verifyAdminAccess(req);
     if (!adminCheck.success) {
         return res.status(adminCheck.status).json({ message: adminCheck.message });
@@ -457,19 +640,20 @@ async function handleRemoveChainIncentive(req, res) {
             return res.status(404).json({ message: 'Chain not found' });
         }
 
+        console.log(`✅ Incentive removed from chain ${result.chain_name}`);
+
         return res.status(200).json({
             success: true,
             message: 'Incentive removed from chain successfully'
         });
     } catch (error) {
-        console.error('Error removing chain incentive:', error);
+        console.error('❌ Error removing chain incentive:', error);
         return res.status(500).json({ message: 'Error removing incentive: ' + error.message });
     }
 }
 
 /**
- * UPDATED: Get chain incentives operation to return embedded incentives
- * This should replace or update your existing get_incentives operation
+ * ENHANCED: Get chain incentives with detailed logging
  */
 async function handleGetChainIncentives(req, res) {
     try {
@@ -478,8 +662,11 @@ async function handleGetChainIncentives(req, res) {
             return res.status(400).json({ message: 'Chain ID is required' });
         }
 
-        const chain = await Chain.findById(chain_id).select('incentives chain_name').lean();
+        console.log(`🎁 CHAINS: Getting incentives for chain ${chain_id}`);
+
+        const chain = await Chain.findById(chain_id).select('incentives chain_name universal_incentives').lean();
         if (!chain) {
+            console.log(`❌ Chain not found: ${chain_id}`);
             return res.status(404).json({ message: 'Chain not found' });
         }
 
@@ -487,21 +674,25 @@ async function handleGetChainIncentives(req, res) {
         const activeIncentives = chain.incentives ?
             chain.incentives.filter(incentive => incentive.is_active !== false) : [];
 
-        console.log(`Found ${activeIncentives.length} active incentives for chain: ${chain.chain_name}`);
+        console.log(`📊 Chain ${chain.chain_name}:`);
+        console.log(`   - Universal incentives: ${chain.universal_incentives}`);
+        console.log(`   - Total incentives: ${chain.incentives ? chain.incentives.length : 0}`);
+        console.log(`   - Active incentives: ${activeIncentives.length}`);
 
         return res.status(200).json({
             success: true,
             incentives: activeIncentives,
-            chain_name: chain.chain_name
+            chain_name: chain.chain_name,
+            universal_incentives: chain.universal_incentives
         });
     } catch (error) {
-        console.error('Error getting chain incentives:', error);
+        console.error('❌ Error getting chain incentives:', error);
         return res.status(500).json({ message: 'Error retrieving chain incentives: ' + error.message });
     }
 }
 
 /**
- * Search chains by name (for getChainFromDatabase function)
+ * Search chains by name
  */
 async function handleSearchChains(req, res) {
     try {
@@ -510,18 +701,22 @@ async function handleSearchChains(req, res) {
             return res.status(400).json({ message: 'Chain name is required for search' });
         }
 
+        console.log(`🔍 CHAINS: Searching for "${chain_name}"`);
+
         // Find chains with names that match (case-insensitive)
         const chains = await Chain.find({
             chain_name: { $regex: new RegExp(chain_name, 'i') },
             status: 'active'
         }).lean();
 
+        console.log(`📊 Found ${chains.length} matching chains`);
+
         return res.status(200).json({
             success: true,
             chains: chains
         });
     } catch (error) {
-        console.error('Error searching chains:', error);
+        console.error('❌ Error searching chains:', error);
         return res.status(500).json({ message: 'Error searching chains: ' + error.message });
     }
 }
@@ -536,7 +731,7 @@ async function handleFindChainMatch(req, res) {
             return res.status(400).json({ message: 'Place name is required for matching' });
         }
 
-        console.log(`Looking for chain match for: ${place_name}`);
+        console.log(`🎯 CHAINS: Looking for chain match for "${place_name}"`);
 
         // Try exact match first
         let chain = await Chain.findOne({
@@ -545,7 +740,7 @@ async function handleFindChainMatch(req, res) {
         }).lean();
 
         if (chain) {
-            console.log(`Exact match found: ${chain.chain_name}`);
+            console.log(`✅ Exact match found: ${chain.chain_name}`);
             return res.status(200).json({
                 success: true,
                 chain: chain
@@ -559,7 +754,7 @@ async function handleFindChainMatch(req, res) {
         }).lean();
 
         if (partialMatches.length > 0) {
-            console.log(`Partial match found: ${partialMatches[0].chain_name}`);
+            console.log(`✅ Partial match found: ${partialMatches[0].chain_name}`);
             return res.status(200).json({
                 success: true,
                 chain: partialMatches[0]
@@ -574,7 +769,7 @@ async function handleFindChainMatch(req, res) {
         for (const chainData of reverseMatches) {
             if (place_name.toLowerCase().includes(chainData.chain_name.toLowerCase()) ||
                 chainData.chain_name.toLowerCase().includes(place_name.toLowerCase())) {
-                console.log(`Reverse match found: ${chainData.chain_name}`);
+                console.log(`✅ Reverse match found: ${chainData.chain_name}`);
                 return res.status(200).json({
                     success: true,
                     chain: chainData
@@ -583,22 +778,24 @@ async function handleFindChainMatch(req, res) {
         }
 
         // No match found
-        console.log(`No chain match found for: ${place_name}`);
+        console.log(`❌ No chain match found for: ${place_name}`);
         return res.status(200).json({
             success: false,
             chain: null
         });
 
     } catch (error) {
-        console.error('Error finding chain match:', error);
+        console.error('❌ Error finding chain match:', error);
         return res.status(500).json({ message: 'Error finding chain match: ' + error.message });
     }
 }
 
 /**
- * Add location to chain
+ * ENHANCED: Add location to chain with inheritance setup
  */
 async function handleAddLocationToChain(req, res) {
+    console.log("🏢 CHAINS: Adding location to chain");
+
     const adminCheck = await verifyAdminAccess(req);
     if (!adminCheck.success) {
         return res.status(adminCheck.status).json({ message: adminCheck.message });
@@ -615,20 +812,28 @@ async function handleAddLocationToChain(req, res) {
             return res.status(400).json({ message: 'Business ID and Chain ID are required' });
         }
 
-        // Get the chain to retrieve its name
+        // Get the chain to retrieve its properties
         const chain = await Chain.findById(chain_id);
         if (!chain) {
             return res.status(404).json({ message: 'Chain not found' });
         }
 
-        // Update the business to link it to the chain
+        console.log(`🔗 Adding business to chain: ${chain.chain_name}`);
+        console.log(`   - Chain universal_incentives: ${chain.universal_incentives}`);
+
+        // ENHANCED: Update the business with full chain inheritance
+        const updateData = {
+            chain_id: chain_id,
+            chain_name: chain.chain_name,
+            is_chain_location: true,
+            // CRITICAL: Inherit universal_incentives from chain
+            universal_incentives: chain.universal_incentives,
+            updated_at: new Date()
+        };
+
         const updatedBusiness = await Business.findByIdAndUpdate(
             business_id,
-            {
-                chain_id: chain_id,
-                chain_name: chain.chain_name,
-                is_chain_location: true
-            },
+            updateData,
             { new: true }
         );
 
@@ -636,21 +841,28 @@ async function handleAddLocationToChain(req, res) {
             return res.status(404).json({ message: 'Business not found' });
         }
 
+        console.log(`✅ Business added to chain successfully:`);
+        console.log(`   - Business: ${updatedBusiness.bname}`);
+        console.log(`   - Chain: ${updatedBusiness.chain_name}`);
+        console.log(`   - Universal incentives: ${updatedBusiness.universal_incentives}`);
+
         return res.status(200).json({
             success: true,
             message: 'Business added to chain successfully',
             business: updatedBusiness
         });
     } catch (error) {
-        console.error('Error adding location to chain:', error);
+        console.error('❌ Error adding location to chain:', error);
         return res.status(500).json({ message: 'Error adding location to chain: ' + error.message });
     }
 }
 
 /**
- * Remove location from chain
+ * ENHANCED: Remove location from chain with cleanup
  */
 async function handleRemoveLocationFromChain(req, res) {
+    console.log("🏢 CHAINS: Removing location from chain");
+
     const adminCheck = await verifyAdminAccess(req);
     if (!adminCheck.success) {
         return res.status(adminCheck.status).json({ message: adminCheck.message });
@@ -667,21 +879,31 @@ async function handleRemoveLocationFromChain(req, res) {
             return res.status(400).json({ message: 'Business ID is required' });
         }
 
+        // Get business details before removal
+        const business = await Business.findById(business_id);
+        if (!business) {
+            return res.status(404).json({ message: 'Business not found' });
+        }
+
+        console.log(`🔄 Removing ${business.bname} from chain ${business.chain_name || 'unknown'}`);
+
         const updatedBusiness = await Business.findByIdAndUpdate(
             business_id,
             {
                 $unset: {
                     chain_id: 1,
                     chain_name: 1,
-                    is_chain_location: 1
+                    is_chain_location: 1,
+                    universal_incentives: 1
+                },
+                $set: {
+                    updated_at: new Date()
                 }
             },
             { new: true }
         );
 
-        if (!updatedBusiness) {
-            return res.status(404).json({ message: 'Business not found' });
-        }
+        console.log(`✅ Business removed from chain successfully`);
 
         return res.status(200).json({
             success: true,
@@ -689,13 +911,13 @@ async function handleRemoveLocationFromChain(req, res) {
             business: updatedBusiness
         });
     } catch (error) {
-        console.error('Error removing location from chain:', error);
+        console.error('❌ Error removing location from chain:', error);
         return res.status(500).json({ message: 'Error removing location from chain: ' + error.message });
     }
 }
 
 /**
- * Get chain locations
+ * Get chain locations with inheritance status
  */
 async function handleGetChainLocations(req, res) {
     try {
@@ -704,17 +926,169 @@ async function handleGetChainLocations(req, res) {
             return res.status(400).json({ message: 'Chain ID is required' });
         }
 
+        console.log(`📍 CHAINS: Getting locations for chain ${chain_id}`);
+
         const locations = await Business.find({ chain_id: chain_id })
-            .select('bname address1 address2 city state zip phone created_at')
+            .select('bname address1 address2 city state zip phone universal_incentives created_at')
             .sort({ bname: 1 })
             .lean();
 
+        console.log(`📊 Found ${locations.length} locations`);
+
+        // Add inheritance status analysis
+        const locationsWithStatus = locations.map(location => ({
+            ...location,
+            inheritance_status: location.universal_incentives === true ? 'enabled' :
+                location.universal_incentives === false ? 'disabled' : 'undefined'
+        }));
+
         return res.status(200).json({
             success: true,
-            locations: locations
+            locations: locationsWithStatus
         });
     } catch (error) {
-        console.error('Error getting chain locations:', error);
+        console.error('❌ Error getting chain locations:', error);
         return res.status(500).json({ message: 'Error retrieving chain locations: ' + error.message });
+    }
+}
+
+/**
+ * NEW: Sync chain locations - ensures all locations have proper inheritance settings
+ */
+async function handleSyncChainLocations(req, res) {
+    console.log("🔄 CHAINS: Syncing chain locations");
+
+    const adminCheck = await verifyAdminAccess(req);
+    if (!adminCheck.success) {
+        return res.status(adminCheck.status).json({ message: adminCheck.message });
+    }
+
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    try {
+        const { chain_id } = req.body;
+
+        if (!chain_id) {
+            return res.status(400).json({ message: 'Chain ID is required' });
+        }
+
+        // Get chain details
+        const chain = await Chain.findById(chain_id);
+        if (!chain) {
+            return res.status(404).json({ message: 'Chain not found' });
+        }
+
+        console.log(`🔄 Syncing locations for chain: ${chain.chain_name}`);
+        console.log(`   - Target universal_incentives: ${chain.universal_incentives}`);
+
+        // Update all locations to match chain settings
+        const syncResult = await Business.updateMany(
+            { chain_id: chain_id },
+            {
+                $set: {
+                    chain_name: chain.chain_name, // Ensure chain name is current
+                    universal_incentives: chain.universal_incentives,
+                    is_chain_location: true,
+                    updated_at: new Date()
+                }
+            }
+        );
+
+        console.log(`✅ Synced ${syncResult.modifiedCount} locations`);
+
+        // Get updated stats
+        const totalLocations = await Business.countDocuments({ chain_id: chain_id });
+        const enabledLocations = await Business.countDocuments({
+            chain_id: chain_id,
+            universal_incentives: true
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Chain locations synced successfully',
+            chain_name: chain.chain_name,
+            total_locations: totalLocations,
+            synced_count: syncResult.modifiedCount,
+            enabled_count: enabledLocations
+        });
+    } catch (error) {
+        console.error('❌ Error syncing chain locations:', error);
+        return res.status(500).json({ message: 'Error syncing chain locations: ' + error.message });
+    }
+}
+
+/**
+ * NEW: Bulk update universal incentives for multiple chains
+ */
+async function handleBulkUpdateUniversalIncentives(req, res) {
+    console.log("🔄 CHAINS: Bulk updating universal incentives");
+
+    const adminCheck = await verifyAdminAccess(req);
+    if (!adminCheck.success) {
+        return res.status(adminCheck.status).json({ message: adminCheck.message });
+    }
+
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    try {
+        const { chain_ids, universal_incentives, sync_locations } = req.body;
+
+        if (!chain_ids || !Array.isArray(chain_ids) || chain_ids.length === 0) {
+            return res.status(400).json({ message: 'Chain IDs array is required' });
+        }
+
+        if (universal_incentives === undefined) {
+            return res.status(400).json({ message: 'universal_incentives value is required' });
+        }
+
+        console.log(`🔄 Bulk updating ${chain_ids.length} chains to universal_incentives=${universal_incentives}`);
+
+        // Update chains
+        const chainUpdateResult = await Chain.updateMany(
+            { _id: { $in: chain_ids } },
+            {
+                $set: {
+                    universal_incentives: universal_incentives,
+                    updated_date: new Date(),
+                    updated_by: adminCheck.userId
+                }
+            }
+        );
+
+        console.log(`✅ Updated ${chainUpdateResult.modifiedCount} chains`);
+
+        let locationUpdateCount = 0;
+
+        // Optionally sync locations
+        if (sync_locations) {
+            console.log(`🔄 Syncing locations for updated chains`);
+
+            const locationUpdateResult = await Business.updateMany(
+                { chain_id: { $in: chain_ids } },
+                {
+                    $set: {
+                        universal_incentives: universal_incentives,
+                        updated_at: new Date()
+                    }
+                }
+            );
+
+            locationUpdateCount = locationUpdateResult.modifiedCount;
+            console.log(`✅ Synced ${locationUpdateCount} locations`);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Bulk update completed successfully',
+            chains_updated: chainUpdateResult.modifiedCount,
+            locations_updated: locationUpdateCount
+        });
+    } catch (error) {
+        console.error('❌ Error in bulk update:', error);
+        return res.status(500).json({ message: 'Error in bulk update: ' + error.message });
     }
 }
