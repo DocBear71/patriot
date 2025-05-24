@@ -7,13 +7,14 @@ const jwt = require('jsonwebtoken');
 const { ObjectId } = mongoose.Types;
 
 // Initialize models with error handling
-let User, AdminCode, Business, Incentive;
+let User, AdminCode, Business, Incentive, Chain;
 
 try {
     User = mongoose.model('User');
     AdminCode = mongoose.model('AdminCode');
     Business = mongoose.model('Business');
     Incentive = mongoose.model('Incentive');
+    Chain = mongoose.model('Chain');
 } catch (error) {
     // Define schemas if models aren't registered yet
 
@@ -35,6 +36,47 @@ try {
         level: String
     });
 
+    // Chain schema - ADDED TO FIX THE ERROR
+    const chainSchema = new mongoose.Schema({
+        chain_name: { type: String, required: true, trim: true },
+        business_type: { type: String, required: true },
+        universal_incentives: { type: Boolean, default: true },
+        status: { type: String, default: 'active', enum: ['active', 'inactive'] },
+
+        // Corporate information (optional)
+        corporate_info: {
+            headquarters: String,
+            website: String,
+            phone: String,
+            description: String
+        },
+
+        // Chain-wide incentives stored directly in the chain document
+        incentives: [{
+            type: { type: String, required: true, enum: ['VT', 'AD', 'FR', 'SP', 'OT'] },
+            amount: { type: Number, required: true, min: 0, max: 100 },
+            description: String,
+            other_description: String, // For "OT" type
+            information: String,
+            discount_type: { type: String, default: 'percentage', enum: ['percentage', 'dollar'] },
+            is_active: { type: Boolean, default: true },
+            created_date: { type: Date, default: Date.now },
+            created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+        }],
+
+        // Metadata
+        created_date: { type: Date, default: Date.now },
+        updated_date: { type: Date, default: Date.now },
+        created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    });
+
+    // Create indexes for better performance
+    chainSchema.index({ chain_name: 1 });
+    chainSchema.index({ business_type: 1 });
+    chainSchema.index({ status: 1 });
+    chainSchema.index({ 'incentives.type': 1 });
+
     // Initialize models that aren't already registered
     if (!AdminCode) {
         try {
@@ -49,6 +91,16 @@ try {
             User = mongoose.model('User');
         } catch (error) {
             User = mongoose.model('User', userSchema, 'users');
+        }
+    }
+
+    // FIXED: Initialize Chain model
+    if (!Chain) {
+        try {
+            Chain = mongoose.model('Chain');
+        } catch (error) {
+            Chain = mongoose.model('Chain', chainSchema, 'patriot_thanks_chains');
+            console.log('✅ Chain model initialized in combined-api.js');
         }
     }
 
@@ -144,7 +196,7 @@ module.exports = async (req, res) => {
                     return await handleGetUserIncentives(req, res);
                 case 'get_chain_incentives':
                 case 'chain_incentives':
-                    // UPDATED: Use the enhanced chain incentive handler
+                    // FIXED: Use the proper chain incentive handler
                     return await handleGetChainIncentives(req, res);
                 // Other operations as needed
             }
@@ -172,96 +224,115 @@ module.exports = async (req, res) => {
     }
 };
 
-
 /***************************
- * CHAIN INCENTIVES HANDLERS - FIXED FOR DEDICATED CHAINS API
+ * CHAIN INCENTIVES HANDLERS - FIXED
  ***************************/
 
 /**
- * Handle chain incentives operations - Now delegates to dedicated chains API
+ * FIXED: Handle chain incentives operations with proper Chain model support
  */
-async function handleChainIncentives(req, res) {
-    console.log("Chain incentives API hit (delegating to chains.js):", req.method);
+async function handleGetChainIncentives(req, res) {
+    console.log("🔗 FIXED: Chain incentives API hit");
     console.log("Query parameters:", req.query);
 
     try {
-        // Import the dedicated chains API handler
-        const chainsHandler = require('./chains.js');
+        await connect;
 
-        // Delegate to the dedicated chains API
-        return await chainsHandler(req, res);
-
-    } catch (error) {
-        console.error('Error delegating to chains API:', error);
-
-        // Fallback: Try to handle chain incentives directly if chains.js is not available
-        try {
-            await connect;
-
-            const { chain_id } = req.query;
-            if (!chain_id) {
-                return res.status(400).json({
-                    message: 'Chain ID is required',
-                    error: 'Missing chain_id parameter'
-                });
-            }
-
-            console.log(`Fallback: Fetching chain incentives for chain_id: ${chain_id}`);
-
-            // Try to use Chain model if available
-            let Chain;
-            try {
-                Chain = mongoose.model('Chain');
-            } catch (modelError) {
-                // If Chain model doesn't exist, try to find incentives by business_id
-                const chainIncentives = await Incentive.find({
-                    business_id: chain_id,
-                    is_available: true
-                }).lean();
-
-                const formattedIncentives = chainIncentives.map(incentive => ({
-                    _id: incentive._id,
-                    is_active: incentive.is_available,
-                    type: incentive.type,
-                    amount: incentive.amount,
-                    information: incentive.information,
-                    other_description: incentive.other_description,
-                    created_at: incentive.created_at,
-                    discount_type: incentive.discount_type || 'percentage'
-                }));
-
-                return res.status(200).json({
-                    success: true,
-                    incentives: formattedIncentives,
-                    chain_id: chain_id
-                });
-            }
-
-            // Use the Chain model to get embedded incentives
-            const chain = await Chain.findById(chain_id).select('incentives chain_name').lean();
-            if (!chain) {
-                return res.status(404).json({ message: 'Chain not found' });
-            }
-
-            // Filter for active incentives only
-            const activeIncentives = chain.incentives ?
-                chain.incentives.filter(incentive => incentive.is_active !== false) : [];
-
-            console.log(`Fallback: Found ${activeIncentives.length} active incentives for chain: ${chain.chain_name}`);
-
-            return res.status(200).json({
-                success: true,
-                incentives: activeIncentives,
-                chain_name: chain.chain_name
-            });
-
-        } catch (fallbackError) {
-            console.error('Fallback chain incentives handler failed:', fallbackError);
-            return res.status(500).json({
-                message: 'Error retrieving chain incentives',
-                error: fallbackError.message
+        const { chain_id } = req.query;
+        if (!chain_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Chain ID is required',
+                error: 'Missing chain_id parameter'
             });
         }
+
+        console.log(`🔍 FIXED: Fetching chain incentives for chain_id: ${chain_id}`);
+
+        // Ensure Chain model is available
+        if (!Chain) {
+            console.error("❌ Chain model not available, trying to initialize...");
+
+            // Try to get from existing models first
+            try {
+                Chain = mongoose.model('Chain');
+                console.log("✅ Chain model found in existing models");
+            } catch (modelError) {
+                console.error("❌ Chain model not found in existing models:", modelError.message);
+
+                // Fallback: Try to find incentives by business_id instead
+                try {
+                    const chainIncentives = await Incentive.find({
+                        business_id: chain_id,
+                        is_available: true
+                    }).lean();
+
+                    console.log(`🔄 FALLBACK: Found ${chainIncentives.length} incentives using Incentive model`);
+
+                    const formattedIncentives = chainIncentives.map(incentive => ({
+                        _id: incentive._id,
+                        is_active: incentive.is_available,
+                        type: incentive.type,
+                        amount: incentive.amount,
+                        information: incentive.information,
+                        other_description: incentive.other_description,
+                        created_date: incentive.created_at,
+                        discount_type: incentive.discount_type || 'percentage'
+                    }));
+
+                    return res.status(200).json({
+                        success: true,
+                        incentives: formattedIncentives,
+                        chain_id: chain_id,
+                        source: 'fallback_incentive_model'
+                    });
+                } catch (fallbackError) {
+                    console.error("❌ Fallback failed:", fallbackError);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Chain model not available and fallback failed',
+                        error: fallbackError.message
+                    });
+                }
+            }
+        }
+
+        // Use the Chain model to get embedded incentives
+        const chain = await Chain.findById(chain_id).select('incentives chain_name universal_incentives').lean();
+
+        if (!chain) {
+            console.log(`❌ Chain not found with ID: ${chain_id}`);
+            return res.status(404).json({
+                success: false,
+                message: 'Chain not found'
+            });
+        }
+
+        console.log(`📊 FIXED: Chain found: ${chain.chain_name}`);
+        console.log(`   - Universal Incentives: ${chain.universal_incentives}`);
+        console.log(`   - Total Incentives: ${chain.incentives ? chain.incentives.length : 0}`);
+
+        // Filter for active incentives only
+        const activeIncentives = chain.incentives ?
+            chain.incentives.filter(incentive => incentive.is_active !== false) : [];
+
+        console.log(`✅ FIXED: Found ${activeIncentives.length} active incentives for chain: ${chain.chain_name}`);
+
+        return res.status(200).json({
+            success: true,
+            incentives: activeIncentives,
+            chain_name: chain.chain_name,
+            universal_incentives: chain.universal_incentives,
+            chain_id: chain_id
+        });
+
+    } catch (error) {
+        console.error('❌ FIXED: Error in handleGetChainIncentives:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error retrieving chain incentives',
+            error: error.message
+        });
     }
 }
 
@@ -771,9 +842,8 @@ async function handleGetUserIncentives(req, res) {
         console.log("📍 GOOGLE PLACES: Handling Google Places result");
         // For Places API results, we need chain ID to get incentives
         if (chainId) {
-            // Get chain-wide incentives using chains API
+            // Get chain-wide incentives using Chain model
             try {
-                const Chain = mongoose.model('Chain');
                 const chainDetails = await Chain.findById(chainId);
 
                 if (chainDetails && chainDetails.incentives) {
@@ -787,7 +857,7 @@ async function handleGetUserIncentives(req, res) {
                             information: incentive.information,
                             other_description: incentive.other_description,
                             created_at: incentive.created_date,
-                            discount_type: 'percentage',
+                            discount_type: incentive.discount_type || 'percentage',
                             is_chain_wide: true
                         }));
 
@@ -828,7 +898,6 @@ async function handleGetUserIncentives(req, res) {
 
             try {
                 // Get chain details and incentives
-                const Chain = mongoose.model('Chain');
                 const chainDetails = await Chain.findById(business.chain_id);
 
                 if (chainDetails) {
@@ -855,7 +924,7 @@ async function handleGetUserIncentives(req, res) {
                                 information: incentive.information,
                                 other_description: incentive.other_description,
                                 created_at: incentive.created_date,
-                                discount_type: 'percentage',
+                                discount_type: incentive.discount_type || 'percentage',
                                 is_chain_wide: true // Mark as chain-wide
                             }));
 
@@ -926,71 +995,6 @@ async function handleGetUserIncentives(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Error retrieving incentives: ' + error.message
-        });
-    }
-}
-
-async function handleGetChainIncentives(req, res) {
-    console.log("🔗 CHAIN INCENTIVES: Getting incentives by chain ID");
-
-    const chainId = req.query.chain_id;
-
-    if (!chainId) {
-        return res.status(400).json({ message: 'Chain ID is required as a query parameter' });
-    }
-
-    try {
-        const Chain = mongoose.model('Chain');
-        const chainDetails = await Chain.findById(chainId);
-
-        if (!chainDetails) {
-            return res.status(404).json({ message: 'Chain not found' });
-        }
-
-        console.log(`📊 Chain: ${chainDetails.chain_name}`);
-        console.log(`   - Universal Incentives: ${chainDetails.universal_incentives}`);
-        console.log(`   - Total Incentives: ${chainDetails.incentives ? chainDetails.incentives.length : 0}`);
-
-        if (!chainDetails.incentives || chainDetails.incentives.length === 0) {
-            return res.status(200).json({
-                message: 'No incentives found for this chain',
-                results: [],
-                chain_info: {
-                    name: chainDetails.chain_name,
-                    universal_incentives: chainDetails.universal_incentives
-                }
-            });
-        }
-
-        // Convert chain incentives to standard format
-        const chainIncentives = chainDetails.incentives
-            .filter(incentive => incentive.is_active)
-            .map(incentive => ({
-                _id: incentive._id,
-                is_available: incentive.is_active,
-                type: incentive.type,
-                amount: incentive.amount,
-                information: incentive.information,
-                other_description: incentive.other_description,
-                created_at: incentive.created_date,
-                discount_type: 'percentage',
-                is_chain_wide: true
-            }));
-
-        return res.status(200).json({
-            message: 'Chain incentives retrieved successfully',
-            results: chainIncentives,
-            chain_info: {
-                name: chainDetails.chain_name,
-                universal_incentives: chainDetails.universal_incentives
-            }
-        });
-
-    } catch (error) {
-        console.error("❌ Error getting chain incentives:", error);
-        return res.status(500).json({
-            success: false,
-            message: 'Error retrieving chain incentives: ' + error.message
         });
     }
 }
