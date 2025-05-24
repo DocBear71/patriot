@@ -517,14 +517,14 @@
 
                 // Fill form fields (adjust field IDs to match your form)
                 const fieldMappings = {
-                    'business-name': businessData.name,
+                    'bname': businessData.name,
                     'address1': businessData.address1,
                     'city': businessData.city,
                     'state': businessData.state,
                     'zip': businessData.zip,
                     'phone': businessData.phone,
-                    'latitude': businessData.lat,
-                    'longitude': businessData.lng
+                    'lat': businessData.lat,
+                    'lng': businessData.lng
                 };
 
                 // ENHANCED: Also handle chain fields if present
@@ -852,7 +852,7 @@
 
             // If we have a business name, pre-fill search form and trigger search
             if (businessName) {
-                const businessNameField = document.getElementById('business-name');
+                const businessNameField = document.getElementById('bname');
                 if (businessNameField) {
                     businessNameField.value = businessName;
                     validateField(businessNameField, isNotEmpty);
