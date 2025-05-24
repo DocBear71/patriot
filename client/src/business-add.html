@@ -61,6 +61,15 @@
                         <h2 class="caveat">Basic Info</h2>
                     </legend>
                     <br>
+                    <!-- Chain-related fields -->
+                    <input type="hidden" id="chain-id" name="chain_id" />
+                    <label for="chain-name">Chain Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                    <input type="text" id="chain-name" name="chain_name" readonly />
+                    <br>
+                    <label for="is-chain-location">Is this a Chain Location?&nbsp;&nbsp;&nbsp;</label>
+                    <input type="checkbox" id="is-chain-location" name="is_chain_location" />
+                    <br>
+                    <br>
                     <label for="bname">Business Name</label>
                     <input type="text" id="bname" name="business-name" placeholder="Business name...">
                     <br>
@@ -326,6 +335,27 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Check if we have data to prefill the form
         const urlParams = new URLSearchParams(window.location.search);
+        const hasAutoChain = urlParams.get('auto_chain') === 'true';
+        const hasPrefill = urlParams.get('prefill') === 'true';
+
+        if (urlParams.get('auto_chain') === 'true') {
+            // Wait a moment for form to be ready
+            setTimeout(handleAutoChainLinking, 500);
+        }
+
+        if (hasPrefill) {
+            // Handle business data prefill (existing functionality)
+            handleBusinessDataPrefill();
+        }
+
+        if (hasAutoChain) {
+            // Handle automatic chain linking (new functionality)
+            setTimeout(handleAutoChainLinking, 500);
+        }
+
+        // Setup enhanced form submission
+        setupEnhancedFormSubmission();
+
         const shouldPrefill = urlParams.get('prefill') === 'true';
 
         if (shouldPrefill) {
@@ -472,6 +502,305 @@
             }
         }
     });
+
+    /**
+     * Handle business data prefill (enhanced version)
+     */
+    function handleBusinessDataPrefill() {
+        console.log("📝 Handling business data prefill...");
+
+        try {
+            const businessDataStr = sessionStorage.getItem('newBusinessData');
+            if (businessDataStr) {
+                const businessData = JSON.parse(businessDataStr);
+                console.log("✅ Business data found:", businessData);
+
+                // Fill form fields (adjust field IDs to match your form)
+                const fieldMappings = {
+                    'business-name': businessData.name,
+                    'address1': businessData.address1,
+                    'city': businessData.city,
+                    'state': businessData.state,
+                    'zip': businessData.zip,
+                    'phone': businessData.phone,
+                    'latitude': businessData.lat,
+                    'longitude': businessData.lng
+                };
+
+                // ENHANCED: Also handle chain fields if present
+                if (businessData.chain_id) {
+                    fieldMappings['chain-id'] = businessData.chain_id;
+                    fieldMappings['chain-name'] = businessData.chain_name;
+                    fieldMappings['is-chain-location'] = true; // checkbox
+                }
+
+                // Fill the form fields
+                Object.entries(fieldMappings).forEach(([fieldId, value]) => {
+                    const field = document.getElementById(fieldId);
+                    if (field) {
+                        if (field.type === 'checkbox') {
+                            field.checked = !!value;
+                            console.log(`Set ${fieldId} to ${field.checked}`);
+                        } else {
+                            field.value = value || '';
+                            console.log(`Set ${fieldId} to ${value}`);
+                        }
+                    } else {
+                        console.warn(`Field not found: ${fieldId}`);
+                    }
+                });
+
+                // Clean up session storage
+                sessionStorage.removeItem('newBusinessData');
+            }
+        } catch (error) {
+            console.error("❌ Error handling business data prefill:", error);
+        }
+    }
+
+    /**
+     * Handle automatic chain linking notification and form setup
+     */
+    function handleAutoChainLinking() {
+        console.log("🔗 CHECKING FOR AUTO CHAIN LINKING...");
+
+        try {
+            const autoChainData = sessionStorage.getItem('autoChainLinking');
+            if (autoChainData) {
+                const chainInfo = JSON.parse(autoChainData);
+                console.log("✅ Auto chain linking data found:", chainInfo);
+
+                // Set chain fields if they exist in your form
+                const chainIdField = document.getElementById('chain-id');
+                const chainNameField = document.getElementById('chain-name');
+                const isChainLocationField = document.getElementById('is-chain-location');
+
+                if (chainIdField) {
+                    chainIdField.value = chainInfo.chainId;
+                    console.log(`Set chain ID: ${chainInfo.chainId}`);
+                }
+
+                if (chainNameField) {
+                    chainNameField.value = chainInfo.chainName;
+                    console.log(`Set chain name: ${chainInfo.chainName}`);
+                }
+
+                if (isChainLocationField) {
+                    isChainLocationField.checked = true;
+                    console.log("Set as chain location: true");
+                }
+
+                // Show notification to user
+                showAutoChainNotification(chainInfo);
+
+                // Clean up session storage
+                sessionStorage.removeItem('autoChainLinking');
+            }
+        } catch (error) {
+            console.error("❌ Error handling auto chain linking:", error);
+        }
+    }
+
+    /**
+     * Show notification about auto chain linking
+     */
+    function showAutoChainNotification(chainInfo) {
+        const notification = document.createElement('div');
+        notification.className = 'auto-chain-notification';
+        notification.innerHTML = `
+        <div class="notification-content">
+            <div class="notification-icon">🔗</div>
+            <div class="notification-text">
+                <strong>Chain Automatically Detected!</strong>
+                <p>This business has been automatically linked to <strong>${chainInfo.chainName}</strong>.</p>
+                <p>Chain-wide incentives will automatically apply to this location.</p>
+                ${chainInfo.autoDetected ? '<p><em>Chain was automatically detected based on business name.</em></p>' : ''}
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="notification-close">×</button>
+        </div>
+    `;
+
+        // Add styles if not already added
+        if (!document.getElementById('auto-chain-notification-styles')) {
+            const style = document.createElement('style');
+            style.id = 'auto-chain-notification-styles';
+            style.textContent = `
+            .auto-chain-notification {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                color: white;
+                padding: 0;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 1000;
+                max-width: 350px;
+                animation: slideInRight 0.5s ease-out;
+            }
+
+            .notification-content {
+                display: flex;
+                align-items: flex-start;
+                padding: 16px;
+                gap: 12px;
+            }
+
+            .notification-icon {
+                font-size: 24px;
+                flex-shrink: 0;
+            }
+
+            .notification-text {
+                flex: 1;
+            }
+
+            .notification-text strong {
+                display: block;
+                margin-bottom: 4px;
+                font-size: 16px;
+            }
+
+            .notification-text p {
+                margin: 4px 0;
+                font-size: 14px;
+                opacity: 0.9;
+            }
+
+            .notification-close {
+                background: none;
+                border: none;
+                color: white;
+                font-size: 20px;
+                cursor: pointer;
+                padding: 0;
+                width: 24px;
+                height: 24px;
+                flex-shrink: 0;
+            }
+
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+        `;
+            document.head.appendChild(style);
+        }
+
+        // Add to page
+        document.body.appendChild(notification);
+
+        // Auto-remove after 8 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 8000);
+    }
+
+    /**
+     * Setup enhanced form submission to ensure chain data is included
+     */
+    function setupEnhancedFormSubmission() {
+        console.log("📝 Setting up enhanced form submission...");
+
+        const form = document.getElementById('business-add-form'); // Adjust ID to match your form
+        if (form) {
+            form.addEventListener('submit', function(event) {
+                console.log("📤 Enhanced form submission triggered");
+
+                // Add any additional validation or processing here
+                const chainIdField = document.getElementById('chain-id');
+                const isChainLocationField = document.getElementById('is-chain-location');
+
+                if (chainIdField && chainIdField.value && isChainLocationField) {
+                    // Ensure is-chain-location is checked if we have a chain ID
+                    if (!isChainLocationField.checked) {
+                        isChainLocationField.checked = true;
+                        console.log("✅ Auto-checked is-chain-location due to chain ID presence");
+                    }
+                }
+
+                // Let the normal form submission proceed
+                console.log("✅ Enhanced form validation passed, proceeding with submission");
+            });
+        } else {
+            console.warn("⚠️ Business add form not found - adjust form ID in setupEnhancedFormSubmission()");
+        }
+    }
+
+    /**
+     * ENHANCED: Business form submission success handler
+     * Call this after successful business addition to update the database properly
+     */
+    function handleBusinessAddSuccess(newBusinessId, businessData) {
+        console.log("🎉 Business add success - checking for chain linking...");
+
+        // If this was a chain location, we might need to add it to the chain's locations
+        if (businessData.chain_id && businessData.is_chain_location) {
+            console.log(`🔗 Adding business ${newBusinessId} to chain ${businessData.chain_id}`);
+
+            // You might want to call your chains API to update the location count
+            // or refresh any cached data about the chain
+            updateChainLocationCount(businessData.chain_id);
+        }
+
+        // Enhanced return URL handling
+        const returnUrl = sessionStorage.getItem('returnToSearch');
+        if (returnUrl) {
+            console.log("🔄 Returning to search page with success notification");
+
+            // Add success parameters to the return URL
+            const url = new URL(returnUrl);
+            url.searchParams.set('business_added', 'true');
+            url.searchParams.set('business_name', businessData.name || 'New Business');
+            url.searchParams.set('business_id', newBusinessId);
+
+            if (businessData.chain_id) {
+                url.searchParams.set('chain_linked', 'true');
+                url.searchParams.set('chain_name', businessData.chain_name || 'Chain');
+            }
+
+            // Clean up session storage
+            sessionStorage.removeItem('returnToSearch');
+
+            // Redirect back
+            window.location.href = url.toString();
+        }
+    }
+
+    /**
+     * Update chain location count (optional enhancement)
+     */
+    async function updateChainLocationCount(chainId) {
+        try {
+            const baseURL = getBaseURL();
+            // This would be a new operation you could add to chains.js to refresh location counts
+            await fetch(`${baseURL}/api/chains.js?operation=refresh_location_count&chain_id=${chainId}`, {
+                method: 'POST'
+            });
+            console.log(`✅ Chain location count updated for chain ${chainId}`);
+        } catch (error) {
+            console.warn("⚠️ Could not update chain location count:", error);
+            // This is non-critical, so we don't fail the whole process
+        }
+    }
+
+    /**
+     * Get base URL helper (add this if not already present)
+     */
+    function getBaseURL() {
+        return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `http://${window.location.host}`
+                : window.location.origin;
+    }
+
 
     // Function to handle successful business addition and return to search
     function handleBusinessAddedSuccessfully(businessName, businessId) {
@@ -690,6 +1019,146 @@
             }
         }, 10000);
     }
+
+    function handleAutoChainLinking() {
+        console.log("🔗 CHECKING FOR AUTO CHAIN LINKING...");
+
+        try {
+            const autoChainData = sessionStorage.getItem('autoChainLinking');
+            if (autoChainData) {
+                const chainInfo = JSON.parse(autoChainData);
+                console.log("✅ Auto chain linking data found:", chainInfo);
+
+                // Set chain fields if they exist in your form
+                const chainIdField = document.getElementById('chain-id');
+                const chainNameField = document.getElementById('chain-name');
+                const isChainLocationField = document.getElementById('is-chain-location');
+
+                if (chainIdField) {
+                    chainIdField.value = chainInfo.chainId;
+                    console.log(`Set chain ID: ${chainInfo.chainId}`);
+                }
+
+                if (chainNameField) {
+                    chainNameField.value = chainInfo.chainName;
+                    console.log(`Set chain name: ${chainInfo.chainName}`);
+                }
+
+                if (isChainLocationField) {
+                    isChainLocationField.checked = true;
+                    console.log("Set as chain location: true");
+                }
+
+                // Show notification to user
+                showAutoChainNotification(chainInfo);
+
+                // Clean up session storage
+                sessionStorage.removeItem('autoChainLinking');
+            }
+        } catch (error) {
+            console.error("❌ Error handling auto chain linking:", error);
+        }
+    }
+
+    /**
+     * Show notification about auto chain linking
+     */
+    function showAutoChainNotification(chainInfo) {
+        const notification = document.createElement('div');
+        notification.className = 'auto-chain-notification';
+        notification.innerHTML = `
+        <div class="notification-content">
+            <div class="notification-icon">🔗</div>
+            <div class="notification-text">
+                <strong>Chain Automatically Detected!</strong>
+                <p>This business has been automatically linked to <strong>${chainInfo.chainName}</strong>.</p>
+                <p>Chain-wide incentives will automatically apply to this location.</p>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="notification-close">×</button>
+        </div>
+    `;
+
+        // Add styles
+        const style = document.createElement('style');
+        style.textContent = `
+        .auto-chain-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-width: 350px;
+            animation: slideInRight 0.5s ease-out;
+        }
+
+        .notification-content {
+            display: flex;
+            align-items: flex-start;
+            padding: 16px;
+            gap: 12px;
+        }
+
+        .notification-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .notification-text {
+            flex: 1;
+        }
+
+        .notification-text strong {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 16px;
+        }
+
+        .notification-text p {
+            margin: 4px 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .notification-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    `;
+        document.head.appendChild(style);
+
+        // Add to page
+        document.body.appendChild(notification);
+
+        // Auto-remove after 8 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 8000);
+    }
+
 
     // Export functions for use
     if (typeof window !== 'undefined') {

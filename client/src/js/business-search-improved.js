@@ -652,15 +652,14 @@ function getUserLocation() {
     });
 }
 /**
- * UPDATED: Enhanced addBusinessToDatabase function to work with new chains API
- * @param {string} placeId - Google Place ID
- * @param {string} chainId - Optional chain ID if this place is part of a chain
+ * UPDATED: Enhanced addBusinessToDatabase function with automatic chain linking
+ * This replaces the existing function in business-search-improved.js
  */
 window.addBusinessToDatabase = async function (placeId, chainId = null) {
-    console.log("Adding place to database with NEW CHAINS API:", placeId, "Chain ID:", chainId);
+    console.log("🔗 AUTO CHAIN LINKING: Adding place to database with automatic chain association:", placeId, "Chain ID:", chainId);
 
     try {
-        // Import the new Places library instead of using deprecated PlacesService
+        // Import the new Places library
         const {Place} = await google.maps.importLibrary("places");
 
         // Create a Place instance with the clicked place ID
@@ -680,9 +679,9 @@ window.addBusinessToDatabase = async function (placeId, chainId = null) {
             ]
         });
 
-        console.log("Place details retrieved with new API:", place);
+        console.log("Place details retrieved:", place);
 
-        // Extract address components (same as before)
+        // Extract address components
         const addressComponents = {};
         if (place.addressComponents) {
             for (const component of place.addressComponents) {
@@ -702,12 +701,8 @@ window.addBusinessToDatabase = async function (placeId, chainId = null) {
             phone: place.nationalPhoneNumber || place.internationalPhoneNumber || '',
             placeId: place.id,
             formattedAddress: place.formattedAddress,
-
-            // Store coordinates for later use
             lat: place.location?.lat() || 0,
             lng: place.location?.lng() || 0,
-
-            // Add this for proper GeoJSON formatting
             location: {
                 type: 'Point',
                 coordinates: [
@@ -717,51 +712,86 @@ window.addBusinessToDatabase = async function (placeId, chainId = null) {
             }
         };
 
-        // Enhanced messaging for chain locations using NEW API
-        let redirectMessage = '';
+        // ENHANCED: Auto chain linking logic
+        let chainInfo = null;
         let chainMessage = '';
 
         if (chainId) {
+            // Chain was explicitly provided (from chain matching)
             try {
-                // NEW: Get chain name from the NEW chains API
-                const chain = await getChainDetails(chainId);
-                if (chain && chain.bname) {
-                    businessData.chain_name = chain.bname;
-                    chainMessage = `This business will be added as a location of ${chain.bname}. Chain-wide incentives already apply to this location.`;
+                chainInfo = await getChainDetails(chainId);
+                if (chainInfo) {
+                    // ADD CHAIN LINKING DATA TO BUSINESS
+                    businessData.chain_id = chainId;
+                    businessData.chain_name = chainInfo.chain_name || chainInfo.bname;
+                    businessData.is_chain_location = true;
+
+                    chainMessage = `🔗 AUTOMATIC CHAIN LINKING: This business will be automatically linked to ${businessData.chain_name}!\n\n✨ Benefits:\n• Chain-wide incentives will automatically apply\n• Easier management through chain system\n• Consistent branding and information\n\n`;
+
+                    console.log(`✅ AUTO CHAIN LINK: ${businessData.name} → ${businessData.chain_name} (ID: ${chainId})`);
                 } else {
-                    chainMessage = "This business will be added as a chain location. Chain-wide incentives may apply.";
+                    console.warn(`⚠️ Chain details not found for ID: ${chainId}`);
                 }
             } catch (error) {
-                console.error("Error getting chain details from NEW API:", error);
-                chainMessage = "This business will be added as a chain location.";
+                console.error("❌ Error getting chain details:", error);
+            }
+        } else {
+            // ENHANCED: Try to find chain match even if not explicitly provided
+            console.log("🔍 ATTEMPTING AUTO CHAIN DETECTION...");
+            try {
+                const autoChainMatch = await findMatchingChainForPlaceResult(place.displayName);
+                if (autoChainMatch) {
+                    chainInfo = autoChainMatch;
+                    businessData.chain_id = autoChainMatch._id;
+                    businessData.chain_name = autoChainMatch.chain_name || autoChainMatch.bname;
+                    businessData.is_chain_location = true;
+
+                    chainMessage = `🎯 CHAIN DETECTED: We automatically detected that this business matches ${businessData.chain_name}!\n\n✨ Benefits:\n• Chain-wide incentives will automatically apply\n• No manual linking required\n• Consistent management\n\n`;
+
+                    console.log(`🎯 AUTO CHAIN DETECTION: ${businessData.name} → ${businessData.chain_name} (ID: ${businessData.chain_id})`);
+                } else {
+                    console.log("ℹ️ No chain match found for auto-detection");
+                }
+            } catch (error) {
+                console.error("❌ Auto chain detection failed:", error);
             }
         }
 
         // Enhanced redirect messaging
-        redirectMessage = `
-${chainMessage ? chainMessage + '\n\n' : ''}You will now be redirected to the "Add Business" page where the form will be pre-filled with this business information.
+        const redirectMessage = `${chainMessage}You will now be redirected to the "Add Business" page where the form will be pre-filled with this business information.
+
+${chainInfo ? '🔗 Chain association will be automatically included!' : ''}
 
 After you complete adding the business, you will be returned to this search page.
 
 Click OK to continue.`;
 
-        // Show enhanced alert with better messaging
+        // Show enhanced alert
         if (confirm(redirectMessage)) {
-            // Store in sessionStorage for the add business page to use
+            // Store business data with chain information
             sessionStorage.setItem('newBusinessData', JSON.stringify(businessData));
-
-            // Store return URL for after business is added
             sessionStorage.setItem('returnToSearch', window.location.href);
 
+            // ENHANCED: Store chain linking instructions for the add business page
+            if (chainInfo) {
+                sessionStorage.setItem('autoChainLinking', JSON.stringify({
+                    chainId: businessData.chain_id,
+                    chainName: businessData.chain_name,
+                    autoDetected: !chainId,
+                    message: chainMessage
+                }));
+            }
+
             // Redirect to add business page
-            window.location.href = 'business-add.html?prefill=true';
+            window.location.href = 'business-add.html?prefill=true&auto_chain=true';
         }
 
     } catch (error) {
-        console.error("Error in addBusinessToDatabase with NEW CHAINS API:", error);
+        console.error("❌ Error in enhanced addBusinessToDatabase:", error);
         alert("Sorry, we couldn't retrieve the business information. Please try again or add it manually.");
     }
 };
+
 
 /**
  * UPDATED: Get chain details using the new chains API
@@ -5801,13 +5831,17 @@ async function createEnhancedBusinessMarkerFixed(business, location, forceDataba
     }
 }
 
+/**
+ * UPDATED: Fixed fetchBusinessIncentivesFixed to handle chain businesses properly
+ * Replace the existing function in business-search-improved.js
+ */
 function fetchBusinessIncentivesFixed(businessId, chainId = null) {
     if (!businessId || businessId.startsWith('google_')) {
         console.log(`⏭️ Skipping incentives for Google Places business: ${businessId}`);
         return;
     }
 
-    console.log(`🎁 INCENTIVES DEBUG: Fetching for business ID: ${businessId}`);
+    console.log(`🎁 ENHANCED INCENTIVES DEBUG: Fetching for business ID: ${businessId}`);
     console.log(`   - Chain ID: ${chainId || 'None'}`);
 
     // Wait for DOM to be ready
@@ -5816,79 +5850,191 @@ function fetchBusinessIncentivesFixed(businessId, chainId = null) {
 
         if (!incentivesCell) {
             console.error(`❌ Could not find incentives cell for business ${businessId}`);
-            console.log(`   - Looking for element ID: incentives-for-${businessId}`);
-
-            // Debug: List all incentives containers
-            const allIncentiveElements = document.querySelectorAll('[id*="incentives-for"]');
-            console.log(`🔍 Available incentive elements:`, Array.from(allIncentiveElements).map(el => el.id));
             return;
         }
 
         console.log(`✅ Found incentives cell for ${businessId}`);
         incentivesCell.innerHTML = '<span class="loading-incentives">Loading incentives...</span>';
 
-        // Determine the base URL
+        // ENHANCED: Check if this business is part of a chain
+        // We need to fetch the business details first to check for chain association
         const baseURL = getBaseURL();
-        const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
 
-        console.log(`🌐 Fetching incentives from: ${apiURL}`);
-
-        fetch(apiURL)
+        // First, get the business details to check for chain association
+        fetch(`${baseURL}/api/business.js?operation=get&id=${businessId}`)
             .then(response => {
-                console.log(`📡 Incentives API response status: ${response.status}`);
                 if (!response.ok) {
-                    throw new Error(`Failed to fetch incentives: ${response.status} ${response.statusText}`);
+                    throw new Error(`Failed to get business details: ${response.status}`);
                 }
                 return response.json();
             })
-            .then(data => {
-                console.log(`📊 Incentives data for business ${businessId}:`, data);
+            .then(businessData => {
+                console.log(`📊 Business details for incentives:`, businessData.result);
 
-                // Check if there are any incentives
-                if (!data.results || data.results.length === 0) {
-                    console.log(`ℹ️ No incentives found for business ${businessId}`);
-                    incentivesCell.innerHTML = '<em style="color: #666;">No incentives available</em>';
-                    return;
-                }
+                const business = businessData.result;
+                const isChainLocation = !!(business.chain_id || chainId);
+                const effectiveChainId = business.chain_id || chainId;
 
-                // Build HTML for the incentives
-                let incentivesHTML = '';
-                let activeIncentivesCount = 0;
+                console.log(`🔍 Chain analysis for ${business.bname}:`);
+                console.log(`   - Has chain_id: ${!!business.chain_id}`);
+                console.log(`   - Passed chainId: ${chainId}`);
+                console.log(`   - Is chain location: ${isChainLocation}`);
+                console.log(`   - Effective chain ID: ${effectiveChainId}`);
 
-                data.results.forEach(incentive => {
-                    if (incentive.is_available) {
-                        activeIncentivesCount++;
-                        const typeLabel = getIncentiveTypeLabel(incentive.type);
-                        const otherDescription = incentive.other_description ?
-                            ` (${incentive.other_description})` : '';
-
-                        // Add a badge for chain-wide incentives
-                        const chainBadge = incentive.is_chain_wide ?
-                            '<span class="chain-badge small">Chain-wide</span>' : '';
-
-                        incentivesHTML += `
-                            <div class="incentive-item">
-                                <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}
-                                ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
-                            </div>
-                        `;
-                    }
-                });
-
-                if (activeIncentivesCount === 0) {
-                    incentivesCell.innerHTML = '<em style="color: #666;">No active incentives found</em>';
+                if (isChainLocation && effectiveChainId) {
+                    // FIXED: This is a chain location - load chain incentives
+                    console.log(`🔗 Loading CHAIN incentives for ${business.bname} (Chain ID: ${effectiveChainId})`);
+                    loadChainIncentivesForTableCell(businessId, effectiveChainId, business.bname);
                 } else {
-                    incentivesCell.innerHTML = incentivesHTML;
-                    console.log(`✅ Successfully loaded ${activeIncentivesCount} incentives for business ${businessId}`);
+                    // Regular business - load business-specific incentives
+                    console.log(`🏢 Loading BUSINESS incentives for ${business.bname}`);
+                    loadBusinessIncentivesForTableCell(businessId, business.bname);
                 }
             })
             .catch(error => {
-                console.error(`❌ Error fetching incentives for business ${businessId}:`, error);
-                incentivesCell.innerHTML = '<span class="incentives-error">Error loading incentives</span>';
+                console.error(`❌ Error getting business details for incentives:`, error);
+                // Fallback to regular business incentives
+                loadBusinessIncentivesForTableCell(businessId, 'Unknown Business');
             });
-    }, 200); // Increased delay to ensure DOM elements are ready
+    }, 200);
 }
 
+/**
+ * NEW: Load chain incentives for table cell
+ */
+function loadChainIncentivesForTableCell(businessId, chainId, businessName) {
+    console.log(`🔗 TABLE CHAIN INCENTIVES: Loading for business ${businessName} (ID: ${businessId}, Chain: ${chainId})`);
+
+    const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+    if (!incentivesCell) {
+        console.error(`❌ Incentives cell not found for ${businessId}`);
+        return;
+    }
+
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/chains.js?operation=get_incentives&chain_id=${chainId}`;
+
+    console.log(`🌐 Fetching chain incentives for table: ${apiURL}`);
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Chain incentives API failed: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`📊 Chain incentives data for table (${businessName}):`, data);
+
+            if (!data.incentives || data.incentives.length === 0) {
+                incentivesCell.innerHTML = '<em style="color: #666;">No chain incentives available</em>';
+                return;
+            }
+
+            // Build HTML for chain incentives in table format
+            let incentivesHTML = '';
+            let activeIncentivesCount = 0;
+
+            data.incentives.forEach(incentive => {
+                if (incentive.is_active) {
+                    activeIncentivesCount++;
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ?
+                        ` (${incentive.other_description})` : '';
+
+                    incentivesHTML += `
+                        <div class="incentive-item table-incentive">
+                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% 
+                            <span class="chain-badge small">⛓️ Chain-wide</span>
+                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                        </div>
+                    `;
+                }
+            });
+
+            if (activeIncentivesCount === 0) {
+                incentivesCell.innerHTML = '<em style="color: #666;">No active chain incentives</em>';
+            } else {
+                incentivesCell.innerHTML = incentivesHTML;
+                console.log(`✅ Successfully loaded ${activeIncentivesCount} chain incentives for table (${businessName})`);
+            }
+        })
+        .catch(error => {
+            console.error(`❌ Error loading chain incentives for table (${businessName}):`, error);
+            incentivesCell.innerHTML = '<span class="incentives-error">Error loading chain incentives</span>';
+        });
+}
+
+/**
+ * NEW: Load business incentives for table cell (non-chain businesses)
+ */
+function loadBusinessIncentivesForTableCell(businessId, businessName) {
+    console.log(`🏢 TABLE BUSINESS INCENTIVES: Loading for ${businessName} (ID: ${businessId})`);
+
+    const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+    if (!incentivesCell) {
+        console.error(`❌ Incentives cell not found for ${businessId}`);
+        return;
+    }
+
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+
+    console.log(`🌐 Fetching business incentives for table: ${apiURL}`);
+
+    fetch(apiURL)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Business incentives API failed: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(`📊 Business incentives data for table (${businessName}):`, data);
+
+            if (!data.results || data.results.length === 0) {
+                incentivesCell.innerHTML = '<em style="color: #666;">No incentives available</em>';
+                return;
+            }
+
+            // Build HTML for business incentives
+            let incentivesHTML = '';
+            let activeIncentivesCount = 0;
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    activeIncentivesCount++;
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ?
+                        ` (${incentive.other_description})` : '';
+
+                    incentivesHTML += `
+                        <div class="incentive-item table-incentive">
+                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}%
+                            ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                        </div>
+                    `;
+                }
+            });
+
+            if (activeIncentivesCount === 0) {
+                incentivesCell.innerHTML = '<em style="color: #666;">No active incentives</em>';
+            } else {
+                incentivesCell.innerHTML = incentivesHTML;
+                console.log(`✅ Successfully loaded ${activeIncentivesCount} business incentives for table (${businessName})`);
+            }
+        })
+        .catch(error => {
+            console.error(`❌ Error loading business incentives for table (${businessName}):`, error);
+            incentivesCell.innerHTML = '<span class="incentives-error">Error loading incentives</span>';
+        });
+}
+
+
+/**
+ * UPDATED: Enhanced addBusinessRowFixed to better handle chain businesses
+ * Replace the existing function in business-search-improved.js
+ */
 function addBusinessRowFixed(business, tableBody, isFromPlaces) {
     if (!business) return;
 
@@ -5898,9 +6044,10 @@ function addBusinessRowFixed(business, tableBody, isFromPlaces) {
         return;
     }
 
-    console.log(`📝 Adding table row for: ${business.bname}`);
+    console.log(`📝 ENHANCED TABLE ROW: Adding row for: ${business.bname}`);
     console.log(`   - Is from Places: ${isFromPlaces}`);
     console.log(`   - Business ID: ${business._id}`);
+    console.log(`   - Chain ID: ${business.chain_id || 'None'}`);
     console.log(`   - Is chain location: ${!!business.chain_id}`);
 
     // Format address
@@ -5919,14 +6066,15 @@ function addBusinessRowFixed(business, tableBody, isFromPlaces) {
     // Convert business type to readable label
     const businessType = getBusinessTypeLabel(business.type);
 
-    // Check business type and create badges
+    // Enhanced chain badge logic
     const isChainLocation = !!business.chain_id;
     const isGooglePlace = !!business.isGooglePlace;
 
-    // Create chain badge
+    // ENHANCED: Create chain badge with more information
     let chainBadge = '';
     if (isChainLocation) {
-        chainBadge = '<span class="chain-badge">Chain Location</span>';
+        const chainName = business.chain_name || 'Chain Location';
+        chainBadge = `<span class="chain-badge enhanced">🔗 ${chainName}</span>`;
     }
 
     // Create appropriate action button
@@ -5943,6 +6091,7 @@ function addBusinessRowFixed(business, tableBody, isFromPlaces) {
 
     // Create the row
     const row = document.createElement('tr');
+    row.className = `business-row ${isChainLocation ? 'chain-business' : 'regular-business'}`;
     row.innerHTML = `
         <th class="left_table" data-business-id="${business._id}">
             ${business.bname} ${chainBadge}
@@ -5950,18 +6099,23 @@ function addBusinessRowFixed(business, tableBody, isFromPlaces) {
         <th class="left_table">${addressLine}</th>
         <th class="left_table">${businessType}</th>
         <th class="right_table" id="incentives-for-${business._id}">
-            ${isFromPlaces && !isChainLocation ? 'Not in database yet' : '<span class="loading-incentives">Loading incentives...</span>'}
+            ${(isFromPlaces && !isChainLocation) ? 'Not in database yet' : '<span class="loading-incentives">Loading incentives...</span>'}
         </th>
         <th class="center_table">${actionButton}</th>
     `;
 
     tableBody.appendChild(row);
 
-    // CRITICAL FIX: Handle incentives loading properly
+    // ENHANCED: Load incentives with proper chain handling
     if (!isGooglePlace) {
-        console.log(`🎁 Scheduling incentives load for database business: ${business.bname} (ID: ${business._id})`);
-        // Use the fixed incentives function
-        fetchBusinessIncentivesFixed(business._id, business.chain_id);
+        console.log(`🎁 ENHANCED: Scheduling incentives load for database business: ${business.bname}`);
+        console.log(`   - Will check for chain association: ${isChainLocation ? 'Yes' : 'No'}`);
+        console.log(`   - Chain ID to pass: ${business.chain_id || 'None'}`);
+
+        // Use the enhanced incentives function that handles chain businesses
+        setTimeout(() => {
+            fetchBusinessIncentivesFixed(business._id, business.chain_id);
+        }, 100);
     } else if (isChainLocation) {
         console.log(`🔗 Scheduling chain incentives load for Google Places: ${business.bname}`);
         fetchChainIncentivesForPlacesResult(business._id, business.chain_id);
@@ -5969,6 +6123,73 @@ function addBusinessRowFixed(business, tableBody, isFromPlaces) {
         console.log(`ℹ️ No incentives to load for non-chain Google Places: ${business.bname}`);
     }
 }
+
+/**
+ * ENHANCED: Add better styling for chain businesses in tables
+ */
+function addEnhancedTableChainStyles() {
+    if (!document.getElementById('enhanced-table-chain-styles')) {
+        const style = document.createElement('style');
+        style.id = 'enhanced-table-chain-styles';
+        style.textContent = `
+            /* Enhanced chain business styling in tables */
+            .business-row.chain-business {
+                background-color: rgba(66, 133, 244, 0.05);
+                border-left: 3px solid #4285F4;
+            }
+            
+            .chain-badge.enhanced {
+                display: inline-block;
+                background: linear-gradient(45deg, #4285F4, #64B5F6);
+                color: white;
+                padding: 3px 8px;
+                border-radius: 12px;
+                font-size: 0.8em;
+                margin-left: 8px;
+                font-weight: 500;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            }
+            
+            .incentive-item.table-incentive {
+                margin: 4px 0;
+                padding: 4px 6px;
+                background-color: #f8f9fa;
+                border-radius: 4px;
+                border-left: 3px solid #28a745;
+                font-size: 13px;
+            }
+            
+            .chain-badge.small {
+                background: #4285F4;
+                color: white;
+                padding: 1px 6px;
+                border-radius: 8px;
+                font-size: 10px;
+                margin-left: 4px;
+                font-weight: 500;
+            }
+            
+            .incentive-info {
+                font-size: 11px;
+                color: #666;
+                font-style: italic;
+                margin-top: 2px;
+            }
+            
+            .loading-incentives {
+                color: #666;
+                font-style: italic;
+            }
+            
+            .incentives-error {
+                color: #dc3545;
+                font-style: italic;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
 
 /**
  * Update the loading message
@@ -10556,6 +10777,7 @@ if (typeof window !== 'undefined') {
     window.ENHANCED_CONFIG = ENHANCED_CONFIG;
 
     addEnhancedUserInterfaceCSS();
+    addEnhancedTableChainStyles();
 
 }
 
