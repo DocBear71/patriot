@@ -24,6 +24,20 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
     <script src="./js/simple-incentive-search.js"></script>
     <script src="./js/incentive-update-handler.js"></script>
+    <script>
+        // Enhanced chain incentive support for update page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("🎯 INCENTIVE UPDATE: Adding chain support");
+
+            // Override the fetchIncentives function if it exists
+            if (typeof window.fetchIncentives === 'function') {
+                window.originalFetchIncentives = window.fetchIncentives;
+            }
+
+            // The enhanced functions are loaded from simple-incentive-search.js
+            console.log("✅ Chain incentive support enabled for incentive-update.html");
+        });
+    </script>
     <script src="./js/discount-type-handler.js"></script>
     <script src="./js/incentive-display-fix.js"></script>
     <script src="./js/boolean-incentive-fix.js"></script>

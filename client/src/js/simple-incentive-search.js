@@ -794,3 +794,335 @@ if (typeof window.fetchIncentives === 'function') {
     window.originalFetchIncentives = window.fetchIncentives;
 }
 window.fetchIncentives = window.enhancedFetchIncentives;
+
+/**
+ * Chain Incentive Display Fix
+ * Add this to the END of your simple-incentive-search.js file
+ * This ensures chain incentives are properly displayed in all pages
+ */
+
+// Enhanced business selection functions with proper chain incentive handling
+window.selectBusinessForIncentiveView = async function(businessId) {
+    console.log("🔍 ENHANCED: Selecting business for incentive view:", businessId);
+
+    try {
+        showIncentiveLoadingIndicator("Loading business details...");
+
+        // Fetch business details
+        const businessDetails = await fetchIncentiveBusinessDetails(businessId);
+
+        if (businessDetails) {
+            console.log("✅ Business details loaded for incentive view:", businessDetails);
+            console.log("   - Chain ID:", businessDetails.chain_id);
+            console.log("   - Is Chain Location:", !!businessDetails.chain_id);
+
+            // Clear the search results and loading indicator
+            clearSearchResultsAndLoading();
+
+            // Show the business info section
+            const businessInfoSection = document.getElementById('business-info-section');
+            if (businessInfoSection) {
+                businessInfoSection.style.display = 'block';
+            }
+
+            // Set the business ID in the hidden field
+            const selectedBusinessIdField = document.getElementById('selected-business-id');
+            if (selectedBusinessIdField) {
+                selectedBusinessIdField.value = businessDetails._id || '';
+            }
+
+            // Populate the business information fields
+            populateBusinessInfo(businessDetails);
+
+            // CRITICAL: Use enhanced incentive fetching that handles chains
+            console.log("🎯 Calling enhanced incentive fetch for chain support");
+            setTimeout(() => {
+                window.enhancedFetchIncentives(businessDetails._id, businessDetails.bname, businessDetails);
+            }, 200);
+
+        } else {
+            hideIncentiveLoadingIndicator();
+            alert("Error: Could not load business details.");
+        }
+
+    } catch (error) {
+        console.error("❌ Error selecting business for incentive view:", error);
+        hideIncentiveLoadingIndicator();
+        alert("Error: " + error.message);
+    }
+};
+
+window.selectBusinessForIncentiveUpdate = async function(businessId) {
+    console.log("🔍 ENHANCED: Selecting business for incentive update:", businessId);
+
+    try {
+        showIncentiveLoadingIndicator("Loading business details...");
+
+        // Fetch business details
+        const businessDetails = await fetchIncentiveBusinessDetails(businessId);
+
+        if (businessDetails) {
+            console.log("✅ Business details loaded for incentive update:", businessDetails);
+            console.log("   - Chain ID:", businessDetails.chain_id);
+            console.log("   - Is Chain Location:", !!businessDetails.chain_id);
+
+            // Clear the search results and loading indicator
+            clearSearchResultsAndLoading();
+
+            // Ensure populateBusinessInfo is available globally
+            window.populateBusinessInfo = populateBusinessInfo;
+
+            // Call the existing function from incentive-update-handler.js
+            if (typeof window.selectBusinessForIncentives === 'function') {
+                window.selectBusinessForIncentives(businessDetails);
+            } else if (typeof window.selectBusinessForIncentive === 'function') {
+                window.selectBusinessForIncentive(businessDetails);
+            }
+
+            // ENHANCED: Override the incentive fetching for update page
+            setTimeout(() => {
+                enhanceIncentiveUpdatePageWithChainSupport(businessDetails);
+            }, 500);
+
+        } else {
+            hideIncentiveLoadingIndicator();
+            alert("Error: Could not load business details.");
+        }
+
+    } catch (error) {
+        console.error("❌ Error selecting business for incentive update:", error);
+        hideIncentiveLoadingIndicator();
+        alert("Error: " + error.message);
+    }
+};
+
+// Enhanced function specifically for the update page
+function enhanceIncentiveUpdatePageWithChainSupport(businessDetails) {
+    console.log("🔧 ENHANCING: Update page with chain support for:", businessDetails.bname);
+
+    const isChainLocation = !!businessDetails.chain_id;
+
+    if (isChainLocation) {
+        console.log("🔗 This is a chain location, fetching both local and chain incentives");
+
+        // Override the incentive display
+        setTimeout(() => {
+            fetchAndDisplayUpdatePageIncentives(businessDetails._id, businessDetails.chain_id, businessDetails.bname);
+        }, 100);
+    } else {
+        console.log("🏢 Regular business, using standard incentive fetching");
+    }
+}
+
+// Function to fetch and display incentives for the update page with chain support
+async function fetchAndDisplayUpdatePageIncentives(businessId, chainId, businessName) {
+    console.log("📊 FETCHING: Update page incentives for", businessName);
+
+    const incentivesTableContainer = document.getElementById('incentives-table-container');
+    if (!incentivesTableContainer) {
+        console.error("❌ Incentives table container not found");
+        return;
+    }
+
+    // Show loading in the table container
+    incentivesTableContainer.innerHTML = '<p>Loading incentives...</p>';
+
+    try {
+        const baseURL = getIncentiveBaseURL();
+        let allIncentives = [];
+
+        // Fetch local incentives
+        console.log("📍 Fetching local incentives for business:", businessId);
+        try {
+            const localResponse = await fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`);
+            const localData = await localResponse.json();
+            const localIncentives = (localData.results || []).map(incentive => ({
+                ...incentive,
+                is_chain_wide: false,
+                source: 'local'
+            }));
+            console.log("📍 Local incentives:", localIncentives.length);
+            allIncentives = allIncentives.concat(localIncentives);
+        } catch (error) {
+            console.error("❌ Error fetching local incentives:", error);
+        }
+
+        // Fetch chain incentives if this is a chain location
+        if (chainId) {
+            console.log("🔗 Fetching chain incentives for chain:", chainId);
+            try {
+                const chainResponse = await fetch(`${baseURL}/api/chains.js?operation=get_incentives&chain_id=${chainId}`);
+                const chainData = await chainResponse.json();
+                const chainIncentives = (chainData.incentives || []).map(incentive => ({
+                    _id: incentive._id || `chain_${incentive.type}_${Date.now()}`,
+                    is_available: incentive.is_active,
+                    type: incentive.type,
+                    amount: incentive.amount,
+                    information: incentive.information,
+                    other_description: incentive.other_description,
+                    created_at: incentive.created_at || new Date().toISOString(),
+                    discount_type: incentive.discount_type || 'percentage',
+                    is_chain_wide: true,
+                    source: 'chain'
+                })).filter(incentive => incentive.is_available); // Only show active chain incentives
+                console.log("🔗 Chain incentives:", chainIncentives.length);
+                allIncentives = allIncentives.concat(chainIncentives);
+            } catch (error) {
+                console.error("❌ Error fetching chain incentives:", error);
+            }
+        }
+
+        console.log("📊 Total incentives to display:", allIncentives.length);
+
+        // Display the incentives in the update page format
+        displayUpdatePageIncentives(allIncentives, businessName, incentivesTableContainer);
+
+    } catch (error) {
+        console.error("❌ Error in fetchAndDisplayUpdatePageIncentives:", error);
+        incentivesTableContainer.innerHTML = `<p class="error">Error loading incentives: ${error.message}</p>`;
+    }
+}
+
+// Function to display incentives in the update page format
+function displayUpdatePageIncentives(incentives, businessName, container) {
+    console.log("🎨 DISPLAYING: Update page incentives for", businessName);
+
+    if (!incentives || incentives.length === 0) {
+        container.innerHTML = '<p>No incentives found for this business.</p>';
+        return;
+    }
+
+    // Check if user is admin for chain incentive editing
+    const isAdmin = checkIfUserIsAdmin();
+    console.log("👤 User is admin:", isAdmin);
+
+    let html = `
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Available</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Information</th>
+                    <th>Scope</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    incentives.forEach(incentive => {
+        const available = incentive.is_available ? 'Yes' : 'No';
+        const typeLabel = getIncentiveTypeLabel(incentive.type);
+        const otherDescription = incentive.type === 'OT' && incentive.other_description
+            ? `<br><em>(${incentive.other_description})</em>`
+            : '';
+
+        // Format the amount based on discount_type
+        let amountDisplay = 'N/A';
+        if (incentive.is_available) {
+            if (incentive.discount_type === 'dollar') {
+                amountDisplay = `$${incentive.amount.toFixed(2)}`;
+            } else {
+                amountDisplay = `${incentive.amount}%`;
+            }
+        }
+
+        // Determine scope and action based on incentive type
+        const isChainWide = incentive.is_chain_wide === true;
+        let scopeBadge, actionButton;
+
+        if (isChainWide) {
+            scopeBadge = '<span class="chain-badge">Chain-wide</span>';
+
+            if (isAdmin) {
+                actionButton = `
+                    <button class="select-incentive admin-chain" data-incentive-id="${incentive._id}">
+                        Edit Chain Incentive
+                    </button>
+                `;
+            } else {
+                actionButton = `
+                    <div class="chain-admin-warning">
+                        <span class="chain-badge admin-only">Admin Only</span>
+                        <small style="display: block; color: #666; margin-top: 2px;">
+                            Only administrators can edit chain-wide incentives
+                        </small>
+                    </div>
+                `;
+            }
+        } else {
+            scopeBadge = '<span class="location-badge">Location only</span>';
+            actionButton = `
+                <button class="select-incentive" data-incentive-id="${incentive._id}">
+                    Edit
+                </button>
+            `;
+        }
+
+        html += `
+            <tr>
+                <td>${available}</td>
+                <td>${typeLabel}${otherDescription}</td>
+                <td>${amountDisplay}</td>
+                <td>${incentive.information || ''}</td>
+                <td>${scopeBadge}</td>
+                <td>${actionButton}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+    `;
+
+    container.innerHTML = html;
+
+    // Add event listeners to the edit buttons (only for local incentives or admin chain access)
+    const editButtons = document.querySelectorAll('.select-incentive');
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const incentiveId = this.getAttribute('data-incentive-id');
+
+            // Find the selected incentive
+            const selectedIncentive = incentives.find(inc => inc._id === incentiveId);
+            if (selectedIncentive) {
+                // Check if this is a chain incentive and user is not admin
+                if (selectedIncentive.is_chain_wide && !isAdmin) {
+                    alert("You don't have permission to edit chain-wide incentives.");
+                    return;
+                }
+
+                // Set the selected incentive ID
+                const selectedIncentiveIdField = document.getElementById('selected-incentive-id');
+                if (selectedIncentiveIdField) {
+                    selectedIncentiveIdField.value = incentiveId;
+                }
+
+                // Call the existing load function if it exists
+                if (typeof window.loadIncentiveForEditing === 'function') {
+                    window.loadIncentiveForEditing(selectedIncentive);
+                }
+            }
+        });
+    });
+
+    console.log("✅ Update page incentives displayed successfully");
+}
+
+// Function to check if user is admin
+function checkIfUserIsAdmin() {
+    try {
+        const sessionData = localStorage.getItem('patriotThanksSession');
+        if (!sessionData) return false;
+
+        const session = JSON.parse(sessionData);
+        return (session.user && (session.user.isAdmin === true || session.user.level === 'Admin'));
+    } catch (error) {
+        console.error("Error checking admin status:", error);
+        return false;
+    }
+}
+
+console.log("🎯 Chain Incentive Display Fix loaded successfully!");

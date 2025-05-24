@@ -27,6 +27,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
     <script src="./js/simple-incentive-search.js"></script>
     <script src="./js/business-incentive-viewer.js"></script>
+    <script>
+        // Override the viewBusinessIncentives function to use our enhanced version
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("🎯 INCENTIVE VIEW: Overriding viewBusinessIncentives for chain support");
+
+            // Store the original function if it exists
+            if (typeof window.viewBusinessIncentives === 'function') {
+                window.originalViewBusinessIncentives = window.viewBusinessIncentives;
+            }
+
+            // Our enhanced version is already loaded from simple-incentive-search.js
+            // The selectBusinessForIncentiveView function will handle everything
+            console.log("✅ Chain incentive support enabled for incentive-view.html");
+        });
+    </script>
     <script src="./js/reset-functionality.js"></script>
     <script src="./js/simple-view-button-fix.js"></script>
     <script src="./js/layout-manager.js"></script>

@@ -282,3 +282,38 @@
     text-align: center;
     margin: 10px 0;
 }
+
+/* Enhanced admin warning styles */
+.chain-admin-warning {
+    text-align: center;
+    padding: 5px;
+}
+
+.chain-badge.admin-only {
+    background-color: #dc3545;
+    color: white;
+    font-size: 11px;
+}
+
+.select-incentive {
+    background-color: #0000ff;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.select-incentive:hover {
+    background-color: #0000cc;
+}
+
+.select-incentive.admin-chain {
+    background-color: #9C27B0;
+    color: white;
+}
+
+.select-incentive.admin-chain:hover {
+    background-color: #7B1FA2;
+}
