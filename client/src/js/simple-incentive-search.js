@@ -534,136 +534,6 @@ window.enhancedFetchIncentives = function(business_id, businessName, businessDat
     }
 };
 
-// Function to fetch both local and chain incentives
-function fetchBothLocalAndChainIncentives(businessId, chainId, businessName, container) {
-    console.log(`Fetching both local and chain incentives for ${businessName}`);
-
-    const baseURL = getIncentiveBaseURL();
-
-    // Fetch local incentives
-    const localIncentivesPromise = fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`)
-        .then(response => response.json())
-        .catch(error => {
-            console.error("Error fetching local incentives:", error);
-            return { results: [] };
-        });
-
-    // Fetch chain incentives using the new chains API
-    const chainIncentivesPromise = fetch(`${baseURL}/api/chains.js?operation=get_incentives&chain_id=${chainId}`)
-        .then(response => response.json())
-        .catch(error => {
-            console.error("Error fetching chain incentives:", error);
-            return { incentives: [] };
-        });
-
-    // Wait for both to complete
-    Promise.all([localIncentivesPromise, chainIncentivesPromise])
-        .then(([localData, chainData]) => {
-            console.log("Local incentives data:", localData);
-            console.log("Chain incentives data:", chainData);
-
-            displayCombinedIncentives(localData.results || [], chainData.incentives || [], businessName, container);
-        })
-        .catch(error => {
-            console.error("Error fetching combined incentives:", error);
-            container.innerHTML = `<p class="error">Error loading incentives: ${error.message}</p>`;
-        });
-}
-
-// Function to fetch only local incentives
-function fetchLocalIncentivesOnly(businessId, businessName, container) {
-    console.log(`Fetching local incentives only for ${businessName}`);
-
-    const baseURL = getIncentiveBaseURL();
-    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
-
-    fetch(apiURL)
-        .then(response => response.json())
-        .then(data => {
-            console.log("Local incentives data:", data);
-            displayLocalIncentivesOnly(data.results || [], businessName, container);
-        })
-        .catch(error => {
-            console.error("Error fetching local incentives:", error);
-            container.innerHTML = `<p class="error">Error loading incentives: ${error.message}</p>`;
-        });
-}
-
-// Function to display combined local and chain incentives
-function displayCombinedIncentives(localIncentives, chainIncentives, businessName, container) {
-    console.log(`Displaying combined incentives for ${businessName}`);
-
-    let html = `
-        <fieldset id="incentives-section">
-            <legend>
-                <h3 class="caveat">Step 3: View Incentives for ${businessName}</h3>
-            </legend>
-    `;
-
-    const hasLocalIncentives = localIncentives && localIncentives.length > 0;
-    const hasChainIncentives = chainIncentives && chainIncentives.length > 0;
-
-    if (!hasLocalIncentives && !hasChainIncentives) {
-        html += '<p>No incentives found for this business.</p>';
-    } else {
-        html += `
-            <table class="results-table">
-                <thead>
-                    <tr>
-                        <th>Available</th>
-                        <th>Type</th>
-                        <th>Amount</th>
-                        <th>Information</th>
-                        <th>Scope</th>
-                        <th>Date Added</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-
-        // Add local incentives first
-        if (hasLocalIncentives) {
-            localIncentives.forEach(incentive => {
-                html += formatIncentiveRow(incentive, false); // false = not chain-wide
-            });
-        }
-
-        // Add chain incentives
-        if (hasChainIncentives) {
-            chainIncentives.forEach(incentive => {
-                // Convert chain incentive format to standard format
-                if (incentive.is_active) {
-                    const standardIncentive = {
-                        is_available: incentive.is_active,
-                        type: incentive.type,
-                        amount: incentive.amount,
-                        information: incentive.information,
-                        other_description: incentive.other_description,
-                        created_at: incentive.created_at || new Date().toISOString(),
-                        is_chain_wide: true
-                    };
-                    html += formatIncentiveRow(standardIncentive, true); // true = chain-wide
-                }
-            });
-        }
-
-        html += `
-                </tbody>
-            </table>
-        `;
-    }
-
-    html += `</fieldset>`;
-
-    container.innerHTML = html;
-
-    // Scroll to incentives section
-    const incentivesSection = document.getElementById('incentives-section');
-    if (incentivesSection) {
-        incentivesSection.scrollIntoView({ behavior: 'smooth' });
-    }
-}
-
 // Function to display only local incentives
 function displayLocalIncentivesOnly(localIncentives, businessName, container) {
     console.log(`Displaying local incentives only for ${businessName}`);
@@ -1126,3 +996,285 @@ function checkIfUserIsAdmin() {
 }
 
 console.log("🎯 Chain Incentive Display Fix loaded successfully!");
+// Function to fetch both local and chain incentives - FIXED FOR DEDICATED CHAINS API
+function fetchBothLocalAndChainIncentives(businessId, chainId, businessName, container) {
+    console.log(`🔗 FIXED: Fetching both local and chain incentives for ${businessName}`);
+    console.log(`   - Business ID: ${businessId}`);
+    console.log(`   - Chain ID: ${chainId}`);
+
+    const baseURL = getIncentiveBaseURL();
+
+    // FIXED: Fetch local incentives using the combined API
+    const localIncentivesPromise = fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`)
+        .then(response => {
+            console.log(`📍 Local incentives response status: ${response.status}`);
+            return response.json();
+        })
+        .catch(error => {
+            console.error("❌ Error fetching local incentives:", error);
+            return { results: [] };
+        });
+
+    // FIXED: Use the dedicated chains.js API for chain incentives
+    const chainIncentivesPromise = fetch(`${baseURL}/api/chains.js?operation=get_incentives&chain_id=${chainId}`)
+        .then(response => {
+            console.log(`🔗 Chain incentives response status: ${response.status}`);
+            if (!response.ok) {
+                throw new Error(`Chain incentives request failed: ${response.status}`);
+            }
+            return response.json();
+        })
+        .catch(error => {
+            console.error("❌ Error fetching chain incentives:", error);
+            // Try fallback with combined API
+            console.log("🔄 Trying fallback with combined API...");
+            return fetch(`${baseURL}/api/combined-api.js?operation=get_chain_incentives&chain_id=${chainId}`)
+                .then(response => response.json())
+                .catch(fallbackError => {
+                    console.error("❌ Fallback also failed:", fallbackError);
+                    return { incentives: [] };
+                });
+        });
+
+    // Wait for both to complete
+    Promise.all([localIncentivesPromise, chainIncentivesPromise])
+        .then(([localData, chainData]) => {
+            console.log("📊 FIXED: Local incentives data:", localData);
+            console.log("📊 FIXED: Chain incentives data:", chainData);
+
+            const localIncentives = localData.results || [];
+            const chainIncentives = chainData.incentives || [];
+
+            console.log(`✅ FIXED: Found ${localIncentives.length} local + ${chainIncentives.length} chain incentives`);
+
+            displayCombinedIncentives(localIncentives, chainIncentives, businessName, container);
+        })
+        .catch(error => {
+            console.error("❌ FIXED: Error fetching combined incentives:", error);
+            container.innerHTML = `<p class="error">Error loading incentives: ${error.message}</p>`;
+        });
+}
+
+// FIXED: Enhanced business selection functions with better error handling
+window.selectBusinessForIncentiveView = async function(businessId) {
+    console.log("🔍 FIXED: Selecting business for incentive view:", businessId);
+
+    try {
+        showIncentiveLoadingIndicator("Loading business details...");
+
+        // Fetch business details
+        const businessDetails = await fetchIncentiveBusinessDetails(businessId);
+
+        if (businessDetails) {
+            console.log("✅ FIXED: Business details loaded:", businessDetails);
+            console.log("   - Chain ID:", businessDetails.chain_id);
+            console.log("   - Is Chain Location:", !!businessDetails.chain_id);
+
+            // Clear the search results and loading indicator
+            clearSearchResultsAndLoading();
+
+            // Show the business info section
+            const businessInfoSection = document.getElementById('business-info-section');
+            if (businessInfoSection) {
+                businessInfoSection.style.display = 'block';
+            }
+
+            // Set the business ID in the hidden field
+            const selectedBusinessIdField = document.getElementById('selected-business-id');
+            if (selectedBusinessIdField) {
+                selectedBusinessIdField.value = businessDetails._id || '';
+            }
+
+            // Populate the business information fields
+            populateBusinessInfo(businessDetails);
+
+            // FIXED: Use enhanced incentive fetching with better error handling
+            console.log("🎯 FIXED: Calling enhanced incentive fetch for chain support");
+            setTimeout(() => {
+                try {
+                    window.enhancedFetchIncentives(businessDetails._id, businessDetails.bname, businessDetails);
+                } catch (fetchError) {
+                    console.error("❌ FIXED: Error in enhanced fetch:", fetchError);
+                    // Fallback to basic fetch if enhanced fails
+                    if (typeof window.fetchIncentives === 'function') {
+                        window.fetchIncentives(businessDetails._id, businessDetails.bname);
+                    }
+                }
+            }, 200);
+
+        } else {
+            hideIncentiveLoadingIndicator();
+            alert("Error: Could not load business details.");
+        }
+
+    } catch (error) {
+        console.error("❌ FIXED: Error selecting business for incentive view:", error);
+        hideIncentiveLoadingIndicator();
+        alert("Error: " + error.message);
+    }
+};
+
+// FIXED: Enhanced function to fetch and display incentives with better chain support
+window.enhancedFetchIncentives = function(business_id, businessName, businessData) {
+    console.log("🚀 FIXED: Enhanced fetchIncentives called for:", businessName, "ID:", business_id);
+    console.log("📋 FIXED: Business data:", businessData);
+
+    // Get the incentives container
+    let incentivesContainer = document.getElementById('incentives-container');
+    if (!incentivesContainer) {
+        console.log("🔧 FIXED: Creating incentives container");
+        incentivesContainer = document.createElement('div');
+        incentivesContainer.id = 'incentives-container';
+
+        // Find a good place to put it
+        const businessInfoSection = document.getElementById('business-info-section');
+        if (businessInfoSection && businessInfoSection.parentNode) {
+            businessInfoSection.parentNode.insertBefore(incentivesContainer, businessInfoSection.nextSibling);
+        } else {
+            const main = document.querySelector('main');
+            if (main) {
+                main.appendChild(incentivesContainer);
+            } else {
+                document.body.appendChild(incentivesContainer);
+            }
+        }
+    }
+
+    // Display loading indicator
+    incentivesContainer.innerHTML = '<p>Loading incentives...</p>';
+    console.log(`🔍 FIXED: Fetching incentives for business ID: ${business_id}`);
+
+    // Determine if this is a chain location
+    const isChainLocation = businessData && businessData.chain_id ? true : false;
+    const chainId = isChainLocation ? businessData.chain_id : null;
+
+    console.log(`🔗 FIXED: Chain analysis - Is Chain: ${isChainLocation}, Chain ID: ${chainId}`);
+
+    // For chain locations, we need to fetch both local and chain incentives
+    if (isChainLocation && chainId) {
+        console.log(`🔗 FIXED: This is a chain location. Fetching both local and chain incentives`);
+        fetchBothLocalAndChainIncentives(business_id, chainId, businessName, incentivesContainer);
+    } else {
+        console.log(`🏢 FIXED: Regular business - fetch only local incentives`);
+        // Regular business - fetch only local incentives
+        fetchLocalIncentivesOnly(business_id, businessName, incentivesContainer);
+    }
+};
+
+// FIXED: Function to fetch only local incentives with better error handling
+function fetchLocalIncentivesOnly(businessId, businessName, container) {
+    console.log(`🏢 FIXED: Fetching local incentives only for ${businessName}`);
+
+    const baseURL = getIncentiveBaseURL();
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+
+    console.log(`📡 FIXED: API URL: ${apiURL}`);
+
+    fetch(apiURL)
+        .then(response => {
+            console.log(`📍 FIXED: Local incentives response status: ${response.status}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("📊 FIXED: Local incentives data:", data);
+            const incentives = data.results || [];
+            console.log(`✅ FIXED: Found ${incentives.length} local incentives`);
+            displayLocalIncentivesOnly(incentives, businessName, container);
+        })
+        .catch(error => {
+            console.error("❌ FIXED: Error fetching local incentives:", error);
+            container.innerHTML = `<p class="error">Error loading incentives: ${error.message}</p>`;
+        });
+}
+
+// FIXED: Function to display combined local and chain incentives with better formatting
+function displayCombinedIncentives(localIncentives, chainIncentives, businessName, container) {
+    console.log(`🎨 FIXED: Displaying combined incentives for ${businessName}`);
+    console.log(`   - Local: ${localIncentives.length}, Chain: ${chainIncentives.length}`);
+
+    let html = `
+        <fieldset id="incentives-section">
+            <legend>
+                <h3 class="caveat">Step 3: View Incentives for ${businessName}</h3>
+            </legend>
+    `;
+
+    const hasLocalIncentives = localIncentives && localIncentives.length > 0;
+    const hasChainIncentives = chainIncentives && chainIncentives.length > 0;
+
+    if (!hasLocalIncentives && !hasChainIncentives) {
+        html += '<p>No incentives found for this business.</p>';
+    } else {
+        // FIXED: Add summary info for user clarity
+        html += `
+            <div class="incentives-summary">
+                <p><strong>Total Incentives:</strong> ${(localIncentives.length || 0) + (chainIncentives.length || 0)}</p>
+                ${hasLocalIncentives ? `<p>• <span class="location-badge">Location-specific</span>: ${localIncentives.length}</p>` : ''}
+                ${hasChainIncentives ? `<p>• <span class="chain-badge">Chain-wide</span>: ${chainIncentives.length}</p>` : ''}
+            </div>
+        `;
+
+        html += `
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Available</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Information</th>
+                        <th>Scope</th>
+                        <th>Date Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        // Add local incentives first
+        if (hasLocalIncentives) {
+            console.log(`🏢 FIXED: Adding ${localIncentives.length} local incentives`);
+            localIncentives.forEach(incentive => {
+                html += formatIncentiveRow(incentive, false); // false = not chain-wide
+            });
+        }
+
+        // Add chain incentives
+        if (hasChainIncentives) {
+            console.log(`🔗 FIXED: Adding ${chainIncentives.length} chain incentives`);
+            chainIncentives.forEach(incentive => {
+                // FIXED: Convert chain incentive format to standard format
+                if (incentive.is_active !== false) { // Show active and undefined (default to active)
+                    const standardIncentive = {
+                        is_available: incentive.is_active !== false,
+                        type: incentive.type,
+                        amount: incentive.amount,
+                        information: incentive.information,
+                        other_description: incentive.other_description,
+                        created_at: incentive.created_at || new Date().toISOString(),
+                        discount_type: incentive.discount_type || 'percentage',
+                        is_chain_wide: true
+                    };
+                    html += formatIncentiveRow(standardIncentive, true); // true = chain-wide
+                }
+            });
+        }
+
+        html += `
+                </tbody>
+            </table>
+        `;
+    }
+
+    html += `</fieldset>`;
+
+    container.innerHTML = html;
+    console.log(`✅ FIXED: Combined incentives displayed successfully`);
+
+    // Scroll to incentives section
+    const incentivesSection = document.getElementById('incentives-section');
+    if (incentivesSection) {
+        incentivesSection.scrollIntoView({ behavior: 'smooth' });
+    }
+}

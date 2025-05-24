@@ -141,6 +141,10 @@ module.exports = async (req, res) => {
                     return await handleAdminIncentives(req, res, req.query.action);
                 case 'incentives':
                     return await handleIncentives(req, res, req.query.action);
+                // FIXED: Add chain incentives support
+                case 'get_chain_incentives':
+                case 'chain_incentives':
+                    return await handleChainIncentives(req, res);
                 // Other operations as needed
             }
         }
@@ -154,6 +158,9 @@ module.exports = async (req, res) => {
                 return await handleAdminIncentives(req, res, operation);
             case 'incentives':
                 return await handleIncentives(req, res, operation);
+            // FIXED: Add chain path support
+            case 'chains':
+                return await handleChainIncentives(req, res);
             default:
                 return res.status(404).json({ message: 'Endpoint not found' });
         }
@@ -162,6 +169,98 @@ module.exports = async (req, res) => {
         return res.status(500).json({ message: 'Server error: ' + error.message });
     }
 };
+
+/***************************
+ * CHAIN INCENTIVES HANDLERS - FIXED FOR DEDICATED CHAINS API
+ ***************************/
+
+/**
+ * Handle chain incentives operations - Now delegates to dedicated chains API
+ */
+async function handleChainIncentives(req, res) {
+    console.log("Chain incentives API hit (delegating to chains.js):", req.method);
+    console.log("Query parameters:", req.query);
+
+    try {
+        // Import the dedicated chains API handler
+        const chainsHandler = require('./chains.js');
+
+        // Delegate to the dedicated chains API
+        return await chainsHandler(req, res);
+
+    } catch (error) {
+        console.error('Error delegating to chains API:', error);
+
+        // Fallback: Try to handle chain incentives directly if chains.js is not available
+        try {
+            await connect;
+
+            const { chain_id } = req.query;
+            if (!chain_id) {
+                return res.status(400).json({
+                    message: 'Chain ID is required',
+                    error: 'Missing chain_id parameter'
+                });
+            }
+
+            console.log(`Fallback: Fetching chain incentives for chain_id: ${chain_id}`);
+
+            // Try to use Chain model if available
+            let Chain;
+            try {
+                Chain = mongoose.model('Chain');
+            } catch (modelError) {
+                // If Chain model doesn't exist, try to find incentives by business_id
+                const chainIncentives = await Incentive.find({
+                    business_id: chain_id,
+                    is_available: true
+                }).lean();
+
+                const formattedIncentives = chainIncentives.map(incentive => ({
+                    _id: incentive._id,
+                    is_active: incentive.is_available,
+                    type: incentive.type,
+                    amount: incentive.amount,
+                    information: incentive.information,
+                    other_description: incentive.other_description,
+                    created_at: incentive.created_at,
+                    discount_type: incentive.discount_type || 'percentage'
+                }));
+
+                return res.status(200).json({
+                    success: true,
+                    incentives: formattedIncentives,
+                    chain_id: chain_id
+                });
+            }
+
+            // Use the Chain model to get embedded incentives
+            const chain = await Chain.findById(chain_id).select('incentives chain_name').lean();
+            if (!chain) {
+                return res.status(404).json({ message: 'Chain not found' });
+            }
+
+            // Filter for active incentives only
+            const activeIncentives = chain.incentives ?
+                chain.incentives.filter(incentive => incentive.is_active !== false) : [];
+
+            console.log(`Fallback: Found ${activeIncentives.length} active incentives for chain: ${chain.chain_name}`);
+
+            return res.status(200).json({
+                success: true,
+                incentives: activeIncentives,
+                chain_name: chain.chain_name
+            });
+
+        } catch (fallbackError) {
+            console.error('Fallback chain incentives handler failed:', fallbackError);
+            return res.status(500).json({
+                message: 'Error retrieving chain incentives',
+                error: fallbackError.message
+            });
+        }
+    }
+}
 
 /***************************
  * ADMIN CODES HANDLERS
@@ -600,7 +699,7 @@ async function handleDeleteIncentive(req, res) {
 }
 
 /***************************
- * REGULAR INCENTIVES HANDLERS
+ * REGULAR INCENTIVES HANDLERS - ENHANCED WITH CHAIN SUPPORT
  ***************************/
 
 /**
@@ -647,9 +746,11 @@ async function handleIncentives(req, res, operation) {
 }
 
 /**
- * Handle GET request for retrieving incentives for a business with chain support for Places results
+ * ENHANCED: Handle GET request for retrieving incentives for a business with proper chain support
  */
 async function handleGetUserIncentives(req, res) {
+    console.log("ENHANCED: Getting user incentives with chain support");
+
     // Get the business ID from the query parameters
     const businessId = req.query.business_id;
     const chainId = req.query.chain_id;
@@ -661,7 +762,8 @@ async function handleGetUserIncentives(req, res) {
     let incentives = [];
 
     // Check if this is a Google Places result (not in our database)
-    if (businessId.startsWith('google_') || businessId.startsWith('place_')) {
+    if (businessId && (businessId.startsWith('google_') || businessId.startsWith('place_'))) {
+        console.log("ENHANCED: Handling Google Places result");
         // For Places API results, we need chain ID to get incentives
         if (chainId) {
             // Get chain-wide incentives
@@ -687,41 +789,59 @@ async function handleGetUserIncentives(req, res) {
     }
 
     // For businesses in our database:
+    console.log(`ENHANCED: Getting incentives for business ${businessId}`);
+
     // First get incentives directly associated with this business
     const businessIncentives = await Incentive.find({ business_id: businessId }).lean();
+    console.log(`ENHANCED: Found ${businessIncentives.length} local incentives`);
 
     // Start with business-specific incentives
     incentives = [...businessIncentives];
 
-    // Check if this is a chain location
-    const business = await Business.findById(businessId).lean();
+    // Check if this is a chain location by looking up the business
+    let business = null;
+    try {
+        business = await Business.findById(businessId).lean();
+        console.log(`ENHANCED: Business lookup result:`, business ? `Found business with chain_id: ${business.chain_id}` : 'Business not found');
+    } catch (error) {
+        console.error('ENHANCED: Error looking up business:', error);
+    }
 
     if (business && business.chain_id) {
-        // Check if the chain has universal incentives enabled
-        const chainBusiness = await Business.findById(business.chain_id).lean();
+        console.log(`ENHANCED: This is a chain location. Chain ID: ${business.chain_id}`);
 
-        if (chainBusiness && chainBusiness.universal_incentives) {
+        // FIXED: Get chain incentives directly by querying with chain_id as business_id
+        try {
             const chainIncentives = await Incentive.find({
                 business_id: business.chain_id,
                 is_available: true
             }).lean();
 
+            console.log(`ENHANCED: Found ${chainIncentives.length} chain incentives`);
+
             // Add chain incentives that don't conflict with location-specific ones
             if (chainIncentives.length > 0) {
                 chainIncentives.forEach(chainIncentive => {
                     const hasLocationOverride = incentives.some(
-                        li => li.type === chainIncentive.type
+                        li => li.type === chainIncentive.type && li.is_available
                     );
 
                     if (!hasLocationOverride) {
                         // Mark as chain-wide incentive
                         chainIncentive.is_chain_wide = true;
                         incentives.push(chainIncentive);
+                        console.log(`ENHANCED: Added chain incentive of type ${chainIncentive.type}`);
+                    } else {
+                        console.log(`ENHANCED: Skipped chain incentive of type ${chainIncentive.type} - local override exists`);
                     }
                 });
             }
+        } catch (chainError) {
+            console.error('ENHANCED: Error fetching chain incentives:', chainError);
         }
     }
+
+    console.log(`ENHANCED: Total incentives to return: ${incentives.length}`);
 
     // Return all incentives (location-specific + chain-wide)
     return res.status(200).json({
@@ -729,7 +849,7 @@ async function handleGetUserIncentives(req, res) {
         results: incentives,
         chain_info: business && business.chain_id ? {
             id: business.chain_id,
-            name: business.chain_name
+            name: business.chain_name || 'Chain Business'
         } : null
     });
 }
