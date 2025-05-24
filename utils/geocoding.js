@@ -1,5 +1,4 @@
 // utils/geocoding.js
-const axios = require('axios');
 
 /**
  * Geocode an address to get coordinates
@@ -11,12 +10,11 @@ async function geocodeAddress(address) {
         // Use Google Maps Geocoding API
         const apiKey = process.env.GOOGLE_MAPS_API_KEY; // Store API key in environment variables
         const encodedAddress = encodeURIComponent(address);
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
+        const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`);
+        const data = await response.json();
 
-        const response = await axios.get(url);
-
-        if (response.data.status === 'OK' && response.data.results.length > 0) {
-            const location = response.data.results[0].geometry.location;
+        if (data.results && data.results.length > 0) {
+            const location = data.results[0].geometry.location;
             return {
                 lat: location.lat,
                 lng: location.lng
