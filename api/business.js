@@ -1,9 +1,52 @@
-// api/business.js - Enhanced with chain business system
+// api/business.js - Enhanced with separated chain business system
 const connect = require('../config/db');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 let Business = require('../models/Business');
 let User = require('../models/User');
+
+// Chain model for separate collection
+let Chain;
+const chainSchema = new mongoose.Schema({
+    chain_name: { type: String, required: true, trim: true },
+    business_type: { type: String, required: true },
+    universal_incentives: { type: Boolean, default: true },
+    status: { type: String, default: 'active', enum: ['active', 'inactive'] },
+
+    // Corporate information (optional)
+    corporate_info: {
+        headquarters: String,
+        website: String,
+        phone: String,
+        description: String
+    },
+
+    // Chain-wide incentives stored directly in the chain document
+    incentives: [{
+        type: { type: String, required: true, enum: ['VT', 'AD', 'FR', 'SP', 'OT'] },
+        amount: { type: Number, required: true, min: 0, max: 100 },
+        description: String,
+        other_description: String,
+        information: String,
+        discount_type: { type: String, default: 'percentage', enum: ['percentage', 'dollar'] },
+        is_active: { type: Boolean, default: true },
+        created_date: { type: Date, default: Date.now },
+        created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }],
+
+    // Metadata
+    created_date: { type: Date, default: Date.now },
+    updated_date: { type: Date, default: Date.now },
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+});
+
+// Initialize Chain model
+try {
+    Chain = mongoose.model('Chain');
+} catch (error) {
+    Chain = mongoose.model('Chain', chainSchema, 'patriot_thanks_chains');
+}
 
 /**
  * Consolidated business API handler
@@ -46,7 +89,7 @@ module.exports = async (req, res) => {
             case 'check_place_exists':
                 return await handleCheckPlaceExists(req, res);
 
-            // Admin operations
+            // FIXED: Admin operations with separated chains support
             case 'admin-list-businesses':
                 return await handleAdminListBusinesses(req, res);
             case 'admin-get-business':
@@ -116,8 +159,6 @@ async function verifyAdminToken(req) {
 
         // Find the user
         const user = await User.findById(decoded.userId);
-        user.isAdmin = true;
-        user.level = 'Admin';
 
         if (!user) {
             console.log("User not found in database");
@@ -137,6 +178,241 @@ async function verifyAdminToken(req) {
         return { authorized: false, message: 'Invalid or expired token' };
     }
 }
+
+/**
+ * FIXED: Handle admin listing of businesses with separated chains support
+ */
+async function handleAdminListBusinesses(req, res) {
+    console.log("🏢 ADMIN LIST BUSINESSES: Fixed for separated chains");
+
+    // Verify admin token
+    const auth = await verifyAdminToken(req);
+    if (!auth.authorized) {
+        return res.status(401).json({ message: auth.message });
+    }
+
+    try {
+        // Connect to MongoDB
+        await connect;
+        console.log("✅ Database connection established");
+
+        // Parse query parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        const includeChains = req.query.include_chains === 'true';
+
+        console.log(`📊 Query params: page=${page}, limit=${limit}, includeChains=${includeChains}`);
+
+        // Build query for regular businesses (locations only, not chain parents)
+        const businessQuery = {
+            // FIXED: Exclude chain parent businesses - they're now in separate collection
+            is_chain: { $ne: true }
+        };
+
+        // Search filter for businesses
+        if (req.query.search) {
+            const searchRegex = new RegExp(req.query.search, 'i');
+            businessQuery.$or = [
+                { bname: searchRegex },
+                { address1: searchRegex },
+                { city: searchRegex },
+                { state: searchRegex },
+                { zip: searchRegex },
+                { phone: searchRegex }
+            ];
+        }
+
+        // Category filter for businesses
+        if (req.query.category) {
+            businessQuery.type = req.query.category;
+        }
+
+        // Status filter for businesses
+        if (req.query.status) {
+            businessQuery.status = req.query.status;
+        }
+
+        console.log("🔍 Business query:", JSON.stringify(businessQuery, null, 2));
+
+        // Count total businesses (excluding chain parents)
+        const businessTotal = await Business.countDocuments(businessQuery);
+        console.log(`📈 Found ${businessTotal} regular businesses`);
+
+        // Find businesses with pagination
+        let businesses = await Business.find(businessQuery)
+            .sort({ created_at: -1 })
+            .skip(skip)
+            .limit(includeChains ? Math.floor(limit * 0.7) : limit) // Reserve space for chains if needed
+            .lean();
+
+        console.log(`📍 Retrieved ${businesses.length} businesses from database`);
+
+        let chains = [];
+        let chainTotal = 0;
+
+        // FIXED: Get chains from separate collection if requested
+        if (includeChains) {
+            console.log("🔗 CHAINS: Fetching from separate collection");
+
+            try {
+                // Build query for chains
+                const chainQuery = { status: 'active' };
+
+                if (req.query.search) {
+                    chainQuery.chain_name = new RegExp(req.query.search, 'i');
+                }
+
+                // Count total chains
+                chainTotal = await Chain.countDocuments(chainQuery);
+                console.log(`🔗 Found ${chainTotal} chains`);
+
+                // Get chains (limit to remaining space)
+                const chainLimit = limit - businesses.length;
+                if (chainLimit > 0) {
+                    chains = await Chain.find(chainQuery)
+                        .sort({ created_date: -1 })
+                        .limit(chainLimit)
+                        .lean();
+
+                    // Convert chains to business-like format for consistent display
+                    chains = chains.map(chain => ({
+                        _id: chain._id,
+                        bname: chain.chain_name,
+                        address1: 'Chain Headquarters',
+                        address2: '',
+                        city: chain.corporate_info?.headquarters || 'N/A',
+                        state: '',
+                        zip: '',
+                        phone: chain.corporate_info?.phone || 'N/A',
+                        type: chain.business_type,
+                        status: chain.status,
+                        created_at: chain.created_date,
+                        created_by: chain.created_by,
+                        is_chain: true, // Mark as chain for display
+                        chain_name: chain.chain_name,
+                        location_count: 0 // Will be populated below
+                    }));
+
+                    console.log(`🔗 Retrieved ${chains.length} chains from separate collection`);
+
+                    // Get location counts for each chain
+                    for (let i = 0; i < chains.length; i++) {
+                        const locationCount = await Business.countDocuments({
+                            chain_id: chains[i]._id
+                        });
+                        chains[i].location_count = locationCount;
+                        console.log(`   - ${chains[i].chain_name}: ${locationCount} locations`);
+                    }
+                }
+            } catch (chainError) {
+                console.error("❌ Error fetching chains:", chainError);
+                // Continue without chains if there's an error
+            }
+        }
+
+        // Combine businesses and chains
+        const allBusinesses = [...businesses, ...chains];
+        const total = businessTotal + chainTotal;
+
+        console.log(`📊 FINAL RESULTS: ${allBusinesses.length} items (${businesses.length} businesses + ${chains.length} chains)`);
+
+        // Get user information for each business/chain
+        const userIds = allBusinesses
+            .map(item => item.created_by)
+            .filter(id => id);
+
+        let users = [];
+
+        if (userIds.length > 0) {
+            users = await User.find({
+                _id: { $in: userIds }
+            }).select('_id fname lname email').lean();
+        }
+
+        // Create a map of user IDs to user details for quick lookup
+        const userMap = {};
+        users.forEach(user => {
+            userMap[user._id.toString()] = {
+                name: `${user.fname} ${user.lname}`,
+                email: user.email
+            };
+        });
+
+        // Add user details to each business/chain
+        const enrichedBusinesses = allBusinesses.map(item => {
+            if (item.created_by && userMap[item.created_by.toString()]) {
+                item.createdByUser = userMap[item.created_by.toString()];
+            }
+            return item;
+        });
+
+        // Calculate total pages based on combined total
+        const totalPages = Math.ceil(total / limit);
+
+        console.log(`✅ ADMIN LIST SUCCESS: Returning ${enrichedBusinesses.length} items`);
+
+        return res.status(200).json({
+            businesses: enrichedBusinesses,
+            total,
+            page,
+            limit,
+            totalPages,
+            breakdown: {
+                businesses: businessTotal,
+                chains: chainTotal
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error listing businesses:', error);
+        return res.status(500).json({
+            message: 'Server error during business listing: ' + error.message
+        });
+    }
+}
+
+/**
+ * FIXED: Handle getting chains from separate collection
+ */
+async function handleGetChains(req, res) {
+    console.log("🔗 GET CHAINS: From separated collection");
+
+    try {
+        // Connect to MongoDB
+        await connect;
+
+        // Find all chains from separate collection
+        const chains = await Chain.find({ status: 'active' })
+            .sort({ chain_name: 1 })
+            .lean();
+
+        console.log(`📊 Found ${chains.length} chains in separate collection`);
+
+        // For each chain, count the number of locations
+        for (let i = 0; i < chains.length; i++) {
+            const locationCount = await Business.countDocuments({
+                chain_id: chains[i]._id
+            });
+            chains[i].location_count = locationCount;
+            console.log(`   - ${chains[i].chain_name}: ${locationCount} locations`);
+        }
+
+        return res.status(200).json({
+            message: 'Chains retrieved successfully',
+            results: chains
+        });
+
+    } catch (error) {
+        console.error('❌ Error retrieving chains:', error);
+        return res.status(500).json({
+            message: 'Error retrieving chains',
+            error: error.message
+        });
+    }
+}
+
+// ... [Keep all other existing functions unchanged] ...
 
 /**
  * Handle business registration
@@ -264,8 +540,7 @@ async function handleBusinessSearch(req, res) {
         // Only use business name if a value is provided
         if (businessNameValue && businessNameValue.trim() !== '') {
             // Use case-insensitive regex search with more flexible matching
-            const searchRegex = new RegExp(businessNameValue.trim().replace(/\s+/g, '.*'), 'i');
-            query.bname = searchRegex;
+            query.bname = new RegExp(businessNameValue.trim().replace(/\s+/g, '.*'), 'i');
         }
 
         if (addressValue && addressValue.trim() !== '') {
@@ -310,10 +585,10 @@ async function handleBusinessSearch(req, res) {
         if (businessNameValue && businessNameValue.trim() !== '' && results.length < 2) {
             const chainNameSearch = new RegExp(businessNameValue.trim(), 'i');
 
-            // Find parent chain businesses
-            const chainBusinesses = await Business.find({
-                is_chain: true,
-                bname: chainNameSearch
+            // FIXED: Find chains from separate collection
+            const chainBusinesses = await Chain.find({
+                status: 'active',
+                chain_name: chainNameSearch
             }).lean();
 
             console.log(`Found ${chainBusinesses.length} chain businesses matching "${businessNameValue}"`);
@@ -326,7 +601,7 @@ async function handleBusinessSearch(req, res) {
                         chain_id: chainBusiness._id
                     }).lean();
 
-                    console.log(`Found ${chainLocations.length} locations for chain ${chainBusiness.bname}`);
+                    console.log(`Found ${chainLocations.length} locations for chain ${chainBusiness.chain_name}`);
 
                     // Add chain locations to results if they're not already included
                     for (const location of chainLocations) {
@@ -338,7 +613,7 @@ async function handleBusinessSearch(req, res) {
                         if (!isDuplicate) {
                             // Add chain info to the location
                             location.chain_info = {
-                                name: chainBusiness.bname,
+                                name: chainBusiness.chain_name,
                                 id: chainBusiness._id
                             };
                             results.push(location);
@@ -363,8 +638,16 @@ async function handleBusinessSearch(req, res) {
                                 // If we still have no locations but found a chain,
                                 // add the chain parent as a result with a flag
                                 if (results.length === 0) {
-                                    chainBusiness.is_parent_chain = true;
-                                    results.push(chainBusiness);
+                                    const chainAsResult = {
+                                        _id: chainBusiness._id,
+                                        bname: chainBusiness.chain_name,
+                                        type: chainBusiness.business_type,
+                                        is_parent_chain: true,
+                                        address1: 'Chain Business - Multiple Locations',
+                                        city: chainBusiness.corporate_info?.headquarters || '',
+                                        status: chainBusiness.status
+                                    };
+                                    results.push(chainAsResult);
                                 }
                             }
                         } catch (error) {
@@ -417,32 +700,8 @@ async function handleGetBusiness(req, res) {
     }
 }
 
-/**
- * Handle get all chains
- */
-async function handleGetChains(req, res) {
-    try {
-        // Connect to MongoDB
-        await connect;
-
-        // Find all businesses that are marked as chains
-        const chains = await Business.find({ is_chain: true }).lean();
-
-        // For each chain, count the number of locations
-        for (let i = 0; i < chains.length; i++) {
-            const locationCount = await Business.countDocuments({ chain_id: chains[i]._id });
-            chains[i].location_count = locationCount;
-        }
-
-        return res.status(200).json({
-            message: 'Chains retrieved successfully',
-            results: chains
-        });
-    } catch (error) {
-        console.error('Error retrieving chains:', error);
-        return res.status(500).json({ message: 'Error retrieving chains', error: error.message });
-    }
-}
+// ... [Continue with all other existing functions unchanged] ...
+// [I'm truncating here due to length, but include all your other existing functions]
 
 /**
  * Handle get chain locations
@@ -917,111 +1176,6 @@ async function handleUpdateBusinessNoAdmin(req, res) {
     } catch (error) {
         console.error('Error updating business:', error);
         return res.status(500).json({ message: 'Server error updating business: ' + error.message });
-    }
-}
-
-/**
- * Handle admin listing of businesses
- */
-async function handleAdminListBusinesses(req, res) {
-    // Verify admin token
-    const auth = await verifyAdminToken(req);
-    if (!auth.authorized) {
-        return res.status(401).json({ message: auth.message });
-    }
-
-    try {
-        // Connect to MongoDB
-        await connect;
-        console.log("Database connection established");
-
-        // Parse query parameters
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
-
-        // Build query based on filters
-        const query = {};
-
-        // Search filter
-        if (req.query.search) {
-            const searchRegex = new RegExp(req.query.search, 'i');
-            query.$or = [
-                { bname: searchRegex },
-                { address1: searchRegex },
-                { city: searchRegex },
-                { state: searchRegex },
-                { zip: searchRegex },
-                { phone: searchRegex }
-            ];
-        }
-
-        // Category filter
-        if (req.query.category) {
-            query.type = req.query.category;
-        }
-
-        // Status filter
-        if (req.query.status) {
-            query.status = req.query.status;
-        }
-
-        // Chain filter
-        if (req.query.is_chain) {
-            query.is_chain = req.query.is_chain === 'true';
-        }
-
-        // Count total businesses matching query
-        const total = await Business.countDocuments(query);
-
-        // Find businesses with pagination
-        let businesses = await Business.find(query)
-            .sort({ created_at: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean();
-
-        // Get user information for each business
-        // We do this in a separate step to keep the code clean
-        const userIds = businesses.map(business => business.created_by).filter(id => id);
-        let users = [];
-
-        if (userIds.length > 0) {
-            users = await User.find({
-                _id: { $in: userIds }
-            }).select('_id fname lname email').lean();
-        }
-
-        // Create a map of user IDs to user details for quick lookup
-        const userMap = {};
-        users.forEach(user => {
-            userMap[user._id.toString()] = {
-                name: `${user.fname} ${user.lname}`,
-                email: user.email
-            };
-        });
-
-        // Add user details to each business
-        businesses = businesses.map(business => {
-            if (business.created_by && userMap[business.created_by.toString()]) {
-                business.createdByUser = userMap[business.created_by.toString()];
-            }
-            return business;
-        });
-
-        // Calculate total pages
-        const totalPages = Math.ceil(total / limit);
-
-        return res.status(200).json({
-            businesses,
-            total,
-            page,
-            limit,
-            totalPages
-        });
-    } catch (error) {
-        console.error('Error listing businesses:', error);
-        return res.status(500).json({ message: 'Server error during business listing: ' + error.message });
     }
 }
 
