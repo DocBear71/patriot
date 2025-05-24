@@ -125,8 +125,14 @@ async function performSimpleUpdateSearch(formData) {
     }
 }
 
+// Store the last successful results to restore them
+let lastSuccessfulResults = null;
+
 function displaySimpleUpdateResults(businesses) {
     console.log(`Displaying ${businesses.length} businesses in simple table`);
+
+    // Store the results for potential restoration
+    lastSuccessfulResults = businesses;
 
     const resultsContainer = document.getElementById('business-search-results');
     if (!resultsContainer) {
@@ -149,6 +155,17 @@ function displaySimpleUpdateResults(businesses) {
     }
 
     // Create simple results table
+    const tableHTML = createSimpleResultsTable(businesses);
+    resultsContainer.innerHTML = tableHTML;
+    resultsContainer.style.display = 'block';
+
+    // Scroll to results
+    resultsContainer.scrollIntoView({ behavior: 'smooth' });
+
+    console.log("Simple results displayed successfully");
+}
+
+function createSimpleResultsTable(businesses) {
     let tableHTML = `
         <div class="simple-results-container">
             <h3>Search Results (${businesses.length} found)</h3>
@@ -195,7 +212,7 @@ function displaySimpleUpdateResults(businesses) {
                 <td><span class="simple-status-badge ${statusClass}">${status}</span></td>
                 <td>
                     <button class="simple-select-btn" onclick="selectSimpleBusinessForUpdate('${business._id}')">
-                        Select
+                        Select for Update
                     </button>
                 </td>
             </tr>
@@ -208,13 +225,24 @@ function displaySimpleUpdateResults(businesses) {
         </div>
     `;
 
-    resultsContainer.innerHTML = tableHTML;
-    resultsContainer.style.display = 'block';
+    return tableHTML;
+}
 
-    // Scroll to results
-    resultsContainer.scrollIntoView({ behavior: 'smooth' });
+function restoreSimpleResultsTable() {
+    console.log("Restoring simple results table");
 
-    console.log("Simple results displayed successfully");
+    if (lastSuccessfulResults && lastSuccessfulResults.length > 0) {
+        const resultsContainer = document.getElementById('business-search-results');
+        if (resultsContainer) {
+            const tableHTML = createSimpleResultsTable(lastSuccessfulResults);
+            resultsContainer.innerHTML = tableHTML;
+            resultsContainer.style.display = 'block';
+            console.log("Results table restored successfully");
+        }
+    } else {
+        console.log("No previous results to restore");
+        hideSimpleLoadingIndicator();
+    }
 }
 
 window.selectSimpleBusinessForUpdate = async function(businessId) {
@@ -227,7 +255,10 @@ window.selectSimpleBusinessForUpdate = async function(businessId) {
         const businessDetails = await fetchSimpleBusinessDetails(businessId);
 
         if (businessDetails) {
-            hideSimpleLoadingIndicator();
+            console.log("Business details loaded successfully");
+
+            // Hide the loading indicator and restore the table
+            restoreSimpleResultsTable();
 
             // Populate the form directly
             populateSimpleUpdateForm(businessDetails);
@@ -351,7 +382,19 @@ function showSimpleLoadingIndicator(message = "Searching...") {
 }
 
 function hideSimpleLoadingIndicator() {
-    // Loading will be replaced by results or error message
+    console.log("Hiding simple loading indicator");
+
+    // Restore the table if we have previous results
+    if (lastSuccessfulResults && lastSuccessfulResults.length > 0) {
+        restoreSimpleResultsTable();
+    } else {
+        // Just clear the results container
+        const resultsContainer = document.getElementById('business-search-results');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '';
+            resultsContainer.style.display = 'none';
+        }
+    }
 }
 
 function showSimpleErrorMessage(message) {
