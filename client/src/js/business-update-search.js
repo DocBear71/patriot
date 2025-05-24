@@ -247,7 +247,7 @@ function createUpdateResultsTable(businesses) {
                     <span class="status-badge ${statusClass}">${status}</span>
                 </td>
                 <td class="action-cell">
-                    <button class="select-business-btn" onclick="selectBusinessForUpdate('${business._id}', '${escapeHtml(business.bname)}')">
+                    <button class="select-business-btn" onclick="window.selectBusinessForUpdate('${business._id}', '${escapeHtml(business.bname)}')">
                         Select for Update
                     </button>
                 </td>
@@ -284,22 +284,23 @@ window.selectBusinessForUpdate = async function(businessId, businessName) {
             // Hide loading indicator
             hideUpdateLoadingIndicator();
 
-            // Call the existing selectBusinessForUpdate function from business-update-handler.js
-            if (typeof window.selectBusinessForUpdate === 'function') {
-                // Temporarily rename this function to avoid conflict
-                const originalFunction = window.selectBusinessForUpdate;
-                window.selectBusinessForUpdate = null;
-
-                // Call the handler function
-                if (typeof originalFunction === 'function') {
-                    originalFunction(businessDetails);
-                }
-
-                // Restore the function
-                window.selectBusinessForUpdate = selectBusinessForUpdate;
-            } else {
+            // Call the handler function directly (it should be available from business-update-handler.js)
+            if (typeof window.selectBusinessForUpdate !== 'function') {
                 console.error("selectBusinessForUpdate handler not found");
                 alert("Error: Update handler not found. Please refresh the page.");
+                return;
+            }
+
+            // Since we already have the business details, pass them directly to the handler
+            // The handler expects the business data object
+            console.log("Calling business update handler with:", businessDetails);
+
+            // Check if the global handler exists (from business-update-handler.js)
+            if (window.selectedBusinessData !== undefined || document.getElementById('business-info-section')) {
+                // Call the original selectBusinessForUpdate function that populates the form
+                populateUpdateForm(businessDetails);
+            } else {
+                alert("Error: Update form not ready. Please refresh the page.");
             }
         } else {
             hideUpdateLoadingIndicator();
@@ -312,6 +313,91 @@ window.selectBusinessForUpdate = async function(businessId, businessName) {
         alert("Error selecting business: " + error.message);
     }
 };
+
+/**
+ * Populate the update form with business details
+ */
+function populateUpdateForm(businessData) {
+    console.log("Populating update form with:", businessData);
+
+    try {
+        // Store the selected business data for later use
+        window.selectedBusinessData = businessData;
+
+        // Show the business info section
+        const businessInfoSection = document.getElementById('business-info-section');
+        if (businessInfoSection) {
+            businessInfoSection.style.display = 'block';
+        }
+
+        // Populate the hidden field with the business ID
+        const businessIdField = document.getElementById('selected-business-id');
+        if (businessIdField) {
+            businessIdField.value = businessData._id || '';
+            console.log("Setting business ID to:", businessData._id);
+        }
+
+        // Populate the business information fields
+        populateUpdateField('bname', businessData.bname);
+        populateUpdateField('address1', businessData.address1);
+        populateUpdateField('address2', businessData.address2);
+        populateUpdateField('city', businessData.city);
+        populateUpdateField('zip', businessData.zip);
+        populateUpdateField('phone', businessData.phone);
+
+        // Special handling for select fields
+        populateUpdateSelectField('state', businessData.state);
+        populateUpdateSelectField('type', businessData.type);
+        populateUpdateSelectField('status', businessData.status || 'active');
+
+        // Scroll to the form
+        if (businessInfoSection) {
+            businessInfoSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        console.log("Update form populated successfully");
+
+    } catch (error) {
+        console.error("Error populating update form:", error);
+        alert("Error preparing update form: " + error.message);
+    }
+}
+
+/**
+ * Helper function to safely populate form fields
+ */
+function populateUpdateField(fieldId, value) {
+    const field = document.getElementById(fieldId);
+    if (field) {
+        field.value = value || '';
+        console.log(`Populated ${fieldId} with:`, value);
+    } else {
+        console.warn(`Field ${fieldId} not found.`);
+    }
+}
+
+/**
+ * Helper function to safely populate select fields
+ */
+function populateUpdateSelectField(fieldId, value) {
+    const field = document.getElementById(fieldId);
+    if (!field) {
+        console.warn(`Field ${fieldId} not found.`);
+        return;
+    }
+
+    // Try for a direct match first
+    for (let i = 0; i < field.options.length; i++) {
+        if (field.options[i].value.toLowerCase() === (value || '').toLowerCase()) {
+            field.selectedIndex = i;
+            console.log(`Selected ${value} in ${fieldId}`);
+            return;
+        }
+    }
+
+    // If no match is found, set to default (first option)
+    console.warn(`Could not find a matching option for ${value} in ${fieldId}`);
+}
 
 /**
  * Fetch full business details for update
