@@ -1,0 +1,295 @@
+/* Business Update Search Styles */
+
+.update-results-container {
+    margin: 20px 0;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.update-results-container h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 18px;
+    border-bottom: 2px solid #4285F4;
+    padding-bottom: 8px;
+}
+
+.results-table-container {
+    overflow-x: auto;
+    margin-top: 15px;
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.results-table thead th {
+    background: #4285F4;
+    color: white;
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.results-table tbody td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+}
+
+.business-result-row:hover {
+    background-color: #f5f5f5;
+}
+
+.business-result-row:nth-child(even) {
+    background-color: #fafafa;
+}
+
+.business-result-row:nth-child(even):hover {
+    background-color: #f0f0f0;
+}
+
+.business-name-cell {
+    font-weight: 600;
+    color: #333;
+    min-width: 200px;
+}
+
+.address-cell {
+    color: #666;
+    min-width: 250px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.type-cell {
+    color: #555;
+    min-width: 120px;
+    font-size: 13px;
+}
+
+.status-cell {
+    min-width: 80px;
+}
+
+.action-cell {
+    min-width: 140px;
+    text-align: center;
+}
+
+/* Status Badges */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-badge.status-active {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+
+.status-badge.status-inactive {
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+/* Chain Badge */
+.chain-badge-small {
+    display: inline-block;
+    background: #4285F4;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 10px;
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+/* Select Button */
+.select-business-btn {
+    background: linear-gradient(45deg, #4285F4, #64B5F6);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.select-business-btn:hover {
+    background: linear-gradient(45deg, #3367D6, #42A5F5);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.select-business-btn:active {
+    transform: translateY(0);
+}
+
+/* Loading Indicator */
+.update-loading-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e3f2fd;
+    border-top: 4px solid #2196f3;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    font-size: 16px;
+    color: #333;
+    font-weight: 500;
+}
+
+/* Error Message */
+.update-error-message {
+    text-align: center;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+    border-radius: 8px;
+    margin: 20px 0;
+    border: 1px solid #f8bbd9;
+}
+
+.update-error-message h3 {
+    color: #c62828;
+    margin: 0 0 10px 0;
+    font-size: 18px;
+}
+
+.update-error-message p {
+    color: #666;
+    margin: 0 0 20px 0;
+    line-height: 1.5;
+}
+
+.retry-btn {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s ease;
+}
+
+.retry-btn:hover {
+    background: #45a049;
+}
+
+/* No Results Message */
+.no-results-message {
+    text-align: center;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, #fff3e0 0%, #ffccbc 100%);
+    border-radius: 8px;
+    margin: 20px 0;
+    border: 1px solid #ffcc80;
+}
+
+.no-results-message h3 {
+    color: #e65100;
+    margin: 0 0 10px 0;
+    font-size: 18px;
+}
+
+.no-results-message p {
+    color: #666;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .update-results-container {
+        margin: 10px 0;
+        padding: 15px;
+    }
+
+    .results-table {
+        font-size: 12px;
+    }
+
+    .results-table thead th,
+    .results-table tbody td {
+        padding: 8px 6px;
+    }
+
+    .business-name-cell,
+    .address-cell,
+    .type-cell {
+        min-width: auto;
+    }
+
+    .select-business-btn {
+        padding: 6px 12px;
+        font-size: 11px;
+    }
+
+    .chain-badge-small {
+        display: block;
+        margin: 4px 0 0 0;
+        width: fit-content;
+    }
+}
+
+@media (max-width: 480px) {
+    .results-table-container {
+        margin-top: 10px;
+    }
+
+    .results-table {
+        font-size: 11px;
+    }
+
+    .results-table thead th,
+    .results-table tbody td {
+        padding: 6px 4px;
+    }
+
+    .address-cell {
+        font-size: 11px;
+    }
+
+    .select-business-btn {
+        padding: 5px 10px;
+        font-size: 10px;
+    }
+}

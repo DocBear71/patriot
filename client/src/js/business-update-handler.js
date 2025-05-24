@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Define the selectBusinessForUpdate function in the global scope for business-search.js
-    window.selectBusinessForUpdate = function(businessData) {
+    window.selectBusinessForUpdateHandler = function(businessData) {
         console.log("selectBusinessForUpdate called with: ", businessData);
 
         // Store the selected business data for later use
