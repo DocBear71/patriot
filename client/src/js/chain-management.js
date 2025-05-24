@@ -343,11 +343,10 @@ function loadExistingChains() {
     const chainsListContainer = document.getElementById('chains-list');
     if (!chainsListContainer) return;
 
-    // Get the base URL
     const baseURL = getBaseURL();
 
-    // Make API request to get all chains
-    fetch(`${baseURL}/api/business.js?operation=get_chains`)
+    // NEW: Use chains API instead of business API
+    fetch(`${baseURL}/api/chains.js?operation=list`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Failed to load chains: ${response.status}`);
@@ -355,31 +354,28 @@ function loadExistingChains() {
             return response.json();
         })
         .then(data => {
-            // Check if we have results
-            if (!data.results || data.results.length === 0) {
+            if (!data.chains || data.chains.length === 0) {
                 chainsListContainer.innerHTML = '<p class="text-center py-3">No chains found. Create a new chain above.</p>';
                 return;
             }
 
             // Sort chains alphabetically
-            data.results.sort((a, b) => a.bname.localeCompare(b.bname));
+            data.chains.sort((a, b) => a.chain_name.localeCompare(b.chain_name));
 
             // Build the chains list HTML
             let chainsHTML = '';
-
-            data.results.forEach(chain => {
-                // Get the business type label for display
-                const businessTypeLabel = getBusinessTypeLabel(chain.type);
+            data.chains.forEach(chain => {
+                const businessTypeLabel = getBusinessTypeLabel(chain.business_type);
 
                 chainsHTML += `
-                    <div class="card mb-2 chain-item" data-chain-id="${chain._id}" data-chain-name="${chain.bname}">
+                    <div class="card mb-2 chain-item" data-chain-id="${chain._id}" data-chain-name="${chain.chain_name}">
                         <div class="card-body d-flex justify-content-between align-items-center py-2">
                             <div class="text-left">
-                                <h4 class="mb-0 text-left">${chain.bname}</h4>
+                                <h4 class="mb-0 text-left">${chain.chain_name}</h4>
                                 <small class="text-left">${businessTypeLabel}</small>
                             </div>
                             <div>
-                                <small>${chain.locations ? chain.locations.length : 0} locations</small>
+                                <small>${chain.location_count || 0} locations | ${chain.incentive_count || 0} incentives</small>
                                 <button class="btn btn-sm btn-primary btn-action view-chain-btn"
                                         data-chain-id="${chain._id}">
                                     View Details
@@ -392,7 +388,7 @@ function loadExistingChains() {
 
             chainsListContainer.innerHTML = chainsHTML;
 
-            // Add click event listeners to the view details buttons
+            // Add click event listeners
             const viewChainBtns = document.querySelectorAll('.view-chain-btn');
             viewChainBtns.forEach(btn => {
                 btn.addEventListener('click', function() {
@@ -411,11 +407,11 @@ function loadExistingChains() {
         });
 }
 
+
 /**
- * Create a new chain
+ * Create a new chain - COMPLETE FUNCTION
  */
 function createNewChain() {
-    // Get form values
     const chainName = document.getElementById('chain-name').value.trim();
     const chainType = document.getElementById('chain-type').value;
     const universalIncentives = document.getElementById('universal-incentives').checked;
@@ -425,25 +421,16 @@ function createNewChain() {
         return;
     }
 
-    // Get the base URL
     const baseURL = getBaseURL();
 
-    // Prepare the chain data WITHOUT the problematic location field
+    // NEW: Use chains API with updated data structure
     const chainData = {
-        bname: chainName,
-        type: chainType,
-        is_chain: true,
-        universal_incentives: universalIncentives,
-        locations: [],
-        // Explicitly set location with coordinates (this is just a placeholder - you can set to null later if needed)
-        location: {
-            type: 'Point',
-            coordinates: [0, 0]  // Default to [0,0] (null island)
-        }
+        chain_name: chainName,
+        business_type: chainType,
+        universal_incentives: universalIncentives
     };
 
-    // Make API request to create the chain
-    fetch(`${baseURL}/api/business.js?operation=create`, {
+    fetch(`${baseURL}/api/chains.js?operation=create`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -470,8 +457,8 @@ function createNewChain() {
             loadExistingChains();
 
             // View the newly created chain
-            if (data.result && data.result._id) {
-                viewChainDetails(data.result._id);
+            if (data.chain && data.chain._id) {
+                viewChainDetails(data.chain._id);
             }
         })
         .catch(error => {
@@ -481,7 +468,7 @@ function createNewChain() {
 }
 
 /**
- * View chain details
+ * View chain details - UPDATED to use new chains API
  * @param {string} chainId - The ID of the chain to view
  */
 function viewChainDetails(chainId) {
@@ -493,8 +480,8 @@ function viewChainDetails(chainId) {
     // Get the base URL
     const baseURL = getBaseURL();
 
-    // Make API request to get chain details
-    fetch(`${baseURL}/api/business.js?operation=get&id=${chainId}`)
+    // NEW: Use chains API instead of business API
+    fetch(`${baseURL}/api/chains.js?operation=get&id=${chainId}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Failed to load chain details: ${response.status}`);
@@ -503,25 +490,25 @@ function viewChainDetails(chainId) {
         })
         .then(data => {
             // Check if we have a result
-            if (!data.result) {
+            if (!data.chain) {
                 alert('Chain not found.');
                 return;
             }
 
-            const chain = data.result;
+            const chain = data.chain;
 
-            // Update chain details section
+            // Update chain details section with new chain structure
             document.getElementById('selected-chain-id').value = chain._id;
-            document.getElementById('selected-chain-name').textContent = chain.bname;
-            document.getElementById('update-chain-name').value = chain.bname;
-            document.getElementById('update-chain-type').value = chain.type;
+            document.getElementById('selected-chain-name').textContent = chain.chain_name;
+            document.getElementById('update-chain-name').value = chain.chain_name;
+            document.getElementById('update-chain-type').value = chain.business_type;
             document.getElementById('update-universal-incentives').checked = chain.universal_incentives === true;
 
             // Show the chain details section
             document.getElementById('chain-details').style.display = 'block';
 
-            // Load chain incentives
-            loadChainIncentives(chainId);
+            // Load chain incentives from embedded array
+            loadChainIncentivesFromEmbedded(chain.incentives || []);
 
             // Load chain locations
             loadChainLocations(chainId);
@@ -533,6 +520,49 @@ function viewChainDetails(chainId) {
             console.error('Error loading chain details:', error);
             alert(`Error loading chain details: ${error.message}`);
         });
+}
+
+/**
+ * Load incentives from embedded chain data
+ * @param {Array} incentives - Array of incentives from chain document
+ */
+function loadChainIncentivesFromEmbedded(incentives) {
+    const incentivesContainer = document.getElementById('chain-incentives');
+    if (!incentivesContainer) return;
+
+    // Check if we have incentives
+    if (!incentives || incentives.length === 0) {
+        incentivesContainer.innerHTML = '<p>No incentives found for this chain.</p>';
+        return;
+    }
+
+    // Build the incentives list HTML
+    let incentivesHTML = '<div class="list-group">';
+
+    incentives.forEach(incentive => {
+        if (incentive.is_active) {
+            const typeLabel = getIncentiveTypeLabel(incentive.type);
+            const otherDescription = incentive.other_description ?
+                ` (${incentive.other_description})` : '';
+
+            incentivesHTML += `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}%
+                        <div><small>${incentive.information || ''}</small></div>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-danger" onclick="deleteChainIncentive('${incentive._id}')">
+                            <i class="fas fa-trash"></i> Remove
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    incentivesHTML += '</div>';
+    incentivesContainer.innerHTML = incentivesHTML;
 }
 
 /**
@@ -606,7 +636,111 @@ function loadChainIncentives(chainId) {
 }
 
 /**
- * Load locations for a chain
+ * Update a chain - UPDATED to use new chains API
+ */
+function updateChain() {
+    const chainId = document.getElementById('selected-chain-id').value;
+    if (!chainId) {
+        alert('No chain selected.');
+        return;
+    }
+
+    // Get form values
+    const chainName = document.getElementById('update-chain-name').value.trim();
+    const chainType = document.getElementById('update-chain-type').value;
+    const universalIncentives = document.getElementById('update-universal-incentives').checked;
+
+    if (!chainName || !chainType) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+
+    // Get the base URL
+    const baseURL = getBaseURL();
+
+    // NEW: Prepare the chain data for new API structure
+    const chainData = {
+        _id: chainId,
+        chain_name: chainName,
+        business_type: chainType,
+        universal_incentives: universalIncentives
+    };
+
+    // NEW: Use chains API instead of business API
+    fetch(`${baseURL}/api/chains.js?operation=update`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify(chainData)
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to update chain: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert('Chain updated successfully!');
+
+            // Update the chain name in the header
+            document.getElementById('selected-chain-name').textContent = chainName;
+
+            // Reload the chains list
+            loadExistingChains();
+        })
+        .catch(error => {
+            console.error('Error updating chain:', error);
+            alert(`Error updating chain: ${error.message}`);
+        });
+}
+
+/**
+ * Delete a chain - UPDATED to use new chains API
+ * @param {string} chainId - The ID of the chain to delete
+ */
+function deleteChain(chainId) {
+    if (!chainId) return;
+
+    // Get the base URL
+    const baseURL = getBaseURL();
+
+    // NEW: Use chains API instead of business API
+    fetch(`${baseURL}/api/chains.js?operation=delete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({ _id: chainId })
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to delete chain: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert('Chain deleted successfully!');
+
+            // Hide the chain details section
+            document.getElementById('chain-details').style.display = 'none';
+
+            // Reset current chain ID
+            currentChainId = null;
+
+            // Reload the chains list
+            loadExistingChains();
+        })
+        .catch(error => {
+            console.error('Error deleting chain:', error);
+            alert(`Error deleting chain: ${error.message}`);
+        });
+}
+
+/**
+ * Load chain locations - UPDATED to use new chains API
  * @param {string} chainId - The ID of the chain
  */
 function loadChainLocations(chainId) {
@@ -621,8 +755,8 @@ function loadChainLocations(chainId) {
     // Get the base URL
     const baseURL = getBaseURL();
 
-    // Make API request to get chain locations
-    fetch(`${baseURL}/api/business.js?operation=get_chain_locations&chain_id=${chainId}`)
+    // NEW: Use chains API to get locations
+    fetch(`${baseURL}/api/chains.js?operation=get_locations&chain_id=${chainId}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Failed to load locations: ${response.status}`);
@@ -631,7 +765,7 @@ function loadChainLocations(chainId) {
         })
         .then(data => {
             // Check if we have results
-            if (!data.results || data.results.length === 0) {
+            if (!data.locations || data.locations.length === 0) {
                 locationsContainer.innerHTML = '<p>No locations found for this chain.</p>';
                 return;
             }
@@ -639,7 +773,7 @@ function loadChainLocations(chainId) {
             // Build the locations list HTML
             let locationsHTML = '';
 
-            data.results.forEach(location => {
+            data.locations.forEach(location => {
                 const addressLine = location.address2
                     ? `${location.address1}, ${location.address2}, ${location.city}, ${location.state} ${location.zip}`
                     : `${location.address1}, ${location.city}, ${location.state} ${location.zip}`;
@@ -672,63 +806,95 @@ function loadChainLocations(chainId) {
 }
 
 /**
- * Update a chain
+ * Add a location to a chain - UPDATED to use new chains API
+ * @param {string} businessId - The ID of the business to add as a location
  */
-function updateChain() {
-    const chainId = document.getElementById('selected-chain-id').value;
+function addLocationToChain(businessId) {
+    if (!businessId) return;
+
+    const chainId = currentChainId;
     if (!chainId) {
         alert('No chain selected.');
-        return;
-    }
-
-    // Get form values
-    const chainName = document.getElementById('update-chain-name').value.trim();
-    const chainType = document.getElementById('update-chain-type').value;
-    const universalIncentives = document.getElementById('update-universal-incentives').checked;
-
-    if (!chainName || !chainType) {
-        alert('Please fill in all required fields.');
         return;
     }
 
     // Get the base URL
     const baseURL = getBaseURL();
 
-    // Prepare the chain data
-    const chainData = {
-        _id: chainId,
-        bname: chainName,
-        type: chainType,
-        is_chain: true,
-        universal_incentives: universalIncentives
-    };
-
-    // Make API request to update the chain
-    fetch(`${baseURL}/api/business.js?operation=update`, {
+    // NEW: Use chains API to add location
+    fetch(`${baseURL}/api/chains.js?operation=add_location`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`
         },
-        body: JSON.stringify(chainData)
+        body: JSON.stringify({
+            business_id: businessId,
+            chain_id: chainId
+        })
     })
         .then(response => {
             if (!response.ok) {
-                throw new Error(`Failed to update chain: ${response.status}`);
+                throw new Error(`Failed to add location to chain: ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            alert('Chain updated successfully!');
+            alert('Location added to chain successfully!');
 
-            // Update the chain name in the header
-            document.getElementById('selected-chain-name').textContent = chainName;
+            // Close the modal
+            ModalHelper.hide('add-location-modal');
 
-            // Reload the chains list
-            loadExistingChains();
+            // Reload chain locations
+            loadChainLocations(chainId);
         })
         .catch(error => {
-            console.error('Error updating chain:', error);
-            alert(`Error updating chain: ${error.message}`);
+            console.error('Error adding location to chain:', error);
+            alert(`Error adding location to chain: ${error.message}`);
+        });
+}
+
+/**
+ * Remove a location from a chain - UPDATED to use new chains API
+ * @param {string} businessId - The ID of the business to remove
+ */
+function removeLocationFromChain(businessId) {
+    if (!businessId) return;
+
+    // Confirm remove
+    if (!confirm('Are you sure you want to remove this location from the chain?')) {
+        return;
+    }
+
+    // Get the base URL
+    const baseURL = getBaseURL();
+
+    // NEW: Use chains API to remove location
+    fetch(`${baseURL}/api/chains.js?operation=remove_location`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+            business_id: businessId
+        })
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to remove location from chain: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert('Location removed from chain successfully!');
+
+            // Reload chain locations
+            loadChainLocations(currentChainId);
+        })
+        .catch(error => {
+            console.error('Error removing location from chain:', error);
+            alert(`Error removing location from chain: ${error.message}`);
         });
 }
 
@@ -748,44 +914,6 @@ function confirmDeleteChain() {
     if (confirm(`Are you sure you want to delete the chain "${chainName}"? This will remove all chain associations but will not delete individual locations.`)) {
         deleteChain(chainId);
     }
-}
-
-/**
- * Delete a chain
- * @param {string} chainId - The ID of the chain to delete
- */
-function deleteChain(chainId) {
-    if (!chainId) return;
-
-    // Get the base URL
-    const baseURL = getBaseURL();
-
-    // Make API request to delete the chain
-    fetch(`${baseURL}/api/business.js?operation=delete_chain&id=${chainId}`, {
-        method: 'POST'
-    })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to delete chain: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            alert('Chain deleted successfully!');
-
-            // Hide the chain details section
-            document.getElementById('chain-details').style.display = 'none';
-
-            // Reset current chain ID
-            currentChainId = null;
-
-            // Reload the chains list
-            loadExistingChains();
-        })
-        .catch(error => {
-            console.error('Error deleting chain:', error);
-            alert(`Error deleting chain: ${error.message}`);
-        });
 }
 
 /**
@@ -891,97 +1019,6 @@ function searchBusinesses(query) {
 }
 
 /**
- * Add a location to a chain
- * @param {string} businessId - The ID of the business to add as a location
- */
-function addLocationToChain(businessId) {
-    if (!businessId) return;
-
-    const chainId = currentChainId;
-    if (!chainId) {
-        alert('No chain selected.');
-        return;
-    }
-
-    // Get the base URL
-    const baseURL = getBaseURL();
-
-    // Make API request to add the location to the chain
-    fetch(`${baseURL}/api/business.js?operation=add_to_chain`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            business_id: businessId,
-            chain_id: chainId
-        })
-    })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to add location to chain: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            alert('Location added to chain successfully!');
-
-            // Close the modal
-            $('#add-location-modal').modal('hide');
-
-            // Reload chain locations
-            loadChainLocations(chainId);
-        })
-        .catch(error => {
-            console.error('Error adding location to chain:', error);
-            alert(`Error adding location to chain: ${error.message}`);
-        });
-}
-
-/**
- * Remove a location from a chain
- * @param {string} businessId - The ID of the business to remove
- */
-function removeLocationFromChain(businessId) {
-    if (!businessId) return;
-
-    // Confirm remove
-    if (!confirm('Are you sure you want to remove this location from the chain?')) {
-        return;
-    }
-
-    // Get the base URL
-    const baseURL = getBaseURL();
-
-    // Make API request to remove the location from the chain
-    fetch(`${baseURL}/api/business.js?operation=remove_from_chain`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            business_id: businessId
-        })
-    })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to remove location from chain: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            alert('Location removed from chain successfully!');
-
-            // Reload chain locations
-            loadChainLocations(currentChainId);
-        })
-        .catch(error => {
-            console.error('Error removing location from chain:', error);
-            alert(`Error removing location from chain: ${error.message}`);
-        });
-}
-
-/**
  * Open manage incentives modal
  */
 function openManageIncentivesModal() {
@@ -1006,7 +1043,7 @@ function openManageIncentivesModal() {
 
 
 /**
- * Load chain incentives in the modal
+ * Load chain incentives in the modal - UPDATED for new API
  * @param {string} chainId - The ID of the chain
  */
 function loadModalChainIncentives(chainId) {
@@ -1021,8 +1058,8 @@ function loadModalChainIncentives(chainId) {
     // Get the base URL
     const baseURL = getBaseURL();
 
-    // Make API request to get chain incentives - CHANGE THIS LINE:
-    fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${chainId}`)
+    // NEW: Use chains API to get incentives
+    fetch(`${baseURL}/api/chains.js?operation=get_incentives&chain_id=${chainId}`)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Failed to load incentives: ${response.status}`);
@@ -1030,8 +1067,37 @@ function loadModalChainIncentives(chainId) {
             return response.json();
         })
         .then(data => {
-            // Rest of the function remains the same
-            // ...
+            // Check if we have results
+            if (!data.incentives || data.incentives.length === 0) {
+                incentivesContainer.innerHTML = '<p>No incentives found for this chain.</p>';
+                return;
+            }
+
+            // Build the incentives list HTML
+            let incentivesHTML = '<div class="list-group">';
+
+            data.incentives.forEach(incentive => {
+                const typeLabel = getIncentiveTypeLabel(incentive.type);
+                const otherDescription = incentive.other_description ?
+                    ` (${incentive.other_description})` : '';
+
+                incentivesHTML += `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}%
+                            <div><small>${incentive.information || ''}</small></div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-danger" onclick="deleteChainIncentive('${incentive._id}', true)">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            incentivesHTML += '</div>';
+            incentivesContainer.innerHTML = incentivesHTML;
         })
         .catch(error => {
             console.error('Error loading incentives:', error);
@@ -1044,7 +1110,7 @@ function loadModalChainIncentives(chainId) {
 }
 
 /**
- * Add an incentive to a chain
+ * Add an incentive to a chain - UPDATED for new API
  */
 function addChainIncentive(event) {
     // Ensure we have the event
@@ -1078,13 +1144,12 @@ function addChainIncentive(event) {
     // Get the base URL
     const baseURL = getBaseURL();
 
-    // Prepare the incentive data
+    // NEW: Prepare the incentive data for new API
     const incentiveData = {
-        business_id: chainId,
+        chain_id: chainId,
         type: incentiveType,
         amount: incentiveAmount,
-        information: incentiveInfo,
-        is_available: true
+        information: incentiveInfo
     };
 
     // Add other description if needed
@@ -1092,14 +1157,12 @@ function addChainIncentive(event) {
         incentiveData.other_description = otherDescription;
     }
 
-    // Prevent the default form submission
-    event.preventDefault();
-
-    // Make API request to add the incentive
-    fetch(`${baseURL}/api/combined-api.js?operation=incentives`, {
+    // NEW: Use chains API to add incentive
+    fetch(`${baseURL}/api/chains.js?operation=add_incentive`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`
         },
         body: JSON.stringify(incentiveData)
     })
@@ -1119,11 +1182,62 @@ function addChainIncentive(event) {
             ModalHelper.hide('manage-incentives-modal');
 
             // Reload incentives in the main view
-            loadChainIncentives(chainId);
+            viewChainDetails(chainId); // Reload entire chain details
         })
         .catch(error => {
             console.error('Error adding incentive:', error);
             alert(`Error adding incentive: ${error.message}`);
+        });
+}
+
+/**
+ * Delete a chain incentive - NEW function for embedded incentives
+ * @param {string} incentiveId - The ID of the incentive to delete
+ * @param {boolean} isModal - Whether the function is called from the modal
+ */
+function deleteChainIncentive(incentiveId, isModal = false) {
+    if (!incentiveId) return;
+
+    // Confirm delete
+    if (!confirm('Are you sure you want to delete this incentive?')) {
+        return;
+    }
+
+    // Get the base URL
+    const baseURL = getBaseURL();
+
+    // NEW: Use chains API to remove incentive
+    fetch(`${baseURL}/api/chains.js?operation=remove_incentive`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+            chain_id: currentChainId,
+            incentive_id: incentiveId
+        })
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to delete incentive: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert('Incentive deleted successfully!');
+
+            // Reload incentives
+            if (isModal) {
+                loadModalChainIncentives(currentChainId);
+            }
+
+            // Always reload chain details to update the main view
+            viewChainDetails(currentChainId);
+        })
+        .catch(error => {
+            console.error('Error deleting incentive:', error);
+            alert(`Error deleting incentive: ${error.message}`);
         });
 }
 
@@ -1194,17 +1308,15 @@ function filterChains(query) {
 function setupSearchFunctionality() {
     // Already implemented in setupEventListeners
 }
-
 /**
- * Get the base URL based on environment
+ * Get the base URL based on environment - FIXED
  * @returns {string} The base URL
  */
 function getBaseURL() {
     return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? `https://${window.location.host}`
+        ? `http://${window.location.host}`  // Changed from https to http for localhost
         : window.location.origin;
 }
-
 /**
  * Get the label for a business type
  * @param {string} typeCode - The business type code
