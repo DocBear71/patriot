@@ -553,7 +553,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 type: 'AD',
                 is_available: true,
                 amount: 15,
-                information: 'Active duty military receive 15% discount.',
+                information: 'Active-Duty military receive 15% discount.',
                 created_at: '2025-04-05T00:00:00.000Z'
             },
             {
@@ -1254,7 +1254,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function getIncentiveTypeLabel(typeCode) {
         const types = {
             'VT': 'Veteran',
-            'AD': 'Active Duty',
+            'AD': 'Active-Duty',
             'FR': 'First Responder',
             'SP': 'Spouse',
             'OT': 'Other'

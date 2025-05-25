@@ -1037,7 +1037,7 @@ async function sendDonationConfirmationEmail(donation) {
                     </div>
                     <div style="padding: 20px;">
                         <p>Dear ${donation.anonymous ? 'Supporter' : donation.name},</p>
-                        <p>Thank you for your generous donation of <strong>$${donation.amount.toFixed(2)}</strong> to Patriot Thanks. Your support helps us continue connecting veterans, active duty military, first responders, and their spouses with businesses that appreciate their service.</p>
+                        <p>Thank you for your generous donation of <strong>$${donation.amount.toFixed(2)}</strong> to Patriot Thanks. Your support helps us continue connecting veterans, active-duty military, first responders, and their spouses with businesses that appreciate their service.</p>
                         
                         <div style="background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; margin: 20px 0; border-radius: 5px;">
                             <h3 style="margin-top: 0;">Donation Details:</h3>
@@ -1075,7 +1075,7 @@ async function sendDonationConfirmationEmail(donation) {
                 
                 Dear ${donation.anonymous ? 'Supporter' : donation.name},
                 
-                Thank you for your generous donation of $${donation.amount.toFixed(2)} to Patriot Thanks. Your support helps us continue connecting veterans, active duty military, first responders, and their spouses with businesses that appreciate their service.
+                Thank you for your generous donation of $${donation.amount.toFixed(2)} to Patriot Thanks. Your support helps us continue connecting veterans, active-duty military, first responders, and their spouses with businesses that appreciate their service.
                 
                 Donation Details:
                 Amount: $${donation.amount.toFixed(2)}

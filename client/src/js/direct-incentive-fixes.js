@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
         typeText = typeText.trim();
 
         if (typeText.startsWith('Veteran')) return 'VT';
-        if (typeText.startsWith('Active Duty')) return 'AD';
+        if (typeText.startsWith('Active-Duty')) return 'AD';
         if (typeText.startsWith('First Responder')) return 'FR';
         if (typeText.startsWith('Spouse')) return 'SP';
         if (typeText.startsWith('Other')) return 'OT';

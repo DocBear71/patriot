@@ -889,7 +889,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function getIncentiveTypeLabel(typeCode) {
         const types = {
             'VT': 'Veteran',
-            'AD': 'Active Duty',
+            'AD': 'Active-Duty',
             'FR': 'First Responder',
             'SP': 'Spouse',
             'OT': 'Other'

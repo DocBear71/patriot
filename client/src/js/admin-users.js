@@ -306,8 +306,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     statusText = 'Veteran';
                     break;
                 case 'AD':
-                    statusBadge = '<span class="badge badge-active">Active Duty</span>';
-                    statusText = 'Active Duty';
+                    statusBadge = '<span class="badge badge-active">Active-Duty</span>';
+                    statusText = 'Active-Duty';
                     break;
                 case 'FR':
                     statusBadge = '<span class="badge badge-active">First Responder</span>';
