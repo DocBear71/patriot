@@ -380,6 +380,7 @@ p {
     font-size: large;
     font-weight: bold;
     text-indent: 2%;
+    padding: 0 2%;
     justify-content: center;
 }
 

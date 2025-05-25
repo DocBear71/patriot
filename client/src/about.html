@@ -16,12 +16,36 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="./css/normalize.css" rel="stylesheet">
     <link href="./css/style.css" rel="stylesheet">
-    <link href="./css/figures.css" rel="stylesheet">
     <link href="./css/menu-auth.css" rel="stylesheet">
     <link href="./css/forms.css" rel="stylesheet">
     <link href="./css/form-validation.css" rel="stylesheet">
     <script src="./js/jquery-3.7.1.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
+    <style>
+        .creator-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .creator-photo-header {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 0 auto 20px auto;
+            display: block;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border: 4px solid #f8f9fa;
+        }
+        .creator-intro {
+            font-size: 1.1em;
+            color: #666;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+        .creator-content {
+            text-align: left;
+        }
+    </style>
 </head>
 <body style="padding-top: 70px" id="page_layout">
 <div id="nav-placeholder"></div>
@@ -40,23 +64,75 @@
     <div style="clear:left;"></div>
 </header>
 <main>
-    <h2>About Us</h2>
-    <p class="paragraph_style">Dr. Edward Mc Keown was born in Mexico, Missouri and is
-        a veteran of the United States Marine Corps. He received his associate's degree
-        in general studies (emphasis on culinary) & a certificate in Hotel Food & Beverage
-        Management from Pima Community College in 1996. He received his bachelor's degree
-        and master's degree in Hotel Administration from the University of Nevada, Las
-        Vegas (2006 & 2008, respectively). Dr. Mc Keown completed his Ph.D. in Hospitality
-        and Tourism Management in 2014 at Purdue University.</p>
-    <p>Dr. Mc Keown has had a career in hospitality, food safety, and management for over
-        30 years, working with companies such as Waffle House, Hilton Hotels, The Flamingo
-        Hotel and Casino, Burger King, Popeye's Chicken, and many more. He is a certified
-        ServSafe Food Protection Manager and ServSafe Food Safety Instructor and Proctor
-        for the National Restaurant Association Educational Foundation, and also a certified
-        trainer for the National Environmental Health Association's food safety training
-        program. Dr. Mc Keown is also a certified trainer for the ServSafe Alcohol program
-        for responsible alcohol service and the American Hotel & Lodging Education Institute
-        Controlling Alcohol Risks Effectively® (CARE).</p>
+    <section>
+        <h2>About Patriot Thanks</h2>
+        <p class="paragraph_style">Patriot Thanks is a web application designed to help active-duty military personnel,
+            veterans, first responders, their spouses, and supporters locate local area businesses that offer discounts
+            and incentives. Our platform serves a dual purpose: making it easier for those who serve our communities to
+            find businesses that appreciate their service, while helping local businesses increase their customer base
+            by showcasing their support for these important community members.</p>
+
+        <p class="paragraph_style">Are you looking for a restaurant that offers military discounts? Maybe a retailer
+            with first responder incentives? Patriot Thanks connects you with local businesses that want to show
+            appreciation for service members and their families. We help you find establishments that truly value your
+            service and sacrifice.</p>
+    </section>
+
+    <section>
+        <h2>About the Creator</h2>
+        <div class="creator-section">
+            <img src="./images/edmckeown.jpg" alt="Dr. Edward McKeown" class="creator-photo-header">
+            <p class="creator-intro">Dr. Edward McKeown<br>
+                U.S. Marine Corps Veteran • Founder & Creator of Patriot Thanks</p>
+        </div>
+
+        <div class="creator-content">
+            <p class="paragraph_style">Dr. Edward McKeown, a United States Marine Corps veteran, is the founder and
+                creator of Patriot Thanks. Born in Mexico, Missouri, Dr. McKeown brings over 30 years of experience in
+                hospitality management, food safety, and business operations to this innovative platform.</p>
+
+            <p class="paragraph_style">Dr. McKeown's educational journey spans decades of continuous learning. He began
+                his educational journey at Pima Community College in 1996. There he earned his Associate's degree in
+                General Studies with an emphasis on culinary arts. He also received a certificate in Hotel Food &
+                Beverage Management. He continued his education at the University of Nevada, Las Vegas, earning his
+                Bachelor's degree in Hotel Administration in 2006. He completed his Master's degree in the same field
+                in 2008. He completed his Ph.D. in Hospitality and Tourism Management at Purdue University in 2014,
+                focusing on food safety procedures at public food cook-off competitions.</p>
+
+            <p class="paragraph_style">Making a career pivot toward technology, Dr. McKeown is currently pursuing dual
+                degrees in Computer Software Development and Web Application Development at Kirkwood Community College,
+                along with certifications in Java Programming and .NET Programming. This unique combination of
+                hospitality expertise and technical skills enables him to create solutions that truly serve both
+                businesses and customers.</p>
+
+            <p class="paragraph_style">Throughout his career, Dr. McKeown has worked with major companies including
+                Waffle House, Hilton Hotels, The Flamingo Hotel and Casino, Burger King, and Popeye's Chicken. He is
+                a certified ServSafe Food Protection Manager and Instructor and holds multiple certifications in food
+                safety and responsible alcohol service training.</p>
+
+            <p class="paragraph_style">As an active member of Kirkwood's Veterans' Association, Dr. McKeown continues to
+                support fellow veterans in their educational and career transitions. He's also known in his community
+                for occasionally donning the red suit to play Santa for special needs children, demonstrating his
+                commitment to giving back to those who need extra support.</p>
+
+            <p class="paragraph_style">Dr. McKeown is also the author of the "Doc Bear's Comfort Food Survival Guide"
+                cookbook series and operates Doc Bear Enterprises, where he provides food safety training and
+                certification services. He's a certified BBQ judge through the Kansas City BBQ Society and has published
+                many research papers on food safety and hospitality management.</p>
+        </div>
+    </section>
+
+    <section>
+        <h2>Our Mission</h2>
+        <p class="paragraph_style">Patriot Thanks was born from a simple belief: those who serve our communities deserve
+            recognition and support from local businesses. By connecting service members, veterans, first responders,
+            and their families with businesses that offer meaningful discounts and incentives, we're building stronger
+            community bonds while helping local businesses thrive.</p>
+
+        <p class="paragraph_style">Our platform makes it easy for businesses to demonstrate their appreciation while
+            reaching new customers who value that support. Together, we're creating a network of mutual respect and
+            community support that benefits everyone involved.</p>
+    </section>
 </main>
 <footer class="footer_style">
     <br><br>
