@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let businesses = [];
     let currentPage = 1;
     let totalPages = 1;
+    let totalItems = 0; // <-- Add this declaration
     let itemsPerPage = 10;
     let currentFilters = {
         search: '',
@@ -310,12 +311,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw response;
             }
 
-            // Similarly, in loadBusinesses() in admin-business.js:
-
             const data = await response.json();
+            console.log("API Response:", data); // Debug log to see what's being returned
+
             businesses = data.businesses || [];
             totalPages = data.totalPages || 1;
-            totalItems = data.total || 0; // <-- Capture this value
+            totalItems = data.total || 0;
 
             // Update the UI to show the total count
             updateTotalCount(totalItems);
@@ -349,7 +350,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 state: 'IA',
                 zip: '52404',
                 phone: '319-555-1234',
-                type: 'technology',
+                type: 'TECH',
                 status: 'active',
                 created_at: '2024-04-01T00:00:00.000Z',
                 created_by: '1',
@@ -366,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 state: 'IA',
                 zip: '52302',
                 phone: '319-555-5678',
-                type: 'food',
+                type: 'REST',
                 status: 'active',
                 created_at: '2024-04-05T00:00:00.000Z',
                 created_by: '2',
@@ -383,7 +384,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 state: 'IA',
                 zip: '52402',
                 phone: '319-555-9012',
-                type: 'healthcare',
+                type: 'HEAL',
                 status: 'active',
                 created_at: '2024-04-10T00:00:00.000Z',
                 created_by: '3',
@@ -395,6 +396,8 @@ document.addEventListener('DOMContentLoaded', function() {
         ];
 
         totalPages = 1;
+        totalItems = businesses.length;
+        updateTotalCount(totalItems);
         renderBusinesses();
         renderPagination();
     }
@@ -411,6 +414,8 @@ document.addEventListener('DOMContentLoaded', function() {
         businessTableBody.innerHTML = '';
 
         businesses.forEach(business => {
+            console.log("Rendering business:", business); // Debug log
+
             const locationText = business.address1 && business.city && business.state
                 ? `${business.address1}, ${business.city}, ${business.state}`
                 : 'Location not specified';
@@ -420,14 +425,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Display user name and email if available
             let createdByInfo = '';
-            if (business.createdByUser) {
+            if (business.createdByUser && business.createdByUser.name) {
+                console.log("Found createdByUser:", business.createdByUser); // Debug log
                 createdByInfo = `<div data-user-id="${business.created_by}">
                     <div>${business.createdByUser.name}</div>
-                    <div class="text-muted small">${business.createdByUser.email}</div>
+                    <div class="text-muted small">${business.createdByUser.email || 'No email'}</div>
                 </div>`;
             } else if (business.created_by) {
+                console.log("Only found user ID:", business.created_by); // Debug log
                 createdByInfo = `<span data-user-id="${business.created_by}">ID: ${business.created_by}</span>`;
             } else {
+                console.log("No creator info found"); // Debug log
                 createdByInfo = 'Unknown';
             }
 

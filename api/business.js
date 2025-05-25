@@ -138,11 +138,10 @@ async function verifyAdminToken(req) {
 }
 
 /**
- * FINAL FIX: Handle admin listing of businesses with separated chains support
- * Replace your existing handleAdminListBusinesses function with this one
+ * FIXED: Handle admin listing of businesses with proper user population
  */
 async function handleAdminListBusinesses(req, res) {
-    console.log("🏢 ADMIN LIST BUSINESSES: Using dedicated Chain model");
+    console.log("🏢 ADMIN LIST BUSINESSES: With proper user population");
 
     // Verify admin token
     const auth = await verifyAdminToken(req);
@@ -192,20 +191,95 @@ async function handleAdminListBusinesses(req, res) {
         if (req.query.category) businessQuery.type = req.query.category;
         if (req.query.status) businessQuery.status = req.query.status;
 
-        // Get businesses
+        console.log("🔍 Business query:", JSON.stringify(businessQuery, null, 2));
+
+        // Get businesses with population
         const businessTotal = await Business.countDocuments(businessQuery);
         const businessLimit = includeChains ? Math.floor(limit * 0.7) : limit;
 
+        // FIXED: Use populate to get user information directly
         let businesses = await Business.find(businessQuery)
+            .populate('created_by', 'fname lname email') // This populates the user info
             .sort({ created_at: -1 })
             .skip(skip)
             .limit(businessLimit)
             .lean();
 
+        console.log(`📊 Found ${businesses.length} businesses from query`);
+
+        // If populate didn't work (created_by might not be a reference), do manual lookup
+        if (businesses.length > 0 && !businesses[0].created_by?.fname) {
+            console.log("📝 Populate didn't work, doing manual user lookup");
+
+            // Get unique user IDs
+            const userIds = [...new Set(businesses
+                .map(business => business.created_by)
+                .filter(id => id && mongoose.Types.ObjectId.isValid(id))
+            )];
+
+            console.log(`👥 Looking up ${userIds.length} unique user IDs:`, userIds);
+
+            let users = [];
+            if (userIds.length > 0) {
+                try {
+                    users = await User.find({
+                        _id: { $in: userIds.map(id => new mongoose.Types.ObjectId(id)) }
+                    }).select('_id fname lname email').lean();
+
+                    console.log(`✅ Found ${users.length} users`);
+                    console.log("👥 Users found:", users.map(u => ({ id: u._id, name: `${u.fname} ${u.lname}`, email: u.email })));
+                } catch (userError) {
+                    console.error("❌ Error fetching users:", userError);
+                }
+            }
+
+            // Create user map
+            const userMap = {};
+            users.forEach(user => {
+                userMap[user._id.toString()] = {
+                    name: `${user.fname || ''} ${user.lname || ''}`.trim() || 'Unknown User',
+                    email: user.email || 'No email'
+                };
+            });
+
+            console.log("🗺️ User map created:", userMap);
+
+            // Add user info to businesses
+            businesses = businesses.map(business => {
+                if (business.created_by) {
+                    const userId = business.created_by.toString();
+                    if (userMap[userId]) {
+                        business.createdByUser = userMap[userId];
+                        console.log(`✅ Added user info for business ${business.bname}: ${userMap[userId].name}`);
+                    } else {
+                        console.log(`❌ No user found for business ${business.bname} with user ID: ${userId}`);
+                        business.createdByUser = {
+                            name: 'Unknown User',
+                            email: 'No email'
+                        };
+                    }
+                }
+                return business;
+            });
+        } else if (businesses.length > 0) {
+            // Populate worked, just format the user data
+            businesses = businesses.map(business => {
+                if (business.created_by && business.created_by.fname) {
+                    business.createdByUser = {
+                        name: `${business.created_by.fname} ${business.created_by.lname || ''}`.trim(),
+                        email: business.created_by.email || 'No email'
+                    };
+                    // Replace the populated object with just the ID for consistency
+                    business.created_by = business.created_by._id;
+                }
+                return business;
+            });
+        }
+
         let chains = [];
         let chainTotal = 0;
 
-        // ✅ Get chains using the dedicated model - much simpler!
+        // Handle chains if requested
         if (includeChains) {
             console.log("🔗 CHAINS: Using dedicated Chain model");
 
@@ -215,27 +289,66 @@ async function handleAdminListBusinesses(req, res) {
                     chainQuery.chain_name = new RegExp(req.query.search, 'i');
                 }
 
-                // Use the static method from the Chain model
-                const chainsWithCounts = await Chain.getWithLocationCounts(chainQuery);
+                // Get chains - assuming you have a Chain model with getWithLocationCounts method
+                let chainsResult = [];
+                if (Chain && typeof Chain.getWithLocationCounts === 'function') {
+                    chainsResult = await Chain.getWithLocationCounts(chainQuery);
+                } else {
+                    // Fallback if the method doesn't exist
+                    chainsResult = await Chain.find(chainQuery).lean();
+                    // Add location counts manually
+                    for (let chain of chainsResult) {
+                        chain.location_count = await Business.countDocuments({ chain_id: chain._id });
+                    }
+                }
 
-                chainTotal = chainsWithCounts.length;
+                chainTotal = chainsResult.length;
 
-                // Convert to business-like format
-                chains = chainsWithCounts.slice(0, limit - businesses.length).map(chain => ({
-                    _id: chain._id,
-                    bname: chain.chain_name,
-                    address1: 'Chain Headquarters',
-                    city: chain.corporate_info?.headquarters || 'N/A',
-                    type: chain.business_type,
-                    status: chain.status,
-                    created_at: chain.created_date,
-                    created_by: chain.created_by,
-                    is_chain: true,
-                    chain_name: chain.chain_name,
-                    location_count: chain.location_count
-                }));
+                // Convert chains to business-like format and add user info
+                const chainUserIds = [...new Set(chainsResult
+                    .map(chain => chain.created_by)
+                    .filter(id => id && mongoose.Types.ObjectId.isValid(id))
+                )];
 
-                console.log(`✅ Retrieved ${chains.length} chains`);
+                let chainUsers = [];
+                if (chainUserIds.length > 0) {
+                    chainUsers = await User.find({
+                        _id: { $in: chainUserIds.map(id => new mongoose.Types.ObjectId(id)) }
+                    }).select('_id fname lname email').lean();
+                }
+
+                const chainUserMap = {};
+                chainUsers.forEach(user => {
+                    chainUserMap[user._id.toString()] = {
+                        name: `${user.fname || ''} ${user.lname || ''}`.trim() || 'Unknown User',
+                        email: user.email || 'No email'
+                    };
+                });
+
+                chains = chainsResult.slice(0, limit - businesses.length).map(chain => {
+                    const chainBusiness = {
+                        _id: chain._id,
+                        bname: chain.chain_name,
+                        address1: 'Chain Headquarters',
+                        city: chain.corporate_info?.headquarters || 'N/A',
+                        type: chain.business_type,
+                        status: chain.status,
+                        created_at: chain.created_date,
+                        created_by: chain.created_by,
+                        is_chain: true,
+                        chain_name: chain.chain_name,
+                        location_count: chain.location_count
+                    };
+
+                    // Add user info for chains too
+                    if (chain.created_by && chainUserMap[chain.created_by.toString()]) {
+                        chainBusiness.createdByUser = chainUserMap[chain.created_by.toString()];
+                    }
+
+                    return chainBusiness;
+                });
+
+                console.log(`✅ Retrieved ${chains.length} chains with user info`);
             } catch (chainError) {
                 console.error("❌ Error fetching chains:", chainError);
                 chains = [];
@@ -243,46 +356,20 @@ async function handleAdminListBusinesses(req, res) {
             }
         }
 
-        // Combine and return results
+        // Combine results
         const allBusinesses = [...businesses, ...chains];
         const total = businessTotal + chainTotal;
-
-        // Get user information
-        const userIds = allBusinesses.map(item => item.created_by).filter(id => id);
-        let users = [];
-
-        if (userIds.length > 0) {
-            try {
-                users = await User.find({ _id: { $in: userIds } })
-                    .select('_id fname lname email').lean();
-            } catch (userError) {
-                console.error("❌ Error fetching users:", userError);
-            }
-        }
-
-        // Map user data
-        const userMap = {};
-        users.forEach(user => {
-            userMap[user._id.toString()] = {
-                name: `${user.fname} ${user.lname}`,
-                email: user.email
-            };
-        });
-
-        // Add user details
-        const enrichedBusinesses = allBusinesses.map(item => {
-            if (item.created_by && userMap[item.created_by.toString()]) {
-                item.createdByUser = userMap[item.created_by.toString()];
-            }
-            return item;
-        });
-
         const totalPages = Math.ceil(total / limit);
 
-        console.log(`✅ SUCCESS: Returning ${enrichedBusinesses.length} items`);
+        console.log(`✅ SUCCESS: Returning ${allBusinesses.length} items with user information`);
+        console.log("📋 Sample business with user info:", allBusinesses[0] ? {
+            name: allBusinesses[0].bname,
+            createdBy: allBusinesses[0].created_by,
+            createdByUser: allBusinesses[0].createdByUser
+        } : 'No businesses found');
 
         return res.status(200).json({
-            businesses: enrichedBusinesses,
+            businesses: allBusinesses,
             total,
             page,
             limit,
