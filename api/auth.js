@@ -5,71 +5,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const {ObjectId} = mongoose.Types;
-
-// Initialize models with error handling
-let User, AdminCode, Business, Incentive;
-
-try {
-    User = mongoose.model('User');
-    AdminCode = mongoose.model('AdminCode');
-    Business = mongoose.model('Business');
-    Incentive = mongoose.model('Incentive');
-} catch (error) {
-    // If models aren't registered yet, define them
-
-    // User schema
-    const userSchema = new mongoose.Schema({
-        fname: String,
-        lname: String,
-        address1: String,
-        address2: String,
-        city: String,
-        state: String,
-        zip: String,
-        status: String,
-        level: String,
-        email: String,
-        password: String,
-        isAdmin: Boolean,
-        resetToken: String,
-        resetTokenExpires: Date,
-        created_at: {type: Date, default: Date.now},
-        updated_at: {type: Date, default: Date.now},
-    });
-
-    // Admin Code schema
-    const adminCodeSchema = new mongoose.Schema({
-        code: String,
-        description: String,
-        expiration: Date,
-        created_at: {type: Date, default: Date.now}
-    });
-
-    // Initialize models that aren't already registered
-    if (!User) {
-        try {
-            User = mongoose.model('User');
-        } catch (error) {
-            User = mongoose.model('User', userSchema, 'users');
-        }
-    }
-
-    if (!AdminCode) {
-        try {
-            AdminCode = mongoose.model('AdminCode');
-        } catch (error) {
-            AdminCode = mongoose.model('AdminCode', adminCodeSchema, 'admin_codes');
-        }
-    }
-
-    // These models might not be needed in this file, but include them to avoid errors
-    try {
-        Business = mongoose.model('Business');
-        Incentive = mongoose.model('Incentive');
-    } catch (modelError) {
-        console.log('Note: Business or Incentive models not available, will be used conditionally');
-    }
-}
+const User = require('../models/User');
+const AdminCode = require('../models/AdminCode');
+const Business = require('../models/Business');
+const Incentive = require('../models/Incentive');
 
 // Create email transporter for password reset
 const transporter = nodemailer.createTransport({

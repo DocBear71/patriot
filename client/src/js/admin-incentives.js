@@ -416,7 +416,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`Fetching incentives with query: ${queryParams}`);
 
             // Make API request
-            const response = await fetch(`${baseURL}/api/combined-api.js?operation=admin-incentives.js&action=${queryParams}`, {
+            const response = await fetch(`${baseURL}/api/combined-api.js?operation=admin-incentives&action=${queryParams}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
