@@ -1,7 +1,7 @@
-// form-validator.js -- handles the validation of the registration form.
+// fixed-form-validator.js -- Updated to properly handle terms acceptance during registration
 
 document.addEventListener('DOMContentLoaded', function() {
-    // console.log("Form validator loaded!");
+    console.log("Fixed Form validator loaded!");
 
     // Get form elements
     const form = {
@@ -17,12 +17,10 @@ document.addEventListener('DOMContentLoaded', function() {
         termsCheckbox: document.getElementById("terms-checkbox")
     };
 
-    // Get the form element
     const registerForm = document.getElementById("register-form");
 
     // Add form submission handler
     registerForm.addEventListener('submit', function(event) {
-        // Prevent the form from submitting immediately
         event.preventDefault();
 
         // Validate all fields
@@ -37,6 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!isValidEmail(form.email.value)) invalidFields.push("Email");
         if (!isNotEmpty(form.status.value)) invalidFields.push("Status");
         if (!isNotEmpty(form.level.value)) invalidFields.push("Membership Level");
+
         if (!form.termsCheckbox.checked) {
             invalidFields.push("Terms and Conditions agreement");
             document.getElementById("terms-error").style.display = "block";
@@ -48,25 +47,18 @@ document.addEventListener('DOMContentLoaded', function() {
             invalidFields.push("Terms and Conditions acceptance");
         }
 
-
-
         // Check password validation
         const passwordMatch = document.getElementById("match");
         if (passwordMatch && !passwordMatch.classList.contains("valid")) {
             invalidFields.push("Password (must meet all requirements and match)");
         }
 
-        // check if admin verification is required but not completed
-        // First, check if window.adminVerified exists, then use its value
+        // Check admin verification if needed
         if (form.level.value === "Admin" && window.adminVerified !== true) {
-            // console.log("Admin verification failed, window.adminVerified = ", window.adminVerified);
             invalidFields.push("Admin access code verification");
             alert("Admin access must be verified with a valid code before registration");
             return;
-        } else if (form.level.value === "Admin") {
-            // console.log("Admin verification passed, proceeding with registration");
         }
-
 
         // If there are invalid fields, show an alert
         if (invalidFields.length > 0) {
@@ -74,6 +66,9 @@ document.addEventListener('DOMContentLoaded', function() {
             message += invalidFields.join("\n");
             alert(message);
         } else {
+            // FIXED: Properly set terms acceptance data during registration
+            const currentTermsVersion = "May 14, 2025"; // This should match your current terms version
+
             const formData = {
                 fname: form.firstName.value,
                 lname: form.lastName.value,
@@ -87,12 +82,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 email: form.email.value.toLowerCase(),
                 password: document.getElementById("psw").value,
                 psw_repeat: document.getElementById("psw_repeat").value,
+
+                // CRITICAL FIX: Properly set terms acceptance for new registrations
                 termsAccepted: form.termsCheckbox ? form.termsCheckbox.checked : false,
                 termsAcceptedDate: new Date().toISOString(),
-                termsVersion: "May 14, 2025"
+                termsVersion: currentTermsVersion  // This ensures new users start with current version
             };
 
-            // console.log("Form data to submit:", formData);
+            console.log("Form data to submit:", formData);
+            console.log("Terms acceptance set to:", formData.termsAccepted);
+            console.log("Terms version set to:", formData.termsVersion);
 
             // Submit the data to MongoDB
             submitToMongoDB(formData);
@@ -103,25 +102,21 @@ document.addEventListener('DOMContentLoaded', function() {
         const membershipSelect = document.getElementById('membership-level');
 
         if (membershipSelect) {
-            // Get all options except "Free" and "Admin"
             const options = membershipSelect.querySelectorAll('option:not([value="Free"]):not([value="Admin"]):not([value="Test"])');
 
-            // Add "Coming Soon" to premium options and disable them
             options.forEach(option => {
                 option.textContent = option.textContent + ' (Coming Soon)';
                 option.disabled = true;
                 option.title = 'This membership level will be available soon';
             });
 
-            // Add a note about premium options
             const membershipField = membershipSelect.parentElement;
             const premiumNote = document.createElement('div');
             premiumNote.className = 'premium-note';
-            premiumNote.innerHTML = '<p><small>Premium access levels will be available soon. You can support the site through <a href="donate.html">donations</a>.</small></p>';
+            premiumNote.innerHTML = '<p><small>Premium access levels will be available soon. You can support the site through <a href="../donate.html">donations</a>.</small></p>';
             membershipField.appendChild(premiumNote);
         }
     }
-
 
     function validateTerms() {
         if (form.termsCheckbox) {
@@ -137,15 +132,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 return false;
             }
         }
-        return true; // If checkbox doesn't exist, consider it valid
+        return true;
     }
 
     async function submitToMongoDB(formData) {
         try {
             const baseURL = window.location.origin;
-            // Use the absolute URL to your Vercel deployment with the new endpoint
             const apiUrl = `${baseURL}/api/auth.js?operation=register`;
-            // console.log("Submitting to API at:", apiUrl);
+            console.log("Submitting to API at:", apiUrl);
 
             const res = await fetch(apiUrl, {
                 method: "POST",
@@ -155,24 +149,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(formData),
             });
 
-            // console.log("Response status:", res.status);
+            console.log("Response status:", res.status);
 
             if (!res.ok) {
                 const errorText = await res.text();
-                // console.error("Error response:", errorText);
+                console.error("Error response:", errorText);
                 throw new Error(`Failed to submit data to MongoDB: ${res.status} ${errorText}`);
             }
 
             const data = await res.json();
-            // console.log("Success:", data);
+            console.log("Success:", data);
 
             // Show success message to user
             alert("Registration successful! You can now log in.");
 
+            // IMPORTANT: Clear any existing session data to prevent conflicts
+            localStorage.removeItem('patriotThanksSession');
+            localStorage.removeItem('isLoggedIn');
+
+            // Redirect to login page or home page
             window.location.href = '../index.html';
 
         } catch (error) {
-            // console.error("Error:", error);
+            console.error("Error:", error);
             alert("Registration failed: " + error.message);
         }
     }
@@ -212,22 +211,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Apply validation styling to a field
     function validateField(field, validationFn) {
-        // console.log(`Validating ${field.id} with value: ${field.value}`);
-
         if (validationFn(field.value)) {
             field.classList.remove('invalid-field');
             field.classList.add('valid-field');
             field.setAttribute('data-valid', 'true');
-            // console.log(`${field.id} is VALID`);
         } else {
             field.classList.remove('valid-field');
             field.classList.add('invalid-field');
             field.setAttribute('data-valid', 'false');
-            // console.log(`${field.id} is INVALID`);
         }
     }
 
-    // Validate the entire form (for use with other functions if needed)
+    // Validate the entire form
     function validateForm() {
         const requiredFields = [
             { element: form.firstName, validator: isNotEmpty },
@@ -243,7 +238,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let formIsValid = true;
 
-        // Validate each field and update its visual state
         requiredFields.forEach(field => {
             if (!field.validator(field.element.value)) {
                 formIsValid = false;
@@ -261,15 +255,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Run initial validation to set the visual state
     validateForm();
 
-
     function addAsterisksToRequiredFields() {
-        // Define the IDs of required fields based on your validation logic
         const requiredFieldIds = [
             "fname", "lname", "address1", "city", "state",
             "zip", "email", "status", "membership-level"
         ];
 
-        // Add asterisks to each required field's label
         requiredFieldIds.forEach(id => {
             const field = document.getElementById(id);
             if (field) {
@@ -279,13 +270,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     const asterisk = document.createElement('span');
                     asterisk.className = 'required-indicator';
                     asterisk.textContent = ' *';
-                    asterisk.style.color = 'red'; // Match your existing color scheme
+                    asterisk.style.color = 'red';
                     label.appendChild(asterisk);
                 }
             }
         });
 
-        // Add explanation at the top of the form
         const form = document.getElementById("register-form");
         if (form) {
             const explanation = document.createElement('div');
