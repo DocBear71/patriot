@@ -870,6 +870,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'GROC': 'Grocery',
             'HARDW': 'Hardware',
             'HEAL': 'Health',
+            'HOTEL': 'Hotel/Motel',
             'JEWL': 'Jewelry',
             'OTHER': 'Other',
             'RX': 'Pharmacy',

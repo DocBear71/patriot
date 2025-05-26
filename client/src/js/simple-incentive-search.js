@@ -429,7 +429,7 @@ function getIncentiveBusinessTypeLabel(typeCode) {
         'CLTH': 'Clothing', 'CONV': 'Convenience Store', 'DEPT': 'Department Store',
         'ELEC': 'Electronics', 'ENTR': 'Entertainment', 'FURN': 'Furniture',
         'FUEL': 'Fuel Station', 'GIFT': 'Gift Shop', 'GROC': 'Grocery',
-        'HARDW': 'Hardware', 'HEAL': 'Health', 'JEWL': 'Jewelry',
+        'HARDW': 'Hardware', 'HEAL': 'Health', 'HOTEL': 'Hotel/Motel', 'JEWL': 'Jewelry',
         'OTHER': 'Other', 'RX': 'Pharmacy', 'REST': 'Restaurant',
         'RETAIL': 'Retail', 'SERV': 'Service', 'SPEC': 'Specialty',
         'SPRT': 'Sporting Goods', 'TECH': 'Technology', 'TOYS': 'Toys'
