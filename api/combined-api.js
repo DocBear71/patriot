@@ -90,15 +90,15 @@ module.exports = async (req, res) => {
                 case 'admin-incentives':
                     return await handleAdminIncentives(req, res, req.query.action);
                 case 'incentives':
-                    // UPDATED: Use the enhanced incentive handler
-                    return await handleGetUserIncentives(req, res);
+                    // FIXED: Route to the proper handler based on HTTP method
+                    return await handleIncentives(req, res, req.query.action);
                 case 'get_chain_incentives':
                 case 'chain_incentives':
-                    // FIXED: Use the proper chain incentive handler
                     return await handleGetChainIncentives(req, res);
                 // Other operations as needed
             }
         }
+
 
         // If no operation or unrecognized, try to determine from the path
         const mainPath = pathParts[0]?.toLowerCase();
@@ -147,51 +147,44 @@ async function handleGetChainIncentives(req, res) {
 
         console.log(`🔍 FIXED: Fetching chain incentives for chain_id: ${chain_id}`);
 
-        // Ensure Chain model is available
+        // FIXED: Don't try to reassign const Chain - it's already defined at the top
+        // Just use the Chain model directly
         if (!Chain) {
-            console.error("❌ Chain model not available, trying to initialize...");
+            console.error("❌ Chain model not available");
 
-            // Try to get from existing models first
+            // Fallback: Try to find incentives by business_id instead
             try {
-                Chain = mongoose.model('Chain');
-                console.log("✅ Chain model found in existing models");
-            } catch (modelError) {
-                console.error("❌ Chain model not found in existing models:", modelError.message);
+                const chainIncentives = await Incentive.find({
+                    business_id: chain_id,
+                    is_available: true
+                }).lean();
 
-                // Fallback: Try to find incentives by business_id instead
-                try {
-                    const chainIncentives = await Incentive.find({
-                        business_id: chain_id,
-                        is_available: true
-                    }).lean();
+                console.log(`🔄 FALLBACK: Found ${chainIncentives.length} incentives using Incentive model`);
 
-                    console.log(`🔄 FALLBACK: Found ${chainIncentives.length} incentives using Incentive model`);
+                const formattedIncentives = chainIncentives.map(incentive => ({
+                    _id: incentive._id,
+                    is_active: incentive.is_available,
+                    type: incentive.type,
+                    amount: incentive.amount,
+                    information: incentive.information,
+                    other_description: incentive.other_description,
+                    created_date: incentive.created_at,
+                    discount_type: incentive.discount_type || 'percentage'
+                }));
 
-                    const formattedIncentives = chainIncentives.map(incentive => ({
-                        _id: incentive._id,
-                        is_active: incentive.is_available,
-                        type: incentive.type,
-                        amount: incentive.amount,
-                        information: incentive.information,
-                        other_description: incentive.other_description,
-                        created_date: incentive.created_at,
-                        discount_type: incentive.discount_type || 'percentage'
-                    }));
-
-                    return res.status(200).json({
-                        success: true,
-                        incentives: formattedIncentives,
-                        chain_id: chain_id,
-                        source: 'fallback_incentive_model'
-                    });
-                } catch (fallbackError) {
-                    console.error("❌ Fallback failed:", fallbackError);
-                    return res.status(500).json({
-                        success: false,
-                        message: 'Chain model not available and fallback failed',
-                        error: fallbackError.message
-                    });
-                }
+                return res.status(200).json({
+                    success: true,
+                    incentives: formattedIncentives,
+                    chain_id: chain_id,
+                    source: 'fallback_incentive_model'
+                });
+            } catch (fallbackError) {
+                console.error("❌ Fallback failed:", fallbackError);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Chain model not available and fallback failed',
+                    error: fallbackError.message
+                });
             }
         }
 
