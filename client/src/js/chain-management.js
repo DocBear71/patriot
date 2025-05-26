@@ -49,15 +49,6 @@ function setupModals() {
             }
         });
     });
-
-    // Setup form submission for the incentive form
-    const addChainIncentiveForm = document.getElementById('add-chain-incentive-form');
-    if (addChainIncentiveForm) {
-        addChainIncentiveForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            addChainIncentive(event);
-        });
-    }
 }
 
 /**
@@ -280,11 +271,11 @@ function setupEventListeners() {
         });
     }
 
-    // Add chain incentive form
-    // Add chain incentive form - just make sure it doesn't double-bind
-    if (!document.getElementById('add-chain-incentive-form').hasAttribute('data-event-bound')) {
-        document.getElementById('add-chain-incentive-form').setAttribute('data-event-bound', 'true');
-        document.getElementById('add-chain-incentive-form').addEventListener('submit', function(event) {
+    // FIXED: Single event listener setup for add chain incentive form with proper duplicate prevention
+    const addChainIncentiveForm = document.getElementById('add-chain-incentive-form');
+    if (addChainIncentiveForm && !addChainIncentiveForm.hasAttribute('data-event-bound')) {
+        addChainIncentiveForm.setAttribute('data-event-bound', 'true');
+        addChainIncentiveForm.addEventListener('submit', function(event) {
             event.preventDefault();
             addChainIncentive(event);
         });
