@@ -6,61 +6,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const { ObjectId } = mongoose.Types;
-
-// Initialize models
-let User, Donation;
-
-try {
-    // Try to get existing models
-    User = mongoose.model('User');
-    Donation = mongoose.model('Donation');
-} catch (error) {
-    // Define schemas if models aren't registered yet
-
-    // User schema
-    const userSchema = new mongoose.Schema({
-        fname: String,
-        lname: String,
-        address1: String,
-        address2: String,
-        city: String,
-        state: String,
-        zip: String,
-        status: String,
-        level: String,
-        email: { type: String, required: true, unique: true },
-        password: { type: String, required: true },
-        isAdmin: Boolean,
-        created_at: { type: Date, default: Date.now },
-        updated_at: { type: Date, default: Date.now },
-        termsAccepted: { type: Boolean, default: false },
-        termsAcceptedDate: { type: Date },
-        termsVersion: { type: String, default: "May 14, 2025" },
-        resetToken: String,
-        resetTokenExpires: Date
-    });
-
-    // Donation schema
-    const donationSchema = new mongoose.Schema({
-        amount: { type: Number, required: true },
-        name: { type: String, required: true },
-        email: { type: String, required: true },
-        anonymous: { type: Boolean, default: false },
-        recurring: { type: Boolean, default: false },
-        message: String,
-        paymentMethod: { type: String, required: true },
-        paymentId: String,
-        transactionId: String,
-        status: { type: String, default: 'pending' },
-        cancelledAt: Date,
-        userId: mongoose.Schema.Types.ObjectId, // If the donor is a registered user
-        created_at: { type: Date, default: Date.now }
-    });
-
-    // Register models
-    User = mongoose.model('User', userSchema, 'users');
-    Donation = mongoose.model('Donation', donationSchema, 'donations');
-}
+const User = require('../models/User');
+const Donation = require('../models/Donation');
 
 // Create email transporter for donation confirmations
 const transporter = nodemailer.createTransport({

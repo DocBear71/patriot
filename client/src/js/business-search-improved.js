@@ -3882,9 +3882,14 @@ function showEnhancedInfoWindow(marker) {
     // Open info window
     setTimeout(() => {
         try {
-            if (marker.getPosition) {
+            // FIXED: Always try to open with marker first for consistent behavior
+            if (marker && (marker.getPosition || marker.position)) {
+                // This will make the info window move with the map
                 infoWindow.open(map, marker);
+                console.log("Info window opened with marker - will move with map");
             } else {
+                // Fallback to position-based opening only if marker doesn't work
+                console.log("Fallback: Opening info window at fixed position");
                 infoWindow.setPosition(position);
                 infoWindow.open(map);
             }
@@ -3896,17 +3901,14 @@ function showEnhancedInfoWindow(marker) {
                 setTimeout(() => {
                     applyEnhancedInfoWindowFixes();
 
-                    // FIXED: Load incentives with correct container handling
+                    // Load incentives logic (keep your existing code here)
                     if (!isGooglePlace) {
-                        // Database business
                         loadIncentivesForEnhancedWindow(business._id);
                     } else if (isChainLocation) {
-                        // Google Places chain location - use placeId as container ID
                         console.log(`Loading chain incentives for place: ${business.placeId}, chain: ${business.chain_id}`);
                         loadChainIncentivesForEnhancedWindow(business.placeId, business.chain_id);
                     }
-                    // Non-chain Google Places don't need incentives loaded
-                }, 200); // Increased delay to ensure DOM is ready
+                }, 200);
             });
 
         } catch (error) {

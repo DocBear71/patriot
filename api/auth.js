@@ -5,10 +5,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const {ObjectId} = mongoose.Types;
-const User = require('../models/User');
-const AdminCode = require('../models/AdminCode');
-const Business = require('../models/Business');
-const Incentive = require('../models/Incentive');
+let User = require('../models/User');
+let AdminCode = require('../models/AdminCode');
+let Business = require('../models/Business');
+let Incentive = require('../models/Incentive');
 
 // Create email transporter for password reset
 const transporter = nodemailer.createTransport({
@@ -259,7 +259,10 @@ async function handleLogin(req, res) {
             level: user.level,
             status: user.status,
             isAdmin: user.isAdmin || false,
-            token: token
+            token: token,
+            termsAccepted: user.termsAccepted || false,
+            termsVersion: user.termsVersion || null,
+            termsAcceptedDate: user.termsAcceptedDate || null
         });
     } catch (error) {
         console.error('Error generating JWT token:', error);

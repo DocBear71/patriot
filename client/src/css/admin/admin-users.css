@@ -243,3 +243,55 @@ h2 > .badge {
         display: none;
     }
 }
+
+/* Fix modal height and scrolling issues */
+.modal-dialog {
+    max-height: calc(100vh - 60px);
+    margin: 30px auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-content {
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-body {
+    overflow-y: auto;
+    max-height: calc(100vh - 200px);
+    flex: 1;
+}
+
+.modal-header,
+.modal-footer {
+    flex-shrink: 0;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+    .modal-dialog {
+        margin: 10px;
+        max-height: calc(100vh - 20px);
+        width: calc(100% - 20px);
+    }
+
+    .modal-body {
+        max-height: calc(100vh - 160px);
+        padding: 15px;
+    }
+
+    .modal-header,
+    .modal-footer {
+        padding: 15px;
+    }
+
+    /* Ensure form elements are properly sized on mobile */
+    .modal-form input,
+    .modal-form select {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 12px;
+    }
+}

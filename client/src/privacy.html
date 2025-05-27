@@ -12,14 +12,16 @@
     <meta name="keywords" content="business, incentives, discounts, veteran discounts, military discounts,
                                        first responder discounts, veterans, active-duty, first responders">
     <link href="./images/docbearlogov4.png" rel="icon" type="image/x-icon">
-    <link rel="stylesheet" type="text/css" href="./css/bootstrap-4.0.0.css">
-
+    <link href="./css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="./css/normalize.css" rel="stylesheet">
+    <link href="./css/style.css" rel="stylesheet">
     <link href="./css/menu-auth.css" rel="stylesheet">
+    <link href="./css/forms.css" rel="stylesheet">
     <link href="./css/form-validation.css" rel="stylesheet">
     <script src="./js/jquery-3.7.1.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
-    <script src="./js/bootstrap-4.0.0.js"></script>
+    <script src="./js/bootstrap.bundle.min.js"></script>
     <script src="./js/terms-tracking.js"></script>
 </head>
 
@@ -27,60 +29,60 @@
 <!--Navigation bar-->
 <div id="nav-placeholder">
 </div>
-<script>
-    // Emergency fix for terms/privacy pages
-    (function() {
-        // Force remove any modal problems on terms/privacy pages
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log("Terms/privacy page loaded - cleaning up any modal issues");
+<!--<script>-->
+<!--    // Emergency fix for terms/privacy pages-->
+<!--    (function() {-->
+<!--        // Force remove any modal problems on terms/privacy pages-->
+<!--        document.addEventListener('DOMContentLoaded', function() {-->
+<!--            console.log("Terms/privacy page loaded - cleaning up any modal issues");-->
 
-            // Remove modal backdrops
-            document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
-                backdrop.remove();
-            });
+<!--            // Remove modal backdrops-->
+<!--            document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {-->
+<!--                backdrop.remove();-->
+<!--            });-->
 
-            // Find and hide any modals
-            document.querySelectorAll('.modal').forEach(function(modal) {
-                modal.style.display = 'none';
-                modal.classList.remove('show');
-            });
+<!--            // Find and hide any modals-->
+<!--            document.querySelectorAll('.modal').forEach(function(modal) {-->
+<!--                modal.style.display = 'none';-->
+<!--                modal.classList.remove('show');-->
+<!--            });-->
 
-            // Reset body
-            document.body.classList.remove('modal-open');
-            document.body.style.overflow = '';
-            document.body.style.paddingRight = '';
+<!--            // Reset body-->
+<!--            document.body.classList.remove('modal-open');-->
+<!--            document.body.style.overflow = '';-->
+<!--            document.body.style.paddingRight = '';-->
 
-            // Add escape button in case page is still stuck
-            const escapeButton = document.createElement('div');
-            escapeButton.innerHTML = `
-            <button id="emergencyFixBtn" style="position: fixed; top: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-                Emergency Fix
-            </button>
-        `;
-            document.body.appendChild(escapeButton.firstElementChild);
+<!--            // Add escape button in case page is still stuck-->
+<!--            const escapeButton = document.createElement('div');-->
+<!--            escapeButton.innerHTML = `-->
+<!--            <button id="emergencyFixBtn" style="position: fixed; top: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">-->
+<!--                Emergency Fix-->
+<!--            </button>-->
+<!--        `;-->
+<!--            document.body.appendChild(escapeButton.firstElementChild);-->
 
-            document.getElementById('emergencyFixBtn').addEventListener('click', function() {
-                // Force remove modal issues
-                document.querySelectorAll('.modal-backdrop').forEach(e => e.remove());
-                document.body.classList.remove('modal-open');
-                document.body.style.overflow = '';
-                document.body.style.paddingRight = '';
+<!--            document.getElementById('emergencyFixBtn').addEventListener('click', function() {-->
+<!--                // Force remove modal issues-->
+<!--                document.querySelectorAll('.modal-backdrop').forEach(e => e.remove());-->
+<!--                document.body.classList.remove('modal-open');-->
+<!--                document.body.style.overflow = '';-->
+<!--                document.body.style.paddingRight = '';-->
 
-                // Reload the page
-                location.reload();
-            });
+<!--                // Reload the page-->
+<!--                location.reload();-->
+<!--            });-->
 
-            // Hide the button after 3 seconds if not needed
-            setTimeout(function() {
-                const scrollable = document.body.scrollHeight > window.innerHeight &&
-                        document.body.style.overflow !== 'hidden';
-                if (scrollable) {
-                    document.getElementById('emergencyFixBtn').style.display = 'none';
-                }
-            }, 3000);
-        });
-    })();
-</script>
+<!--            // Hide the button after 3 seconds if not needed-->
+<!--            setTimeout(function() {-->
+<!--                const scrollable = document.body.scrollHeight > window.innerHeight &&-->
+<!--                        document.body.style.overflow !== 'hidden';-->
+<!--                if (scrollable) {-->
+<!--                    document.getElementById('emergencyFixBtn').style.display = 'none';-->
+<!--                }-->
+<!--            }, 3000);-->
+<!--        });-->
+<!--    })();-->
+<!--</script>-->
 <script>
     $(function() {
         $('#nav-placeholder').load('NavBar.html', function() {
