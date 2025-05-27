@@ -10,6 +10,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Global variables
 let currentChainId = null;
+let allChains = []; // Store all chains
+let currentPage = 1;
+let chainsPerPage = 10; // Adjust this number as needed
+let filteredChains = []; // Store filtered chains for search
 
 /**
  * Initialize the chain management page
@@ -23,6 +27,9 @@ function initChainManagement() {
             // Add event listeners
             setupEventListeners();
 
+            // Set up back to top button
+            setupBackToTopButton();
+
             // Load existing chains
             loadExistingChains();
 
@@ -34,6 +41,29 @@ function initChainManagement() {
             console.error("Admin access denied");
         }
     });
+}
+
+function setupBackToTopButton() {
+    const backToTopBtn = document.getElementById('backToTopBtn');
+
+    if (backToTopBtn) {
+        // Show/hide button based on scroll position
+        window.addEventListener('scroll', function() {
+            if (window.pageYOffset > 300) {
+                backToTopBtn.classList.add('show');
+            } else {
+                backToTopBtn.classList.remove('show');
+            }
+        });
+
+        // Smooth scroll to top when clicked
+        backToTopBtn.addEventListener('click', function() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+    }
 }
 
 /**
@@ -336,7 +366,16 @@ function loadExistingChains() {
 
     const baseURL = getBaseURL();
 
-    // NEW: Use chains API instead of business API
+    // Show loading indicator
+    chainsListContainer.innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+            <p>Loading chains...</p>
+        </div>
+    `;
+
     fetch(`${baseURL}/api/chains.js?operation=list`)
         .then(response => {
             if (!response.ok) {
@@ -347,46 +386,17 @@ function loadExistingChains() {
         .then(data => {
             if (!data.chains || data.chains.length === 0) {
                 chainsListContainer.innerHTML = '<p class="text-center py-3">No chains found. Create a new chain above.</p>';
+                hidePagination();
                 return;
             }
 
-            // Sort chains alphabetically
-            data.chains.sort((a, b) => a.chain_name.localeCompare(b.chain_name));
+            // Store all chains and set up pagination
+            allChains = data.chains.sort((a, b) => a.chain_name.localeCompare(b.chain_name));
+            filteredChains = [...allChains]; // Initialize filtered chains
+            currentPage = 1;
 
-            // Build the chains list HTML
-            let chainsHTML = '';
-            data.chains.forEach(chain => {
-                const businessTypeLabel = getBusinessTypeLabel(chain.business_type);
-
-                chainsHTML += `
-                    <div class="card mb-2 chain-item" data-chain-id="${chain._id}" data-chain-name="${chain.chain_name}">
-                        <div class="card-body d-flex justify-content-between align-items-center py-2">
-                            <div class="text-left">
-                                <h4 class="mb-0 text-left">${chain.chain_name}</h4>
-                                <small class="text-left">${businessTypeLabel}</small>
-                            </div>
-                            <div>
-                                <small>${chain.location_count || 0} locations | ${chain.incentive_count || 0} incentives</small>
-                                <button class="btn btn-sm btn-primary btn-action view-chain-btn"
-                                        data-chain-id="${chain._id}">
-                                    View Details
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            chainsListContainer.innerHTML = chainsHTML;
-
-            // Add click event listeners
-            const viewChainBtns = document.querySelectorAll('.view-chain-btn');
-            viewChainBtns.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const chainId = this.getAttribute('data-chain-id');
-                    viewChainDetails(chainId);
-                });
-            });
+            displayChainsPage();
+            updatePagination();
         })
         .catch(error => {
             console.error('Error loading chains:', error);
@@ -395,9 +405,107 @@ function loadExistingChains() {
                     Error loading chains: ${error.message}
                 </div>
             `;
+            hidePagination();
         });
 }
 
+function displayChainsPage() {
+    const chainsListContainer = document.getElementById('chains-list');
+    if (!chainsListContainer) return;
+
+    const startIndex = (currentPage - 1) * chainsPerPage;
+    const endIndex = startIndex + chainsPerPage;
+    const chainsToShow = filteredChains.slice(startIndex, endIndex);
+
+    if (chainsToShow.length === 0) {
+        chainsListContainer.innerHTML = '<p class="text-center py-3">No chains found.</p>';
+        return;
+    }
+
+    // Build the chains list HTML
+    let chainsHTML = '';
+    chainsToShow.forEach(chain => {
+        const businessTypeLabel = getBusinessTypeLabel(chain.business_type);
+
+        chainsHTML += `
+            <div class="card mb-2 chain-item" data-chain-id="${chain._id}" data-chain-name="${chain.chain_name}">
+                <div class="card-body d-flex justify-content-between align-items-center py-2">
+                    <div class="text-left">
+                        <h4 class="mb-0 text-left">${chain.chain_name}</h4>
+                        <small class="text-left">${businessTypeLabel}</small>
+                    </div>
+                    <div>
+                        <small>${chain.location_count || 0} locations | ${chain.incentive_count || 0} incentives</small>
+                        <button class="btn btn-sm btn-primary btn-action view-chain-btn"
+                                data-chain-id="${chain._id}">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    chainsListContainer.innerHTML = chainsHTML;
+
+    // Add click event listeners
+    const viewChainBtns = document.querySelectorAll('.view-chain-btn');
+    viewChainBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const chainId = this.getAttribute('data-chain-id');
+            viewChainDetails(chainId);
+        });
+    });
+}
+
+function updatePagination() {
+    const paginationContainer = document.getElementById('pagination-container');
+    const paginationInfo = document.getElementById('paginationInfo');
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+
+    if (!paginationContainer) return;
+
+    const totalPages = Math.ceil(filteredChains.length / chainsPerPage);
+
+    if (totalPages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'flex';
+    paginationInfo.textContent = `Page ${currentPage} of ${totalPages} (${filteredChains.length} chains)`;
+
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage === totalPages;
+}
+
+// Add this new function to handle page changes
+function changePage(direction) {
+    const totalPages = Math.ceil(filteredChains.length / chainsPerPage);
+
+    currentPage += direction;
+
+    if (currentPage < 1) currentPage = 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    displayChainsPage();
+    updatePagination();
+
+    // Smooth scroll to chains list
+    document.getElementById('chains-list').scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+    });
+}
+
+// Add this function to hide pagination
+function hidePagination() {
+    const paginationContainer = document.getElementById('pagination-container');
+    if (paginationContainer) {
+        paginationContainer.style.display = 'none';
+    }
+}
 
 /**
  * Create a new chain - COMPLETE FUNCTION
@@ -414,7 +522,6 @@ function createNewChain() {
 
     const baseURL = getBaseURL();
 
-    // NEW: Use chains API with updated data structure
     const chainData = {
         chain_name: chainName,
         business_type: chainType,
@@ -444,19 +551,15 @@ function createNewChain() {
             // Reset the form
             document.getElementById('create-chain-form').reset();
 
-            // Reload the chains list
+            // Reload the chains list without scrolling
             loadExistingChains();
-
-            // View the newly created chain
-            if (data.chain && data.chain._id) {
-                viewChainDetails(data.chain._id);
-            }
         })
         .catch(error => {
             console.error('Error creating chain:', error);
             alert(`Error creating chain: ${error.message}`);
         });
 }
+
 
 /**
  * View chain details - UPDATED to use new chains API
@@ -1104,9 +1207,7 @@ function loadModalChainIncentives(chainId) {
  * Add an incentive to a chain - UPDATED for new API
  */
 function addChainIncentive(event) {
-    // Ensure we have the event
     event = event || window.event;
-    // Prevent the default form submission
     if (event) event.preventDefault();
 
     const chainId = currentChainId;
@@ -1115,7 +1216,6 @@ function addChainIncentive(event) {
         return;
     }
 
-    // Get form values
     const incentiveType = document.getElementById('incentive-type').value;
     const otherDescription = document.getElementById('other-description').value.trim();
     const incentiveAmount = document.getElementById('incentive-amount').value;
@@ -1126,16 +1226,13 @@ function addChainIncentive(event) {
         return;
     }
 
-    // Validate type-specific fields
     if (incentiveType === 'OT' && !otherDescription) {
         alert('Please provide a description for the "Other" incentive type.');
         return;
     }
 
-    // Get the base URL
     const baseURL = getBaseURL();
 
-    // NEW: Prepare the incentive data for new API
     const incentiveData = {
         chain_id: chainId,
         type: incentiveType,
@@ -1143,12 +1240,10 @@ function addChainIncentive(event) {
         information: incentiveInfo
     };
 
-    // Add other description if needed
     if (incentiveType === 'OT') {
         incentiveData.other_description = otherDescription;
     }
 
-    // NEW: Use chains API to add incentive
     fetch(`${baseURL}/api/chains.js?operation=add_incentive`, {
         method: 'POST',
         headers: {
@@ -1169,11 +1264,11 @@ function addChainIncentive(event) {
             // Reset the form
             document.getElementById('add-chain-incentive-form').reset();
 
-            // Close the modal using the helper
+            // Close the modal
             ModalHelper.hide('manage-incentives-modal');
 
-            // Reload incentives in the main view
-            viewChainDetails(chainId); // Reload entire chain details
+            // Reload chain details without scrolling
+            viewChainDetails(chainId);
         })
         .catch(error => {
             console.error('Error adding incentive:', error);
@@ -1280,18 +1375,23 @@ function deleteIncentive(incentiveId, isModal = false) {
  * @param {string} query - The search query
  */
 function filterChains(query) {
-    const chainItems = document.querySelectorAll('.chain-item');
+    if (!query.trim()) {
+        // If no query, show all chains
+        filteredChains = [...allChains];
+    } else {
+        // Filter chains based on query
+        filteredChains = allChains.filter(chain =>
+            chain.chain_name.toLowerCase().includes(query.toLowerCase()) ||
+            getBusinessTypeLabel(chain.business_type).toLowerCase().includes(query.toLowerCase())
+        );
+    }
 
-    chainItems.forEach(item => {
-        const chainName = item.getAttribute('data-chain-name').toLowerCase();
-
-        if (chainName.includes(query.toLowerCase())) {
-            item.style.display = 'block';
-        } else {
-            item.style.display = 'none';
-        }
-    });
+    // Reset to first page when filtering
+    currentPage = 1;
+    displayChainsPage();
+    updatePagination();
 }
+
 
 /**
  * Set up search functionality
