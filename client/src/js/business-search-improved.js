@@ -2582,17 +2582,47 @@ async function setupMapClickHandler() {
 
                     console.log("Parsed business object:", business);
 
-                    const tempMarker = new google.maps.Marker({
-                        position: new google.maps.LatLng(lat, lng),
-                        map: null, // Don't add to map yet - just for info window positioning
-                        title: business.bname
-                    });
+                    try {
+                        // Import the marker library
+                        const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
 
-// Store the business data
-                    tempMarker.business = business;
+                        // Create a simple pin element for the temporary marker
+                        const pinElement = document.createElement('div');
+                        pinElement.style.width = '10px';
+                        pinElement.style.height = '10px';
+                        pinElement.style.backgroundColor = '#EA4335';
+                        pinElement.style.borderRadius = '50%';
+                        pinElement.style.opacity = '0'; // Make it invisible since it's just for positioning
 
-// Show enhanced info window
-                    showEnhancedInfoWindow(tempMarker);
+                        // Create a real AdvancedMarkerElement
+                        const tempMarker = new AdvancedMarkerElement({
+                            position: new google.maps.LatLng(lat, lng),
+                            map: null, // Don't add to map visually
+                            content: pinElement,
+                            title: business.bname
+                        });
+
+                        // Store the business data
+                        tempMarker.business = business;
+                        tempMarker.position = new google.maps.LatLng(lat, lng);
+
+                        // Show enhanced info window
+                        showEnhancedInfoWindow(tempMarker);
+
+                    } catch (error) {
+                        console.error("Error creating temporary AdvancedMarkerElement:", error);
+
+                        // Fallback to the old method if AdvancedMarkerElement fails
+                        const tempMarker = {
+                            business: business,
+                            position: new google.maps.LatLng(lat, lng),
+                            getPosition: function () {
+                                return this.position;
+                            }
+                        };
+
+                        showEnhancedInfoWindow(tempMarker);
+                    }
                 } catch (error) {
                     console.error("Error fetching place details:", error);
                     // Show a user-friendly message instead of breaking
@@ -3882,39 +3912,73 @@ function showEnhancedInfoWindow(marker) {
     // Open info window
     setTimeout(() => {
         try {
-            // Check if this is a real Google Maps marker
-            if (marker instanceof google.maps.Marker) {
-                // Real marker - use marker-based opening
+            // Check if this is an AdvancedMarkerElement or regular Marker
+            if (marker instanceof google.maps.marker.AdvancedMarkerElement ||
+                marker instanceof google.maps.Marker) {
+
+                // Real Google Maps marker - use marker-based opening
                 infoWindow.open(map, marker);
-                console.log("Info window opened with real marker - will move with map");
+                console.log("Info window opened with Google Maps marker - will move with map");
+
             } else {
-                // Temporary marker or custom object - use position but add tracking
+                // Custom marker object - use position-based opening with enhanced tracking
+                console.log("Info window opened at position - adding comprehensive map tracking");
+
                 infoWindow.setPosition(position);
                 infoWindow.open(map);
-                console.log("Info window opened at position - adding map tracking");
 
-                // Add listener to make it follow map movement
-                const moveListener = google.maps.event.addListener(map, 'center_changed', function() {
+                // Enhanced tracking for multiple map events
+                const listeners = [];
+
+                // Store the original position
+                const originalPosition = position;
+
+                // Function to update info window position
+                const updatePosition = () => {
                     if (infoWindow.getMap()) {
-                        // Recalculate position relative to map center
-                        infoWindow.setPosition(position);
+                        infoWindow.setPosition(originalPosition);
                     }
-                });
+                };
 
-                // Clean up listener when info window closes
-                google.maps.event.addListenerOnce(infoWindow, 'closeclick', function() {
-                    google.maps.event.removeListener(moveListener);
-                });
+                // Track all types of map movement
+                listeners.push(google.maps.event.addListener(map, 'center_changed', updatePosition));
+                listeners.push(google.maps.event.addListener(map, 'zoom_changed', updatePosition));
+                listeners.push(google.maps.event.addListener(map, 'drag', updatePosition));
+                listeners.push(google.maps.event.addListener(map, 'dragstart', updatePosition));
+                listeners.push(google.maps.event.addListener(map, 'dragend', updatePosition));
+                listeners.push(google.maps.event.addListener(map, 'bounds_changed', updatePosition));
+
+                // Clean up all listeners when info window closes
+                const cleanupListeners = () => {
+                    listeners.forEach(listener => google.maps.event.removeListener(listener));
+                    console.log("Cleaned up info window movement listeners");
+                };
+
+                google.maps.event.addListenerOnce(infoWindow, 'closeclick', cleanupListeners);
+
+                // Also clean up when a new info window is opened
+                google.maps.event.addListenerOnce(infoWindow, 'position_changed', cleanupListeners);
             }
 
             console.log("Enhanced info window opened successfully");
 
-            // Rest of your existing code...
+            // Apply fixes after DOM is ready
             google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
                 setTimeout(() => {
                     applyEnhancedInfoWindowFixes();
-                    // ... your existing incentives loading code
-                }, 200);
+
+                    // Load incentives with correct container ID logic
+                    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
+                    console.log(`🎁 INCENTIVES: Loading for container ID: ${containerId}`);
+
+                    if (isFromDatabase && isChainLocation) {
+                        loadChainIncentivesForDatabaseBusinessFixed(containerId, business.chain_id);
+                    } else if (isFromDatabase) {
+                        loadIncentivesForEnhancedWindowFixed(containerId);
+                    } else if (isGooglePlace && isChainLocation) {
+                        loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
+                    }
+                }, 300);
             });
 
         } catch (error) {
