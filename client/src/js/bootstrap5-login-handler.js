@@ -60,6 +60,9 @@ function handleLogin() {
                         isAdmin: data.isAdmin,
                         created_at: data.created_at,
                         updated_at: data.updated_at,
+                        termsAccepted: data.termsAccepted || false,
+                        termsVersion: data.termsVersion || null,
+                        termsAcceptedDate: data.termsAcceptedDate || null
                     },
                     token: data.token || 'no-token-provided',
                     timestamp: new Date().getTime(),
