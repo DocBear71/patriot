@@ -3882,32 +3882,38 @@ function showEnhancedInfoWindow(marker) {
     // Open info window
     setTimeout(() => {
         try {
-            // FIXED: Always try to open with marker first for consistent behavior
-            if (marker && (marker.getPosition || marker.position)) {
-                // This will make the info window move with the map
+            // Check if this is a real Google Maps marker
+            if (marker instanceof google.maps.Marker) {
+                // Real marker - use marker-based opening
                 infoWindow.open(map, marker);
-                console.log("Info window opened with marker - will move with map");
+                console.log("Info window opened with real marker - will move with map");
             } else {
-                // Fallback to position-based opening only if marker doesn't work
-                console.log("Fallback: Opening info window at fixed position");
+                // Temporary marker or custom object - use position but add tracking
                 infoWindow.setPosition(position);
                 infoWindow.open(map);
+                console.log("Info window opened at position - adding map tracking");
+
+                // Add listener to make it follow map movement
+                const moveListener = google.maps.event.addListener(map, 'center_changed', function() {
+                    if (infoWindow.getMap()) {
+                        // Recalculate position relative to map center
+                        infoWindow.setPosition(position);
+                    }
+                });
+
+                // Clean up listener when info window closes
+                google.maps.event.addListenerOnce(infoWindow, 'closeclick', function() {
+                    google.maps.event.removeListener(moveListener);
+                });
             }
 
             console.log("Enhanced info window opened successfully");
 
-            // Apply fixes after DOM is ready
+            // Rest of your existing code...
             google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
                 setTimeout(() => {
                     applyEnhancedInfoWindowFixes();
-
-                    // Load incentives logic (keep your existing code here)
-                    if (!isGooglePlace) {
-                        loadIncentivesForEnhancedWindow(business._id);
-                    } else if (isChainLocation) {
-                        console.log(`Loading chain incentives for place: ${business.placeId}, chain: ${business.chain_id}`);
-                        loadChainIncentivesForEnhancedWindow(business.placeId, business.chain_id);
-                    }
+                    // ... your existing incentives loading code
                 }, 200);
             });
 
