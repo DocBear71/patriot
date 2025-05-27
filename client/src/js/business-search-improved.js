@@ -2582,16 +2582,16 @@ async function setupMapClickHandler() {
 
                     console.log("Parsed business object:", business);
 
-                    // Create temporary marker for info window
-                    const tempMarker = {
-                        business: business,
+                    const tempMarker = new google.maps.Marker({
                         position: new google.maps.LatLng(lat, lng),
-                        getPosition: function () {
-                            return this.position;
-                        }
-                    };
+                        map: null, // Don't add to map yet - just for info window positioning
+                        title: business.bname
+                    });
 
-                    // Show enhanced info window
+// Store the business data
+                    tempMarker.business = business;
+
+// Show enhanced info window
                     showEnhancedInfoWindow(tempMarker);
                 } catch (error) {
                     console.error("Error fetching place details:", error);
