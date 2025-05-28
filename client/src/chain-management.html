@@ -177,13 +177,15 @@
             justify-content: center;
             align-items: center;
             margin: 20px 0;
-            gap: 10px;
+            gap: 5px;
+            flex-wrap: wrap;
         }
 
         .pagination-info {
             font-size: 14px;
             color: #666;
-            margin: 0 15px;
+            margin: 10px 15px;
+            white-space: nowrap;
         }
 
         .pagination-btn {
@@ -194,6 +196,9 @@
             cursor: pointer;
             border-radius: 4px;
             transition: all 0.2s ease;
+            font-size: 14px;
+            min-width: 40px;
+            text-align: center;
         }
 
         .pagination-btn:hover:not(:disabled) {
@@ -211,6 +216,76 @@
             background-color: #4285F4;
             color: white;
             border-color: #4285F4;
+        }
+
+        .pagination-btn.jump-btn {
+            background-color: #28a745;
+            color: white;
+            border-color: #28a745;
+            font-weight: bold;
+        }
+
+        .pagination-btn.jump-btn:hover:not(:disabled) {
+            background-color: #218838;
+            border-color: #1e7e34;
+        }
+
+        .pagination-separator {
+            padding: 8px 4px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .page-jump-input {
+            width: 60px;
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 14px;
+            margin: 0 5px;
+        }
+
+        .page-jump-container {
+            display: flex;
+            align-items: center;
+            margin: 0 15px;
+            white-space: nowrap;
+        }
+
+        .chains-per-page-container {
+            display: flex;
+            align-items: center;
+            margin: 10px 15px;
+            white-space: nowrap;
+        }
+
+        .chains-per-page-select {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-left: 5px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .pagination-container {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .pagination-info,
+            .page-jump-container,
+            .chains-per-page-container {
+                margin: 5px;
+            }
+
+            .pagination-btn {
+                min-width: 35px;
+                padding: 6px 8px;
+                font-size: 12px;
+            }
         }
     </style>
 </head>
@@ -319,9 +394,66 @@
                 </div>
             </div>
             <div class="pagination-container" id="pagination-container" style="display: none;">
-                <button class="pagination-btn" id="prevPageBtn" onclick="changePage(-1)">Previous</button>
-                <span class="pagination-info" id="paginationInfo">Page 1 of 1</span>
-                <button class="pagination-btn" id="nextPageBtn" onclick="changePage(1)">Next</button>
+                <!-- First row: Main navigation -->
+                <div style="display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 5px;">
+                    <!-- Jump to First/Last -->
+                    <button class="pagination-btn jump-btn" id="firstPageBtn" onclick="jumpToPage(1)" title="First Page">
+                        <i class="bi bi-chevron-double-left"></i> First
+                    </button>
+
+                    <!-- Previous buttons -->
+                    <button class="pagination-btn" id="prevTenBtn" onclick="changePage(-10)" title="Previous 10 Pages">
+                        <i class="bi bi-chevron-left"></i><i class="bi bi-chevron-left"></i> -10
+                    </button>
+                    <button class="pagination-btn" id="prevPageBtn" onclick="changePage(-1)" title="Previous Page">
+                        <i class="bi bi-chevron-left"></i> Prev
+                    </button>
+
+                    <!-- Current page indicator -->
+                    <span class="pagination-info" id="paginationInfo">Page 1 of 1</span>
+
+                    <!-- Next buttons -->
+                    <button class="pagination-btn" id="nextPageBtn" onclick="changePage(1)" title="Next Page">
+                        Next <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button class="pagination-btn" id="nextTenBtn" onclick="changePage(10)" title="Next 10 Pages">
+                        +10 <i class="bi bi-chevron-right"></i><i class="bi bi-chevron-right"></i>
+                    </button>
+
+                    <!-- Jump to Last -->
+                    <button class="pagination-btn jump-btn" id="lastPageBtn" onclick="jumpToLastPage()" title="Last Page">
+                        Last <i class="bi bi-chevron-double-right"></i>
+                    </button>
+                </div>
+
+                <!-- Second row: Page numbers (for nearby pages) -->
+                <div id="pageNumbers" style="display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 2px; margin-top: 5px;">
+                    <!-- Page numbers will be inserted here -->
+                </div>
+
+                <!-- Third row: Jump to specific page and items per page -->
+                <div style="display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 10px;">
+                    <!-- Jump to specific page -->
+                    <div class="page-jump-container">
+                        <label for="pageJumpInput">Go to page:</label>
+                        <input type="number" id="pageJumpInput" class="page-jump-input" min="1" placeholder="1">
+                        <button class="pagination-btn" onclick="jumpToInputPage()">Go</button>
+                    </div>
+
+                    <!-- Items per page selector -->
+                    <div class="chains-per-page-container">
+                        <label for="chainsPerPageSelect">Show:</label>
+                        <select id="chainsPerPageSelect" class="chains-per-page-select" onchange="changeItemsPerPage()">
+                            <option value="5">5 per page</option>
+                            <option value="10" selected>10 per page</option>
+                            <option value="15">15 per page</option>
+                            <option value="20">20 per page</option>
+                            <option value="25">25 per page</option>
+                            <option value="50">50 per page</option>
+                            <option value="100">100 per page</option>
+                        </select>
+                    </div>
+                </div>
             </div>
             <!-- Chain Details Section (will show when a chain is selected) -->
             <div id="chain-details" class="card" style="display: none;">

@@ -36,6 +36,9 @@ function initChainManagement() {
             // Set up search functionality
             setupSearchFunctionality();
 
+            // Add pagination keyboard support
+            setupPaginationKeyboardSupport();
+
             setupModals();
         } else {
             console.error("Admin access denied");
@@ -461,8 +464,7 @@ function displayChainsPage() {
 function updatePagination() {
     const paginationContainer = document.getElementById('pagination-container');
     const paginationInfo = document.getElementById('paginationInfo');
-    const prevBtn = document.getElementById('prevPageBtn');
-    const nextBtn = document.getElementById('nextPageBtn');
+    const pageJumpInput = document.getElementById('pageJumpInput');
 
     if (!paginationContainer) return;
 
@@ -473,30 +475,199 @@ function updatePagination() {
         return;
     }
 
-    paginationContainer.style.display = 'flex';
-    paginationInfo.textContent = `Page ${currentPage} of ${totalPages} (${filteredChains.length} chains)`;
+    paginationContainer.style.display = 'block';
 
-    prevBtn.disabled = currentPage === 1;
-    nextBtn.disabled = currentPage === totalPages;
+    // Update info display
+    const startItem = (currentPage - 1) * chainsPerPage + 1;
+    const endItem = Math.min(currentPage * chainsPerPage, filteredChains.length);
+    paginationInfo.textContent = `Page ${currentPage} of ${totalPages} (${startItem}-${endItem} of ${filteredChains.length} chains)`;
+
+    // Update jump input max value
+    if (pageJumpInput) {
+        pageJumpInput.max = totalPages;
+        pageJumpInput.placeholder = `1-${totalPages}`;
+    }
+
+    // Update button states
+    updatePaginationButtons(totalPages);
+
+    // Update page numbers display
+    updatePageNumbers(totalPages);
 }
 
-// Add this new function to handle page changes
+// New function to update pagination button states
+function updatePaginationButtons(totalPages) {
+    const firstBtn = document.getElementById('firstPageBtn');
+    const prevBtn = document.getElementById('prevPageBtn');
+    const prevTenBtn = document.getElementById('prevTenBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+    const nextTenBtn = document.getElementById('nextTenBtn');
+    const lastBtn = document.getElementById('lastPageBtn');
+
+    // First page and previous buttons
+    if (firstBtn) firstBtn.disabled = currentPage === 1;
+    if (prevBtn) prevBtn.disabled = currentPage === 1;
+    if (prevTenBtn) prevTenBtn.disabled = currentPage <= 10;
+
+    // Last page and next buttons
+    if (lastBtn) lastBtn.disabled = currentPage === totalPages;
+    if (nextBtn) nextBtn.disabled = currentPage === totalPages;
+    if (nextTenBtn) nextTenBtn.disabled = currentPage > totalPages - 10;
+}
+
+// New function to display page numbers (shows current page ± 2 pages)
+function updatePageNumbers(totalPages) {
+    const pageNumbersContainer = document.getElementById('pageNumbers');
+    if (!pageNumbersContainer) return;
+
+    // Only show page numbers if there are multiple pages but not too many
+    if (totalPages <= 1 || totalPages > 20) {
+        pageNumbersContainer.style.display = 'none';
+        return;
+    }
+
+    pageNumbersContainer.style.display = 'flex';
+
+    let pageNumbersHTML = '';
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+
+    // Adjust range to always show 5 pages when possible
+    if (endPage - startPage < 4) {
+        if (startPage === 1) {
+            endPage = Math.min(totalPages, startPage + 4);
+        } else if (endPage === totalPages) {
+            startPage = Math.max(1, endPage - 4);
+        }
+    }
+
+    // Add ellipsis and first page if needed
+    if (startPage > 1) {
+        pageNumbersHTML += `<button class="pagination-btn" onclick="jumpToPage(1)">1</button>`;
+        if (startPage > 2) {
+            pageNumbersHTML += `<span class="pagination-separator">...</span>`;
+        }
+    }
+
+    // Add page numbers
+    for (let i = startPage; i <= endPage; i++) {
+        const activeClass = i === currentPage ? 'active' : '';
+        pageNumbersHTML += `<button class="pagination-btn ${activeClass}" onclick="jumpToPage(${i})">${i}</button>`;
+    }
+
+    // Add ellipsis and last page if needed
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            pageNumbersHTML += `<span class="pagination-separator">...</span>`;
+        }
+        pageNumbersHTML += `<button class="pagination-btn" onclick="jumpToPage(${totalPages})">${totalPages}</button>`;
+    }
+
+    pageNumbersContainer.innerHTML = pageNumbersHTML;
+}
+
+
+// Enhanced changePage function
 function changePage(direction) {
     const totalPages = Math.ceil(filteredChains.length / chainsPerPage);
 
-    currentPage += direction;
+    let newPage = currentPage + direction;
 
-    if (currentPage < 1) currentPage = 1;
-    if (currentPage > totalPages) currentPage = totalPages;
+    // Ensure we stay within bounds
+    if (newPage < 1) newPage = 1;
+    if (newPage > totalPages) newPage = totalPages;
+
+    // Only update if the page actually changed
+    if (newPage !== currentPage) {
+        currentPage = newPage;
+        displayChainsPage();
+        updatePagination();
+
+        // Smooth scroll to chains list
+        document.getElementById('chains-list').scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+        });
+    }
+}
+
+// New function to jump to a specific page
+function jumpToPage(pageNumber) {
+    const totalPages = Math.ceil(filteredChains.length / chainsPerPage);
+
+    if (pageNumber < 1) pageNumber = 1;
+    if (pageNumber > totalPages) pageNumber = totalPages;
+
+    if (pageNumber !== currentPage) {
+        currentPage = pageNumber;
+        displayChainsPage();
+        updatePagination();
+
+        // Smooth scroll to chains list
+        document.getElementById('chains-list').scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+        });
+    }
+}
+
+// New function to jump to last page
+function jumpToLastPage() {
+    const totalPages = Math.ceil(filteredChains.length / chainsPerPage);
+    jumpToPage(totalPages);
+}
+
+// New function to jump to page from input field
+function jumpToInputPage() {
+    const pageInput = document.getElementById('pageJumpInput');
+    if (!pageInput) return;
+
+    const pageNumber = parseInt(pageInput.value);
+    if (isNaN(pageNumber)) {
+        alert('Please enter a valid page number.');
+        return;
+    }
+
+    const totalPages = Math.ceil(filteredChains.length / chainsPerPage);
+
+    if (pageNumber < 1 || pageNumber > totalPages) {
+        alert(`Please enter a page number between 1 and ${totalPages}.`);
+        return;
+    }
+
+    jumpToPage(pageNumber);
+    pageInput.value = ''; // Clear the input
+}
+
+// New function to change items per page
+function changeItemsPerPage() {
+    const select = document.getElementById('chainsPerPageSelect');
+    if (!select) return;
+
+    const newItemsPerPage = parseInt(select.value);
+    if (isNaN(newItemsPerPage)) return;
+
+    // Calculate what the new current page should be to keep roughly the same items visible
+    const firstItemIndex = (currentPage - 1) * chainsPerPage;
+    const newCurrentPage = Math.floor(firstItemIndex / newItemsPerPage) + 1;
+
+    chainsPerPage = newItemsPerPage;
+    currentPage = newCurrentPage;
 
     displayChainsPage();
     updatePagination();
+}
 
-    // Smooth scroll to chains list
-    document.getElementById('chains-list').scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-    });
+// Add keyboard support for the jump input
+function setupPaginationKeyboardSupport() {
+    const pageJumpInput = document.getElementById('pageJumpInput');
+    if (pageJumpInput) {
+        pageJumpInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                jumpToInputPage();
+            }
+        });
+    }
 }
 
 // Add this function to hide pagination
