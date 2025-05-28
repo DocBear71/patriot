@@ -108,9 +108,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     dashboardStats.activeChainsWithIncentives = chainStats.activeChainsWithIncentives;
                     dashboardStats.averageLocationsPerChain = chainStats.averageLocationsPerChain;
                     dashboardStats.averageIncentivesPerChain = chainStats.averageIncentivesPerChain;
-                    dashboardStats.chainChange = 8; // Default chain growth
+                    // ENHANCED: Use real calculated monthly growth
+                    dashboardStats.chainChange = chainStats.chainGrowthPercentage;
+                    dashboardStats.chainsThisMonth = chainStats.chainsThisMonth;
+                    dashboardStats.chainsAtStartOfMonth = chainStats.chainsAtStartOfMonth;
 
                     console.log(`✅ Chain stats loaded: ${chainStats.totalChains} chains, ${chainStats.totalChainLocations} locations`);
+                    console.log(`📈 REAL GROWTH: ${chainStats.chainGrowthPercentage}% (${chainStats.chainsThisMonth} new this month vs ${chainStats.chainsAtStartOfMonth} at start)`);
                 } else {
                     console.log("❌ Chain stats failed to load");
                     dashboardStats.chainCount = 0;
@@ -791,13 +795,22 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
             console.log("🔗 Chain stats from API:", data);
 
+            // ENHANCED: Use actual calculated monthly growth
+            const chainGrowthPercentage = data.chain_growth_percentage || 0;
+
+            console.log(`📊 REAL MONTHLY GROWTH: ${chainGrowthPercentage}% (${data.chains_this_month} new chains this month)`);
+
             return {
                 totalChains: data.total_chains || 0,
                 totalChainLocations: data.total_locations || 0,
                 totalChainIncentives: data.total_incentives || 0,
                 activeChainsWithIncentives: data.active_chains_with_incentives || 0,
                 averageLocationsPerChain: data.average_locations_per_chain || 0,
-                averageIncentivesPerChain: data.average_incentives_per_active_chain || 0
+                averageIncentivesPerChain: data.average_incentives_per_active_chain || 0,
+                // ENHANCED: Real monthly growth data
+                chainGrowthPercentage: chainGrowthPercentage,
+                chainsThisMonth: data.chains_this_month || 0,
+                chainsAtStartOfMonth: data.chains_at_start_of_month || 0
             };
 
         } catch (error) {
@@ -809,7 +822,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 totalChainIncentives: 0,
                 activeChainsWithIncentives: 0,
                 averageLocationsPerChain: 0,
-                averageIncentivesPerChain: 0
+                averageIncentivesPerChain: 0,
+                chainGrowthPercentage: 0,
+                chainsThisMonth: 0,
+                chainsAtStartOfMonth: 0
             };
         }
     }

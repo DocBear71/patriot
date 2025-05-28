@@ -202,12 +202,52 @@ async function handleListChains(req, res) {
  * NEW: Get chain summary statistics
  */
 async function handleChainSummary(req, res) {
-    console.log("📊 CHAINS: Getting summary statistics");
+    console.log("📊 CHAINS: Getting summary statistics with monthly growth calculation");
 
     try {
         // Count total active chains
         const totalChains = await Chain.countDocuments({ status: 'active' });
         console.log(`📈 Total chains: ${totalChains}`);
+
+        // Calculate monthly growth - chains created this month
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+        console.log(`📅 This month: ${startOfMonth.toISOString().split('T')[0]} to ${now.toISOString().split('T')[0]}`);
+        console.log(`📅 Last month: ${startOfLastMonth.toISOString().split('T')[0]} to ${endOfLastMonth.toISOString().split('T')[0]}`);
+
+        // Count chains created this month
+        const chainsThisMonth = await Chain.countDocuments({
+            status: 'active',
+            created_date: {
+                $gte: startOfMonth,
+                $lte: now
+            }
+        });
+
+        // Count chains that existed at the start of this month
+        const chainsAtStartOfMonth = await Chain.countDocuments({
+            status: 'active',
+            created_date: {
+                $lt: startOfMonth
+            }
+        });
+
+        // Calculate growth percentage
+        let chainGrowthPercentage = 0;
+        if (chainsAtStartOfMonth > 0) {
+            chainGrowthPercentage = Math.round((chainsThisMonth / chainsAtStartOfMonth) * 100);
+        } else if (chainsThisMonth > 0) {
+            // If we had no chains at start of month but have some now, that's infinite growth
+            // Cap it at a reasonable number like 1000%
+            chainGrowthPercentage = 1000;
+        }
+
+        console.log(`🔢 Chains at start of month: ${chainsAtStartOfMonth}`);
+        console.log(`🔢 New chains this month: ${chainsThisMonth}`);
+        console.log(`📊 Chain growth percentage: ${chainGrowthPercentage}%`);
 
         // Count total locations that belong to chains
         const totalLocations = await Business.countDocuments({
@@ -260,6 +300,10 @@ async function handleChainSummary(req, res) {
             total_locations: totalLocations,
             total_incentives: totalIncentives,
             active_chains_with_incentives: activeChainsWithIncentives,
+            // Enhanced growth tracking
+            chains_this_month: chainsThisMonth,
+            chains_at_start_of_month: chainsAtStartOfMonth,
+            chain_growth_percentage: chainGrowthPercentage,
             // Bonus stats
             chains_with_universal_incentives: chainsWithUniversalIncentives,
             locations_with_universal_enabled: locationsWithUniversalEnabled,
@@ -268,7 +312,7 @@ async function handleChainSummary(req, res) {
                 Math.round(totalIncentives / activeChainsWithIncentives * 10) / 10 : 0
         };
 
-        console.log("📊 Summary statistics compiled successfully");
+        console.log("📊 Summary statistics compiled successfully with monthly growth");
 
         return res.status(200).json({
             success: true,
