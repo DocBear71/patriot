@@ -295,6 +295,55 @@ async function handleChainSummary(req, res) {
         console.log(`🌐 Chains with universal incentives enabled: ${chainsWithUniversalIncentives}`);
         console.log(`🏢 Locations with universal incentives enabled: ${locationsWithUniversalEnabled}`);
 
+
+        const chainIncentivesThisMonth = await Chain.aggregate([
+            { $match: { status: 'active' } },
+            { $unwind: '$incentives' },
+            {
+                $match: {
+                    'incentives.is_active': { $ne: false },
+                    'incentives.created_date': {
+                        $gte: startOfMonth,
+                        $lte: now
+                    }
+                }
+            },
+            { $count: 'total' }
+        ]);
+
+        const newChainIncentivesThisMonth = chainIncentivesThisMonth.length > 0 ?
+            chainIncentivesThisMonth[0].total : 0;
+
+    // Count chain incentives that existed at start of month
+        const chainIncentivesAtStartOfMonth = await Chain.aggregate([
+            { $match: { status: 'active' } },
+            { $unwind: '$incentives' },
+            {
+                $match: {
+                    'incentives.is_active': { $ne: false },
+                    'incentives.created_date': {
+                        $lt: startOfMonth
+                    }
+                }
+            },
+            { $count: 'total' }
+        ]);
+
+        const existingChainIncentivesAtStart = chainIncentivesAtStartOfMonth.length > 0 ?
+            chainIncentivesAtStartOfMonth[0].total : 0;
+
+    // Calculate chain incentive growth percentage
+        let chainIncentiveGrowthPercentage = 0;
+        if (existingChainIncentivesAtStart > 0) {
+            chainIncentiveGrowthPercentage = Math.round((newChainIncentivesThisMonth / existingChainIncentivesAtStart) * 100);
+        } else if (newChainIncentivesThisMonth > 0) {
+            chainIncentiveGrowthPercentage = 1000; // Cap at 1000% for new programs
+        }
+
+        console.log(`🎁 Chain incentives at start of month: ${existingChainIncentivesAtStart}`);
+        console.log(`🎁 New chain incentives this month: ${newChainIncentivesThisMonth}`);
+        console.log(`📊 Chain incentive growth: ${chainIncentiveGrowthPercentage}%`);
+
         const summaryData = {
             total_chains: totalChains,
             total_locations: totalLocations,
@@ -304,6 +353,10 @@ async function handleChainSummary(req, res) {
             chains_this_month: chainsThisMonth,
             chains_at_start_of_month: chainsAtStartOfMonth,
             chain_growth_percentage: chainGrowthPercentage,
+            // NEW: Chain incentive tracking
+            chain_incentives_this_month: newChainIncentivesThisMonth,
+            chain_incentives_at_start_of_month: existingChainIncentivesAtStart,
+            chain_incentive_growth_percentage: chainIncentiveGrowthPercentage,
             // Bonus stats
             chains_with_universal_incentives: chainsWithUniversalIncentives,
             locations_with_universal_enabled: locationsWithUniversalEnabled,

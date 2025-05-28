@@ -112,13 +112,19 @@ document.addEventListener('DOMContentLoaded', function () {
                     dashboardStats.chainChange = chainStats.chainGrowthPercentage;
                     dashboardStats.chainsThisMonth = chainStats.chainsThisMonth;
                     dashboardStats.chainsAtStartOfMonth = chainStats.chainsAtStartOfMonth;
+                    // NEW: Chain incentive data
+                    dashboardStats.chainIncentiveChange = chainStats.chainIncentiveGrowthPercentage;
+                    dashboardStats.chainIncentivesThisMonth = chainStats.chainIncentivesThisMonth;
+                    dashboardStats.chainIncentivesAtStartOfMonth = chainStats.chainIncentivesAtStartOfMonth;
 
                     console.log(`✅ Chain stats loaded: ${chainStats.totalChains} chains, ${chainStats.totalChainLocations} locations`);
                     console.log(`📈 REAL GROWTH: ${chainStats.chainGrowthPercentage}% (${chainStats.chainsThisMonth} new this month vs ${chainStats.chainsAtStartOfMonth} at start)`);
+                    console.log(`🎁 INCENTIVE GROWTH: ${chainStats.chainIncentiveGrowthPercentage}% (${chainStats.chainIncentivesThisMonth} new incentives this month)`);
                 } else {
                     console.log("❌ Chain stats failed to load");
                     dashboardStats.chainCount = 0;
                     dashboardStats.chainChange = 0;
+                    dashboardStats.chainIncentiveChange = 0;
                 }
             } catch (chainError) {
                 console.error("Error loading chain stats:", chainError);
@@ -175,7 +181,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateEnhancedDashboardStats() {
         const stats = dashboardStats;
-        console.log("🔗 ENHANCED: Updating dashboard with enhanced stats:", stats);
+        console.log("🔗 ENHANCED: Updating dashboard with enhanced stats (5 cards):", stats);
 
         // Handle undefined or null values with fallbacks
         const userCount = stats.userCount || 0;
@@ -186,14 +192,19 @@ document.addEventListener('DOMContentLoaded', function () {
         const chainChange = typeof stats.chainChange === 'number' ? stats.chainChange : 0;
         const incentiveCount = stats.incentiveCount || 0;
         const incentiveChange = typeof stats.incentiveChange === 'number' ? stats.incentiveChange : 0;
+        // NEW: Chain incentive stats
+        const chainIncentiveCount = stats.chainIncentives || 0;
+        const chainIncentiveChange = typeof stats.chainIncentiveChange === 'number' ? stats.chainIncentiveChange : 0;
+        const activeChainsWithIncentives = stats.activeChainsWithIncentives || 0;
 
-        console.log(`📊 Values being used: Users=${userCount}, Businesses=${businessCount}, Chains=${chainCount}, Incentives=${incentiveCount}`);
+        console.log(`📊 Values being used: Users=${userCount}, Businesses=${businessCount}, Chains=${chainCount}, Incentives=${incentiveCount}, Chain Incentives=${chainIncentiveCount}`);
 
-        // Update 4-card layout
+        // Update 5-card layout
         const userStatElement = document.getElementById('dashboard-users-stat');
         const businessStatElement = document.getElementById('dashboard-businesses-stat');
         const chainStatElement = document.getElementById('dashboard-chains-stat');
         const incentiveStatElement = document.getElementById('dashboard-incentives-stat');
+        const chainIncentiveStatElement = document.getElementById('dashboard-chain-incentives-stat');
 
         if (userStatElement) {
             userStatElement.textContent = userCount;
@@ -215,11 +226,24 @@ document.addEventListener('DOMContentLoaded', function () {
             console.log(`✅ Updated incentives: ${incentiveCount}`);
         }
 
+        // NEW: Update chain incentives card
+        if (chainIncentiveStatElement) {
+            chainIncentiveStatElement.textContent = `${chainIncentiveCount} total`;
+            console.log(`✅ Updated chain incentives: ${chainIncentiveCount}`);
+        }
+
+        // Update chain incentives breakdown
+        const chainIncentiveBreakdownElement = document.getElementById('dashboard-chain-incentives-breakdown');
+        if (chainIncentiveBreakdownElement) {
+            chainIncentiveBreakdownElement.innerHTML = `${activeChainsWithIncentives} chains • ${stats.averageIncentivesPerChain || 0} avg per chain`;
+        }
+
         // Update change percentages
         const userChangeElement = document.getElementById('dashboard-users-change');
         const businessChangeElement = document.getElementById('dashboard-businesses-change');
         const chainChangeElement = document.getElementById('dashboard-chains-change');
         const incentiveChangeElement = document.getElementById('dashboard-incentives-change');
+        const chainIncentiveChangeElement = document.getElementById('dashboard-chain-incentives-change');
 
         if (userChangeElement) {
             userChangeElement.textContent = `${userChange >= 0 ? '↑' : '↓'} ${Math.abs(userChange)}% from last month`;
@@ -235,6 +259,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (incentiveChangeElement) {
             incentiveChangeElement.textContent = `${incentiveChange >= 0 ? '↑' : '↓'} ${Math.abs(incentiveChange)}% from last month`;
+        }
+
+        // NEW: Update chain incentive change
+        if (chainIncentiveChangeElement) {
+            chainIncentiveChangeElement.textContent = `${chainIncentiveChange >= 0 ? '↑' : '↓'} ${Math.abs(chainIncentiveChange)}% from last month`;
         }
 
         // Also update individual panel stats
@@ -797,8 +826,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // ENHANCED: Use actual calculated monthly growth
             const chainGrowthPercentage = data.chain_growth_percentage || 0;
+            const chainIncentiveGrowthPercentage = data.chain_incentive_growth_percentage || 0;
 
             console.log(`📊 REAL MONTHLY GROWTH: ${chainGrowthPercentage}% (${data.chains_this_month} new chains this month)`);
+            console.log(`🎁 CHAIN INCENTIVE GROWTH: ${chainIncentiveGrowthPercentage}% (${data.chain_incentives_this_month} new incentives this month)`);
 
             return {
                 totalChains: data.total_chains || 0,
@@ -810,7 +841,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 // ENHANCED: Real monthly growth data
                 chainGrowthPercentage: chainGrowthPercentage,
                 chainsThisMonth: data.chains_this_month || 0,
-                chainsAtStartOfMonth: data.chains_at_start_of_month || 0
+                chainsAtStartOfMonth: data.chains_at_start_of_month || 0,
+                // NEW: Chain incentive growth data
+                chainIncentiveGrowthPercentage: chainIncentiveGrowthPercentage,
+                chainIncentivesThisMonth: data.chain_incentives_this_month || 0,
+                chainIncentivesAtStartOfMonth: data.chain_incentives_at_start_of_month || 0
             };
 
         } catch (error) {
@@ -825,7 +860,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 averageIncentivesPerChain: 0,
                 chainGrowthPercentage: 0,
                 chainsThisMonth: 0,
-                chainsAtStartOfMonth: 0
+                chainsAtStartOfMonth: 0,
+                chainIncentiveGrowthPercentage: 0,
+                chainIncentivesThisMonth: 0,
+                chainIncentivesAtStartOfMonth: 0
             };
         }
     }
