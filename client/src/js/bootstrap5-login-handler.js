@@ -6,27 +6,23 @@ function handleLogin() {
     console.log("Handle login function called");
 
     // Get form values
-    const email = document.getElementById('DropdownFormEmail1').value.toLowerCase(); // Convert to lowercase here
+    const email = document.getElementById('DropdownFormEmail1').value.toLowerCase();
     const password = document.getElementById('DropdownFormPassword1').value;
     const rememberMe = document.getElementById('dropdownCheck')?.checked || false;
 
     console.log("Login attempt with:", email, "Remember me:", rememberMe);
 
-    // For now, just simulate a successful login
     if (email && password) {
         console.log("Login successful");
-        // prepare login data
         const loginData = {
             email: email,
             password: password,
         };
 
-        // determine the base URL
         const baseURL = window.location.hostname === "localhost" || window.location.hostname === '127.0.0.1'
             ? `http://${window.location.host}`
             : window.location.origin;
 
-        // Make API call to login endpoint
         fetch(`${baseURL}/api/auth.js?operation=login`, {
             method: "POST",
             headers: {
@@ -43,7 +39,9 @@ function handleLogin() {
             .then(data => {
                 console.log("Login successful");
 
-                // create session object
+                // CRITICAL FIX: Set session timestamp at login time
+                const currentTime = new Date().getTime();
+
                 const session = {
                     user: {
                         _id: data.userId,
@@ -65,34 +63,29 @@ function handleLogin() {
                         termsAcceptedDate: data.termsAcceptedDate || null
                     },
                     token: data.token || 'no-token-provided',
-                    timestamp: new Date().getTime(),
+                    timestamp: currentTime, // CRITICAL: Set timestamp at login
                     expiresIn: 24 * 60 * 60 * 1000 // 24 hours in milliseconds
                 };
 
-                // Store the session in localStorage
                 localStorage.setItem('patriotThanksSession', JSON.stringify(session));
 
-                // Also store the old format for backward compatibility
+                // Also store timestamp for old format compatibility
                 localStorage.setItem('isLoggedIn', 'true');
                 localStorage.setItem('userEmail', email);
+                localStorage.setItem('sessionTimestamp', currentTime.toString());
 
-                // Update UI with dropdown changes
                 updateUIAfterLogin(session);
-
-                // update the login UI
                 updateLoginUI();
 
                 // Close the dropdown
                 const dropdown = document.querySelector('.dropdown-menu');
                 if (dropdown) {
-                    // Bootstrap 5 way - use bootstrap.Dropdown if available
                     if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
                         const dropdownInstance = bootstrap.Dropdown.getInstance(dropdown.previousElementSibling);
                         if (dropdownInstance) {
                             dropdownInstance.hide();
                         }
                     } else {
-                        // Fallback for Bootstrap 4 or if bootstrap.Dropdown is not available
                         $(dropdown).parent().removeClass('show');
                         $(dropdown).removeClass('show');
                     }
@@ -175,14 +168,18 @@ function updateUIAfterLogin(session) {
 function checkTermsVersion(session) {
     if (!session || !session.user) return;
 
-    // Current version of terms
+    // CRITICAL FIX: Don't check terms if session might be expired
+    const currentTime = new Date().getTime();
+    if (session.timestamp && currentTime >= session.timestamp + session.expiresIn) {
+        console.log("Session expired - not checking terms, user needs to log in again");
+        return;
+    }
+
     const currentTermsVersion = "May 14, 2025";
 
-    // Check if user has accepted current terms
     if (!session.user.termsAccepted || session.user.termsVersion !== currentTermsVersion) {
         console.log("User needs to accept new terms - using SimpleTermsModal");
 
-        // Use the new modal system if available
         if (window.SimpleTermsModal) {
             window.SimpleTermsModal.show();
         } else {
@@ -484,24 +481,58 @@ function checkLoginStatus() {
             const session = JSON.parse(sessionData);
             const currentTime = new Date().getTime();
 
-            // Check if session is still valid
+            // CRITICAL FIX: Check if session is still valid
             if (currentTime < session.timestamp + session.expiresIn) {
                 console.log("User is already logged in (session found)");
-
                 // Update UI with session data
                 updateUIAfterLogin(session);
                 return true;
+            } else {
+                // Session has expired - clean up and require fresh login
+                console.log("Session has expired - cleaning up");
+                localStorage.removeItem('patriotThanksSession');
+                localStorage.removeItem('isLoggedIn');
+                localStorage.removeItem('userEmail');
+
+                // Update UI to show logged out state
+                updateLoginUI();
+                return false; // Return false to indicate user is NOT logged in
             }
         } catch (error) {
             console.error("Error parsing session data:", error);
+            // Clean up corrupted session data
+            localStorage.removeItem('patriotThanksSession');
         }
     }
 
-    // Fallback to the old format
+    // Fallback to the old format - BUT also check for expiration
     const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true' ||
         sessionStorage.getItem('isLoggedIn') === 'true';
 
     if (isLoggedIn) {
+        // Check if there's a timestamp for old format sessions
+        const oldSessionTimestamp = localStorage.getItem('sessionTimestamp') ||
+            sessionStorage.getItem('sessionTimestamp');
+
+        if (oldSessionTimestamp) {
+            const currentTime = new Date().getTime();
+            const sessionAge = currentTime - parseInt(oldSessionTimestamp);
+            const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+
+            if (sessionAge > maxAge) {
+                console.log("Old format session has expired - cleaning up");
+                localStorage.removeItem('isLoggedIn');
+                localStorage.removeItem('userEmail');
+                localStorage.removeItem('sessionTimestamp');
+                sessionStorage.removeItem('isLoggedIn');
+                sessionStorage.removeItem('userEmail');
+                sessionStorage.removeItem('sessionTimestamp');
+
+                updateLoginUI();
+                return false;
+            }
+        }
+
         console.log("User is already logged in (old format)");
 
         const email = localStorage.getItem('userEmail') ||
