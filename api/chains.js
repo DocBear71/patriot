@@ -92,6 +92,8 @@ module.exports = async (req, res) => {
                 return await handleSyncChainLocations(req, res);
             case 'bulk_update_universal_incentives':
                 return await handleBulkUpdateUniversalIncentives(req, res);
+            case 'summary':
+                return await handleChainSummary(req, res);
             default:
                 if (req.method === 'GET') {
                     return res.status(200).json({
@@ -193,6 +195,92 @@ async function handleListChains(req, res) {
     } catch (error) {
         console.error('❌ Error listing chains:', error);
         return res.status(500).json({ message: 'Error retrieving chains: ' + error.message });
+    }
+}
+
+/**
+ * NEW: Get chain summary statistics
+ */
+async function handleChainSummary(req, res) {
+    console.log("📊 CHAINS: Getting summary statistics");
+
+    try {
+        // Count total active chains
+        const totalChains = await Chain.countDocuments({ status: 'active' });
+        console.log(`📈 Total chains: ${totalChains}`);
+
+        // Count total locations that belong to chains
+        const totalLocations = await Business.countDocuments({
+            chain_id: { $exists: true, $ne: null }
+        });
+        console.log(`📍 Total chain locations: ${totalLocations}`);
+
+        // Get all chains and count their incentives
+        const chainsWithIncentives = await Chain.find(
+            { status: 'active' },
+            { incentives: 1, chain_name: 1 }
+        ).lean();
+
+        let totalIncentives = 0;
+        let activeChainsWithIncentives = 0;
+
+        chainsWithIncentives.forEach(chain => {
+            if (chain.incentives && chain.incentives.length > 0) {
+                // Count active incentives only
+                const activeIncentives = chain.incentives.filter(
+                    incentive => incentive.is_active !== false
+                );
+
+                if (activeIncentives.length > 0) {
+                    totalIncentives += activeIncentives.length;
+                    activeChainsWithIncentives++;
+                }
+            }
+        });
+
+        console.log(`🎁 Total incentives: ${totalIncentives}`);
+        console.log(`✅ Chains with incentives: ${activeChainsWithIncentives}`);
+
+        // Additional useful stats
+        const chainsWithUniversalIncentives = await Chain.countDocuments({
+            status: 'active',
+            universal_incentives: true
+        });
+
+        const locationsWithUniversalEnabled = await Business.countDocuments({
+            chain_id: { $exists: true, $ne: null },
+            universal_incentives: true
+        });
+
+        console.log(`🌐 Chains with universal incentives enabled: ${chainsWithUniversalIncentives}`);
+        console.log(`🏢 Locations with universal incentives enabled: ${locationsWithUniversalEnabled}`);
+
+        const summaryData = {
+            total_chains: totalChains,
+            total_locations: totalLocations,
+            total_incentives: totalIncentives,
+            active_chains_with_incentives: activeChainsWithIncentives,
+            // Bonus stats
+            chains_with_universal_incentives: chainsWithUniversalIncentives,
+            locations_with_universal_enabled: locationsWithUniversalEnabled,
+            average_locations_per_chain: totalChains > 0 ? Math.round(totalLocations / totalChains * 10) / 10 : 0,
+            average_incentives_per_active_chain: activeChainsWithIncentives > 0 ?
+                Math.round(totalIncentives / activeChainsWithIncentives * 10) / 10 : 0
+        };
+
+        console.log("📊 Summary statistics compiled successfully");
+
+        return res.status(200).json({
+            success: true,
+            ...summaryData,
+            generated_at: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('❌ Error getting chain summary:', error);
+        return res.status(500).json({
+            message: 'Error retrieving chain summary: ' + error.message
+        });
     }
 }
 

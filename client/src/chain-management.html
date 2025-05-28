@@ -287,6 +287,119 @@
                 font-size: 12px;
             }
         }
+
+        .chain-summary {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .summary-title {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #495057;
+            font-weight: 600;
+        }
+
+        .summary-stats {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            min-width: 150px;
+            flex: 1;
+            max-width: 200px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #4285F4;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-card.chains {
+            border-left: 4px solid #4285F4;
+        }
+
+        .stat-card.locations {
+            border-left: 4px solid #28a745;
+        }
+
+        .stat-card.locations .stat-number {
+            color: #28a745;
+        }
+
+        .stat-card.incentives {
+            border-left: 4px solid #ffc107;
+        }
+
+        .stat-card.incentives .stat-number {
+            color: #ffc107;
+        }
+
+        .stat-card.active-chains {
+            border-left: 4px solid #17a2b8;
+        }
+
+        .stat-card.active-chains .stat-number {
+            color: #17a2b8;
+        }
+
+        .summary-loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+
+        .summary-error {
+            text-align: center;
+            padding: 20px;
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .summary-stats {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .stat-card {
+                max-width: 300px;
+                width: 100%;
+            }
+        }
     </style>
 </head>
 
@@ -312,6 +425,17 @@
 <main>
     <div class="container">
         <section>
+            <div class="chain-summary" id="chain-summary">
+                <h3 class="summary-title">Chain Management Overview</h3>
+                <div id="summary-content">
+                    <div class="summary-loading">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                        <p>Loading chain statistics...</p>
+                    </div>
+                </div>
+            </div>
             <h2 class="section-title">National Chain Management</h2>
             <p class="paragraph_style">
                 This page allows you to manage national business chains and their locations.

@@ -70,6 +70,201 @@ function setupBackToTopButton() {
 }
 
 /**
+ * Load and display chain summary statistics
+ */
+function loadChainSummary() {
+    const summaryContent = document.getElementById('summary-content');
+    if (!summaryContent) return;
+
+    const baseURL = getBaseURL();
+
+    // Call the chains API to get summary statistics
+    fetch(`${baseURL}/api/chains.js?operation=summary`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to load chain summary: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            displayChainSummary(data);
+        })
+        .catch(error => {
+            console.error('Error loading chain summary:', error);
+
+            // Fallback: Calculate summary from existing chain data if available
+            if (allChains && allChains.length > 0) {
+                calculateSummaryFromChains();
+            } else {
+                displaySummaryError();
+            }
+        });
+}
+
+/**
+ * Display the chain summary statistics
+ * @param {Object} data - Summary data from API
+ */
+function displayChainSummary(data) {
+    const summaryContent = document.getElementById('summary-content');
+    if (!summaryContent) return;
+
+    // Extract data with fallbacks
+    const totalChains = data.total_chains || 0;
+    const totalLocations = data.total_locations || 0;
+    const totalIncentives = data.total_incentives || 0;
+    const activeChainsWithIncentives = data.active_chains_with_incentives || 0;
+
+    summaryContent.innerHTML = `
+        <div class="summary-stats">
+            <div class="stat-card chains">
+                <span class="stat-number">${totalChains.toLocaleString()}</span>
+                <div class="stat-label">Total Chains</div>
+            </div>
+            <div class="stat-card locations">
+                <span class="stat-number">${totalLocations.toLocaleString()}</span>
+                <div class="stat-label">Chain Locations</div>
+            </div>
+            <div class="stat-card incentives">
+                <span class="stat-number">${totalIncentives.toLocaleString()}</span>
+                <div class="stat-label">Total Incentives</div>
+            </div>
+            <div class="stat-card active-chains">
+                <span class="stat-number">${activeChainsWithIncentives.toLocaleString()}</span>
+                <div class="stat-label">Chains with Incentives</div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Calculate summary from existing chain data (fallback method)
+ */
+function calculateSummaryFromChains() {
+    const summaryContent = document.getElementById('summary-content');
+    if (!summaryContent || !allChains) return;
+
+    let totalChains = allChains.length;
+    let totalLocations = 0;
+    let totalIncentives = 0;
+    let activeChainsWithIncentives = 0;
+
+    // Calculate totals from chain data
+    allChains.forEach(chain => {
+        totalLocations += chain.location_count || 0;
+        totalIncentives += chain.incentive_count || 0;
+        if (chain.incentive_count > 0) {
+            activeChainsWithIncentives++;
+        }
+    });
+
+    summaryContent.innerHTML = `
+        <div class="summary-stats">
+            <div class="stat-card chains">
+                <span class="stat-number">${totalChains.toLocaleString()}</span>
+                <div class="stat-label">Total Chains</div>
+            </div>
+            <div class="stat-card locations">
+                <span class="stat-number">${totalLocations.toLocaleString()}</span>
+                <div class="stat-label">Chain Locations</div>
+            </div>
+            <div class="stat-card incentives">
+                <span class="stat-number">${totalIncentives.toLocaleString()}</span>
+                <div class="stat-label">Total Incentives</div>
+            </div>
+            <div class="stat-card active-chains">
+                <span class="stat-number">${activeChainsWithIncentives.toLocaleString()}</span>
+                <div class="stat-label">Chains with Incentives</div>
+            </div>
+        </div>
+        <p style="text-align: center; margin-top: 15px; font-size: 0.85rem; color: #6c757d;">
+            <em>Statistics calculated from current page data</em>
+        </p>
+    `;
+}
+
+/**
+ * Display error message for summary
+ */
+function displaySummaryError() {
+    const summaryContent = document.getElementById('summary-content');
+    if (!summaryContent) return;
+
+    summaryContent.innerHTML = `
+        <div class="summary-error">
+            <strong>Unable to load chain statistics</strong><br>
+            <small>The summary will be available once chain data loads successfully.</small>
+        </div>
+    `;
+}
+
+/**
+ * Refresh the chain summary (call this after creating/updating/deleting chains)
+ */
+function refreshChainSummary() {
+    loadChainSummary();
+}
+
+// UPDATE your existing loadExistingChains function to also load the summary
+// REPLACE your existing loadExistingChains function with this updated version:
+function loadExistingChains() {
+    const chainsListContainer = document.getElementById('chains-list');
+    if (!chainsListContainer) return;
+
+    const baseURL = getBaseURL();
+
+    // Show loading indicator
+    chainsListContainer.innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+            <p>Loading chains...</p>
+        </div>
+    `;
+
+    fetch(`${baseURL}/api/chains.js?operation=list`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to load chains: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data.chains || data.chains.length === 0) {
+                chainsListContainer.innerHTML = '<p class="text-center py-3">No chains found. Create a new chain above.</p>';
+                hidePagination();
+
+                // Still try to load summary even if no chains
+                loadChainSummary();
+                return;
+            }
+
+            // Store all chains and set up pagination
+            allChains = data.chains.sort((a, b) => a.chain_name.localeCompare(b.chain_name));
+            filteredChains = [...allChains];
+            currentPage = 1;
+
+            displayChainsPage();
+            updatePagination();
+
+            // Load the chain summary
+            loadChainSummary();
+        })
+        .catch(error => {
+            console.error('Error loading chains:', error);
+            chainsListContainer.innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    Error loading chains: ${error.message}
+                </div>
+            `;
+            hidePagination();
+            displaySummaryError();
+        });
+}
+
+
+/**
  * Setup Bootstrap 5 modals
  */
 function setupModals() {
@@ -358,58 +553,6 @@ function setupEventListeners() {
             filterChains(this.value);
         }, 300));
     }
-}
-
-/**
- * Load existing chains from the database
- */
-function loadExistingChains() {
-    const chainsListContainer = document.getElementById('chains-list');
-    if (!chainsListContainer) return;
-
-    const baseURL = getBaseURL();
-
-    // Show loading indicator
-    chainsListContainer.innerHTML = `
-        <div class="text-center py-3">
-            <div class="spinner-border text-primary" role="status">
-                <span class="sr-only">Loading...</span>
-            </div>
-            <p>Loading chains...</p>
-        </div>
-    `;
-
-    fetch(`${baseURL}/api/chains.js?operation=list`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to load chains: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!data.chains || data.chains.length === 0) {
-                chainsListContainer.innerHTML = '<p class="text-center py-3">No chains found. Create a new chain above.</p>';
-                hidePagination();
-                return;
-            }
-
-            // Store all chains and set up pagination
-            allChains = data.chains.sort((a, b) => a.chain_name.localeCompare(b.chain_name));
-            filteredChains = [...allChains]; // Initialize filtered chains
-            currentPage = 1;
-
-            displayChainsPage();
-            updatePagination();
-        })
-        .catch(error => {
-            console.error('Error loading chains:', error);
-            chainsListContainer.innerHTML = `
-                <div class="alert alert-danger" role="alert">
-                    Error loading chains: ${error.message}
-                </div>
-            `;
-            hidePagination();
-        });
 }
 
 function displayChainsPage() {
@@ -724,7 +867,11 @@ function createNewChain() {
 
             // Reload the chains list without scrolling
             loadExistingChains();
-        })
+        }).then(data => {
+        alert('Chain created successfully!');
+        document.getElementById('create-chain-form').reset();
+        loadExistingChains(); // This will also refresh the summary
+    })
         .catch(error => {
             console.error('Error creating chain:', error);
             alert(`Error creating chain: ${error.message}`);
@@ -954,7 +1101,11 @@ function updateChain() {
 
             // Reload the chains list
             loadExistingChains();
-        })
+        }).then(data => {
+        alert('Chain updated successfully!');
+        document.getElementById('selected-chain-name').textContent = chainName;
+        loadExistingChains(); // This will also refresh the summary
+    })
         .catch(error => {
             console.error('Error updating chain:', error);
             alert(`Error updating chain: ${error.message}`);
@@ -997,7 +1148,12 @@ function deleteChain(chainId) {
 
             // Reload the chains list
             loadExistingChains();
-        })
+        }).then(data => {
+        alert('Chain deleted successfully!');
+        document.getElementById('chain-details').style.display = 'none';
+        currentChainId = null;
+        loadExistingChains(); // This will also refresh the summary
+    })
         .catch(error => {
             console.error('Error deleting chain:', error);
             alert(`Error deleting chain: ${error.message}`);
@@ -1440,7 +1596,13 @@ function addChainIncentive(event) {
 
             // Reload chain details without scrolling
             viewChainDetails(chainId);
-        })
+        }).then(data => {
+        alert('Incentive added successfully!');
+        document.getElementById('add-chain-incentive-form').reset();
+        ModalHelper.hide('manage-incentives-modal');
+        viewChainDetails(chainId);
+        refreshChainSummary(); // Add this line to refresh summary
+    })
         .catch(error => {
             console.error('Error adding incentive:', error);
             alert(`Error adding incentive: ${error.message}`);
