@@ -9,3 +9,5 @@ client/src/MarketPlace
 /oldJSFiles
 .jwt-secret
 googleMigration.docx
+client/src/otherFiles
+client/src/otherFiles/index.html
