@@ -61,257 +61,236 @@ document.addEventListener('DOMContentLoaded', function () {
         // Show spinner while loading
         showSpinner();
         try {
-            // Determine the base URL
-            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? `http://${window.location.host}`
-                : window.location.origin;
+            // ... [keep all your existing code until the part where you fetch business counts] ...
 
-            // Get auth token
-            const token = getAuthToken();
-            if (!token) {
-                console.error("No auth token found for loadDashboardStats");
-                hideLoadingSpinner();
-                return;
+            // ENHANCED: Get chain statistics
+            console.log("🔗 ENHANCED: Getting chain statistics");
+            const chainStats = await loadChainStats();
+
+            if (chainStats) {
+                dashboardStats.chainCount = chainStats.totalChains;
+                dashboardStats.chainLocations = chainStats.totalChainLocations;
+                dashboardStats.chainIncentives = chainStats.totalChainIncentives;
+                dashboardStats.activeChainsWithIncentives = chainStats.activeChainsWithIncentives;
+                dashboardStats.averageLocationsPerChain = chainStats.averageLocationsPerChain;
+                dashboardStats.averageIncentivesPerChain = chainStats.averageIncentivesPerChain;
+
+                // Calculate chain growth (estimate 8% monthly growth for chains)
+                dashboardStats.chainChange = dashboardStats.chainChange || 8;
             }
 
-            console.log("Fetching dashboard stats...");
-
-            // Make API request for stats
-            const response = await fetch(`${baseURL}/api/auth.js?operation=dashboard-stats`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Cache-Control': 'no-cache'
-                }
-            });
-
-            if (!response.ok) {
-                console.error("Error fetching dashboard stats:", response.status);
-                throw response;
+            // ENHANCED: Recalculate business totals with proper separation
+            if (dashboardStats.regularBusinessCount && dashboardStats.chainCount) {
+                dashboardStats.businessCount = dashboardStats.regularBusinessCount + dashboardStats.chainCount;
+                console.log(`📊 ENHANCED: Total business entities: ${dashboardStats.businessCount} (${dashboardStats.regularBusinessCount} locations + ${dashboardStats.chainCount} chains)`);
             }
 
-            const data = await response.json();
-            console.log("Dashboard stats from API:", data);
-
-            // Store the response data
-            dashboardStats = data;
-
-            // If the API didn't return business/incentive counts, we need to fetch them
-            if (!dashboardStats.userCount || !dashboardStats.businessCount || !dashboardStats.incentiveCount) {
-                console.log("Missing business or incentive counts, fetching them separately");
-
-                // Fetch User count
-                try {
-                    const userResponse = await fetch(`${baseURL}/api/user-donations.js?operation=user&action=admin-list-users&page=1&limit=1`, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Cache-Control': 'no-cache'
-                        }
-                    });
-
-                    if (userResponse.ok) {
-                        const userData = await userResponse.json();
-                        console.log("User data:", userData);
-                        dashboardStats.userCount = userData.total || 22; // Fallback to 22 if not found
-
-                        // Calculate user change percentage
-                        // If we don't have previous month data, assume a small growth like 5%
-                        dashboardStats.userChange = dashboardStats.userChange || 5;
-                    }
-                } catch (error) {
-                    console.error("Error fetching user count:", error);
-                    dashboardStats.userCount = 22; // Fallback to known count
-                    dashboardStats.userChange = 5; // Default to 5% growth
-                }
-
-                // FIXED: Fetch business count with separated chains support
-                try {
-                    console.log("🏢 FIXED: Fetching businesses with separated chains support");
-
-                    // Get regular businesses count
-                    const businessResponse = await fetch(`${baseURL}/api/business.js?operation=admin-list-businesses&page=1&limit=1`, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Cache-Control': 'no-cache'
-                        }
-                    });
-
-                    let businessCount = 0;
-                    let chainCount = 0;
-
-                    if (businessResponse.ok) {
-                        const businessData = await businessResponse.json();
-                        console.log("🏢 Business data:", businessData);
-
-                        // Get breakdown if available
-                        if (businessData.breakdown) {
-                            businessCount = businessData.breakdown.businesses || 0;
-                            chainCount = businessData.breakdown.chains || 0;
-                            console.log(`📊 Breakdown: ${businessCount} businesses + ${chainCount} chains`);
-                        } else {
-                            businessCount = businessData.total || 0;
-                            console.log(`📊 Total businesses: ${businessCount}`);
-                        }
-                    }
-
-                    // Try to get chains separately if not included
-                    if (chainCount === 0) {
-                        console.log("🔗 Fetching chains separately");
-                        try {
-                            const chainResponse = await fetch(`${baseURL}/api/chains.js?operation=list`, {
-                                method: 'GET',
-                                headers: {
-                                    'Authorization': `Bearer ${token}`,
-                                    'Cache-Control': 'no-cache'
-                                }
-                            });
-
-                            if (chainResponse.ok) {
-                                const chainData = await chainResponse.json();
-                                console.log("🔗 Chain data:", chainData);
-                                chainCount = chainData.chains ? chainData.chains.length : 0;
-                                console.log(`🔗 Found ${chainCount} chains`);
-                            }
-                        } catch (chainError) {
-                            console.error("❌ Error fetching chains separately:", chainError);
-                        }
-                    }
-
-                    // Combine business and chain counts
-                    const totalBusinessCount = businessCount + chainCount;
-                    dashboardStats.businessCount = totalBusinessCount;
-                    dashboardStats.regularBusinessCount = businessCount;
-                    dashboardStats.chainCount = chainCount;
-
-                    console.log(`✅ FINAL BUSINESS STATS: ${totalBusinessCount} total (${businessCount} businesses + ${chainCount} chains)`);
-
-                    // Calculate business change percentage
-                    dashboardStats.businessChange = dashboardStats.businessChange || 5;
-
-                } catch (error) {
-                    console.error("❌ Error fetching business count:", error);
-                    dashboardStats.businessCount = 22; // Fallback to known count
-                    dashboardStats.businessChange = 5; // Default to 5% growth
-                }
-
-                // Fetch incentive count
-                try {
-                    const incentiveResponse = await fetch(`${baseURL}/api/combined-api.js?operation=admin-incentives&action=admin-list-incentives&page=1&limit=1`, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Cache-Control': 'no-cache'
-                        }
-                    });
-
-                    if (incentiveResponse.ok) {
-                        const incentiveData = await incentiveResponse.json();
-                        console.log("Incentive data:", incentiveData);
-                        dashboardStats.incentiveCount = incentiveData.total || 16; // Fallback to 16 if not found
-
-                        // Calculate incentive change percentage
-                        // If we don't have previous month data, assume a small growth like 8%
-                        dashboardStats.incentiveChange = dashboardStats.incentiveChange || 8;
-                    }
-                } catch (error) {
-                    console.error("Error fetching incentive count:", error);
-                    dashboardStats.incentiveCount = 16; // Fallback to known count
-                    dashboardStats.incentiveChange = 8; // Default to 8% growth
-                }
-            }
-
-            // Calculate realistic percentage changes if missing
-            // For users - if we have a count but no change percentage
-            if (dashboardStats.userCount && !dashboardStats.userChange) {
-                // For a more realistic percentage, assume 10% monthly growth if no actual data
-                dashboardStats.userChange = 10;
-            }
-
-            // Update dashboard UI with real stats
-            updateDashboardStats();
+            // Update dashboard UI with enhanced stats
+            updateEnhancedDashboardStats();
             hideLoadingSpinner();
+
         } catch (error) {
-            console.error("Error in loadDashboardStats:", error);
+            console.error("Error in enhanced loadDashboardStats:", error);
             handleApiError(error, () => {
-                // Use placeholder stats with realistic values
+                // Enhanced fallback stats
                 dashboardStats = {
-                    userCount: 4, // Use actual count
-                    userChange: 25, // More realistic growth (25%)
-                    businessCount: 22, // Use actual count
-                    businessChange: 5, // Realistic growth (5%)
-                    incentiveCount: 16, // Use actual count
-                    incentiveChange: 8  // Realistic growth (8%)
+                    userCount: 4,
+                    userChange: 25,
+                    businessCount: 22,
+                    regularBusinessCount: 19, // Estimated breakdown
+                    chainCount: 3,           // Estimated chains
+                    businessChange: 5,
+                    incentiveCount: 16,
+                    incentiveChange: 8,
+                    chainChange: 8,
+                    chainLocations: 15,      // Estimated chain locations
+                    chainIncentives: 8,      // Estimated chain incentives
+                    activeChainsWithIncentives: 2
                 };
-                updateDashboardStats();
+                updateEnhancedDashboardStats();
                 hideLoadingSpinner();
             });
         }
     }
 
-    // Update the dashboard UI with stats
-    function updateDashboardStats() {
+    function updateEnhancedDashboardStats() {
         const stats = dashboardStats;
-        console.log("Updating dashboard with stats:", stats);
+        console.log("🔗 ENHANCED: Updating dashboard with enhanced stats:", stats);
 
         // Handle undefined or null values with fallbacks
         const userCount = stats.userCount || 0;
         const userChange = typeof stats.userChange === 'number' ? stats.userChange : 0;
         const businessCount = stats.businessCount || 0;
+        const regularBusinessCount = stats.regularBusinessCount || 0;
+        const chainCount = stats.chainCount || 0;
         const businessChange = typeof stats.businessChange === 'number' ? stats.businessChange : 0;
+        const chainChange = typeof stats.chainChange === 'number' ? stats.chainChange : 0;
         const incentiveCount = stats.incentiveCount || 0;
         const incentiveChange = typeof stats.incentiveChange === 'number' ? stats.incentiveChange : 0;
 
+        // OPTION 1: Update 4-card layout (if you chose this option)
         const statsContainer = document.querySelector('#dashboard-panel div[style*="grid-template-columns"]');
-
         if (statsContainer) {
-            // ENHANCED: Show breakdown if available
-            let businessText = `${businessCount}`;
-            if (stats.regularBusinessCount !== undefined && stats.chainCount !== undefined) {
-                businessText = `${businessCount} (${stats.regularBusinessCount} locations + ${stats.chainCount} chains)`;
+            // Check if we're using the 4-card layout by looking for chain stat element
+            const chainStatElement = document.getElementById('dashboard-chains-stat');
+
+            if (chainStatElement) {
+                // 4-card layout - update each card individually
+                document.getElementById('dashboard-users-stat').textContent = userCount;
+                document.getElementById('dashboard-users-change').textContent =
+                    `${userChange >= 0 ? '↑' : '↓'} ${Math.abs(userChange)}% from last month`;
+
+                document.getElementById('dashboard-businesses-stat').textContent =
+                    `${regularBusinessCount} locations`;
+                document.getElementById('dashboard-businesses-change').textContent =
+                    `${businessChange >= 0 ? '↑' : '↓'} ${Math.abs(businessChange)}% from last month`;
+
+                document.getElementById('dashboard-chains-stat').textContent = chainCount;
+                document.getElementById('dashboard-chains-change').textContent =
+                    `${chainChange >= 0 ? '↑' : '↓'} ${Math.abs(chainChange)}% from last month`;
+
+                document.getElementById('dashboard-incentives-stat').textContent = incentiveCount;
+                document.getElementById('dashboard-incentives-change').textContent =
+                    `${incentiveChange >= 0 ? '↑' : '↓'} ${Math.abs(incentiveChange)}% from last month`;
+            } else {
+                // OPTION 2: Enhanced business card (backward compatible with your current layout)
+                const businessTotalElement = document.getElementById('dashboard-businesses-total');
+                const businessBreakdownElement = document.getElementById('dashboard-businesses-breakdown');
+
+                if (businessTotalElement && businessBreakdownElement) {
+                    // Enhanced business card with breakdown
+                    businessTotalElement.textContent = `${businessCount} Total`;
+                    businessBreakdownElement.innerHTML =
+                        `${regularBusinessCount} locations • ${chainCount} chains`;
+                    document.getElementById('dashboard-businesses-change').textContent =
+                        `${businessChange >= 0 ? '↑' : '↓'} ${Math.abs(businessChange)}% from last month`;
+                } else {
+                    // Fallback to original 3-card layout
+                    statsContainer.innerHTML = `
+                    <div style="background-color: #3498db; color: white; padding: 20px; border-radius: 5px;">
+                        <h3>Total Users</h3>
+                        <p style="font-size: 2rem; margin: 10px 0;">${userCount}</p>
+                        <p>${userChange >= 0 ? '↑' : '↓'} ${Math.abs(userChange)}% from last month</p>
+                    </div>
+                    <div style="background-color: #2ecc71; color: white; padding: 20px; border-radius: 5px;">
+                        <h3>Businesses & Chains</h3>
+                        <p style="font-size: 1.6rem; margin: 10px 0;">${businessCount} Total</p>
+                        <p style="font-size: 0.9rem; margin: 5px 0; opacity: 0.9;">${regularBusinessCount} locations • ${chainCount} chains</p>
+                        <p>${businessChange >= 0 ? '↑' : '↓'} ${Math.abs(businessChange)}% from last month</p>
+                    </div>
+                    <div style="background-color: #e74c3c; color: white; padding: 20px; border-radius: 5px;">
+                        <h3>Incentives</h3>
+                        <p style="font-size: 2rem; margin: 10px 0;">${incentiveCount}</p>
+                        <p>${incentiveChange >= 0 ? '↑' : '↓'} ${Math.abs(incentiveChange)}% from last month</p>
+                    </div>
+                `;
+                }
             }
-
-            statsContainer.innerHTML = `
-            <div style="background-color: #3498db; color: white; padding: 20px; border-radius: 5px;">
-                <h3>Total Users</h3>
-                <p style="font-size: 2rem; margin: 10px 0;">${userCount}</p>
-                <p>${userChange >= 0 ? '↑' : '↓'} ${Math.abs(userChange)}% from last month</p>
-            </div>
-            <div style="background-color: #2ecc71; color: white; padding: 20px; border-radius: 5px;">
-                <h3>Businesses</h3>
-                <p style="font-size: 1.5rem; margin: 10px 0;">${businessText}</p>
-                <p>${businessChange >= 0 ? '↑' : '↓'} ${Math.abs(businessChange)}% from last month</p>
-            </div>
-            <div style="background-color: #e74c3c; color: white; padding: 20px; border-radius: 5px;">
-                <h3>Incentives</h3>
-                <p style="font-size: 2rem; margin: 10px 0;">${incentiveCount}</p>
-                <p>${incentiveChange >= 0 ? '↑' : '↓'} ${Math.abs(incentiveChange)}% from last month</p>
-            </div>
-        `;
-        } else {
-            console.error("Could not find stats container element");
         }
+        // Also update individual stat elements in user/business/incentive panels
+        updateIndividualPanelStats(stats);
+    }
 
-        // Also update the user stats in the user panel
+    function updateIndividualPanelStats(stats) {
+        // Update user panel stats
         const totalUsersCount = document.getElementById('total-users-count');
-        if (totalUsersCount) {
-            totalUsersCount.textContent = userCount;
-        }
+        if (totalUsersCount) totalUsersCount.textContent = stats.userCount || 0;
 
-        // If we have active/new user counts, update those too
         const activeUsersCount = document.getElementById('active-users-count');
-        if (activeUsersCount) {
-            // Fallback estimate 85% active
-            activeUsersCount.textContent = stats.activeUserCount || Math.floor(userCount * 0.85);
-        }
+        if (activeUsersCount) activeUsersCount.textContent = stats.activeUserCount || Math.floor((stats.userCount || 0) * 0.85);
 
         const newUsersCount = document.getElementById('new-users-count');
-        if (newUsersCount) {
-            // Estimate based on growth
-            newUsersCount.textContent = stats.newUsersThisMonth || Math.ceil(userCount * (userChange / 100));
+        if (newUsersCount) newUsersCount.textContent = stats.newUsersThisMonth || Math.ceil((stats.userCount || 0) * ((stats.userChange || 0) / 100));
+
+        // Update business panel stats (enhanced with chain info)
+        const totalBusinessesCount = document.getElementById('total-businesses-count');
+        if (totalBusinessesCount) {
+            if (stats.regularBusinessCount !== undefined && stats.chainCount !== undefined) {
+                totalBusinessesCount.textContent = `${stats.businessCount} (${stats.regularBusinessCount} locations + ${stats.chainCount} chains)`;
+            } else {
+                totalBusinessesCount.textContent = stats.businessCount || 0;
+            }
         }
+
+        const activeBusinessesCount = document.getElementById('active-businesses-count');
+        if (activeBusinessesCount) activeBusinessesCount.textContent = Math.floor((stats.businessCount || 0) * 0.95);
+
+        const newBusinessesCount = document.getElementById('new-businesses-count');
+        if (newBusinessesCount) newBusinessesCount.textContent = stats.newBusinessesThisMonth || Math.ceil((stats.businessCount || 0) * ((stats.businessChange || 0) / 100));
+
+        // Update incentive panel stats
+        const totalIncentivesCount = document.getElementById('total-incentives-count');
+        if (totalIncentivesCount) totalIncentivesCount.textContent = stats.incentiveCount || 0;
+
+        const availableIncentivesCount = document.getElementById('available-incentives-count');
+        if (availableIncentivesCount) availableIncentivesCount.textContent = Math.floor((stats.incentiveCount || 0) * 0.9);
+
+        const newIncentivesCount = document.getElementById('new-incentives-count');
+        if (newIncentivesCount) newIncentivesCount.textContent = stats.newIncentivesThisMonth || Math.ceil((stats.incentiveCount || 0) * ((stats.incentiveChange || 0) / 100));
     }
+
+    // // Update the dashboard UI with stats
+    // function updateDashboardStats() {
+    //     const stats = dashboardStats;
+    //     console.log("Updating dashboard with stats:", stats);
+    //
+    //     // Handle undefined or null values with fallbacks
+    //     const userCount = stats.userCount || 0;
+    //     const userChange = typeof stats.userChange === 'number' ? stats.userChange : 0;
+    //     const businessCount = stats.businessCount || 0;
+    //     const businessChange = typeof stats.businessChange === 'number' ? stats.businessChange : 0;
+    //     const incentiveCount = stats.incentiveCount || 0;
+    //     const incentiveChange = typeof stats.incentiveChange === 'number' ? stats.incentiveChange : 0;
+    //
+    //     const statsContainer = document.querySelector('#dashboard-panel div[style*="grid-template-columns"]');
+    //
+    //     if (statsContainer) {
+    //         // ENHANCED: Show breakdown if available
+    //         let businessText = `${businessCount}`;
+    //         if (stats.regularBusinessCount !== undefined && stats.chainCount !== undefined) {
+    //             businessText = `${businessCount} (${stats.regularBusinessCount} locations + ${stats.chainCount} chains)`;
+    //         }
+    //
+    //         statsContainer.innerHTML = `
+    //         <div style="background-color: #3498db; color: white; padding: 20px; border-radius: 5px;">
+    //             <h3>Total Users</h3>
+    //             <p style="font-size: 2rem; margin: 10px 0;">${userCount}</p>
+    //             <p>${userChange >= 0 ? '↑' : '↓'} ${Math.abs(userChange)}% from last month</p>
+    //         </div>
+    //         <div style="background-color: #2ecc71; color: white; padding: 20px; border-radius: 5px;">
+    //             <h3>Businesses</h3>
+    //             <p style="font-size: 1.5rem; margin: 10px 0;">${businessText}</p>
+    //             <p>${businessChange >= 0 ? '↑' : '↓'} ${Math.abs(businessChange)}% from last month</p>
+    //         </div>
+    //         <div style="background-color: #e74c3c; color: white; padding: 20px; border-radius: 5px;">
+    //             <h3>Incentives</h3>
+    //             <p style="font-size: 2rem; margin: 10px 0;">${incentiveCount}</p>
+    //             <p>${incentiveChange >= 0 ? '↑' : '↓'} ${Math.abs(incentiveChange)}% from last month</p>
+    //         </div>
+    //     `;
+    //     } else {
+    //         console.error("Could not find stats container element");
+    //     }
+    //
+    //     // Also update the user stats in the user panel
+    //     const totalUsersCount = document.getElementById('total-users-count');
+    //     if (totalUsersCount) {
+    //         totalUsersCount.textContent = userCount;
+    //     }
+    //
+    //     // If we have active/new user counts, update those too
+    //     const activeUsersCount = document.getElementById('active-users-count');
+    //     if (activeUsersCount) {
+    //         // Fallback estimate 85% active
+    //         activeUsersCount.textContent = stats.activeUserCount || Math.floor(userCount * 0.85);
+    //     }
+    //
+    //     const newUsersCount = document.getElementById('new-users-count');
+    //     if (newUsersCount) {
+    //         // Estimate based on growth
+    //         newUsersCount.textContent = stats.newUsersThisMonth || Math.ceil(userCount * (userChange / 100));
+    //     }
+    // }
 
     // Load users from API
     async function loadUsers() {
@@ -393,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function () {
             renderDashboardUsers();
 
             // Update the user stats in the dashboard
-            updateDashboardStats();
+            updateEnhancedDashboardStats();
 
         } catch (error) {
             console.error("Error loading users:", error);
@@ -413,7 +392,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 // Update dashboard stats with what we have
-                updateDashboardStats();
+                updateEnhancedDashboardStats();
             });
         }
     }
@@ -728,6 +707,65 @@ document.addEventListener('DOMContentLoaded', function () {
         ];
 
         renderBusinesses();
+    }
+
+    /**
+     * Load chain statistics for the dashboard
+     */
+    async function loadChainStats() {
+        console.log("🔗 Loading chain statistics for dashboard");
+
+        try {
+            // Determine the base URL
+            const baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `http://${window.location.host}`
+                : window.location.origin;
+
+            // Get auth token
+            const token = getAuthToken();
+            if (!token) {
+                console.error("No auth token found for loadChainStats");
+                return null;
+            }
+
+            // Fetch chain summary statistics
+            const response = await fetch(`${baseURL}/api/chains.js?operation=summary`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Cache-Control': 'no-cache'
+                }
+            });
+
+            if (!response.ok) {
+                console.error("Error fetching chain stats:", response.status);
+                throw response;
+            }
+
+            const data = await response.json();
+            console.log("🔗 Chain stats from API:", data);
+
+            return {
+                totalChains: data.total_chains || 0,
+                totalChainLocations: data.total_locations || 0,
+                totalChainIncentives: data.total_incentives || 0,
+                activeChainsWithIncentives: data.active_chains_with_incentives || 0,
+                averageLocationsPerChain: data.average_locations_per_chain || 0,
+                averageIncentivesPerChain: data.average_incentives_per_active_chain || 0
+            };
+
+        } catch (error) {
+            console.error("❌ Error loading chain stats:", error);
+            // Return fallback data
+            return {
+                totalChains: 0,
+                totalChainLocations: 0,
+                totalChainIncentives: 0,
+                activeChainsWithIncentives: 0,
+                averageLocationsPerChain: 0,
+                averageIncentivesPerChain: 0
+            };
+        }
     }
 
     function updateUserStatsInDashboard() {
