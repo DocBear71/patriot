@@ -596,7 +596,7 @@ function setupEventListeners() {
 }
 
 /**
- * NEW: Update discount type UI based on selection
+ * UPDATED: Update discount type UI based on selection - FIXED for cents
  * @param {string} discountType - The selected discount type ('percentage' or 'dollar')
  */
 function updateDiscountTypeUI(discountType) {
@@ -608,19 +608,21 @@ function updateDiscountTypeUI(discountType) {
     if (!amountLabel || !amountPrefix || !amountInput || !amountHelp) return;
 
     if (discountType === 'dollar') {
-        // Configure for dollar amount
+        // Configure for dollar amount - FIXED: step should be 0.01 for cents
         amountLabel.textContent = 'Amount ($):';
         amountPrefix.textContent = '$';
-        amountInput.setAttribute('max', '1000'); // Reasonable max for dollar discounts
-        amountInput.setAttribute('step', '0.01');
-        amountHelp.textContent = 'Enter the dollar discount amount (e.g., 10.00 for $10 off)';
+        amountInput.setAttribute('max', '1000');
+        amountInput.setAttribute('step', '0.01'); // FIXED: was incorrectly set to 0.01 then changed to 1
+        amountInput.setAttribute('min', '0.01'); // Minimum 1 cent
+        amountHelp.textContent = 'Enter the dollar discount amount (e.g., 0.05 for $0.05 off per gallon)';
     } else {
         // Configure for percentage (default)
         amountLabel.textContent = 'Amount (%):';
         amountPrefix.textContent = '%';
         amountInput.setAttribute('max', '100');
-        amountInput.setAttribute('step', '1');
-        amountHelp.textContent = 'Enter the discount percentage (0-100)';
+        amountInput.setAttribute('step', '.01'); // Percentages can be whole numbers
+        amountInput.setAttribute('min', '.01'); // Minimum .01%
+        amountHelp.textContent = 'Enter the discount percentage (0.01-100)';
     }
 
     // Clear the current value when switching types
@@ -678,7 +680,7 @@ function displayChainsPage() {
 }
 
 /**
- * NEW: Update edit form discount type UI
+ * UPDATED: Update edit form discount type UI - FIXED for cents
  * @param {string} discountType - The selected discount type ('percentage' or 'dollar')
  */
 function updateEditDiscountTypeUI(discountType) {
@@ -690,19 +692,21 @@ function updateEditDiscountTypeUI(discountType) {
     if (!amountLabel || !amountPrefix || !amountInput || !amountHelp) return;
 
     if (discountType === 'dollar') {
-        // Configure for dollar amount
+        // Configure for dollar amount - FIXED: step should be 0.01 for cents
         amountLabel.textContent = 'Amount ($):';
         amountPrefix.textContent = '$';
         amountInput.setAttribute('max', '1000');
-        amountInput.setAttribute('step', '0.01');
-        amountHelp.textContent = 'Enter the dollar discount amount (e.g., 10.00 for $10 off)';
+        amountInput.setAttribute('step', '0.01'); // FIXED: Now allows cents
+        amountInput.setAttribute('min', '0.01'); // Minimum 1 cent
+        amountHelp.textContent = 'Enter the dollar discount amount (e.g., 0.05 for $0.05 off per gallon)';
     } else {
         // Configure for percentage (default)
         amountLabel.textContent = 'Amount (%):';
         amountPrefix.textContent = '%';
         amountInput.setAttribute('max', '100');
-        amountInput.setAttribute('step', '1');
-        amountHelp.textContent = 'Enter the discount percentage (0-100)';
+        amountInput.setAttribute('step', '0.01'); // CHANGED: Allow partial percentages
+        amountInput.setAttribute('min', '0.01'); // CHANGED: Minimum 0.01%
+        amountHelp.textContent = 'Enter the discount percentage (0.01-100)'; // CHANGED: Updated help text
     }
 }
 
@@ -744,11 +748,11 @@ function openEditChainIncentiveModal(incentiveId, incentiveData) {
 }
 
 /**
- * NEW: Update chain incentive
+ * UPDATED: Update chain incentive - FIXED validation for cents
  * @param {Event} event - The form submit event
  */
 function updateChainIncentive(event) {
-    event = event || window.event;
+
     if (event) event.preventDefault();
 
     const chainId = currentChainId;
@@ -776,21 +780,31 @@ function updateChainIncentive(event) {
         return;
     }
 
-    // Validate amount based on discount type
+    // UPDATED: Validate amount based on discount type - FIXED for cents
     const amount = parseFloat(incentiveAmount);
     if (isNaN(amount) || amount <= 0) {
         alert('Please enter a valid amount greater than 0.');
         return;
     }
 
-    if (discountType === 'percentage' && amount > 100) {
-        alert('Percentage discount cannot exceed 100%.');
-        return;
-    }
-
-    if (discountType === 'dollar' && amount > 1000) {
-        alert('Dollar discount cannot exceed $1000.');
-        return;
+    if (discountType === 'percentage') {
+        if (amount > 100) {
+            alert('Percentage discount cannot exceed 100%.');
+            return;
+        }
+        if (amount < 0.01) { // CHANGED: From 1 to 0.01
+            alert('Percentage discount must be at least 0.01%.'); // CHANGED: Updated message
+            return;
+        }
+    } else if (discountType === 'dollar') {
+        if (amount > 1000) {
+            alert('Dollar discount cannot exceed $1000.');
+            return;
+        }
+        if (amount < 0.01) {
+            alert('Dollar discount must be at least $0.01.');
+            return;
+        }
     }
 
     const baseURL = getBaseURL();
@@ -1856,10 +1870,10 @@ function editChainIncentiveFromModal(incentiveId, incentiveDataJson) {
 }
 
 /**
- * Add an incentive to a chain - UPDATED to include discount type
+ * UPDATED: Add an incentive to a chain - FIXED validation for cents
  */
 function addChainIncentive(event) {
-    event = event || window.event;
+
     if (event) event.preventDefault();
 
     const chainId = currentChainId;
@@ -1872,7 +1886,7 @@ function addChainIncentive(event) {
     const otherDescription = document.getElementById('other-description').value.trim();
     const incentiveAmount = document.getElementById('incentive-amount').value;
     const incentiveInfo = document.getElementById('incentive-info').value.trim();
-    const discountType = document.getElementById('discount-type').value; // NEW
+    const discountType = document.getElementById('discount-type').value;
 
     if (!incentiveType || !incentiveAmount || !discountType) {
         alert('Please fill in all required fields.');
@@ -1884,21 +1898,31 @@ function addChainIncentive(event) {
         return;
     }
 
-    // Validate amount based on discount type
+    // UPDATED: Validate amount based on discount type - FIXED for cents
     const amount = parseFloat(incentiveAmount);
     if (isNaN(amount) || amount <= 0) {
         alert('Please enter a valid amount greater than 0.');
         return;
     }
 
-    if (discountType === 'percentage' && amount > 100) {
-        alert('Percentage discount cannot exceed 100%.');
-        return;
-    }
-
-    if (discountType === 'dollar' && amount > 1000) {
-        alert('Dollar discount cannot exceed $1000.');
-        return;
+    if (discountType === 'percentage') {
+        if (amount > 100) {
+            alert('Percentage discount cannot exceed 100%.');
+            return;
+        }
+        if (amount < 0.01) { // CHANGED: From 1 to 0.01
+            alert('Percentage discount must be at least 0.01%.'); // CHANGED: Updated message
+            return;
+        }
+    } else if (discountType === 'dollar') {
+        if (amount > 1000) {
+            alert('Dollar discount cannot exceed $1000.');
+            return;
+        }
+        if (amount < 0.01) {
+            alert('Dollar discount must be at least $0.01.');
+            return;
+        }
     }
 
     const baseURL = getBaseURL();
@@ -1908,7 +1932,7 @@ function addChainIncentive(event) {
         type: incentiveType,
         amount: amount,
         information: incentiveInfo,
-        discount_type: discountType // NEW
+        discount_type: discountType
     };
 
     if (incentiveType === 'OT') {
