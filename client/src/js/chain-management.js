@@ -523,19 +523,6 @@ function setupEventListeners() {
         });
     }
 
-    // Show/hide other description field based on incentive type
-    const incentiveTypeSelect = document.getElementById('incentive-type');
-    if (incentiveTypeSelect) {
-        incentiveTypeSelect.addEventListener('change', function() {
-            const otherDescriptionGroup = document.getElementById('other-description-group');
-            if (this.value === 'OT') {
-                otherDescriptionGroup.style.display = 'block';
-            } else {
-                otherDescriptionGroup.style.display = 'none';
-            }
-        });
-    }
-
     // NEW: Handle discount type change
     const discountTypeSelect = document.getElementById('discount-type');
     if (discountTypeSelect) {
@@ -553,18 +540,6 @@ function setupEventListeners() {
         editChainIncentiveForm.addEventListener('submit', function(event) {
             event.preventDefault();
             updateChainIncentive(event);
-        });
-    }
-
-    const editIncentiveTypeSelect = document.getElementById('edit-incentive-type');
-    if (editIncentiveTypeSelect) {
-        editIncentiveTypeSelect.addEventListener('change', function() {
-            const editOtherDescriptionGroup = document.getElementById('edit-other-description-group');
-            if (this.value === 'OT') {
-                editOtherDescriptionGroup.style.display = 'block';
-            } else {
-                editOtherDescriptionGroup.style.display = 'none';
-            }
         });
     }
 
@@ -586,6 +561,23 @@ function setupEventListeners() {
         }, 500));
     }
 
+    // Show/hide other description field based on incentive type - UPDATED
+    const incentiveTypeSelect = document.getElementById('incentive-type');
+    if (incentiveTypeSelect) {
+        incentiveTypeSelect.addEventListener('change', function() {
+            handleIncentiveTypeChange(this.value, false); // false = not edit form
+        });
+    }
+
+    // Show/hide other description field for EDIT form - UPDATED
+    const editIncentiveTypeSelect = document.getElementById('edit-incentive-type');
+    if (editIncentiveTypeSelect) {
+        editIncentiveTypeSelect.addEventListener('change', function() {
+            handleIncentiveTypeChange(this.value, true); // true = edit form
+        });
+    }
+
+
     // Add event listener for chain search
     const searchChainInput = document.getElementById('search-chain');
     if (searchChainInput) {
@@ -594,6 +586,77 @@ function setupEventListeners() {
         }, 300));
     }
 }
+
+/**
+ * NEW: Handle incentive type changes for both add and edit forms
+ * @param {string} selectedType - The selected incentive type
+ * @param {boolean} isEditForm - Whether this is the edit form or add form
+ */
+function handleIncentiveTypeChange(selectedType, isEditForm) {
+    // Determine which form elements to work with
+    const prefix = isEditForm ? 'edit-' : '';
+    const otherDescriptionGroup = document.getElementById(prefix + 'other-description-group');
+    const discountTypeSelect = document.getElementById(prefix + 'discount-type');
+    const amountInput = document.getElementById(prefix + 'incentive-amount');
+    const infoTextarea = document.getElementById(prefix + 'incentive-info');
+
+    // Handle "Other" type description field
+    if (otherDescriptionGroup) {
+        if (selectedType === 'OT') {
+            otherDescriptionGroup.style.display = 'block';
+        } else {
+            otherDescriptionGroup.style.display = 'none';
+        }
+    }
+
+    // Handle "No Chainwide Incentives" type
+    if (selectedType === 'NC') {
+        // Disable and set discount type to percentage
+        if (discountTypeSelect) {
+            discountTypeSelect.value = 'percentage';
+            discountTypeSelect.disabled = true;
+        }
+
+        // Set amount to 0 and disable
+        if (amountInput) {
+            amountInput.value = '0';
+            amountInput.disabled = true;
+        }
+
+        // Set the standard message and disable
+        if (infoTextarea) {
+            infoTextarea.value = 'No chainwide incentives available, check your local location for available discounts and/or incentives';
+            infoTextarea.disabled = true;
+        }
+
+        // Update the discount type UI
+        if (isEditForm) {
+            updateEditDiscountTypeUI('percentage');
+        } else {
+            updateDiscountTypeUI('percentage');
+        }
+    } else {
+        // Re-enable fields for other types
+        if (discountTypeSelect) {
+            discountTypeSelect.disabled = false;
+        }
+
+        if (amountInput) {
+            amountInput.disabled = false;
+            if (selectedType !== 'NC') {
+                amountInput.value = ''; // Clear value unless it's NC type
+            }
+        }
+
+        if (infoTextarea) {
+            infoTextarea.disabled = false;
+            if (selectedType !== 'NC') {
+                infoTextarea.value = ''; // Clear value unless it's NC type
+            }
+        }
+    }
+}
+
 
 /**
  * UPDATED: Update discount type UI based on selection - FIXED for cents
@@ -721,8 +784,6 @@ function openEditChainIncentiveModal(incentiveId, incentiveData) {
         return;
     }
 
-    console.log('Opening edit modal for incentive:', incentiveId, incentiveData);
-
     // Populate the form with current data
     document.getElementById('edit-incentive-id').value = incentiveId;
     document.getElementById('edit-incentive-type').value = incentiveData.type || '';
@@ -732,13 +793,8 @@ function openEditChainIncentiveModal(incentiveId, incentiveData) {
     document.getElementById('edit-incentive-info').value = incentiveData.information || '';
     document.getElementById('edit-incentive-active').checked = incentiveData.is_active !== false;
 
-    // Show/hide other description field based on type
-    const otherDescriptionGroup = document.getElementById('edit-other-description-group');
-    if (incentiveData.type === 'OT') {
-        otherDescriptionGroup.style.display = 'block';
-    } else {
-        otherDescriptionGroup.style.display = 'none';
-    }
+    // Handle the incentive type change (this will set up NC type properly)
+    handleIncentiveTypeChange(incentiveData.type || '', true);
 
     // Update discount type UI
     updateEditDiscountTypeUI(incentiveData.discount_type || 'percentage');
@@ -748,12 +804,10 @@ function openEditChainIncentiveModal(incentiveId, incentiveData) {
 }
 
 /**
- * UPDATED: Update chain incentive - FIXED validation for cents
- * @param {Event} event - The form submit event
+ * UPDATED: Update chain incentive - handles "No Chainwide Incentives"
  */
 function updateChainIncentive(event) {
-
-    if (event) event.preventDefault();
+    event.preventDefault();
 
     const chainId = currentChainId;
     const incentiveId = document.getElementById('edit-incentive-id').value;
@@ -770,7 +824,7 @@ function updateChainIncentive(event) {
     const discountType = document.getElementById('edit-discount-type').value;
     const isActive = document.getElementById('edit-incentive-active').checked;
 
-    if (!incentiveType || !incentiveAmount || !discountType) {
+    if (!incentiveType || !discountType) {
         alert('Please fill in all required fields.');
         return;
     }
@@ -780,30 +834,41 @@ function updateChainIncentive(event) {
         return;
     }
 
-    // UPDATED: Validate amount based on discount type - FIXED for cents
-    const amount = parseFloat(incentiveAmount);
-    if (isNaN(amount) || amount <= 0) {
-        alert('Please enter a valid amount greater than 0.');
-        return;
-    }
+    // UPDATED: Special handling for "No Chainwide Incentives"
+    let amount;
+    if (incentiveType === 'NC') {
+        amount = 0; // Always 0 for no chainwide incentives
+    } else {
+        if (!incentiveAmount) {
+            alert('Please enter a discount amount.');
+            return;
+        }
 
-    if (discountType === 'percentage') {
-        if (amount > 100) {
-            alert('Percentage discount cannot exceed 100%.');
+        amount = parseFloat(incentiveAmount);
+        if (isNaN(amount) || amount <= 0) {
+            alert('Please enter a valid amount greater than 0.');
             return;
         }
-        if (amount < 0.01) { // CHANGED: From 1 to 0.01
-            alert('Percentage discount must be at least 0.01%.'); // CHANGED: Updated message
-            return;
-        }
-    } else if (discountType === 'dollar') {
-        if (amount > 1000) {
-            alert('Dollar discount cannot exceed $1000.');
-            return;
-        }
-        if (amount < 0.01) {
-            alert('Dollar discount must be at least $0.01.');
-            return;
+
+        // Validate amount based on discount type (only for non-NC types)
+        if (discountType === 'percentage') {
+            if (amount > 100) {
+                alert('Percentage discount cannot exceed 100%.');
+                return;
+            }
+            if (amount < 0.01) {
+                alert('Percentage discount must be at least 0.01%.');
+                return;
+            }
+        } else if (discountType === 'dollar') {
+            if (amount > 1000) {
+                alert('Dollar discount cannot exceed $1000.');
+                return;
+            }
+            if (amount < 0.01) {
+                alert('Dollar discount must be at least $0.01.');
+                return;
+            }
         }
     }
 
@@ -822,8 +887,6 @@ function updateChainIncentive(event) {
     if (incentiveType === 'OT') {
         incentiveData.other_description = otherDescription;
     }
-
-    console.log('Updating chain incentive:', incentiveData);
 
     fetch(`${baseURL}/api/chains.js?operation=update_incentive`, {
         method: 'POST',
@@ -859,6 +922,7 @@ function updateChainIncentive(event) {
             alert(`Error updating incentive: ${error.message}`);
         });
 }
+
 
 
 function updatePagination() {
@@ -1199,22 +1263,21 @@ function loadChainIncentivesFromEmbedded(incentives) {
     const incentivesContainer = document.getElementById('chain-incentives');
     if (!incentivesContainer) return;
 
-    // Check if we have incentives
     if (!incentives || incentives.length === 0) {
         incentivesContainer.innerHTML = '<p>No incentives found for this chain.</p>';
         return;
     }
 
-    // Build the incentives list HTML
     let incentivesHTML = '<div class="list-group">';
 
     incentives.forEach(incentive => {
-        if (incentive.is_active !== false) { // Show active and undefined (default active)
+        if (incentive.is_active !== false) {
             const typeLabel = getIncentiveTypeLabel(incentive.type);
             const otherDescription = incentive.other_description ?
                 ` (${incentive.other_description})` : '';
 
-            const discountDisplay = formatDiscountAmount(incentive.amount, incentive.discount_type);
+            // UPDATED: Pass incentive type to formatDiscountAmount
+            const discountDisplay = formatDiscountAmount(incentive.amount, incentive.discount_type, incentive.type);
             const statusBadge = incentive.is_active === false ?
                 '<span class="badge badge-secondary">Inactive</span>' : '';
 
@@ -1242,8 +1305,6 @@ function loadChainIncentivesFromEmbedded(incentives) {
     incentivesHTML += '</div>';
     incentivesContainer.innerHTML = incentivesHTML;
 }
-
-
 
 /**
  * Load incentives for a chain
@@ -1748,7 +1809,6 @@ function loadModalChainIncentives(chainId) {
     const incentivesContainer = document.getElementById('modal-chain-incentives');
     if (!incentivesContainer) return;
 
-    // Show loading indicator
     incentivesContainer.innerHTML = '<p class="text-center">Loading incentives...</p>';
 
     const baseURL = getBaseURL();
@@ -1773,11 +1833,11 @@ function loadModalChainIncentives(chainId) {
                 const otherDescription = incentive.other_description ?
                     ` (${incentive.other_description})` : '';
 
-                const discountDisplay = formatDiscountAmount(incentive.amount, incentive.discount_type);
+                // UPDATED: Pass incentive type to formatDiscountAmount
+                const discountDisplay = formatDiscountAmount(incentive.amount, incentive.discount_type, incentive.type);
                 const statusBadge = incentive.is_active === false ?
                     '<span class="badge badge-secondary">Inactive</span>' : '';
 
-                // Store incentive data as JSON for the edit function
                 const incentiveDataJson = JSON.stringify(incentive).replace(/"/g, '&quot;');
 
                 incentivesHTML += `
@@ -1814,12 +1874,18 @@ function loadModalChainIncentives(chainId) {
 }
 
 /**
- * NEW: Format discount amount for display
+ * UPDATED: Format discount amount for display - handles "No Chainwide Incentives"
  * @param {number} amount - The discount amount
  * @param {string} discountType - The discount type ('percentage' or 'dollar')
+ * @param {string} incentiveType - The incentive type (to check for 'NC')
  * @returns {string} Formatted discount string
  */
-function formatDiscountAmount(amount, discountType) {
+function formatDiscountAmount(amount, discountType, incentiveType) {
+    // Special handling for "No Chainwide Incentives"
+    if (incentiveType === 'NC') {
+        return 'See local location';
+    }
+
     if (discountType === 'dollar') {
         return `$${parseFloat(amount).toFixed(2)} off`;
     } else {
@@ -1827,6 +1893,7 @@ function formatDiscountAmount(amount, discountType) {
         return `${parseFloat(amount)}%`;
     }
 }
+
 
 /**
  * NEW: Edit chain incentive from main view
@@ -1870,11 +1937,10 @@ function editChainIncentiveFromModal(incentiveId, incentiveDataJson) {
 }
 
 /**
- * UPDATED: Add an incentive to a chain - FIXED validation for cents
+ * UPDATED: Add an incentive to a chain - handles "No Chainwide Incentives"
  */
 function addChainIncentive(event) {
-
-    if (event) event.preventDefault();
+    event.preventDefault();
 
     const chainId = currentChainId;
     if (!chainId) {
@@ -1888,7 +1954,7 @@ function addChainIncentive(event) {
     const incentiveInfo = document.getElementById('incentive-info').value.trim();
     const discountType = document.getElementById('discount-type').value;
 
-    if (!incentiveType || !incentiveAmount || !discountType) {
+    if (!incentiveType || !discountType) {
         alert('Please fill in all required fields.');
         return;
     }
@@ -1898,30 +1964,41 @@ function addChainIncentive(event) {
         return;
     }
 
-    // UPDATED: Validate amount based on discount type - FIXED for cents
-    const amount = parseFloat(incentiveAmount);
-    if (isNaN(amount) || amount <= 0) {
-        alert('Please enter a valid amount greater than 0.');
-        return;
-    }
+    // UPDATED: Special handling for "No Chainwide Incentives"
+    let amount;
+    if (incentiveType === 'NC') {
+        amount = 0; // Always 0 for no chainwide incentives
+    } else {
+        if (!incentiveAmount) {
+            alert('Please enter a discount amount.');
+            return;
+        }
 
-    if (discountType === 'percentage') {
-        if (amount > 100) {
-            alert('Percentage discount cannot exceed 100%.');
+        amount = parseFloat(incentiveAmount);
+        if (isNaN(amount) || amount <= 0) {
+            alert('Please enter a valid amount greater than 0.');
             return;
         }
-        if (amount < 0.01) { // CHANGED: From 1 to 0.01
-            alert('Percentage discount must be at least 0.01%.'); // CHANGED: Updated message
-            return;
-        }
-    } else if (discountType === 'dollar') {
-        if (amount > 1000) {
-            alert('Dollar discount cannot exceed $1000.');
-            return;
-        }
-        if (amount < 0.01) {
-            alert('Dollar discount must be at least $0.01.');
-            return;
+
+        // Validate amount based on discount type (only for non-NC types)
+        if (discountType === 'percentage') {
+            if (amount > 100) {
+                alert('Percentage discount cannot exceed 100%.');
+                return;
+            }
+            if (amount < 0.01) {
+                alert('Percentage discount must be at least 0.01%.');
+                return;
+            }
+        } else if (discountType === 'dollar') {
+            if (amount > 1000) {
+                alert('Dollar discount cannot exceed $1000.');
+                return;
+            }
+            if (amount < 0.01) {
+                alert('Dollar discount must be at least $0.01.');
+                return;
+            }
         }
     }
 
@@ -1965,7 +2042,7 @@ function addChainIncentive(event) {
             // Close the modal
             ModalHelper.hide('manage-incentives-modal');
 
-            // Reload chain details without scrolling
+            // Reload chain details
             viewChainDetails(chainId);
             refreshChainSummary();
         })
@@ -1974,6 +2051,7 @@ function addChainIncentive(event) {
             alert(`Error adding incentive: ${error.message}`);
         });
 }
+
 
 /**
  * Delete a chain incentive - NEW function for embedded incentives
@@ -2155,6 +2233,7 @@ function getIncentiveTypeLabel(typeCode) {
         'AD': 'Active-Duty',
         'FR': 'First Responder',
         'SP': 'Spouse',
+        'NC': 'No Chainwide Incentives',
         'OT': 'Other'
     };
 
