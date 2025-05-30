@@ -587,8 +587,10 @@ function setupEventListeners() {
     }
 }
 
+// UPDATED JavaScript functions for Military Rate option
+
 /**
- * UPDATED: Handle incentive type changes for both add and edit forms - now includes WeSalute
+ * UPDATED: Handle incentive type changes - now includes Military Rate
  * @param {string} selectedType - The selected incentive type
  * @param {boolean} isEditForm - Whether this is the edit form or add form
  */
@@ -610,7 +612,7 @@ function handleIncentiveTypeChange(selectedType, isEditForm) {
     }
 
     // Handle special types that require automatic field population
-    if (selectedType === 'NC' || selectedType === 'WS') {
+    if (selectedType === 'NC' || selectedType === 'WS' || selectedType === 'MR') {
         // Disable and set discount type to percentage
         if (discountTypeSelect) {
             discountTypeSelect.value = 'percentage';
@@ -629,6 +631,8 @@ function handleIncentiveTypeChange(selectedType, isEditForm) {
                 infoTextarea.value = 'No chainwide incentives available, check your local location for available discounts and/or incentives';
             } else if (selectedType === 'WS') {
                 infoTextarea.value = 'Discounts only available through the paid service of WeSalute.com. Memberships start at $9.99 a month or $119.88 for a year. Discounts and multi-year options also available. Go to WeSalute.com for more details.';
+            } else if (selectedType === 'MR') {
+                infoTextarea.value = 'Military Rate discounts available at participating locations. Save a percentage off the Best Flex Rate. Military ID required at check-in. Discount amount varies by location and availability. Terms and conditions apply.';
             }
             infoTextarea.disabled = true;
         }
@@ -647,14 +651,14 @@ function handleIncentiveTypeChange(selectedType, isEditForm) {
 
         if (amountInput) {
             amountInput.disabled = false;
-            if (selectedType !== 'NC' && selectedType !== 'WS') {
+            if (!['NC', 'WS', 'MR'].includes(selectedType)) {
                 amountInput.value = ''; // Clear value unless it's a special type
             }
         }
 
         if (infoTextarea) {
             infoTextarea.disabled = false;
-            if (selectedType !== 'NC' && selectedType !== 'WS') {
+            if (!['NC', 'WS', 'MR'].includes(selectedType)) {
                 infoTextarea.value = ''; // Clear value unless it's a special type
             }
         }
@@ -662,7 +666,7 @@ function handleIncentiveTypeChange(selectedType, isEditForm) {
 }
 
 /**
- * UPDATED: Add an incentive to a chain - handles WeSalute option
+ * UPDATED: Add an incentive to a chain - handles Military Rate option
  */
 function addChainIncentive(event) {
     event.preventDefault();
@@ -689,9 +693,9 @@ function addChainIncentive(event) {
         return;
     }
 
-    // UPDATED: Special handling for "No Chainwide Incentives" and "WeSalute"
+    // UPDATED: Special handling for zero-amount incentive types
     let amount;
-    if (incentiveType === 'NC' || incentiveType === 'WS') {
+    if (['NC', 'WS', 'MR'].includes(incentiveType)) {
         amount = 0; // Always 0 for these special types
     } else {
         if (!incentiveAmount) {
@@ -778,7 +782,7 @@ function addChainIncentive(event) {
 }
 
 /**
- * UPDATED: Update chain incentive - handles WeSalute option
+ * UPDATED: Update chain incentive - handles Military Rate option
  */
 function updateChainIncentive(event) {
     event.preventDefault();
@@ -808,9 +812,9 @@ function updateChainIncentive(event) {
         return;
     }
 
-    // UPDATED: Special handling for "No Chainwide Incentives" and "WeSalute"
+    // UPDATED: Special handling for zero-amount incentive types
     let amount;
-    if (incentiveType === 'NC' || incentiveType === 'WS') {
+    if (['NC', 'WS', 'MR'].includes(incentiveType)) {
         amount = 0; // Always 0 for these special types
     } else {
         if (!incentiveAmount) {
@@ -898,7 +902,7 @@ function updateChainIncentive(event) {
 }
 
 /**
- * UPDATED: Get the label for an incentive type - includes WeSalute
+ * UPDATED: Get the label for an incentive type - includes Military Rate
  * @param {string} typeCode - The incentive type code
  * @returns {string} The incentive type label
  */
@@ -908,8 +912,9 @@ function getIncentiveTypeLabel(typeCode) {
         'AD': 'Active-Duty',
         'FR': 'First Responder',
         'SP': 'Spouse',
+        'MR': 'Military Rate', // NEW
         'NC': 'No Chainwide Incentives',
-        'WS': 'WeSalute', // NEW
+        'WS': 'WeSalute',
         'OT': 'Other'
     };
 
@@ -917,7 +922,7 @@ function getIncentiveTypeLabel(typeCode) {
 }
 
 /**
- * UPDATED: Format discount amount for display - handles WeSalute
+ * UPDATED: Format discount amount for display - handles Military Rate
  * @param {number} amount - The discount amount
  * @param {string} discountType - The discount type ('percentage' or 'dollar')
  * @param {string} incentiveType - The incentive type (to check for special types)
@@ -928,7 +933,9 @@ function formatDiscountAmount(amount, discountType, incentiveType) {
     if (incentiveType === 'NC') {
         return 'See local location';
     } else if (incentiveType === 'WS') {
-        return 'WeSalute.com'; // NEW
+        return 'WeSalute.com';
+    } else if (incentiveType === 'MR') {
+        return 'Variable Rate'; // NEW
     }
 
     if (discountType === 'dollar') {
