@@ -4051,7 +4051,7 @@ function buildEnhancedInfoWindowContent(business) {
         `<span class="enhanced-chain-badge">🔗 ${business.chain_name || 'Chain Location'}</span>` : '';
 
     // Enhanced status and messaging for chain locations
-    let statusHTML = '';
+    let statusHTML;
     let chainExplanation = '';
 
     if (isGooglePlace) {
@@ -5363,7 +5363,7 @@ async function tryServerSideChainMatching(placeName) {
                 }
             }
         } catch (error) {
-            continue; // Try next variation
+             // Try next variation
         }
     }
 
@@ -6672,7 +6672,7 @@ function buildEnhancedInfoWindowContentFixed2(business) {
         `<span class="enhanced-chain-badge">🔗 ${business.chain_name || 'Chain Location'}</span>` : '';
 
     // Status and messaging
-    let statusHTML = '';
+    let statusHTML;
     let chainExplanation = '';
 
     if (isGooglePlace) {
@@ -8467,9 +8467,7 @@ function createCategorizedBusinessMarker(business) {
         );
 
         // Use the enhanced marker creation with categories
-        const marker = createEnhancedBusinessMarkerWithCategory(business, position);
-
-        return marker;
+        return createEnhancedBusinessMarkerWithCategory(business, position);
     } catch (error) {
         console.error("❌ Error creating categorized business marker:", error);
         return null;
@@ -10794,6 +10792,330 @@ async function debugNearbySearchOnly() {
     }
 }
 
+// Global variable to store stats
+let databaseStats = null;
+
+/**
+ * Load real-time database statistics
+ */
+async function loadDatabaseStatistics() {
+    console.log("📊 Loading real-time database statistics...");
+
+    try {
+        // Show loading state
+        showStatsLoading(true);
+
+        // Get base URL
+        const baseURL = getBaseURL();
+
+        // Try to get auth token (optional - stats might be public)
+        const token = getAuthTokenOptional();
+
+        // Build headers
+        const headers = {
+            'Cache-Control': 'no-cache'
+        };
+
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        console.log("🌐 Fetching statistics from API...");
+
+        // Fetch main dashboard stats
+        const response = await fetch(`${baseURL}/api/auth.js?operation=dashboard-stats`, {
+            method: 'GET',
+            headers: headers
+        });
+
+        if (!response.ok) {
+            // If auth endpoint fails, try alternative approach
+            console.log("🔄 Primary stats endpoint failed, trying alternative...");
+            throw new Error(`Stats API failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("📊 Dashboard stats received:", data);
+
+        // Load chain statistics separately
+        console.log("🔗 Loading chain statistics...");
+        const chainStats = await loadChainStatistics();
+
+        // Combine the statistics
+        const combinedStats = {
+            businessCount: data.businessCount || 0,
+            chainCount: chainStats?.totalChains || 0,
+            businessIncentives: data.incentiveCount || 0,
+            chainIncentives: chainStats?.totalChainIncentives || 0,
+            // Additional info for potential future use
+            activeBusinesses: data.activeBusinessCount || 0,
+            newBusinessesThisMonth: data.newBusinessesThisMonth || 0,
+            availableIncentives: data.availableIncentiveCount || 0
+        };
+
+        console.log("✅ Combined statistics:", combinedStats);
+
+        // Store globally
+        databaseStats = combinedStats;
+
+        // Update the display
+        updateStatisticsDisplay(combinedStats);
+
+        // Hide loading
+        showStatsLoading(false);
+
+        // Add visual flourish
+        animateStatsContainer();
+
+        console.log("✅ Database statistics loaded successfully");
+
+    } catch (error) {
+        console.error("❌ Error loading database statistics:", error);
+
+        // Try fallback method
+        try {
+            console.log("🔄 Trying fallback statistics method...");
+            const fallbackStats = await loadFallbackStatistics();
+
+            if (fallbackStats) {
+                databaseStats = fallbackStats;
+                updateStatisticsDisplay(fallbackStats);
+                showStatsLoading(false);
+                console.log("✅ Fallback statistics loaded");
+                return;
+            }
+        } catch (fallbackError) {
+            console.error("❌ Fallback statistics also failed:", fallbackError);
+        }
+
+        // Show error state
+        showStatsError();
+    }
+}
+
+/**
+ * Load chain statistics from the chains API
+ */
+async function loadChainStatistics() {
+    try {
+        const baseURL = getBaseURL();
+        const token = getAuthTokenOptional();
+
+        const headers = {
+            'Cache-Control': 'no-cache'
+        };
+
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${baseURL}/api/chains.js?operation=summary`, {
+            method: 'GET',
+            headers: headers
+        });
+
+        if (!response.ok) {
+            console.warn("⚠️ Chain statistics API failed:", response.status);
+            return null;
+        }
+
+        const data = await response.json();
+        console.log("🔗 Chain statistics:", data);
+
+        return {
+            totalChains: data.total_chains || 0,
+            totalChainLocations: data.total_locations || 0,
+            totalChainIncentives: data.total_incentives || 0,
+            activeChainsWithIncentives: data.active_chains_with_incentives || 0
+        };
+
+    } catch (error) {
+        console.error("❌ Error loading chain statistics:", error);
+        return null;
+    }
+}
+
+/**
+ * Fallback method to load statistics using business API
+ */
+async function loadFallbackStatistics() {
+    try {
+        console.log("🔄 Using fallback statistics method...");
+
+        const baseURL = getBaseURL();
+
+        // Try to get basic business count
+        const businessResponse = await fetch(`${baseURL}/api/business.js?operation=search&limit=1`);
+
+        if (businessResponse.ok) {
+            const businessData = await businessResponse.json();
+            const businessCount = businessData.total || businessData.results?.length || 0;
+
+            console.log("📊 Fallback business count:", businessCount);
+
+            return {
+                businessCount: businessCount,
+                chainCount: 0, // Can't get this in fallback
+                businessIncentives: Math.floor(businessCount * 0.6), // Estimate
+                chainIncentives: 0 // Can't get this in fallback
+            };
+        }
+
+        return null;
+    } catch (error) {
+        console.error("❌ Fallback statistics failed:", error);
+        return null;
+    }
+}
+
+/**
+ * Update the statistics display with the loaded data
+ */
+function updateStatisticsDisplay(stats) {
+    console.log("🎨 Updating statistics display with:", stats);
+
+    // Get elements
+    const businessElement = document.getElementById('stat-businesses');
+    const chainsElement = document.getElementById('stat-chains');
+    const businessIncentivesElement = document.getElementById('stat-business-incentives');
+    const chainIncentivesElement = document.getElementById('stat-chain-incentives');
+
+    if (!businessElement || !chainsElement || !businessIncentivesElement || !chainIncentivesElement) {
+        console.error("❌ Statistics elements not found in DOM");
+        return;
+    }
+
+    // Update with animation
+    animateNumberUpdate(businessElement, stats.businessCount);
+    animateNumberUpdate(chainsElement, stats.chainCount);
+    animateNumberUpdate(businessIncentivesElement, stats.businessIncentives);
+    animateNumberUpdate(chainIncentivesElement, stats.chainIncentives);
+
+    console.log("✅ Statistics display updated");
+}
+
+/**
+ * Animate number updates with counting effect
+ */
+function animateNumberUpdate(element, targetValue) {
+    const startValue = 0;
+    const duration = 1000; // 1 second
+    const startTime = performance.now();
+
+    function updateNumber(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Use easeOutCubic for smooth animation
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        const currentValue = Math.floor(startValue + (targetValue - startValue) * easeProgress);
+
+        element.textContent = currentValue.toLocaleString();
+
+        if (progress < 1) {
+            requestAnimationFrame(updateNumber);
+        } else {
+            element.textContent = targetValue.toLocaleString();
+        }
+    }
+
+    requestAnimationFrame(updateNumber);
+}
+
+/**
+ * Show or hide loading state
+ */
+function showStatsLoading(isLoading) {
+    const loadingElement = document.getElementById('stats-loading');
+    const statsText = document.querySelector('.stats-text');
+
+    if (loadingElement && statsText) {
+        if (isLoading) {
+            loadingElement.style.display = 'block';
+            statsText.classList.add('stats-hidden');
+        } else {
+            loadingElement.style.display = 'none';
+            statsText.classList.remove('stats-hidden');
+        }
+    }
+}
+
+/**
+ * Show error state
+ */
+function showStatsError() {
+    const container = document.getElementById('database-stats');
+    if (container) {
+        container.innerHTML = `
+            <p class="stats-error">
+                Unable to load current database statistics. Please try refreshing the page.
+            </p>
+        `;
+    }
+}
+
+/**
+ * Add visual animation to the stats container
+ */
+function animateStatsContainer() {
+    const container = document.getElementById('database-stats');
+    if (container) {
+        container.classList.add('animate');
+
+        // Remove animation class after completion
+        setTimeout(() => {
+            container.classList.remove('animate');
+        }, 2000);
+    }
+}
+
+/**
+ * Get auth token optionally (don't fail if not present)
+ */
+function getAuthTokenOptional() {
+    try {
+        const sessionData = localStorage.getItem('patriotThanksSession');
+        if (!sessionData) {
+            return null;
+        }
+
+        const session = JSON.parse(sessionData);
+        return session.token || null;
+    } catch (error) {
+        console.log("ℹ️ No auth token available (this is okay for public stats)");
+        return null;
+    }
+}
+
+/**
+ * Refresh statistics (can be called periodically)
+ */
+function refreshDatabaseStatistics() {
+    console.log("🔄 Refreshing database statistics...");
+    loadDatabaseStatistics();
+}
+
+/**
+ * Initialize statistics on page load
+ */
+function initializeDatabaseStatistics() {
+    console.log("🚀 Initializing database statistics...");
+
+    // Load immediately
+    loadDatabaseStatistics();
+
+    // Optionally refresh every 5 minutes
+    setInterval(refreshDatabaseStatistics, 5 * 60 * 1000);
+}
+
+// Enhanced DOM ready handler for statistics
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait a moment for other initialization to complete
+    setTimeout(() => {
+        initializeDatabaseStatistics();
+    }, 1000);
+});
+
 
 // Initialize the dual action button styles
 if (typeof document !== 'undefined') {
@@ -10910,6 +11232,10 @@ if (typeof window !== 'undefined') {
     window.COMPREHENSIVE_CHAIN_DATABASE = COMPREHENSIVE_CHAIN_DATABASE_UPDATED;
     window.COMPREHENSIVE_CHAIN_DATABASE_UPDATED = COMPREHENSIVE_CHAIN_DATABASE_UPDATED;
     window.ENHANCED_CONFIG = ENHANCED_CONFIG;
+    window.loadDatabaseStatistics = loadDatabaseStatistics;
+    window.refreshDatabaseStatistics = refreshDatabaseStatistics;
+    window.initializeDatabaseStatistics = initializeDatabaseStatistics;
+    window.databaseStats = databaseStats;
 
     addEnhancedUserInterfaceCSS();
     addEnhancedTableChainStyles();

@@ -51,7 +51,7 @@
                 : 'production',
 
         // Debug mode - set to true to see more console logging
-        debug: true
+        debug: true,
     };
 </script>
 <!-- Dynamic Google Maps script insertion -->
@@ -62,7 +62,7 @@
         const apiKey = window.appConfig.googleMapsApiKey;
         const mapId = window.appConfig.googleMapsMapId;
 
-        console.log("Loading Google Maps with Map ID:", mapId);
+        console.log('Loading Google Maps with Map ID:', mapId);
 
         // Create and insert the Google Maps script with all recommended parameters
         const script = document.createElement('script');
@@ -110,11 +110,35 @@
         <h2>Search for a business within our database</h2>
         <p class="paragraph_style">In Patriot Thanks, you can search for a business within your local
             area that offers discounts and/or incentives for "active-duty, veterans, first responders, and their
-            spouses." If you know of a business that offers discounts and/or incentives, Please add them in the add a business section. </p>
+            spouses." If you know of a business that offers discounts and/or incentives, Please add them in the add a
+            business section. </p>
+
+        <!-- NEW: Real-time Database Statistics -->
+        <div id="database-stats" class="database-stats-container"
+             style="margin: 20px 0; padding: 15px; background: linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%); border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <p class="stats-text"
+               style="margin: 0; font-size: 16px; color: #333; text-align: center; line-height: 1.5;">
+                There are currently
+                <span id="stat-businesses" class="stat-number" style="color: #2ecc71; font-weight: bold;">...</span>
+                businesses,
+                <span id="stat-chains" class="stat-number" style="color: #9b59b6; font-weight: bold;">...</span>
+                business chains,
+                <span id="stat-business-incentives" class="stat-number"
+                      style="color: #e74c3c; font-weight: bold;">...</span> business incentives, and
+                <span id="stat-chain-incentives" class="stat-number"
+                      style="color: #f39c12; font-weight: bold;">...</span> chain incentives
+                in our database, <span style="color: #27ae60; font-weight: 500;">and growing!</span>
+            </p>
+            <div id="stats-loading" class="stats-loading" style="text-align: center; color: #666; font-style: italic;">
+                Loading database statistics...
+            </div>
+        </div>
+
         <div id="debug-controls" style="margin: 10px 0; text-align: right; display: none;">
             <button id="debug-map-btn" class="btn btn-sm btn-secondary">Debug Map</button>
         </div>
     </section>
+
     <div class="left_pane">
         <fieldset>
             <legend>
@@ -126,7 +150,7 @@
                 <input type="text" id="business-name" name="business_name" placeholder="Business Name...">
                 <br>
                 <label for="address">Address Search&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                <input type="text" id="address" name="street-address" placeholder="Address, City, State, or Zip" >
+                <input type="text" id="address" name="street-address" placeholder="Address, City, State, or Zip">
                 <br>
                 <div class="location-option">
                     <input type="checkbox" id="use-my-location" name="use_my_location">
@@ -214,24 +238,23 @@
     </div>
     <br><br>
 </footer>
-<button id="emergencyResetBtn" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+<button id="emergencyResetBtn"
+        style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background-color: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; display: none; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
     Emergency Reset
 </button>
 <script src="./js/bootstrap.bundle.min.js"></script>
 <script>
-    $(function(){
-        $("#nav-placeholder").load("NavBar.html", function() {
-            console.log("NavBar loaded");
+    $(function() {
+        $('#nav-placeholder').load('NavBar.html', function() {
+            console.log('NavBar loaded');
 
             // Load terms modal script
-            $.getScript("./js/terms-modal.js")
-            .done(function() {
-                console.log("Terms modal script loaded successfully");
+            $.getScript('./js/terms-modal.js').done(function() {
+                console.log('Terms modal script loaded successfully');
 
                 // Load login handler
-                $.getScript("./js/bootstrap5-login-handler.js")
-                .done(function() {
-                    console.log("Login handler script loaded successfully");
+                $.getScript('./js/bootstrap5-login-handler.js').done(function() {
+                    console.log('Login handler script loaded successfully');
 
                     // Check login status if function exists
                     setTimeout(function() {
@@ -244,7 +267,7 @@
         });
     });
     document.getElementById('emergencyResetBtn').addEventListener('click', function() {
-        console.log("Emergency reset button clicked");
+        console.log('Emergency reset button clicked');
         $('.modal-backdrop').remove();
         $('body').removeClass('modal-open');
         $('body').css('padding-right', '');
@@ -258,7 +281,7 @@
                 $('body').hasClass('modal-open');
 
         if (modalVisible) {
-            console.log("Modal appears to be stuck - showing emergency reset button");
+            console.log('Modal appears to be stuck - showing emergency reset button');
             document.getElementById('emergencyResetBtn').style.display = 'block';
         }
     }, 10000);
@@ -293,8 +316,12 @@
     }
 
     @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
     }
 
     /* Improved marker styles */
@@ -311,7 +338,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .marker-icon {
@@ -335,7 +362,7 @@
         z-index: 1000;
         background: white;
         border-radius: 8px;
-        box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3);
+        box-shadow: 0 2px 7px 1px rgba(0, 0, 0, 0.3);
         padding: 12px;
         width: 300px;
         max-width: 90vw;
@@ -444,7 +471,7 @@
     .gm-style .gm-style-iw-c {
         padding: 0 !important;
         border-radius: 8px !important;
-        box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3) !important;
+        box-shadow: 0 2px 7px 1px rgba(0, 0, 0, 0.3) !important;
         max-width: 330px !important;
         max-height: 400px !important;
         overflow: hidden !important;
@@ -466,6 +493,7 @@
         width: 1px !important;
         right: 0 !important;
         bottom: 0 !important;
+    }
 
     .gm-style .gm-style-iw-d {
         overflow: auto !important;
@@ -474,6 +502,7 @@
     }
 
     /* Fix info window tail positioning */
+
     .gm-style .gm-style-iw-t::after {
         background: white !important;
         border-radius: 50% !important;
@@ -483,11 +512,13 @@
     }
 
     /* Ensure info window appears above other elements */
+
     .gm-style .gm-style-iw {
         z-index: 1001 !important;
     }
 
     /* Improve close button visibility and positioning */
+
     .gm-ui-hover-effect {
         opacity: 0.8 !important;
         width: 24px !important;
@@ -507,12 +538,14 @@
     }
 
     /* Enhanced marker styles for better visibility and clicking */
+
     .custom-marker {
         cursor: pointer;
         z-index: 100;
     }
 
     /* Legend positioning */
+
     .map-legend {
         display: flex;
         justify-content: center;
@@ -535,7 +568,7 @@
         height: 16px;
         border-radius: 50%;
         border: 2px solid white;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
 
     .legend-color.primary {
@@ -571,6 +604,90 @@
             min-height: 400px;
         }
     }
+
+    /* Enhanced stats styling */
+
+    .database-stats-container {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .database-stats-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+        transition: left 2s ease-in-out;
+    }
+
+    .database-stats-container.animate::before {
+        left: 100%;
+    }
+
+    .stat-number {
+        display: inline-block;
+        font-size: 18px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background-color: rgba(255, 255, 255, 0.7);
+        transition: all 0.3s ease;
+        min-width: 30px;
+        text-align: center;
+    }
+
+    .stat-number:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .stats-loading {
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
+        100% {
+            opacity: 1;
+        }
+    }
+
+    .stats-text {
+        transition: opacity 0.3s ease;
+    }
+
+    .stats-hidden {
+        opacity: 0;
+    }
+
+    .stats-error {
+        color: #dc3545;
+        font-style: italic;
+        text-align: center;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .database-stats-container {
+            margin: 15px 0;
+            padding: 12px;
+        }
+
+        .stats-text {
+            font-size: 14px;
+        }
+
+        .stat-number {
+            font-size: 16px;
+        }
+    }
 </style>
 <script>
     // Show debug controls only in development environment
@@ -587,7 +704,7 @@
                         if (typeof debugMapState === 'function') {
                             debugMapState();
                         } else {
-                            console.log("debugMapState function not available");
+                            console.log('debugMapState function not available');
                         }
                     });
                 }
