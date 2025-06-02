@@ -1353,13 +1353,17 @@ function createNewChain() {
             // Reset the form
             document.getElementById('create-chain-form').reset();
 
-            // Reload the chains list without scrolling
+            // Reload the chains list (this will also refresh the summary)
             loadExistingChains();
-        }).then(data => {
-        alert('Chain created successfully!');
-        document.getElementById('create-chain-form').reset();
-        loadExistingChains(); // This will also refresh the summary
-    })
+
+            // Auto-load the newly created chain details
+            if (data.chain && data.chain._id) {
+                // Small delay to ensure the chains list is loaded first
+                setTimeout(() => {
+                    viewChainDetails(data.chain._id);
+                }, 500);
+            }
+        })
         .catch(error => {
             console.error('Error creating chain:', error);
             alert(`Error creating chain: ${error.message}`);
