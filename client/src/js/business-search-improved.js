@@ -10206,8 +10206,8 @@ function categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResu
 
     // Track primary result addresses with enhanced keys
     finalPrimaryResults.forEach(business => {
-        const addressKey = createEnhancedAddressKey(business);
-        const nameKey = createBusinessNameKey(business);
+        const addressKey = createEnhancedAddressKeyFixed(business);
+        const nameKey = createBusinessNameKeyFixed(business);
         usedAddresses.add(addressKey);
         usedBusinessNames.add(nameKey);
         console.log(`🔴 PRIMARY: ${business.bname} - Address: ${addressKey} - Name: ${nameKey}`);
@@ -10215,8 +10215,8 @@ function categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResu
 
     // FIXED: Google Places results with better duplicate detection
     const finalPlacesResults = placesResults.filter((business, index) => {
-        const addressKey = createEnhancedAddressKey(business);
-        const nameKey = createBusinessNameKey(business);
+        const addressKey = createEnhancedAddressKeyFixed(business);
+        const nameKey = createBusinessNameKeyFixed(business);
 
         console.log(`🔍 CHECKING PLACES #${index + 1}: ${business.bname}`);
         console.log(`   Address Key: ${addressKey}`);
@@ -10243,8 +10243,8 @@ function categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResu
 
     // FIXED: Nearby database businesses with same logic
     const finalNearbyResults = nearbyDatabaseBusinesses.filter(business => {
-        const addressKey = createEnhancedAddressKey(business);
-        const nameKey = createBusinessNameKey(business);
+        const addressKey = createEnhancedAddressKeyFixed(business);
+        const nameKey = createBusinessNameKeyFixed(business);
 
         if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
             console.log(`🚫 NEARBY DUPLICATE: ${business.bname} (already processed)`);
@@ -10383,7 +10383,7 @@ async function performEnhancedBusinessSearchWithFixedDuplicates(formData, bustCa
 
         // PHASE 4: FIXED categorization with proper duplicate detection
         const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
-            categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
+            categorizeResultsWithImprovedChainDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
 
         // PHASE 5: Display results
         const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
@@ -10592,7 +10592,7 @@ async function performEnhancedBusinessSearchWithNearbyFixed(formData, bustCache 
 
         // PHASE 4: Enhanced categorization with fixed duplicate detection
         const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
-            categorizeResultsWithFixedDuplicateDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
+            categorizeResultsWithImprovedChainDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
 
         // PHASE 5: Display results
         const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
@@ -11116,6 +11116,379 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 1000);
 });
 
+/**
+ * FIXED: Enhanced address key that properly handles exact address matches
+ * This will prevent duplicates based on identical addresses regardless of name variations
+ */
+function createEnhancedAddressKeyFixed(business) {
+    const parts = [];
+
+    // Normalize and clean the street address
+    if (business.address1) {
+        let address = business.address1.toLowerCase().trim()
+            .replace(/\s+/g, ' ') // Normalize spaces
+            .replace(/[^\w\s#]/g, '') // Remove punctuation except #
+            .replace(/\b(suite?|ste?|unit|apt|apartment)\b/g, '') // Remove suite/unit indicators
+            .replace(/\s+/g, ' ') // Normalize spaces again
+            .trim();
+        parts.push(address);
+    }
+
+    // Include city and state for additional uniqueness
+    if (business.city) {
+        parts.push(business.city.toLowerCase().trim().replace(/\s+/g, ''));
+    }
+    if (business.state) {
+        parts.push(business.state.toLowerCase().trim());
+    }
+    if (business.zip) {
+        // Only use first 5 digits of ZIP
+        const zip = business.zip.trim().substring(0, 5);
+        parts.push(zip);
+    }
+
+    const key = parts.join('|');
+    console.log(`🔑 FIXED ADDRESS KEY for ${business.bname}: ${key}`);
+    return key;
+}
+
+/**
+ * FIXED: Better business name comparison that handles chain location name variations
+ */
+function createBusinessNameKeyFixed(business) {
+    const businessName = business.bname.toLowerCase().trim();
+
+    // For chain businesses or businesses with chain-like names, use address as primary identifier
+    if (business.isChainLocation || business.chain_id || isChainVariationName(businessName)) {
+        // For chain locations, create a key that includes address to differentiate locations
+        const addressPart = business.address1 ?
+            business.address1.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, '').substring(0, 20) :
+            'noaddr';
+        const nameKey = `${normalizeChainName(businessName)}_${addressPart}`;
+        console.log(`🏪 FIXED CHAIN NAME KEY for ${business.bname}: ${nameKey}`);
+        return nameKey;
+    }
+
+    // For non-chain businesses, use just the normalized name
+    const nameKey = businessName.replace(/[^\w\s]/g, '').replace(/\s+/g, '');
+    console.log(`🏢 FIXED REGULAR NAME KEY for ${business.bname}: ${nameKey}`);
+    return nameKey;
+}
+
+/**
+ * NEW: Check if a business name appears to be a chain location variation
+ */
+function isChainVariationName(businessName) {
+    const chainPatterns = [
+        /^shag\s/i,
+        /\bshag\b/i,
+        /alternative\s*superstore/i,
+        // Add other patterns for different chains as needed
+    ];
+
+    return chainPatterns.some(pattern => pattern.test(businessName));
+}
+
+/**
+ * NEW: Normalize chain names to catch variations
+ */
+function normalizeChainName(businessName) {
+    return businessName
+        .toLowerCase()
+        .replace(/\b(alternative\s*superstore|superstore)\b/i, 'alt-super')
+        .replace(/\b(cedar\s*rapids|marshalltown|west\s*des\s*moines|wiley\s*blvd)\b/i, '')
+        .replace(/[^\w]/g, '')
+        .trim();
+}
+
+/**
+ * FIXED: Enhanced categorization with improved duplicate detection for chain locations
+ */
+function categorizeResultsWithImprovedChainDetection(primaryResults, placesResults, nearbyDatabaseBusinesses) {
+    console.log("🔄 IMPROVED CHAIN CATEGORIZATION - Better duplicate detection:");
+
+    // Start with primary results (highest priority - RED markers)
+    const finalPrimaryResults = [...primaryResults];
+    const usedAddresses = new Set();
+    const usedBusinessNames = new Set();
+
+    // Track primary result addresses with enhanced keys
+    finalPrimaryResults.forEach(business => {
+        const addressKey = createEnhancedAddressKeyFixed(business);
+        const nameKey = createBusinessNameKeyFixed(business);
+        usedAddresses.add(addressKey);
+        usedBusinessNames.add(nameKey);
+        console.log(`🔴 PRIMARY: ${business.bname}`);
+        console.log(`   Address Key: ${addressKey}`);
+        console.log(`   Name Key: ${nameKey}`);
+    });
+
+    // IMPROVED: Google Places results with better duplicate detection for chain locations
+    const finalPlacesResults = placesResults.filter((business, index) => {
+        const addressKey = createEnhancedAddressKeyFixed(business);
+        const nameKey = createBusinessNameKeyFixed(business);
+
+        console.log(`🔍 CHECKING PLACES #${index + 1}: ${business.bname}`);
+        console.log(`   Address Key: ${addressKey}`);
+        console.log(`   Name Key: ${nameKey}`);
+
+        // CRITICAL FIX: Check for address duplicates first (most reliable)
+        if (usedAddresses.has(addressKey)) {
+            console.log(`🚫 PLACES DUPLICATE BY ADDRESS: ${business.bname} (same address: ${addressKey})`);
+            return false;
+        }
+
+        // IMPROVED: For chain locations, also check if this is a name+address combination we've seen
+        if (usedBusinessNames.has(nameKey)) {
+            console.log(`🚫 PLACES DUPLICATE BY NAME+ADDRESS: ${business.bname} (same name+address: ${nameKey})`);
+            return false;
+        }
+
+        // NEW: Additional check for chain locations with slight name variations at same address
+        if (business.isChainLocation || isChainVariationName(business.bname)) {
+            // Check if any existing business has the same address (regardless of name variation)
+            const hasAddressDuplicate = Array.from(usedAddresses).some(existingAddressKey => {
+                // Extract just the address part (before city)
+                const businessAddressPart = addressKey.split('|')[0];
+                const existingAddressPart = existingAddressKey.split('|')[0];
+                return businessAddressPart === existingAddressPart;
+            });
+
+            if (hasAddressDuplicate) {
+                console.log(`🚫 CHAIN LOCATION DUPLICATE: ${business.bname} (same address as existing chain location)`);
+                return false;
+            }
+        }
+
+        // This is a unique location
+        usedAddresses.add(addressKey);
+        usedBusinessNames.add(nameKey);
+        console.log(`🔵 PLACES ACCEPTED: ${business.bname} at ${business.address1}`);
+        return true;
+    });
+
+    // FIXED: Nearby database businesses with same improved logic
+    const finalNearbyResults = nearbyDatabaseBusinesses.filter(business => {
+        const addressKey = createEnhancedAddressKeyFixed(business);
+        const nameKey = createBusinessNameKeyFixed(business);
+
+        if (usedAddresses.has(addressKey) || usedBusinessNames.has(nameKey)) {
+            console.log(`🚫 NEARBY DUPLICATE: ${business.bname} (already processed)`);
+            return false;
+        }
+
+        console.log(`🟢 NEARBY ACCEPTED: ${business.bname} at ${business.address1}`);
+        return true;
+    });
+
+    console.log(`📊 IMPROVED CHAIN CATEGORIZATION RESULTS:`);
+    console.log(`   🔴 Primary: ${finalPrimaryResults.length}`);
+    console.log(`   🔵 Places: ${finalPlacesResults.length} (was ${placesResults.length})`);
+    console.log(`   🟢 Nearby: ${finalNearbyResults.length}`);
+
+    return {
+        finalPrimaryResults,
+        finalPlacesResults,
+        finalNearbyResults
+    };
+}
+
+/**
+ * UPDATED: Main search function that uses the improved categorization
+ */
+async function performEnhancedBusinessSearchWithImprovedChainDetection(formData, bustCache = false) {
+    try {
+        console.log("🔍 IMPROVED CHAIN SEARCH: Starting search with better duplicate detection:", formData);
+
+        // Show loading indicator
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading"><div class="loading-text">Searching for businesses...</div><div class="loading-spinner"></div></div>';
+            resultsContainer.style.display = 'block';
+        }
+
+        // Process search location (keeping existing logic)
+        let searchLocation = null;
+        let searchRadius = 30;
+
+        if (formData.useMyLocation) {
+            try {
+                updateLoadingMessage("Getting your location...");
+                searchLocation = await getUserLocation();
+                window.currentSearchLocation = searchLocation;
+            } catch (error) {
+                console.error("❌ Error getting user location:", error);
+                hideLoadingIndicator();
+                alert("Unable to get your current location. Please try entering an address instead.");
+                return;
+            }
+        } else if (formData.address && formData.address.trim() !== '') {
+            try {
+                updateLoadingMessage("Finding location...");
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    window.currentSearchLocation = searchLocation;
+
+                    if (/^\d{5}$/.test(formData.address.trim())) {
+                        searchRadius = 25;
+                        console.log("📍 ZIP CODE SEARCH: Using 25km radius");
+                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
+                        searchRadius = 30;
+                        console.log("📍 CITY SEARCH: Using 30km radius");
+                    } else {
+                        searchRadius = 20;
+                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
+                    }
+
+                    if (map && searchLocation) {
+                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                        map.setCenter(center);
+                        map.setZoom(searchRadius <= 20 ? 12 : 11);
+                    }
+                } else {
+                    throw new Error(`Geocoding failed for address: ${formData.address}`);
+                }
+            } catch (error) {
+                console.error("❌ Error geocoding address:", error);
+                hideLoadingIndicator();
+                alert("We couldn't recognize that address. Please try a more specific address.");
+                return;
+            }
+        }
+
+        // PHASE 1: Search database for primary results
+        updateLoadingMessage("Searching database...");
+        let primaryResults = [];
+
+        if (formData.businessName && formData.businessName.trim() !== '') {
+            try {
+                primaryResults = await searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache);
+                primaryResults = primaryResults.filter(business => business.is_chain !== true);
+                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
+            } catch (error) {
+                console.error("❌ Primary search failed:", error);
+            }
+        }
+
+        // PHASE 2: Search Google Places
+        let placesResults = [];
+
+        if (formData.businessName && searchLocation) {
+            try {
+                updateLoadingMessage("Searching for additional locations...");
+                const placesSearchLocation = {
+                    ...searchLocation,
+                    searchRadius: Math.max(searchRadius, 35)
+                };
+                placesResults = await searchGooglePlacesForBusinessEnhanced(formData.businessName, placesSearchLocation);
+                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
+            } catch (error) {
+                console.error("❌ Places search failed:", error);
+            }
+        }
+
+        // PHASE 3: Search nearby database businesses
+        let nearbyDatabaseBusinesses = [];
+
+        const shouldSearchNearby = !formData.businessName ||
+            (primaryResults.length + placesResults.length < 8);
+
+        if (searchLocation && shouldSearchNearby) {
+            try {
+                updateLoadingMessage("Finding other nearby businesses...");
+                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinessesEnhanced(searchLocation, searchRadius, formData.businessName);
+                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
+            } catch (error) {
+                console.error("❌ Nearby database search failed:", error);
+            }
+        } else {
+            console.log("⏭️ SKIPPING nearby search - found many relevant results");
+        }
+
+        // PHASE 4: IMPROVED categorization with better chain duplicate detection
+        const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
+            categorizeResultsWithImprovedChainDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
+
+        // PHASE 5: Display results
+        const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
+        console.log(`📊 IMPROVED CHAIN SEARCH RESULTS:`);
+        console.log(`   - 🔴 Primary Database (RED): ${finalPrimaryResults.length} businesses`);
+        console.log(`   - 🔵 Additional Locations (BLUE): ${finalPlacesResults.length} businesses`);
+        console.log(`   - 🟢 Other Nearby (GREEN): ${finalNearbyResults.length} businesses`);
+        console.log(`   - Total: ${allResults.length} businesses`);
+
+        if (allResults.length > 0) {
+            // Set proper flags
+            finalPrimaryResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = true;
+                business.markerColor = 'primary';
+                business.priority = 1;
+            });
+
+            finalPlacesResults.forEach(business => {
+                business.isGooglePlace = true;
+                business.isFromDatabase = false;
+                business.isPrimaryResult = false;
+                business.isRelevantPlaces = true;
+                business.markerColor = 'nearby';
+                business.priority = 2;
+            });
+
+            finalNearbyResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = false;
+                business.isNearbyDatabase = true;
+                business.markerColor = 'database';
+                business.priority = 3;
+            });
+
+            hideLoadingIndicator();
+
+            // Display results
+            displayBusinessesOnMapWithBetterPriority(allResults);
+            displaySearchResultsWithBetterPriority(allResults);
+
+            // Show success message
+            showImprovedSearchSuccessMessage(finalPrimaryResults.length, finalPlacesResults.length, finalNearbyResults.length, formData.businessName);
+
+            console.log("✅ IMPROVED CHAIN SEARCH: Completed successfully with better duplicate detection");
+        } else {
+            hideLoadingIndicator();
+            showNoResultsMessage();
+        }
+
+    } catch (error) {
+        console.error("❌ Improved chain search error:", error);
+        hideLoadingIndicator();
+        showErrorMessage(`Error searching for businesses: ${error.message}`);
+    }
+}
+
+/**
+ * Test function for the improved chain detection
+ */
+async function testImprovedChainDetection() {
+    console.log("🧪 TESTING IMPROVED CHAIN DETECTION: Should eliminate Shag duplicates");
+
+    const formData = {
+        businessName: "Shag",
+        address: "Cedar Rapids, IA",
+        useMyLocation: false
+    };
+
+    try {
+        clearMarkers();
+        await performEnhancedBusinessSearchWithImprovedChainDetection(formData, true);
+        console.log("✅ Improved chain detection test completed - should show only database OR places results, not both!");
+    } catch (error) {
+        console.error("❌ Improved chain detection test failed:", error);
+    }
+}
 
 // Initialize the dual action button styles
 if (typeof document !== 'undefined') {
@@ -11124,18 +11497,25 @@ if (typeof document !== 'undefined') {
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
-    window.retrieveFromMongoDB = performEnhancedBusinessSearchWithNearbyFixed;
+    window.retrieveFromMongoDB = performEnhancedBusinessSearchWithImprovedChainDetection;
+    window.createEnhancedAddressKeyFixed = createEnhancedAddressKeyFixed;
+    window.createBusinessNameKeyFixed = createBusinessNameKeyFixed;
+    window.isChainVariationName = isChainVariationName;
+    window.normalizeChainName = normalizeChainName;
+    window.categorizeResultsWithImprovedChainDetection = categorizeResultsWithImprovedChainDetection;
+    window.performEnhancedBusinessSearchWithImprovedChainDetection = performEnhancedBusinessSearchWithImprovedChainDetection;
+    window.testImprovedChainDetection = testImprovedChainDetection;
+
+    // Replace the main search function
+
     window.addCategorizedBusinessRow = addCategorizedBusinessRowEnhanced;
     window.buildCategoryAwareInfoWindowContent = buildCategoryAwareInfoWindowContentEnhanced;
     window.performEnhancedBusinessSearchWithNearbyFixed = performEnhancedBusinessSearchWithNearbyFixed;
     window.searchNearbyDatabaseBusinessesWithDebugging = searchNearbyDatabaseBusinessesWithDebugging;
     window.testNearbySearchFix = testNearbySearchFix;
     window.debugNearbySearchOnly = debugNearbySearchOnly;
-    window.performEnhancedBusinessSearch = performEnhancedBusinessSearchWithNearbyFixed;
+    window.performEnhancedBusinessSearch = performEnhancedBusinessSearchWithImprovedChainDetection;
     window.searchNearbyDatabaseBusinessesEnhanced = searchNearbyDatabaseBusinessesWithDebugging;
-    window.createEnhancedAddressKey = createEnhancedAddressKey;
-    window.createBusinessNameKey = createBusinessNameKey;
-    window.categorizeResultsWithFixedDuplicateDetection = categorizeResultsWithFixedDuplicateDetection;
     window.performEnhancedBusinessSearchWithFixedDuplicates = performEnhancedBusinessSearchWithFixedDuplicates;
     window.testFixedOliveGardenSearch = testFixedOliveGardenSearch;
     window.searchGooglePlacesForBusinessEnhanced = searchGooglePlacesForBusinessEnhanced;
