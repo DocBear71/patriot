@@ -12590,6 +12590,260 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
+* FIXED: Enhanced incentive loading that uses correct container ID format
+* @param {string} businessId - Business ID (also used as container ID for table cells)
+* @param {string} chainId - Chain ID (optional)
+*/
+async function loadCombinedIncentivesForTableCell(businessId, chainId = null) {
+    console.log(`🎁 FIXED TABLE INCENTIVES: Loading for business ${businessId}, chain ${chainId}`);
+
+    // CRITICAL FIX: Use the correct container ID format that matches your table
+    const container = document.getElementById(`incentives-for-${businessId}`);
+    if (!container) {
+        console.error(`❌ Table container not found: incentives-for-${businessId}`);
+        return;
+    }
+
+    // Show loading state
+    container.innerHTML = '<em style="color: #666;">⏳ Loading all incentives...</em>';
+
+    const baseURL = getBaseURL();
+    let allIncentives = [];
+
+    try {
+        // STEP 1: Load location-specific incentives first
+        console.log(`📍 Loading location-specific incentives for business ${businessId}`);
+        try {
+            const businessIncentivesResponse = await fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`);
+
+            if (businessIncentivesResponse.ok) {
+                const businessData = await businessIncentivesResponse.json();
+                if (businessData.results && businessData.results.length > 0) {
+                    // Add location-specific incentives
+                    const locationIncentives = businessData.results
+                        .filter(incentive => incentive.is_available)
+                        .map(incentive => ({
+                            ...incentive,
+                            source: 'location',
+                            scope: 'Location only'
+                        }));
+
+                    allIncentives.push(...locationIncentives);
+                    console.log(`✅ Found ${locationIncentives.length} location-specific incentives`);
+                } else {
+                    console.log(`ℹ️ No location-specific incentives found for business ${businessId}`);
+                }
+            }
+        } catch (locationError) {
+            console.error("❌ Error loading location-specific incentives:", locationError);
+        }
+
+        // STEP 2: Load chain-wide incentives if this is a chain location
+        if (chainId) {
+            console.log(`🔗 Loading chain-wide incentives for chain ${chainId}`);
+            try {
+                const chainIncentivesResponse = await fetch(`${baseURL}/api/chains.js?operation=get_incentives&chain_id=${chainId}`);
+
+                if (chainIncentivesResponse.ok) {
+                    const chainData = await chainIncentivesResponse.json();
+                    if (chainData.incentives && chainData.incentives.length > 0) {
+                        // Add chain-wide incentives
+                        const chainIncentives = chainData.incentives
+                            .filter(incentive => incentive.is_active)
+                            .map(incentive => ({
+                                _id: incentive._id,
+                                business_id: businessId,
+                                is_available: incentive.is_active,
+                                type: incentive.type,
+                                amount: incentive.amount,
+                                information: incentive.information,
+                                other_description: incentive.other_description,
+                                created_at: incentive.created_date,
+                                source: 'chain',
+                                scope: 'Chain-wide'
+                            }));
+
+                        allIncentives.push(...chainIncentives);
+                        console.log(`✅ Found ${chainIncentives.length} chain-wide incentives`);
+                    } else {
+                        console.log(`ℹ️ No chain-wide incentives found for chain ${chainId}`);
+                    }
+                }
+            } catch (chainError) {
+                console.error("❌ Error loading chain-wide incentives:", chainError);
+            }
+        }
+
+        // STEP 3: Display combined incentives in table format
+        console.log(`📊 Total incentives found: ${allIncentives.length}`);
+
+        if (allIncentives.length === 0) {
+            container.innerHTML = '<em style="color: #666;">💭 No incentives available</em>';
+            return;
+        }
+
+        // Sort incentives: chain-wide first, then location-specific
+        allIncentives.sort((a, b) => {
+            if (a.source === 'chain' && b.source === 'location') return -1;
+            if (a.source === 'location' && b.source === 'chain') return 1;
+            return 0;
+        });
+
+        // Build combined HTML for TABLE display (more compact)
+        let incentivesHTML = '';
+
+        allIncentives.forEach(incentive => {
+            const typeLabel = getIncentiveTypeLabel(incentive.type);
+            const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+
+            // Create scope badge for table
+            const scopeBadge = incentive.source === 'chain' ?
+                '<span class="scope-badge-table chain-scope">⛓️ Chain-wide</span>' :
+                '<span class="scope-badge-table location-scope">📍 Location only</span>';
+
+            incentivesHTML += `
+                <div class="table-incentive-item ${incentive.source}-incentive">
+                    <div class="table-incentive-header">
+                        <strong>${typeLabel}${otherDescription}:</strong> 
+                        <span class="incentive-amount">${incentive.amount}%</span>
+                        ${scopeBadge}
+                    </div>
+                    ${incentive.information ? `<div class="table-incentive-info">${incentive.information}</div>` : ''}
+                </div>
+            `;
+        });
+
+        container.innerHTML = incentivesHTML;
+        console.log(`✅ Successfully displayed ${allIncentives.length} combined incentives in table`);
+
+    } catch (error) {
+        console.error("❌ Error loading combined incentives for table:", error);
+        container.innerHTML = '<em style="color: #dc3545;">❌ Error loading incentives</em>';
+    }
+}
+
+/**
+ * FIXED: Updated fetchCombinedBusinessIncentives to use the correct table loading function
+ */
+function fetchCombinedBusinessIncentivesFixed(businessId, chainId = null) {
+    if (!businessId || businessId.startsWith('google_')) {
+        console.log(`⏭️ Skipping incentives for Google Places business: ${businessId}`);
+        return;
+    }
+
+    console.log(`🎁 FIXED TABLE INCENTIVES: Fetching for business ID: ${businessId}`);
+    console.log(`   - Chain ID: ${chainId || 'None'}`);
+
+    // Wait for DOM to be ready
+    setTimeout(() => {
+        const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+
+        if (!incentivesCell) {
+            console.error(`❌ Could not find incentives cell for business ${businessId}`);
+            return;
+        }
+
+        console.log(`✅ Found incentives cell for ${businessId}, loading combined incentives`);
+
+        // FIXED: Use the table-specific loading function
+        loadCombinedIncentivesForTableCell(businessId, chainId);
+    }, 200);
+}
+
+/**
+ * FIXED: Add enhanced styles for table incentive display
+ */
+function addTableCombinedIncentivesStyles() {
+    if (!document.getElementById('table-combined-incentives-styles')) {
+        const style = document.createElement('style');
+        style.id = 'table-combined-incentives-styles';
+        style.textContent = `
+            /* Table-specific Combined Incentives Styles */
+            .table-incentive-item {
+                margin: 3px 0;
+                padding: 6px 8px;
+                border-radius: 4px;
+                border-left: 3px solid #ddd;
+                background-color: #f8f9fa;
+                font-size: 13px;
+                line-height: 1.3;
+            }
+
+            .table-incentive-item.chain-incentive {
+                border-left-color: #4285F4;
+                background-color: #e8f0fe;
+            }
+
+            .table-incentive-item.location-incentive {
+                border-left-color: #34a853;
+                background-color: #e8f5e8;
+            }
+
+            .table-incentive-header {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 4px;
+                margin-bottom: 2px;
+            }
+
+            .table-incentive-header strong {
+                color: #333;
+                font-size: 13px;
+            }
+
+            .incentive-amount {
+                color: #2e7d32;
+                font-weight: 600;
+                font-size: 14px;
+                margin-left: 4px;
+            }
+
+            .scope-badge-table {
+                font-size: 10px;
+                padding: 2px 4px;
+                border-radius: 6px;
+                font-weight: 500;
+                white-space: nowrap;
+                margin-left: 4px;
+            }
+
+            .scope-badge-table.chain-scope {
+                background-color: #4285F4;
+                color: white;
+            }
+
+            .scope-badge-table.location-scope {
+                background-color: #34a853;
+                color: white;
+            }
+
+            .table-incentive-info {
+                font-size: 11px;
+                color: #666;
+                font-style: italic;
+                margin-top: 2px;
+                line-height: 1.2;
+            }
+
+            /* Responsive table incentives */
+            @media (max-width: 768px) {
+                .table-incentive-header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 2px;
+                }
+                
+                .scope-badge-table {
+                    margin-left: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+/**
  * FIXED: Load BOTH chain-wide AND location-specific incentives for chain locations
  * This replaces the existing incentive loading functions to show complete incentive information
  */
@@ -13334,6 +13588,12 @@ async function testCombinedIncentives() {
     }
 }
 
+// Initialize table styles
+document.addEventListener('DOMContentLoaded', function() {
+    addTableCombinedIncentivesStyles();
+});
+
+
 // Initialize the dual action button styles
 if (typeof document !== 'undefined') {
     addDualActionButtonStyles();
@@ -13341,6 +13601,15 @@ if (typeof document !== 'undefined') {
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
+    window.loadCombinedIncentivesForTableCell = loadCombinedIncentivesForTableCell;
+    window.fetchCombinedBusinessIncentivesFixed = fetchCombinedBusinessIncentivesFixed;
+    window.addTableCombinedIncentivesStyles = addTableCombinedIncentivesStyles;
+
+    // Replace the existing functions
+    window.fetchCombinedBusinessIncentives = fetchCombinedBusinessIncentivesFixed;
+    window.fetchBusinessIncentives = fetchCombinedBusinessIncentivesFixed;
+    window.fetchBusinessIncentivesFixed = fetchCombinedBusinessIncentivesFixed;
+
     window.buildInfoWindowContentWithCombinedIncentives = buildInfoWindowContentWithCombinedIncentives;
     window.showEnhancedInfoWindowWithCombinedIncentives = showEnhancedInfoWindowWithCombinedIncentives;
     window.testCombinedIncentives = testCombinedIncentives;
@@ -13355,13 +13624,10 @@ if (typeof window !== 'undefined') {
 
     window.loadCombinedIncentivesForDatabaseBusiness = loadCombinedIncentivesForDatabaseBusiness;
     window.loadCombinedIncentivesForInfoWindow = loadCombinedIncentivesForInfoWindow;
-    window.fetchCombinedBusinessIncentives = fetchCombinedBusinessIncentives;
     window.addCombinedIncentivesStyles = addCombinedIncentivesStyles;
     window.addBusinessRowWithCombinedIncentives = addBusinessRowWithCombinedIncentives;
 
     // Replace existing functions
-    window.fetchBusinessIncentivesFixed = fetchCombinedBusinessIncentives;
-    window.fetchBusinessIncentives = fetchCombinedBusinessIncentives;
     window.addBusinessRow = addBusinessRowWithCombinedIncentives;
     window.addCategorizedBusinessRow = addBusinessRowWithCombinedIncentives;
     window.loadChainIncentivesForDatabaseBusinessFixed = loadCombinedIncentivesForInfoWindow;
