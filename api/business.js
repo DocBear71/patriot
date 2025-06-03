@@ -462,13 +462,17 @@ async function handleBusinessRegister(req, res) {
 
         // Add geospatial data if coordinates are provided
         if (businessData.lat && businessData.lng) {
-            businessData.location = {
-                type: 'Point',
-                coordinates: [
-                    parseFloat(businessData.lng),  // GeoJSON uses [longitude, latitude]
-                    parseFloat(businessData.lat)
-                ]
-            };
+            const lat = parseFloat(businessData.lat);
+            const lng = parseFloat(businessData.lng);
+
+            // Validate coordinates before creating location object
+            if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+                businessData.location = {
+                    type: 'Point',
+                    coordinates: [lng, lat]  // GeoJSON uses [longitude, latitude]
+                };
+                console.log("✅ Created location from provided coordinates:", businessData.location);
+            }
         } else if (businessData.address1 && businessData.city && businessData.state) {
             // If coordinates weren't provided, geocode the address
             try {
@@ -476,21 +480,32 @@ async function handleBusinessRegister(req, res) {
                 const { geocodeAddress } = require('../utils/geocoding');
 
                 const address = `${businessData.address1}, ${businessData.city}, ${businessData.state} ${businessData.zip}`;
+                console.log("🗺️ Attempting to geocode address:", address);
+
                 const coordinates = await geocodeAddress(address);
 
-                if (coordinates) {
-                    businessData.location = {
-                        type: 'Point',
-                        coordinates: [coordinates.lng, coordinates.lat]
-                    };
-                    console.log("Geocoded coordinates:", coordinates);
+                if (coordinates && coordinates.lat && coordinates.lng) {
+                    const lat = parseFloat(coordinates.lat);
+                    const lng = parseFloat(coordinates.lng);
+
+                    // Validate geocoded coordinates
+                    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+                        businessData.location = {
+                            type: 'Point',
+                            coordinates: [lng, lat]
+                        };
+                        console.log("✅ Created location from geocoded coordinates:", businessData.location);
+                    } else {
+                        console.warn("⚠️ Invalid geocoded coordinates:", coordinates);
+                    }
                 } else {
-                    console.warn("Could not geocode address:", address);
+                    console.warn("⚠️ Could not geocode address:", address);
                 }
             } catch (geocodeError) {
-                console.error("Error geocoding address:", geocodeError);
+                console.error("❌ Error geocoding address:", geocodeError);
             }
         }
+
 
         // Check if business already exists
         const existingBusiness = await Business.findOne({
