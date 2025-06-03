@@ -12589,11 +12589,751 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 1000);
 });
 
-// Export functions
-if (typeof window !== 'undefined') {
+/**
+ * FIXED: Load BOTH chain-wide AND location-specific incentives for chain locations
+ * This replaces the existing incentive loading functions to show complete incentive information
+ */
 
-    // Replace main search function
+/**
+ * FIXED: Enhanced incentive loading that combines chain and location incentives
+ * @param {string} containerId - Container ID for incentives display
+ * @param {string} businessId - Business ID
+ * @param {string} chainId - Chain ID (optional)
+ */
+async function loadCombinedIncentivesForDatabaseBusiness(containerId, businessId, chainId = null) {
+    console.log(`🎁 COMBINED INCENTIVES: Loading for business ${businessId}, chain ${chainId}`);
+
+    const container = document.getElementById(`incentives-container-${containerId}`);
+    if (!container) {
+        console.error(`❌ Container not found: incentives-container-${containerId}`);
+        return;
+    }
+
+    // Show loading state
+    container.innerHTML = '<em style="color: #666;">⏳ Loading all incentives...</em>';
+
+    const baseURL = getBaseURL();
+    let allIncentives = [];
+
+    try {
+        // STEP 1: Load location-specific incentives first
+        console.log(`📍 Loading location-specific incentives for business ${businessId}`);
+        try {
+            const businessIncentivesResponse = await fetch(`${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`);
+
+            if (businessIncentivesResponse.ok) {
+                const businessData = await businessIncentivesResponse.json();
+                if (businessData.results && businessData.results.length > 0) {
+                    // Add location-specific incentives
+                    const locationIncentives = businessData.results
+                        .filter(incentive => incentive.is_available)
+                        .map(incentive => ({
+                            ...incentive,
+                            source: 'location',
+                            scope: 'Location only'
+                        }));
+
+                    allIncentives.push(...locationIncentives);
+                    console.log(`✅ Found ${locationIncentives.length} location-specific incentives`);
+                } else {
+                    console.log(`ℹ️ No location-specific incentives found for business ${businessId}`);
+                }
+            }
+        } catch (locationError) {
+            console.error("❌ Error loading location-specific incentives:", locationError);
+        }
+
+        // STEP 2: Load chain-wide incentives if this is a chain location
+        if (chainId) {
+            console.log(`🔗 Loading chain-wide incentives for chain ${chainId}`);
+            try {
+                const chainIncentivesResponse = await fetch(`${baseURL}/api/chains.js?operation=get_incentives&chain_id=${chainId}`);
+
+                if (chainIncentivesResponse.ok) {
+                    const chainData = await chainIncentivesResponse.json();
+                    if (chainData.incentives && chainData.incentives.length > 0) {
+                        // Add chain-wide incentives
+                        const chainIncentives = chainData.incentives
+                            .filter(incentive => incentive.is_active)
+                            .map(incentive => ({
+                                _id: incentive._id,
+                                business_id: businessId, // Associate with this location
+                                is_available: incentive.is_active,
+                                type: incentive.type,
+                                amount: incentive.amount,
+                                information: incentive.information,
+                                other_description: incentive.other_description,
+                                created_at: incentive.created_date,
+                                source: 'chain',
+                                scope: 'Chain-wide'
+                            }));
+
+                        allIncentives.push(...chainIncentives);
+                        console.log(`✅ Found ${chainIncentives.length} chain-wide incentives`);
+                    } else {
+                        console.log(`ℹ️ No chain-wide incentives found for chain ${chainId}`);
+                    }
+                }
+            } catch (chainError) {
+                console.error("❌ Error loading chain-wide incentives:", chainError);
+            }
+        }
+
+        // STEP 3: Display combined incentives
+        console.log(`📊 Total incentives found: ${allIncentives.length}`);
+
+        if (allIncentives.length === 0) {
+            container.innerHTML = '<em style="color: #666;">💭 No incentives available</em>';
+            return;
+        }
+
+        // Sort incentives: chain-wide first, then location-specific
+        allIncentives.sort((a, b) => {
+            if (a.source === 'chain' && b.source === 'location') return -1;
+            if (a.source === 'location' && b.source === 'chain') return 1;
+            return 0;
+        });
+
+        // Build combined HTML
+        let incentivesHTML = '<div class="incentives-header"><strong>🎁 Available Incentives:</strong></div>';
+        incentivesHTML += '<div class="combined-incentives-list">';
+
+        allIncentives.forEach(incentive => {
+            const typeLabel = getIncentiveTypeLabel(incentive.type);
+            const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+
+            // Create scope badge
+            const scopeBadge = incentive.source === 'chain' ?
+                '<span class="scope-badge chain-scope">🔗 Chain-wide</span>' :
+                '<span class="scope-badge location-scope">📍 Location only</span>';
+
+            incentivesHTML += `
+                <div class="combined-incentive-item ${incentive.source}-incentive">
+                    <div class="incentive-header">
+                        <div class="incentive-type-amount">
+                            <strong>${typeLabel}${otherDescription}:</strong> 
+                            <span class="incentive-amount">${incentive.amount}%</span>
+                        </div>
+                        ${scopeBadge}
+                    </div>
+                    ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                </div>
+            `;
+        });
+
+        incentivesHTML += '</div>';
+
+        // Add summary if both types exist
+        const chainCount = allIncentives.filter(i => i.source === 'chain').length;
+        const locationCount = allIncentives.filter(i => i.source === 'location').length;
+
+        if (chainCount > 0 && locationCount > 0) {
+            incentivesHTML += `
+                <div class="incentives-summary">
+                    ✨ This location offers ${chainCount} chain-wide incentive${chainCount !== 1 ? 's' : ''} 
+                    plus ${locationCount} location-specific incentive${locationCount !== 1 ? 's' : ''}!
+                </div>
+            `;
+        }
+
+        container.innerHTML = incentivesHTML;
+        console.log(`✅ Successfully displayed ${allIncentives.length} combined incentives`);
+
+    } catch (error) {
+        console.error("❌ Error loading combined incentives:", error);
+        container.innerHTML = '<em style="color: #dc3545;">❌ Error loading incentives</em>';
+    }
 }
+
+/**
+ * FIXED: Enhanced info window incentive loading for database businesses
+ * @param {string} containerId - Container ID for incentives
+ * @param {string} businessId - Business ID
+ * @param {string} chainId - Chain ID (optional)
+ */
+async function loadCombinedIncentivesForInfoWindow(containerId, businessId, chainId = null) {
+    console.log(`🪟 INFO WINDOW COMBINED INCENTIVES: Loading for ${containerId}, business ${businessId}, chain ${chainId}`);
+
+    const container = document.getElementById(`incentives-container-${containerId}`);
+    if (!container) {
+        console.error(`❌ Info window container not found: incentives-container-${containerId}`);
+        return;
+    }
+
+    // Use the same combined loading logic
+    await loadCombinedIncentivesForDatabaseBusiness(containerId, businessId, chainId);
+}
+
+/**
+ * UPDATED: Enhanced table row incentive loading
+ * @param {string} businessId - Business ID
+ * @param {string} chainId - Chain ID (optional)
+ */
+function fetchCombinedBusinessIncentives(businessId, chainId = null) {
+    if (!businessId || businessId.startsWith('google_')) {
+        console.log(`⏭️ Skipping incentives for Google Places business: ${businessId}`);
+        return;
+    }
+
+    console.log(`🎁 TABLE COMBINED INCENTIVES: Fetching for business ID: ${businessId}`);
+    console.log(`   - Chain ID: ${chainId || 'None'}`);
+
+    // Wait for DOM to be ready
+    setTimeout(() => {
+        const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+
+        if (!incentivesCell) {
+            console.error(`❌ Could not find incentives cell for business ${businessId}`);
+            return;
+        }
+
+        console.log(`✅ Found incentives cell for ${businessId}, loading combined incentives`);
+
+        // Use the combined loading function
+        loadCombinedIncentivesForDatabaseBusiness(businessId, businessId, chainId);
+    }, 200);
+}
+
+/**
+ * Add enhanced styles for combined incentives display
+ */
+function addCombinedIncentivesStyles() {
+    if (!document.getElementById('combined-incentives-styles')) {
+        const style = document.createElement('style');
+        style.id = 'combined-incentives-styles';
+        style.textContent = `
+            /* Combined Incentives Styles */
+            .combined-incentives-list {
+                margin: 8px 0;
+            }
+
+            .combined-incentive-item {
+                margin: 8px 0;
+                padding: 10px;
+                border-radius: 6px;
+                border-left: 4px solid #ddd;
+                background-color: #f8f9fa;
+                transition: all 0.2s ease;
+            }
+
+            .combined-incentive-item.chain-incentive {
+                border-left-color: #4285F4;
+                background-color: #e8f0fe;
+            }
+
+            .combined-incentive-item.location-incentive {
+                border-left-color: #34a853;
+                background-color: #e8f5e8;
+            }
+
+            .incentive-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 4px;
+            }
+
+            .incentive-type-amount {
+                flex: 1;
+                color: #333;
+                font-size: 14px;
+                line-height: 1.3;
+            }
+
+            .incentive-amount {
+                color: #2e7d32;
+                font-weight: 600;
+                font-size: 16px;
+            }
+
+            .scope-badge {
+                font-size: 11px;
+                padding: 2px 6px;
+                border-radius: 8px;
+                font-weight: 500;
+                white-space: nowrap;
+                margin-left: 8px;
+            }
+
+            .scope-badge.chain-scope {
+                background-color: #4285F4;
+                color: white;
+            }
+
+            .scope-badge.location-scope {
+                background-color: #34a853;
+                color: white;
+            }
+
+            .incentive-info {
+                font-size: 12px;
+                color: #666;
+                font-style: italic;
+                margin-top: 4px;
+                line-height: 1.3;
+            }
+
+            .incentives-summary {
+                margin-top: 12px;
+                padding: 8px;
+                background-color: #fff3e0;
+                border-radius: 4px;
+                font-size: 12px;
+                color: #ef6c00;
+                border-left: 3px solid #ff9800;
+                font-style: italic;
+            }
+
+            /* Table-specific styles */
+            .table-incentive.combined-incentive-item {
+                margin: 4px 0;
+                padding: 6px 8px;
+                font-size: 13px;
+            }
+
+            .table-incentive .incentive-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 2px;
+            }
+
+            .table-incentive .scope-badge {
+                font-size: 10px;
+                padding: 1px 4px;
+            }
+
+            .table-incentive .incentive-info {
+                font-size: 11px;
+                margin-top: 2px;
+            }
+
+            /* Info window specific styles */
+            .enhanced-info-window .combined-incentive-item {
+                margin: 6px 0;
+                padding: 8px;
+            }
+
+            .enhanced-info-window .incentive-header {
+                margin-bottom: 3px;
+            }
+
+            .enhanced-info-window .incentives-summary {
+                margin-top: 8px;
+                padding: 6px;
+                font-size: 11px;
+            }
+
+            /* Responsive adjustments */
+            @media (max-width: 768px) {
+                .incentive-header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 4px;
+                }
+
+                .scope-badge {
+                    margin-left: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+/**
+ * UPDATED: Enhanced business row creation that uses combined incentives
+ * @param {Object} business - Business object
+ * @param {Element} tableBody - Table body element
+ * @param {string} category - Category (primary, database, places)
+ */
+function addBusinessRowWithCombinedIncentives(business, tableBody, category) {
+    if (!business) return;
+
+    // Skip parent chain businesses
+    if (business.is_chain === true) {
+        console.log(`⏭️ Skipping parent chain business in table: ${business.bname}`);
+        return;
+    }
+
+    console.log(`📝 COMBINED INCENTIVES ROW: Adding row for: ${business.bname} (${category})`);
+    console.log(`   - Business ID: ${business._id}`);
+    console.log(`   - Chain ID: ${business.chain_id || 'None'}`);
+    console.log(`   - Is chain location: ${!!business.chain_id}`);
+
+    // Format address (same as before)
+    let addressLine = '';
+    if (business.address1) {
+        addressLine = business.address2 ?
+            `${business.address1}<br>${business.address2}<br>${business.city}, ${business.state} ${business.zip}` :
+            `${business.address1}<br>${business.city}, ${business.state} ${business.zip}`;
+    } else if (business.formattedAddress) {
+        addressLine = business.formattedAddress.replace(/,/g, '<br>');
+    } else {
+        console.warn(`❌ Business ${business.bname} has no address information`);
+        return;
+    }
+
+    // Business type
+    const businessType = getBusinessTypeLabel(business.type);
+
+    // Category-specific badges and styling
+    let categoryBadge = '';
+    let rowClass = '';
+
+    switch (category) {
+        case 'primary':
+            categoryBadge = '<span class="category-badge primary-badge">🎯 Search Result</span>';
+            rowClass = 'primary-result-row';
+            break;
+        case 'database':
+            categoryBadge = '<span class="category-badge database-badge">🏢 In Database</span>';
+            rowClass = 'database-result-row';
+            break;
+        case 'places':
+            categoryBadge = '<span class="category-badge places-badge">🌐 Found Nearby</span>';
+            rowClass = 'places-result-row';
+            break;
+    }
+
+    // Chain badge
+    const chainBadge = business.chain_id ? '<span class="chain-badge">🔗 Chain Location</span>' : '';
+
+    // Action button (same as before)
+    let actionButton;
+    if (category === 'primary' || category === 'database') {
+        actionButton = `<button class="view-map-btn ${category}" onclick="focusOnMapMarker('${business._id}')">📍 View on Map</button>`;
+    } else {
+        const businessIdForMap = business._id || business.placeId;
+        let addButtonText = business.chain_id ? '🔗 Add Chain Location' : '➕ Add to Database';
+        let addButtonOnClick = business.chain_id ?
+            `addBusinessToDatabase('${business.placeId}', '${business.chain_id}')` :
+            `addBusinessToDatabase('${business.placeId}')`;
+
+        actionButton = `
+            <div class="dual-action-buttons">
+                <button class="view-map-btn places" onclick="focusOnGooglePlacesMarker('${businessIdForMap}')">📍 View on Map</button>
+                <button class="add-to-db-btn ${business.chain_id ? 'chain' : ''}" onclick="${addButtonOnClick}">${addButtonText}</button>
+            </div>
+        `;
+    }
+
+    // Create the row
+    const row = document.createElement('tr');
+    row.className = `business-row ${rowClass}`;
+    row.innerHTML = `
+        <th class="left_table" data-business-id="${business._id}">
+            ${business.bname} ${chainBadge}
+            <div class="category-badges">${categoryBadge}</div>
+        </th>
+        <th class="left_table">${addressLine}</th>
+        <th class="left_table">${businessType}</th>
+        <th class="right_table" id="incentives-for-${business._id}">
+            ${(category === 'primary' || category === 'database') ? '<span class="loading-incentives">⏳ Loading all incentives...</span>' : 'Not in database yet'}
+        </th>
+        <th class="center_table">${actionButton}</th>
+    `;
+
+    tableBody.appendChild(row);
+
+    // ENHANCED: Load combined incentives for database businesses
+    if (category === 'primary' || category === 'database') {
+        console.log(`🎁 COMBINED: Scheduling combined incentives load for ${category} business: ${business.bname}`);
+        console.log(`   - Business ID: ${business._id}`);
+        console.log(`   - Chain ID: ${business.chain_id || 'None'}`);
+
+        setTimeout(() => {
+            fetchCombinedBusinessIncentives(business._id, business.chain_id);
+        }, 100);
+    } else if (category === 'places' && business.chain_id) {
+        console.log(`🔗 Scheduling chain incentives load for Places business: ${business.bname}`);
+        fetchChainIncentivesForPlacesResult(business._id, business.chain_id);
+    }
+}
+
+// Initialize combined incentives styles
+document.addEventListener('DOMContentLoaded', function() {
+    addCombinedIncentivesStyles();
+});
+
+/**
+ * UPDATED: Enhanced info window display with combined incentives support
+ * This replaces the existing info window functions to properly load combined incentives
+ */
+
+/**
+ * UPDATED: Enhanced info window content building with combined incentives
+ * @param {Object} business - Business object
+ * @returns {string} HTML content
+ */
+function buildInfoWindowContentWithCombinedIncentives(business) {
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+    const isFromDatabase = business.isFromDatabase === true;
+    const isNearbyDatabase = business.isNearbyDatabase === true;
+    const isPrimaryResult = business.isPrimaryResult === true;
+
+    // Enhanced address formatting (same as before)
+    let addressHTML = '';
+    if (business.address1) {
+        addressHTML = `<div class="info-address">
+            <strong>📍 Address:</strong><br>
+            ${business.address1}`;
+
+        if (business.address2) {
+            addressHTML += `<br>${business.address2}`;
+        }
+
+        const locationParts = [];
+        if (business.city) locationParts.push(business.city);
+        if (business.state) locationParts.push(business.state);
+        if (business.zip) locationParts.push(business.zip);
+
+        if (locationParts.length > 0) {
+            addressHTML += `<br>${locationParts.join(', ')}`;
+        }
+
+        addressHTML += '</div>';
+    } else if (business.formattedAddress) {
+        const addressParts = business.formattedAddress.split(',').map(part => part.trim());
+        addressHTML = `<div class="info-address">
+            <strong>📍 Address:</strong><br>`;
+
+        if (addressParts.length >= 1) {
+            addressHTML += addressParts[0];
+        }
+        if (addressParts.length >= 2) {
+            addressHTML += `<br>${addressParts.slice(1).join(', ')}`;
+        }
+
+        addressHTML += '</div>';
+    }
+
+    // Phone number (same as before)
+    const phoneHTML = business.phone ?
+        `<div class="info-phone"><strong>📞 Phone:</strong> <a href="tel:${business.phone.replace(/\D/g, '')}" style="color: #4285F4; text-decoration: none;">${business.phone}</a></div>` : '';
+
+    // Business type (same as before)
+    let typeHTML = '';
+    if (business.type && business.type !== 'OTHER') {
+        typeHTML = `<div class="info-type"><strong>🏢 Type:</strong> ${getBusinessTypeLabel(business.type)}</div>`;
+    }
+
+    // Distance (same as before)
+    const distanceHTML = business.distance ?
+        `<div class="info-distance"><strong>📏 Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</div>` : '';
+
+    // Enhanced chain badge (same as before)
+    let chainBadge = '';
+    if (isChainLocation) {
+        const badgeColor = isPrimaryResult ? 'rgb(66, 133, 244, 0.3)' : isNearbyDatabase ? 'rgb(40, 167, 69, 0.3)' : 'rgb(66, 133, 244, 0.3)';
+        chainBadge = `<span class="enhanced-chain-badge" style="background-color: ${badgeColor};">🔗 ${business.chain_name || 'Chain Location'}</span>`;
+    }
+
+    // Category-aware status messaging (same as before)
+    let statusHTML = '';
+    let explanationHTML = '';
+
+    if (isPrimaryResult) {
+        statusHTML = '<div class="info-status primary-result">🎯 This business matches your search and is in the Patriot Thanks database.</div>';
+    } else if (isNearbyDatabase) {
+        statusHTML = '<div class="info-status nearby-database">🏢 This business is in the Patriot Thanks database (found nearby).</div>';
+        explanationHTML = '<div class="nearby-explanation">💡 This business appeared because it\'s in your search area and already in our database.</div>';
+    } else if (isGooglePlace && isChainLocation) {
+        statusHTML = '<div class="info-status chain-match">🔗 This location appears to match a chain in our database!</div>';
+        explanationHTML = `<div class="chain-explanation">
+            ✨ Great news! This location matches <strong>${business.chain_name}</strong> in our database. 
+            Chain-wide incentives should apply to this location once added.
+        </div>`;
+    } else if (isGooglePlace) {
+        statusHTML = '<div class="info-status google-place">ℹ️ This business is not yet in the Patriot Thanks database.</div>';
+    }
+
+    // Action button (same as before)
+    let actionButton;
+    if (isFromDatabase) {
+        actionButton = `
+            <div class="info-note">
+                <em>ℹ️ This business is already in the Patriot Thanks database. Click anywhere outside to close.</em>
+            </div>
+        `;
+    } else if (isGooglePlace && isChainLocation) {
+        actionButton = `
+            <button class="enhanced-add-btn chain-add" onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
+                🔗 Add ${business.chain_name} Location
+            </button>
+        `;
+    } else if (isGooglePlace) {
+        actionButton = `
+            <button class="enhanced-add-btn" onclick="window.addBusinessToDatabase('${business.placeId}')">
+                ➕ Add to Patriot Thanks
+            </button>
+        `;
+    }
+
+    // ENHANCED: Container ID for combined incentives
+    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
+
+    // ENHANCED: Better incentives messaging for combined display
+    let incentivesMessage;
+    if (isFromDatabase && isChainLocation) {
+        incentivesMessage = '<em>⏳ Loading chain and location incentives...</em>';
+    } else if (isFromDatabase) {
+        incentivesMessage = '<em>⏳ Loading location incentives...</em>';
+    } else if (isGooglePlace && isChainLocation) {
+        incentivesMessage = '<em>⏳ Loading chain incentives...</em>';
+    } else {
+        incentivesMessage = '<em>💡 Add this business to see available incentives.</em>';
+    }
+
+    return `
+        <div class="enhanced-info-window category-aware">
+            <div class="info-header">
+                <h3>${business.bname} ${chainBadge}</h3>
+            </div>
+            
+            <div class="info-body">
+                ${addressHTML}
+                ${phoneHTML}
+                ${typeHTML}
+                ${distanceHTML}
+                ${statusHTML}
+                ${explanationHTML}
+                
+                <div class="info-incentives">
+                    <div id="incentives-container-${containerId}">
+                        ${incentivesMessage}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-actions">
+                ${actionButton}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * UPDATED: Enhanced info window display with combined incentives loading
+ * @param {Object} marker - The marker that was clicked
+ */
+function showEnhancedInfoWindowWithCombinedIncentives(marker) {
+    console.log("🪟 COMBINED INFO WINDOW: Showing enhanced info window with combined incentives for:", marker.business?.bname);
+
+    if (!marker || !marker.business) {
+        console.error("❌ Invalid marker for combined info window");
+        return;
+    }
+
+    const business = marker.business;
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+    const isFromDatabase = business.isFromDatabase === true;
+
+    // Close existing info window
+    if (infoWindow) {
+        infoWindow.close();
+    }
+
+    // Create new info window
+    infoWindow = new google.maps.InfoWindow({
+        maxWidth: 320,
+        disableAutoPan: false
+    });
+
+    // Build enhanced content with combined incentives support
+    const content = buildInfoWindowContentWithCombinedIncentives(business);
+
+    // Set content
+    infoWindow.setContent(content);
+
+    // Get position (same as before)
+    let position = marker.position;
+    if (!position && marker.getPosition) {
+        position = marker.getPosition();
+    }
+    if (!position) {
+        position = createSafeLatLng(business);
+    }
+
+    if (!position) {
+        console.error("❌ Could not determine position for combined info window");
+        return;
+    }
+
+    // Pan to position
+    try {
+        map.panTo(position);
+    } catch (panError) {
+        console.warn("⚠️ Error panning to position:", panError);
+    }
+
+    // Open info window
+    setTimeout(() => {
+        try {
+            if (marker.getPosition) {
+                infoWindow.open(map, marker);
+            } else {
+                infoWindow.setPosition(position);
+                infoWindow.open(map);
+            }
+
+            console.log("✅ Combined info window opened successfully");
+
+            // ENHANCED: Load combined incentives after DOM is ready
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
+                setTimeout(() => {
+                    applyEnhancedInfoWindowFixes();
+
+                    // ENHANCED: Use combined incentives loading
+                    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
+
+                    console.log(`🎁 COMBINED INFO INCENTIVES: Loading for container ID: ${containerId}`);
+
+                    if (isFromDatabase && isChainLocation) {
+                        // Database business with chain - load BOTH chain and location incentives
+                        console.log(`🔗 Loading combined chain + location incentives for database business: ${business.bname}`);
+                        loadCombinedIncentivesForInfoWindow(containerId, business._id, business.chain_id);
+                    } else if (isFromDatabase) {
+                        // Database business without chain - load location incentives only
+                        console.log(`🏢 Loading location incentives for database business: ${business.bname}`);
+                        loadCombinedIncentivesForInfoWindow(containerId, business._id, null);
+                    } else if (isGooglePlace && isChainLocation) {
+                        // Google Places with chain - load chain incentives only
+                        console.log(`🌐 Loading chain incentives for Google Places: ${business.bname}`);
+                        loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
+                    }
+                    // Non-chain Google Places don't need incentives loaded
+                }, 300);
+            });
+
+        } catch (error) {
+            console.error("❌ Error opening combined info window:", error);
+        }
+    }, 200);
+}
+
+/**
+ * Test function for combined incentives
+ */
+async function testCombinedIncentives() {
+    console.log("🧪 TESTING COMBINED INCENTIVES: Should show both chain and location incentives");
+
+    const formData = {
+        businessName: "Hy-Vee Fast & Fresh",
+        address: "Cedar Rapids, IA",
+        useMyLocation: false
+    };
+
+    try {
+        clearMarkers();
+        await performEnhancedBusinessSearchWithLoadingOverlay(formData, true);
+        console.log("✅ Combined incentives test completed - should show ALL incentives for Hy-Vee Fast & Fresh!");
+    } catch (error) {
+        console.error("❌ Combined incentives test failed:", error);
+    }
+}
+
 // Initialize the dual action button styles
 if (typeof document !== 'undefined') {
     addDualActionButtonStyles();
@@ -12601,6 +13341,31 @@ if (typeof document !== 'undefined') {
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
+    window.buildInfoWindowContentWithCombinedIncentives = buildInfoWindowContentWithCombinedIncentives;
+    window.showEnhancedInfoWindowWithCombinedIncentives = showEnhancedInfoWindowWithCombinedIncentives;
+    window.testCombinedIncentives = testCombinedIncentives;
+
+    // Replace existing info window functions
+    window.buildCategoryAwareInfoWindowContent = buildInfoWindowContentWithCombinedIncentives;
+    window.buildCategoryAwareInfoWindowContentEnhanced = buildInfoWindowContentWithCombinedIncentives;
+    window.buildEnhancedInfoWindowContent = buildInfoWindowContentWithCombinedIncentives;
+    window.showEnhancedInfoWindow = showEnhancedInfoWindowWithCombinedIncentives;
+    window.showEnhancedInfoWindowWithCategory = showEnhancedInfoWindowWithCombinedIncentives;
+    window.showEnhancedInfoWindowFixed2 = showEnhancedInfoWindowWithCombinedIncentives;
+
+    window.loadCombinedIncentivesForDatabaseBusiness = loadCombinedIncentivesForDatabaseBusiness;
+    window.loadCombinedIncentivesForInfoWindow = loadCombinedIncentivesForInfoWindow;
+    window.fetchCombinedBusinessIncentives = fetchCombinedBusinessIncentives;
+    window.addCombinedIncentivesStyles = addCombinedIncentivesStyles;
+    window.addBusinessRowWithCombinedIncentives = addBusinessRowWithCombinedIncentives;
+
+    // Replace existing functions
+    window.fetchBusinessIncentivesFixed = fetchCombinedBusinessIncentives;
+    window.fetchBusinessIncentives = fetchCombinedBusinessIncentives;
+    window.addBusinessRow = addBusinessRowWithCombinedIncentives;
+    window.addCategorizedBusinessRow = addBusinessRowWithCombinedIncentives;
+    window.loadChainIncentivesForDatabaseBusinessFixed = loadCombinedIncentivesForInfoWindow;
+    window.loadIncentivesForEnhancedWindowFixed = loadCombinedIncentivesForInfoWindow;
     window.searchDatabaseWithExpandedChainRadius = searchDatabaseWithExpandedChainRadius;
     window.calculateDistance = calculateDistance;
     window.performEnhancedBusinessSearchWithExpandedChainRadius = performEnhancedBusinessSearchWithExpandedChainRadius;
@@ -12623,8 +13388,6 @@ if (typeof window !== 'undefined') {
 
     // Replace the main search function
 
-    window.addCategorizedBusinessRow = addCategorizedBusinessRowEnhanced;
-    window.buildCategoryAwareInfoWindowContent = buildCategoryAwareInfoWindowContentEnhanced;
     window.performEnhancedBusinessSearchWithNearbyFixed = performEnhancedBusinessSearchWithNearbyFixed;
     window.searchNearbyDatabaseBusinessesWithDebugging = searchNearbyDatabaseBusinessesWithDebugging;
     window.testNearbySearchFix = testNearbySearchFix;
@@ -12650,7 +13413,6 @@ if (typeof window !== 'undefined') {
     window.categorizeFinalResults = categorizeFinalResults;
     window.createAddressKey = createAddressKey;
     window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerWithCategory;
-    window.showEnhancedInfoWindowWithCategory = showEnhancedInfoWindowWithCategory;
     window.createCategorizedBusinessMarker = createCategorizedBusinessMarker;
     window.addTableSectionHeader = addTableSectionHeader;
     window.showEnhancedSearchSuccessMessage = showEnhancedSearchSuccessMessage;
@@ -12670,17 +13432,12 @@ if (typeof window !== 'undefined') {
     window.tryServerSideChainMatchingOptimized = tryServerSideChainMatchingOptimized;
     window.clearChainMatchCache = clearChainMatchCache;
     window.getChainMatchCacheStatus = getChainMatchCacheStatus;
-    window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContentFixed2;
-    window.showEnhancedInfoWindow = showEnhancedInfoWindowFixed2;
     window.loadChainIncentivesForEnhancedWindow = loadChainIncentivesForEnhancedWindowFixed;
     window.loadIncentivesForEnhancedWindow = loadIncentivesForEnhancedWindowFixed;
     window.loadChainIncentivesForDatabaseBusiness = loadChainIncentivesForDatabaseBusinessFixed;
     window.createBusinessMarker = createBusinessMarker;
     window.createEnhancedBusinessMarkerFixed = createEnhancedBusinessMarkerFixed;
-    window.fetchBusinessIncentivesFixed = fetchBusinessIncentivesFixed;
     window.addBusinessRowFixed = addBusinessRowFixed;
-    window.fetchBusinessIncentives = fetchBusinessIncentivesFixed;
-    window.addBusinessRow = addBusinessRowFixed;
     window.supplementWithGooglePlaces = supplementWithGooglePlaces;
     window.createBusinessMarker = createBusinessMarker;
     window.hasValidCoordinates = hasValidCoordinates;
