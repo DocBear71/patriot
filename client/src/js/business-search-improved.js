@@ -6391,21 +6391,35 @@ function showErrorMessage(message) {
  * @param {boolean} bustCache - Cache busting flag
  * @returns {Promise<Array>} Search results
  */
-async function searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCache) {
+async function searchDatabaseWithExpandedChainRadius(formData, searchLocation, bustCache) {
     const params = {};
 
+    // Handle business name search
     if (formData.businessName && formData.businessName.trim() !== '') {
         params.business_name = formData.businessName;
     }
 
+    // Handle address search (only if no business name)
     if (formData.address && formData.address.trim() !== '' && !searchLocation) {
         params.address = formData.address;
     }
 
+    // ENHANCED: Location-based search with dynamic radius
     if (searchLocation && searchLocation.lat && searchLocation.lng) {
         params.lat = searchLocation.lat;
         params.lng = searchLocation.lng;
-        params.radius = 25;
+
+        // CRITICAL FIX: Use different radius based on search type
+        if (formData.businessName && formData.businessName.trim() !== '') {
+            // For business name searches (like "Shag"), use much larger radius to find all locations
+            // This is especially important for chain businesses
+            params.radius = 200; // 200km / ~125 miles - covers most of Iowa and surrounding areas
+            console.log(`🔍 BUSINESS NAME SEARCH: Using expanded ${params.radius}km radius for "${formData.businessName}"`);
+        } else {
+            // For location-only searches, use smaller radius
+            params.radius = 25; // 25km for local area searches
+            console.log(`📍 LOCATION SEARCH: Using standard ${params.radius}km radius`);
+        }
     }
 
     if (bustCache) {
@@ -6415,6 +6429,8 @@ async function searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCac
     const queryParams = new URLSearchParams(params).toString();
     const baseURL = getBaseURL();
     const apiURL = `${baseURL}/api/business.js?operation=search&${queryParams}`;
+
+    console.log(`🌐 ENHANCED DATABASE SEARCH: ${apiURL}`);
 
     const response = await fetch(apiURL, {
         method: 'GET',
@@ -6431,11 +6447,13 @@ async function searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCac
     const data = await response.json();
     const rawResults = data.results || [];
 
-    // CRITICAL FIX: Filter out parent chain businesses from location-based searches
+    console.log(`📊 Raw database results: ${rawResults.length} businesses found`);
+
+    // ENHANCED: Filter out parent chain businesses and invalid coordinates
     const filteredResults = rawResults.filter(business => {
-        // Always exclude parent chains (businesses with is_chain: true) from location searches
+        // Always exclude parent chains (businesses with is_chain: true)
         if (business.is_chain === true) {
-            console.log(`Filtering out parent chain business: ${business.bname}`);
+            console.log(`🚫 Filtering out parent chain business: ${business.bname}`);
             return false;
         }
 
@@ -6443,7 +6461,7 @@ async function searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCac
         if (searchLocation) {
             const hasValidLocation = hasValidCoordinates(business);
             if (!hasValidLocation) {
-                console.log(`Filtering out business without valid coordinates: ${business.bname}`);
+                console.log(`🚫 Filtering out business without valid coordinates: ${business.bname}`);
                 return false;
             }
         }
@@ -6451,9 +6469,235 @@ async function searchDatabaseWithFuzzyMatching(formData, searchLocation, bustCac
         return true;
     });
 
-    console.log(`📊 Filtered ${rawResults.length} raw results to ${filteredResults.length} location businesses`);
+    console.log(`✅ ENHANCED FILTER: ${rawResults.length} raw → ${filteredResults.length} valid location businesses`);
+
+    // Log the business names found for debugging
+    if (filteredResults.length > 0) {
+        console.log("📋 Database businesses found:");
+        filteredResults.forEach((business, index) => {
+            const distance = searchLocation && business.lat && business.lng ?
+                calculateDistance(searchLocation.lat, searchLocation.lng, business.lat, business.lng) :
+                'Unknown';
+            console.log(`   ${index + 1}. ${business.bname} - ${business.city}, ${business.state} (${distance}km)`);
+        });
+    }
 
     return filteredResults;
+}
+
+/**
+ * Helper function to calculate distance between two points
+ */
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+    return Math.round(distance);
+}
+
+/**
+ * UPDATED: Enhanced search function with improved radius handling for chains
+ */
+async function performEnhancedBusinessSearchWithExpandedChainRadius(formData, bustCache = false) {
+    try {
+        console.log("🔍 EXPANDED CHAIN SEARCH: Starting search with dynamic radius for chains:", formData);
+
+        // Show loading indicator
+        const resultsContainer = document.getElementById('business-search-results') ||
+            document.getElementById('search_table');
+        if (resultsContainer) {
+            resultsContainer.innerHTML = '<div class="loading-indicator" id="main-loading"><div class="loading-text">Searching for businesses...</div><div class="loading-spinner"></div></div>';
+            resultsContainer.style.display = 'block';
+        }
+
+        // Process search location (same as before)
+        let searchLocation = null;
+        let searchRadius = 30;
+
+        if (formData.useMyLocation) {
+            try {
+                updateLoadingMessage("Getting your location...");
+                searchLocation = await getUserLocation();
+                window.currentSearchLocation = searchLocation;
+            } catch (error) {
+                console.error("❌ Error getting user location:", error);
+                hideLoadingIndicator();
+                alert("Unable to get your current location. Please try entering an address instead.");
+                return;
+            }
+        } else if (formData.address && formData.address.trim() !== '') {
+            try {
+                updateLoadingMessage("Finding location...");
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    window.currentSearchLocation = searchLocation;
+
+                    if (/^\d{5}$/.test(formData.address.trim())) {
+                        searchRadius = 25;
+                        console.log("📍 ZIP CODE SEARCH: Using 25km radius");
+                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
+                        searchRadius = 30;
+                        console.log("📍 CITY SEARCH: Using 30km radius");
+                    } else {
+                        searchRadius = 20;
+                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
+                    }
+
+                    if (map && searchLocation) {
+                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                        map.setCenter(center);
+                        map.setZoom(searchRadius <= 20 ? 12 : 11);
+                    }
+                } else {
+                    throw new Error(`Geocoding failed for address: ${formData.address}`);
+                }
+            } catch (error) {
+                console.error("❌ Error geocoding address:", error);
+                hideLoadingIndicator();
+                alert("We couldn't recognize that address. Please try a more specific address.");
+                return;
+            }
+        }
+
+        // PHASE 1: ENHANCED database search with expanded radius for business names
+        updateLoadingMessage("Searching database with expanded radius...");
+        let primaryResults = [];
+
+        if (formData.businessName && formData.businessName.trim() !== '') {
+            try {
+                // Use the enhanced search function with dynamic radius
+                primaryResults = await searchDatabaseWithExpandedChainRadius(formData, searchLocation, bustCache);
+                primaryResults = primaryResults.filter(business => business.is_chain !== true);
+                console.log(`📊 ENHANCED PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}" with expanded radius`);
+            } catch (error) {
+                console.error("❌ Enhanced primary search failed:", error);
+            }
+        }
+
+        // PHASE 2: Search Google Places (same as before)
+        let placesResults = [];
+
+        if (formData.businessName && searchLocation) {
+            try {
+                updateLoadingMessage("Searching for additional locations...");
+                const placesSearchLocation = {
+                    ...searchLocation,
+                    searchRadius: Math.max(searchRadius, 35)
+                };
+                placesResults = await searchGooglePlacesForBusinessEnhanced(formData.businessName, placesSearchLocation);
+                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
+            } catch (error) {
+                console.error("❌ Places search failed:", error);
+            }
+        }
+
+        // PHASE 3: Search nearby database businesses (adjust logic for business name searches)
+        let nearbyDatabaseBusinesses = [];
+
+        // IMPROVED: For business name searches with good results, skip nearby search
+        // For location-only searches, still do nearby search
+        const shouldSearchNearby = !formData.businessName ||
+            (formData.businessName && primaryResults.length < 3);
+
+        if (searchLocation && shouldSearchNearby) {
+            try {
+                updateLoadingMessage("Finding other nearby businesses...");
+                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinessesEnhanced(searchLocation, searchRadius, formData.businessName);
+                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
+            } catch (error) {
+                console.error("❌ Nearby database search failed:", error);
+            }
+        } else {
+            console.log("⏭️ SKIPPING nearby search - found sufficient business name results or no business name provided");
+        }
+
+        // PHASE 4: Use improved categorization
+        const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
+            categorizeResultsWithImprovedChainDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
+
+        // PHASE 5: Display results
+        const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
+        console.log(`📊 EXPANDED CHAIN SEARCH RESULTS:`);
+        console.log(`   - 🔴 Primary Database (RED): ${finalPrimaryResults.length} businesses`);
+        console.log(`   - 🔵 Additional Locations (BLUE): ${finalPlacesResults.length} businesses`);
+        console.log(`   - 🟢 Other Nearby (GREEN): ${finalNearbyResults.length} businesses`);
+        console.log(`   - Total: ${allResults.length} businesses`);
+
+        if (allResults.length > 0) {
+            // Set proper flags (same as before)
+            finalPrimaryResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = true;
+                business.markerColor = 'primary';
+                business.priority = 1;
+            });
+
+            finalPlacesResults.forEach(business => {
+                business.isGooglePlace = true;
+                business.isFromDatabase = false;
+                business.isPrimaryResult = false;
+                business.isRelevantPlaces = true;
+                business.markerColor = 'nearby';
+                business.priority = 2;
+            });
+
+            finalNearbyResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = false;
+                business.isNearbyDatabase = true;
+                business.markerColor = 'database';
+                business.priority = 3;
+            });
+
+            hideLoadingIndicator();
+
+            // Display results
+            displayBusinessesOnMapWithBetterPriority(allResults);
+            displaySearchResultsWithBetterPriority(allResults);
+
+            // Show success message
+            showImprovedSearchSuccessMessage(finalPrimaryResults.length, finalPlacesResults.length, finalNearbyResults.length, formData.businessName);
+
+            console.log("✅ EXPANDED CHAIN SEARCH: Completed successfully with dynamic radius");
+        } else {
+            hideLoadingIndicator();
+            showNoResultsMessage();
+        }
+
+    } catch (error) {
+        console.error("❌ Expanded chain search error:", error);
+        hideLoadingIndicator();
+        showErrorMessage(`Error searching for businesses: ${error.message}`);
+    }
+}
+
+/**
+ * Test function for the expanded chain radius
+ */
+async function testExpandedChainRadius() {
+    console.log("🧪 TESTING EXPANDED CHAIN RADIUS: Should find all Shag locations from Cedar Rapids");
+
+    const formData = {
+        businessName: "Shag",
+        address: "", // Will use current location
+        useMyLocation: true
+    };
+
+    try {
+        clearMarkers();
+        await performEnhancedBusinessSearchWithExpandedChainRadius(formData, true);
+        console.log("✅ Expanded chain radius test completed - should show ALL Shag locations in database!");
+    } catch (error) {
+        console.error("❌ Expanded chain radius test failed:", error);
+    }
 }
 
 /**
@@ -11490,6 +11734,866 @@ async function testImprovedChainDetection() {
     }
 }
 
+/**
+ * Enhanced Loading Overlay System
+ * Creates a full-screen tinted overlay with loading animation and progress messages
+ */
+
+// Global loading overlay state
+let loadingOverlay = null;
+let loadingProgress = 0;
+let loadingSteps = [];
+let currentStepIndex = 0;
+
+/**
+ * Create the loading overlay HTML structure
+ */
+function createLoadingOverlay() {
+    if (loadingOverlay && document.body.contains(loadingOverlay)) {
+        return loadingOverlay;
+    }
+
+    loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'patriot-loading-overlay';
+    loadingOverlay.className = 'patriot-loading-overlay';
+
+    loadingOverlay.innerHTML = `
+        <div class="loading-backdrop"></div>
+        <div class="loading-container">
+            <div class="loading-content">
+                <!-- Logo or Icon -->
+                <div class="loading-logo">
+                    <img src="./images/docbearlogov4.png" alt="Patriot Thanks" class="loading-logo-img">
+                </div>
+                
+                <!-- Main Loading Animation -->
+                <div class="loading-spinner-container">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-spinner-ring"></div>
+                </div>
+                
+                <!-- Loading Text -->
+                <div class="loading-text">
+                    <h3 id="loading-title">Searching for Businesses</h3>
+                    <p id="loading-message">Please wait while we find the best results...</p>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="loading-progress-container">
+                    <div class="loading-progress-bar">
+                        <div class="loading-progress-fill" id="loading-progress-fill"></div>
+                    </div>
+                    <div class="loading-progress-text">
+                        <span id="loading-step">Step 1 of 4</span>
+                        <span id="loading-percentage">0%</span>
+                    </div>
+                </div>
+                
+                <!-- Loading Steps -->
+                <div class="loading-steps">
+                    <div class="loading-step active" id="step-1">
+                        <div class="step-icon">📍</div>
+                        <div class="step-text">Processing Location</div>
+                    </div>
+                    <div class="loading-step" id="step-2">
+                        <div class="step-icon">🏢</div>
+                        <div class="step-text">Searching Database</div>
+                    </div>
+                    <div class="loading-step" id="step-3">
+                        <div class="step-icon">🌐</div>
+                        <div class="step-text">Finding Additional Locations</div>
+                    </div>
+                    <div class="loading-step" id="step-4">
+                        <div class="step-icon">📊</div>
+                        <div class="step-text">Organizing Results</div>
+                    </div>
+                </div>
+                
+                <!-- Cancel Button (optional) -->
+                <div class="loading-actions">
+                    <button class="loading-cancel-btn" onclick="hideLoadingOverlay()">
+                        Cancel Search
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    return loadingOverlay;
+}
+
+/**
+ * Add CSS styles for the loading overlay
+ */
+function addLoadingOverlayStyles() {
+    if (document.getElementById('loading-overlay-styles')) {
+        return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'loading-overlay-styles';
+    style.textContent = `
+        /* Loading Overlay Styles */
+        .patriot-loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .patriot-loading-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .loading-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        .loading-container {
+            position: relative;
+            z-index: 1;
+            max-width: 400px;
+            width: 90%;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .patriot-loading-overlay.show .loading-container {
+            transform: scale(1);
+        }
+
+        .loading-content {
+            padding: 40px 30px 30px;
+            text-align: center;
+        }
+
+        /* Logo */
+        .loading-logo {
+            margin-bottom: 20px;
+        }
+
+        .loading-logo-img {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Spinner Animation */
+        .loading-spinner-container {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            margin: 20px auto;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #e3f2fd;
+            border-top: 4px solid #2196f3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+
+        .loading-spinner-ring {
+            width: 80px;
+            height: 80px;
+            border: 2px solid transparent;
+            border-top: 2px solid #4caf50;
+            border-right: 2px solid #4caf50;
+            border-radius: 50%;
+            animation: spin 2s linear infinite reverse;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Loading Text */
+        .loading-text {
+            margin: 20px 0;
+        }
+
+        .loading-text h3 {
+            margin: 0 0 8px 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: #1976d2;
+        }
+
+        .loading-text p {
+            margin: 0;
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        /* Progress Bar */
+        .loading-progress-container {
+            margin: 20px 0;
+        }
+
+        .loading-progress-bar {
+            width: 100%;
+            height: 6px;
+            background-color: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .loading-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2196f3, #4caf50, #ff9800);
+            background-size: 200% 100%;
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.3s ease;
+            animation: progressShine 2s ease-in-out infinite;
+        }
+
+        @keyframes progressShine {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .loading-progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* Loading Steps */
+        .loading-steps {
+            display: flex;
+            justify-content: space-between;
+            margin: 24px 0;
+            padding: 0 10px;
+        }
+
+        .loading-step {
+            flex: 1;
+            text-align: center;
+            opacity: 0.4;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .loading-step.active {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .loading-step.completed {
+            opacity: 0.8;
+        }
+
+        .step-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+            filter: grayscale(100%);
+            transition: filter 0.3s ease;
+        }
+
+        .loading-step.active .step-icon,
+        .loading-step.completed .step-icon {
+            filter: grayscale(0%);
+        }
+
+        .step-text {
+            font-size: 11px;
+            color: #666;
+            font-weight: 500;
+            line-height: 1.2;
+        }
+
+        .loading-step.active .step-text {
+            color: #1976d2;
+            font-weight: 600;
+        }
+
+        /* Actions */
+        .loading-actions {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .loading-cancel-btn {
+            background: transparent;
+            border: 1px solid #ccc;
+            color: #666;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .loading-cancel-btn:hover {
+            background: #f5f5f5;
+            border-color: #999;
+            color: #333;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .loading-container {
+                max-width: 350px;
+            }
+            
+            .loading-content {
+                padding: 30px 20px 20px;
+            }
+            
+            .loading-steps {
+                flex-wrap: wrap;
+                gap: 16px;
+            }
+            
+            .loading-step {
+                flex: 0 0 calc(50% - 8px);
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .loading-container {
+                background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+            }
+            
+            .loading-text h3 {
+                color: #64b5f6;
+            }
+            
+            .loading-text p,
+            .loading-progress-text,
+            .step-text {
+                color: #ccc;
+            }
+            
+            .loading-step.active .step-text {
+                color: #64b5f6;
+            }
+            
+            .loading-actions {
+                border-color: #444;
+            }
+            
+            .loading-cancel-btn {
+                border-color: #666;
+                color: #ccc;
+            }
+            
+            .loading-cancel-btn:hover {
+                background: #333;
+                border-color: #888;
+                color: #fff;
+            }
+        }
+    `;
+
+    document.head.appendChild(style);
+}
+
+/**
+ * Show the loading overlay with optional configuration
+ */
+function showLoadingOverlay(options = {}) {
+    const {
+        title = "Searching for Businesses",
+        message = "Please wait while we find the best results...",
+        steps = [
+            { id: "step-1", text: "Processing Location", icon: "📍" },
+            { id: "step-2", text: "Searching Database", icon: "🏢" },
+            { id: "step-3", text: "Finding Additional Locations", icon: "🌐" },
+            { id: "step-4", text: "Organizing Results", icon: "📊" }
+        ],
+        showCancel = true
+    } = options;
+
+    // Add styles if not already added
+    addLoadingOverlayStyles();
+
+    // Create overlay if it doesn't exist
+    if (!loadingOverlay || !document.body.contains(loadingOverlay)) {
+        loadingOverlay = createLoadingOverlay();
+        document.body.appendChild(loadingOverlay);
+    }
+
+    // Update content
+    const titleElement = document.getElementById('loading-title');
+    const messageElement = document.getElementById('loading-message');
+    const cancelBtn = loadingOverlay.querySelector('.loading-cancel-btn');
+
+    if (titleElement) titleElement.textContent = title;
+    if (messageElement) messageElement.textContent = message;
+    if (cancelBtn) cancelBtn.style.display = showCancel ? 'inline-block' : 'none';
+
+    // Reset progress
+    loadingSteps = steps;
+    currentStepIndex = 0;
+    loadingProgress = 0;
+    updateLoadingProgress(0);
+
+    // Show overlay with animation
+    loadingOverlay.classList.add('show');
+
+    // Activate first step
+    if (steps.length > 0) {
+        activateLoadingStep(0);
+    }
+
+    console.log("✨ Loading overlay shown");
+}
+
+/**
+ * Hide the loading overlay
+ */
+function hideLoadingOverlay() {
+    if (loadingOverlay) {
+        loadingOverlay.classList.remove('show');
+
+        // Remove from DOM after animation
+        setTimeout(() => {
+            if (loadingOverlay && document.body.contains(loadingOverlay)) {
+                document.body.removeChild(loadingOverlay);
+                loadingOverlay = null;
+            }
+        }, 300);
+    }
+
+    console.log("🔄 Loading overlay hidden");
+}
+
+/**
+ * Update loading progress (0-100)
+ */
+function updateLoadingProgress(percentage, stepText = null) {
+    if (!loadingOverlay) return;
+
+    loadingProgress = Math.max(0, Math.min(100, percentage));
+
+    const progressFill = document.getElementById('loading-progress-fill');
+    const progressText = document.getElementById('loading-percentage');
+    const messageElement = document.getElementById('loading-message');
+
+    if (progressFill) {
+        progressFill.style.width = `${loadingProgress}%`;
+    }
+
+    if (progressText) {
+        progressText.textContent = `${Math.round(loadingProgress)}%`;
+    }
+
+    if (stepText && messageElement) {
+        messageElement.textContent = stepText;
+    }
+
+    console.log(`📊 Loading progress: ${loadingProgress}%${stepText ? ` - ${stepText}` : ''}`);
+}
+
+/**
+ * Activate a specific loading step
+ */
+function activateLoadingStep(stepIndex, customMessage = null) {
+    if (!loadingOverlay || stepIndex >= loadingSteps.length) return;
+
+    currentStepIndex = stepIndex;
+
+    // Update step indicators
+    const steps = loadingOverlay.querySelectorAll('.loading-step');
+    steps.forEach((step, index) => {
+        step.classList.remove('active', 'completed');
+        if (index < stepIndex) {
+            step.classList.add('completed');
+        } else if (index === stepIndex) {
+            step.classList.add('active');
+        }
+    });
+
+    // Update step text
+    const stepElement = document.getElementById('loading-step');
+    if (stepElement) {
+        stepElement.textContent = `Step ${stepIndex + 1} of ${loadingSteps.length}`;
+    }
+
+    // Update progress based on step
+    const stepProgress = ((stepIndex + 1) / loadingSteps.length) * 100;
+    updateLoadingProgress(stepProgress, customMessage || loadingSteps[stepIndex]?.text || '');
+
+    console.log(`🔄 Activated loading step ${stepIndex + 1}: ${loadingSteps[stepIndex]?.text}`);
+}
+
+/**
+ * Move to next loading step
+ */
+function nextLoadingStep(customMessage = null) {
+    if (currentStepIndex < loadingSteps.length - 1) {
+        activateLoadingStep(currentStepIndex + 1, customMessage);
+    }
+}
+
+/**
+ * Show loading with automatic step progression
+ */
+function showLoadingWithSteps(title, initialMessage, stepMessages = []) {
+    showLoadingOverlay({ title, message: initialMessage });
+
+    // Auto-progress through steps with delays
+    stepMessages.forEach((message, index) => {
+        setTimeout(() => {
+            nextLoadingStep(message);
+        }, (index + 1) * 1000); // 1 second between steps
+    });
+}
+
+/**
+ * UPDATED: Enhanced search function with full-screen loading overlay
+ * This replaces your existing search function to use the new loading system
+ */
+async function performEnhancedBusinessSearchWithLoadingOverlay(formData, bustCache = false) {
+    try {
+        console.log("🔍 ENHANCED SEARCH WITH LOADING: Starting search with full-screen loading:", formData);
+
+        // STEP 1: Show enhanced loading overlay
+        showLoadingOverlay({
+            title: `Searching for ${formData.businessName || 'Businesses'}`,
+            message: "Please wait while we find the best results in your area...",
+            steps: [
+                { id: "step-1", text: "Processing Location", icon: "📍" },
+                { id: "step-2", text: "Searching Database", icon: "🏢" },
+                { id: "step-3", text: "Finding Additional Locations", icon: "🌐" },
+                { id: "step-4", text: "Organizing Results", icon: "📊" }
+            ],
+            showCancel: true
+        });
+
+        // Small delay to show the overlay
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // STEP 1: Process search location
+        activateLoadingStep(0, "Determining your search location...");
+        let searchLocation = null;
+        let searchRadius = 30;
+
+        if (formData.useMyLocation) {
+            try {
+                updateLoadingProgress(10, "Getting your current location...");
+                searchLocation = await getUserLocation();
+                window.currentSearchLocation = searchLocation;
+                updateLoadingProgress(20, "Location found successfully!");
+            } catch (error) {
+                console.error("❌ Error getting user location:", error);
+                hideLoadingOverlay();
+                alert("Unable to get your current location. Please try entering an address instead.");
+                return;
+            }
+        } else if (formData.address && formData.address.trim() !== '') {
+            try {
+                updateLoadingProgress(10, "Finding location for your address...");
+                const geocodedLocation = await geocodeAddressClientSide(formData.address);
+                if (geocodedLocation && geocodedLocation.lat && geocodedLocation.lng) {
+                    searchLocation = geocodedLocation;
+                    window.currentSearchLocation = searchLocation;
+
+                    if (/^\d{5}$/.test(formData.address.trim())) {
+                        searchRadius = 25;
+                        console.log("📍 ZIP CODE SEARCH: Using 25km radius");
+                    } else if (formData.address.toLowerCase().includes('city') || formData.address.split(',').length >= 2) {
+                        searchRadius = 30;
+                        console.log("📍 CITY SEARCH: Using 30km radius");
+                    } else {
+                        searchRadius = 20;
+                        console.log("📍 ADDRESS SEARCH: Using 20km radius");
+                    }
+
+                    if (map && searchLocation) {
+                        const center = new google.maps.LatLng(searchLocation.lat, searchLocation.lng);
+                        map.setCenter(center);
+                        map.setZoom(searchRadius <= 20 ? 12 : 11);
+                    }
+
+                    updateLoadingProgress(20, `Address found: ${geocodedLocation.formattedAddress || formData.address}`);
+                } else {
+                    throw new Error(`Geocoding failed for address: ${formData.address}`);
+                }
+            } catch (error) {
+                console.error("❌ Error geocoding address:", error);
+                hideLoadingOverlay();
+                alert("We couldn't recognize that address. Please try a more specific address.");
+                return;
+            }
+        } else {
+            updateLoadingProgress(20, "Using general search area...");
+        }
+
+        // STEP 2: Search database
+        nextLoadingStep("Searching our business database...");
+        let primaryResults = [];
+
+        if (formData.businessName && formData.businessName.trim() !== '') {
+            try {
+                updateLoadingProgress(35, `Looking for "${formData.businessName}" in our database...`);
+                primaryResults = await searchDatabaseWithExpandedChainRadius(formData, searchLocation, bustCache);
+                primaryResults = primaryResults.filter(business => business.is_chain !== true);
+
+                updateLoadingProgress(45, `Found ${primaryResults.length} matching businesses in database`);
+                console.log(`📊 PRIMARY RESULTS: Found ${primaryResults.length} businesses for "${formData.businessName}"`);
+            } catch (error) {
+                console.error("❌ Primary search failed:", error);
+                updateLoadingProgress(45, "Database search completed with some issues");
+            }
+        } else {
+            updateLoadingProgress(45, "Skipping database search (no business name provided)");
+        }
+
+        // STEP 3: Search Google Places
+        nextLoadingStep("Finding additional locations...");
+        let placesResults = [];
+
+        if (formData.businessName && searchLocation) {
+            try {
+                updateLoadingProgress(55, `Searching Google Places for "${formData.businessName}"...`);
+                const placesSearchLocation = {
+                    ...searchLocation,
+                    searchRadius: Math.max(searchRadius, 35)
+                };
+                placesResults = await searchGooglePlacesForBusinessEnhanced(formData.businessName, placesSearchLocation);
+
+                updateLoadingProgress(70, `Found ${placesResults.length} additional locations via Google Places`);
+                console.log(`📊 PLACES RESULTS: Found ${placesResults.length} additional "${formData.businessName}" locations`);
+            } catch (error) {
+                console.error("❌ Places search failed:", error);
+                updateLoadingProgress(70, "Additional location search completed");
+            }
+        } else {
+            updateLoadingProgress(70, "Skipping additional location search");
+        }
+
+        // Search nearby database businesses (if needed)
+        let nearbyDatabaseBusinesses = [];
+        const shouldSearchNearby = !formData.businessName ||
+            (formData.businessName && primaryResults.length < 3);
+
+        if (searchLocation && shouldSearchNearby) {
+            try {
+                updateLoadingProgress(75, "Finding other nearby businesses...");
+                nearbyDatabaseBusinesses = await searchNearbyDatabaseBusinessesEnhanced(searchLocation, searchRadius, formData.businessName);
+                console.log(`📊 NEARBY DATABASE: Found ${nearbyDatabaseBusinesses.length} other nearby businesses`);
+            } catch (error) {
+                console.error("❌ Nearby database search failed:", error);
+            }
+        }
+
+        // STEP 4: Organize and display results
+        nextLoadingStep("Organizing your results...");
+        updateLoadingProgress(80, "Removing duplicates and organizing results...");
+
+        const {finalPrimaryResults, finalPlacesResults, finalNearbyResults} =
+            categorizeResultsWithImprovedChainDetection(primaryResults, placesResults, nearbyDatabaseBusinesses);
+
+        const allResults = [...finalPrimaryResults, ...finalPlacesResults, ...finalNearbyResults];
+
+        updateLoadingProgress(90, `Preparing to display ${allResults.length} businesses...`);
+
+        console.log(`📊 FINAL SEARCH RESULTS:`);
+        console.log(`   - 🔴 Primary Database: ${finalPrimaryResults.length} businesses`);
+        console.log(`   - 🔵 Additional Locations: ${finalPlacesResults.length} businesses`);
+        console.log(`   - 🟢 Other Nearby: ${finalNearbyResults.length} businesses`);
+
+        if (allResults.length > 0) {
+            // Set proper flags
+            finalPrimaryResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = true;
+                business.markerColor = 'primary';
+                business.priority = 1;
+            });
+
+            finalPlacesResults.forEach(business => {
+                business.isGooglePlace = true;
+                business.isFromDatabase = false;
+                business.isPrimaryResult = false;
+                business.isRelevantPlaces = true;
+                business.markerColor = 'nearby';
+                business.priority = 2;
+            });
+
+            finalNearbyResults.forEach(business => {
+                business.isGooglePlace = false;
+                business.isFromDatabase = true;
+                business.isPrimaryResult = false;
+                business.isNearbyDatabase = true;
+                business.markerColor = 'database';
+                business.priority = 3;
+            });
+
+            updateLoadingProgress(95, "Loading results on map and table...");
+
+            // Display results
+            displayBusinessesOnMapWithBetterPriority(allResults);
+            displaySearchResultsWithBetterPriority(allResults);
+
+            updateLoadingProgress(100, "Search completed successfully!");
+
+            // Brief delay to show completion, then hide overlay
+            setTimeout(() => {
+                hideLoadingOverlay();
+
+                // Show success message
+                showImprovedSearchSuccessMessage(
+                    finalPrimaryResults.length,
+                    finalPlacesResults.length,
+                    finalNearbyResults.length,
+                    formData.businessName
+                );
+            }, 800);
+
+            console.log("✅ ENHANCED SEARCH WITH LOADING: Completed successfully");
+        } else {
+            updateLoadingProgress(100, "No businesses found matching your criteria");
+
+            setTimeout(() => {
+                hideLoadingOverlay();
+                showNoResultsMessage();
+            }, 1000);
+        }
+
+    } catch (error) {
+        console.error("❌ Enhanced search with loading error:", error);
+        hideLoadingOverlay();
+        showErrorMessage(`Error searching for businesses: ${error.message}`);
+    }
+}
+
+/**
+ * Enhanced form submission handler with loading overlay
+ */
+function enhanceFormSubmissionWithLoading() {
+    const form = document.getElementById('business-search-form');
+    if (!form) return;
+
+    // Remove existing event listeners to avoid duplicates
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+
+    newForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        // Get form data
+        const formData = {
+            businessName: document.getElementById('business-name')?.value || '',
+            address: document.getElementById('address')?.value || '',
+            useMyLocation: document.getElementById('use-my-location')?.checked || false
+        };
+
+        // Validate form
+        if (!formData.businessName && !formData.address && !formData.useMyLocation) {
+            alert("Please enter either a business name, an address, or use your current location to search");
+            return;
+        }
+
+        console.log("🔍 Form submitted with enhanced loading:", formData);
+
+        // Clear existing results
+        clearMarkers();
+
+        // Remove initial map message if it exists
+        const initialMessage = document.getElementById('initial-map-message');
+        if (initialMessage) {
+            initialMessage.remove();
+        }
+
+        // Start enhanced search with loading overlay
+        try {
+            await performEnhancedBusinessSearchWithLoadingOverlay(formData, false);
+        } catch (error) {
+            console.error("❌ Form submission failed:", error);
+            hideLoadingOverlay();
+            showErrorMessage("Search failed. Please try again.");
+        }
+    });
+
+    console.log("✅ Enhanced form submission with loading overlay initialized");
+}
+
+/**
+ * Test function for loading overlay
+ */
+async function testLoadingOverlay() {
+    console.log("🧪 TESTING LOADING OVERLAY");
+
+    showLoadingOverlay({
+        title: "Testing Loading System",
+        message: "This is a test of the loading overlay...",
+        showCancel: true
+    });
+
+    // Simulate search steps
+    const steps = [
+        "Simulating location lookup...",
+        "Pretending to search database...",
+        "Fake Google Places search...",
+        "Organizing fake results..."
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        nextLoadingStep(steps[i]);
+        updateLoadingProgress(((i + 1) / steps.length) * 100);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    hideLoadingOverlay();
+    console.log("✅ Loading overlay test completed");
+}
+
+// Initialize enhanced loading when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Add loading overlay styles
+    addLoadingOverlayStyles();
+
+    // Enhance form submission
+    setTimeout(() => {
+        enhanceFormSubmissionWithLoading();
+    }, 1000);
+});
+
+// Export functions
+if (typeof window !== 'undefined') {
+
+    // Replace main search function
+}
 // Initialize the dual action button styles
 if (typeof document !== 'undefined') {
     addDualActionButtonStyles();
@@ -11497,7 +12601,18 @@ if (typeof document !== 'undefined') {
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
-    window.retrieveFromMongoDB = performEnhancedBusinessSearchWithImprovedChainDetection;
+    window.searchDatabaseWithExpandedChainRadius = searchDatabaseWithExpandedChainRadius;
+    window.calculateDistance = calculateDistance;
+    window.performEnhancedBusinessSearchWithExpandedChainRadius = performEnhancedBusinessSearchWithExpandedChainRadius;
+    window.testExpandedChainRadius = testExpandedChainRadius;
+    window.performEnhancedBusinessSearchWithLoadingOverlay = performEnhancedBusinessSearchWithLoadingOverlay;
+    window.enhanceFormSubmissionWithLoading = enhanceFormSubmissionWithLoading;
+    window.testLoadingOverlay = testLoadingOverlay;
+
+    // Replace the main search functions
+    window.searchDatabaseWithFuzzyMatching = searchDatabaseWithExpandedChainRadius;
+    window.retrieveFromMongoDB = performEnhancedBusinessSearchWithLoadingOverlay;
+    window.performEnhancedBusinessSearch = performEnhancedBusinessSearchWithLoadingOverlay;
     window.createEnhancedAddressKeyFixed = createEnhancedAddressKeyFixed;
     window.createBusinessNameKeyFixed = createBusinessNameKeyFixed;
     window.isChainVariationName = isChainVariationName;
@@ -11514,7 +12629,6 @@ if (typeof window !== 'undefined') {
     window.searchNearbyDatabaseBusinessesWithDebugging = searchNearbyDatabaseBusinessesWithDebugging;
     window.testNearbySearchFix = testNearbySearchFix;
     window.debugNearbySearchOnly = debugNearbySearchOnly;
-    window.performEnhancedBusinessSearch = performEnhancedBusinessSearchWithImprovedChainDetection;
     window.searchNearbyDatabaseBusinessesEnhanced = searchNearbyDatabaseBusinessesWithDebugging;
     window.performEnhancedBusinessSearchWithFixedDuplicates = performEnhancedBusinessSearchWithFixedDuplicates;
     window.testFixedOliveGardenSearch = testFixedOliveGardenSearch;
@@ -11569,7 +12683,6 @@ if (typeof window !== 'undefined') {
     window.addBusinessRow = addBusinessRowFixed;
     window.supplementWithGooglePlaces = supplementWithGooglePlaces;
     window.createBusinessMarker = createBusinessMarker;
-    window.searchDatabaseWithFuzzyMatching = searchDatabaseWithFuzzyMatching;
     window.hasValidCoordinates = hasValidCoordinates;
     window.checkForNewlyAddedBusiness = checkForNewlyAddedBusiness;
     window.updateLoadingMessage = updateLoadingMessage;
@@ -11616,6 +12729,13 @@ if (typeof window !== 'undefined') {
     window.refreshDatabaseStatistics = refreshDatabaseStatistics;
     window.initializeDatabaseStatistics = initializeDatabaseStatistics;
     window.databaseStats = databaseStats;
+    window.showLoadingOverlay = showLoadingOverlay;
+    window.hideLoadingOverlay = hideLoadingOverlay;
+    window.updateLoadingProgress = updateLoadingProgress;
+    window.activateLoadingStep = activateLoadingStep;
+    window.nextLoadingStep = nextLoadingStep;
+    window.showLoadingWithSteps = showLoadingWithSteps;
+    window.addLoadingOverlayStyles = addLoadingOverlayStyles;
 
     addEnhancedUserInterfaceCSS();
     addEnhancedTableChainStyles();
