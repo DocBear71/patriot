@@ -5,6 +5,8 @@ const jwt = require('jsonwebtoken');
 let Business = require('../models/Business');
 let User = require('../models/User');
 let Chain = require('../models/Chain');
+// Import the geocoding function
+const { geocodeAddress } = require('../utils/geocoding');
 
 /**
  * Consolidated business API handler
@@ -476,8 +478,6 @@ async function handleBusinessRegister(req, res) {
         } else if (businessData.address1 && businessData.city && businessData.state) {
             // If coordinates weren't provided, geocode the address
             try {
-                // Import the geocoding function
-                const { geocodeAddress } = require('../utils/geocoding');
 
                 const address = `${businessData.address1}, ${businessData.city}, ${businessData.state} ${businessData.zip}`;
                 console.log("🗺️ Attempting to geocode address:", address);
