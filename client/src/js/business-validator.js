@@ -81,26 +81,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 const lng = parseFloat(lngField.value);
 
                 if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-                    formData.location = {
-                        type: 'Point',
-                        coordinates: [lng, lat] // GeoJSON format: [longitude, latitude]
-                    };
+                    formData.lat = lat;  // Send as separate fields
+                    formData.lng = lng;  // Let server create location object
                     hasValidLocation = true;
-                    console.log("✅ Using coordinates from hidden fields:", formData.location);
+                    console.log("✅ Using coordinates from hidden fields:", lat, lng);
                 }
             }
 
-            // Second priority: Check for Google Place ID and try to geocode
+// Second priority: Check for Google Place ID
             if (!hasValidLocation) {
                 const placeIdField = document.getElementById('google_place_id');
                 if (placeIdField && placeIdField.value) {
-                    console.log("📍 Google Place ID found, but no coordinates. Will geocode on server side.");
+                    console.log("📍 Google Place ID found, server will geocode");
                     formData.google_place_id = placeIdField.value;
                     // Don't set location here - let the server geocode it
                 }
             }
 
-            // Third priority: Let server geocode from address if no coordinates
+// Third priority: Let server geocode from address if no coordinates
             if (!hasValidLocation && !formData.google_place_id) {
                 console.log("🗺️ No coordinates available. Server will geocode from address.");
                 // Don't set location field at all - let server handle geocoding
