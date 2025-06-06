@@ -2401,13 +2401,13 @@ async function setupMapClickHandler() {
         return;
     }
 
-    console.log("Setting up map click handler with Safari POI fixes");
+    console.log("Setting up map click handler with precise conflict detection");
 
     try {
         // Import the Places library
         const {Place} = await google.maps.importLibrary("places");
 
-        // SAFARI FIX: More aggressive POI click prevention
+        // Main POI click handler
         map.addListener('click', async function (event) {
             console.log("Map clicked", event);
 
@@ -2415,53 +2415,86 @@ async function setupMapClickHandler() {
             if (event.placeId) {
                 console.log("POI clicked, placeId:", event.placeId);
 
-                // SAFARI FIX: Always prevent default POI behavior first
-                event.stop();
-
-                // SAFARI FIX: Check if we already have a marker for this place ID or location
-                const existingMarker = markers.find(marker => {
+                // PRECISE CHECK: Only prevent if we have an EXACT match
+                const exactMatch = markers.find(marker => {
                     if (!marker.business) return false;
 
-                    // Check by place ID
+                    // Check by exact place ID match
                     if (marker.business.placeId === event.placeId ||
                         marker.business._id === 'google_' + event.placeId) {
+                        console.log("Found exact place ID match - preventing POI click");
                         return true;
-                    }
-
-                    // SAFARI FIX: Also check by location proximity (within 50 meters)
-                    if (marker.business.lat && marker.business.lng && event.latLng) {
-                        const markerLatLng = new google.maps.LatLng(
-                            parseFloat(marker.business.lat),
-                            parseFloat(marker.business.lng)
-                        );
-                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            event.latLng,
-                            markerLatLng
-                        );
-
-                        // If within 50 meters, consider it the same location
-                        if (distance <= 50) {
-                            console.log(`Safari fix: Found existing marker within ${distance.toFixed(1)}m`);
-                            return true;
-                        }
                     }
 
                     return false;
                 });
 
-                if (existingMarker) {
-                    console.log("Found existing marker for clicked POI - using our enhanced marker");
+                // ONLY prevent if we have an exact place ID match
+                if (exactMatch) {
+                    console.log("Exact match found - using our enhanced marker");
+                    event.stop();
 
-                    // SAFARI FIX: Add small delay to ensure event is fully prevented
                     setTimeout(() => {
-                        showEnhancedInfoWindowWithCombinedIncentives(existingMarker);
-                    }, 100);
+                        showEnhancedInfoWindowWithCombinedIncentives(exactMatch);
+                    }, 50);
 
-                    return; // Exit early, don't create new marker
+                    return;
                 }
 
-                // If no existing marker found, proceed with normal POI handling
-                console.log("No existing marker found, creating new POI marker");
+                // PROXIMITY CHECK: Only for very close markers (within 25 meters)
+                if (event.latLng) {
+                    const veryCloseMarker = markers.find(marker => {
+                        if (!marker.business || !marker.business.lat || !marker.business.lng) return false;
+
+                        const markerLatLng = new google.maps.LatLng(
+                            parseFloat(marker.business.lat),
+                            parseFloat(marker.business.lng)
+                        );
+
+                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            event.latLng,
+                            markerLatLng
+                        );
+
+                        // Only consider it a conflict if VERY close (25 meters)
+                        if (distance <= 25) {
+                            console.log(`Very close marker found at ${distance.toFixed(1)}m - potential conflict`);
+                            return true;
+                        }
+
+                        return false;
+                    });
+
+                    // Only prevent if VERY close AND same business name
+                    if (veryCloseMarker) {
+                        try {
+                            // Get the POI name to compare
+                            const place = new Place({id: event.placeId});
+                            await place.fetchFields({fields: ['displayName']});
+
+                            const poiName = place.displayName.toLowerCase().trim();
+                            const markerName = veryCloseMarker.business.bname.toLowerCase().trim();
+
+                            // Only prevent if names are very similar
+                            if (poiName.includes(markerName) || markerName.includes(poiName) ||
+                                calculateSimilarity(poiName, markerName) > 0.8) {
+                                console.log("Very close marker with similar name - preventing POI click");
+                                event.stop();
+
+                                setTimeout(() => {
+                                    showEnhancedInfoWindowWithCombinedIncentives(veryCloseMarker);
+                                }, 50);
+
+                                return;
+                            }
+                        } catch (error) {
+                            console.warn("Error comparing POI name:", error);
+                        }
+                    }
+                }
+
+                // NO MATCH FOUND - Allow normal POI processing
+                console.log("No exact match found - processing POI normally");
 
                 try {
                     // Create a Place instance with the clicked place ID
@@ -2469,7 +2502,7 @@ async function setupMapClickHandler() {
                         id: event.placeId
                     });
 
-                    // Fetch place details with correct field names
+                    // Fetch place details
                     await place.fetchFields({
                         fields: [
                             'displayName',
@@ -2483,7 +2516,7 @@ async function setupMapClickHandler() {
                         ]
                     });
 
-                    console.log("Place details:", place);
+                    console.log("POI place details:", place);
 
                     // Extract business name safely
                     const businessName = place.displayName || 'Unknown Business';
@@ -2500,8 +2533,6 @@ async function setupMapClickHandler() {
 
                     // Parse address components if available
                     if (place.addressComponents && place.addressComponents.length > 0) {
-                        console.log("Parsing address components:", place.addressComponents);
-
                         const streetNumber = getAddressComponent(place.addressComponents, 'street_number');
                         const route = getAddressComponent(place.addressComponents, 'route');
                         city = getAddressComponent(place.addressComponents, 'locality');
@@ -2517,9 +2548,8 @@ async function setupMapClickHandler() {
                         }
                     }
 
-                    // Fallback: if we couldn't parse components, parse the formatted address
+                    // Fallback: parse formatted address
                     if (!address1 && place.formattedAddress) {
-                        console.log("Falling back to formatted address parsing");
                         const addressParts = place.formattedAddress.split(',').map(part => part.trim());
 
                         if (addressParts.length >= 1) address1 = addressParts[0];
@@ -2557,10 +2587,10 @@ async function setupMapClickHandler() {
                         lng = event.latLng.lng();
                     }
 
-                    // Map business type from Google Places types
+                    // Map business type
                     const businessType = mapGooglePlaceTypeToBusinessType(place.types || []);
 
-                    // Check if this business matches any chains
+                    // Check for chain match
                     let chainMatch = null;
                     try {
                         chainMatch = await findMatchingChainForPlaceResult(businessName);
@@ -2568,7 +2598,7 @@ async function setupMapClickHandler() {
                         console.warn("Error checking for chain match:", error);
                     }
 
-                    // Create properly parsed business object
+                    // Create business object
                     const business = {
                         _id: 'google_' + place.id,
                         bname: businessName,
@@ -2586,7 +2616,7 @@ async function setupMapClickHandler() {
                         types: place.types || []
                     };
 
-                    // Add chain info if it matches
+                    // Add chain info if match found
                     if (chainMatch) {
                         console.log(`POI "${businessName}" matches chain: ${chainMatch.bname}`);
                         business.chain_id = chainMatch._id;
@@ -2609,9 +2639,9 @@ async function setupMapClickHandler() {
                         }
                     }
 
-                    console.log("Parsed business object:", business);
+                    console.log("Created POI business object:", business);
 
-                    // Create a temporary marker-like object for the info window
+                    // Create temporary marker object for info window
                     const tempMarker = {
                         business: business,
                         position: new google.maps.LatLng(lat, lng),
@@ -2620,50 +2650,19 @@ async function setupMapClickHandler() {
                         }
                     };
 
-                    // SAFARI FIX: Add delay before showing info window
+                    // Show info window for this POI business
                     setTimeout(() => {
                         showEnhancedInfoWindowWithCombinedIncentives(tempMarker);
                     }, 100);
 
                 } catch (error) {
-                    console.error("Error fetching place details:", error);
+                    console.error("Error processing POI click:", error);
                     alert("Unable to load details for this location. Please try again.");
                 }
             }
         });
 
-        // SAFARI FIX: Additional listener specifically for POI clicks with higher priority
-        if (isSafariOrIOS) {
-            console.log("Adding Safari-specific POI click prevention");
-
-            map.addListener('click', function (event) {
-                if (event.placeId) {
-                    // Check if we have an existing marker at this location
-                    const hasExistingMarker = markers.some(marker => {
-                        if (!marker.business || !marker.business.lat || !marker.business.lng) return false;
-
-                        const markerLatLng = new google.maps.LatLng(
-                            parseFloat(marker.business.lat),
-                            parseFloat(marker.business.lng)
-                        );
-                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                            event.latLng,
-                            markerLatLng
-                        );
-
-                        return distance <= 50; // Within 50 meters
-                    });
-
-                    if (hasExistingMarker) {
-                        console.log("Safari: Preventing POI click - we have a marker here");
-                        event.stop();
-                        return false;
-                    }
-                }
-            });
-        }
-
-        console.log("Map click handler set up successfully with Safari fixes");
+        console.log("Map click handler set up successfully with precise conflict detection");
     } catch (error) {
         console.error("Error setting up map click handler:", error);
     }
@@ -2968,12 +2967,12 @@ window.initGoogleMap = function () {
 
         // Only create the map if it doesn't already exist
         if (!map) {
-            // SAFARI FIX: Disable clickable icons on Safari from the start
+            // FIXED: Keep clickable icons enabled - we need POI clicks for businesses not in database
             const mapOptions = {
                 center: CONFIG.defaultCenter,
                 zoom: CONFIG.defaultZoom,
                 mapId: CONFIG.mapId || 'ebe8ec43a7bc252d',
-                clickableIcons: !isSafariOrIOS, // Disable on Safari/iOS
+                clickableIcons: true, // KEEP ENABLED
                 gestureHandling: 'greedy',
                 zoomControl: true,
                 mapTypeControl: false,
@@ -2983,25 +2982,29 @@ window.initGoogleMap = function () {
                 fullscreenControl: true
             };
 
-            // SAFARI FIX: Add POI hiding styles on Safari
+            // MINIMAL POI filtering - only hide non-business POIs that might be confusing
             if (isSafariOrIOS) {
                 mapOptions.styles = [
                     {
-                        featureType: "poi",
-                        elementType: "labels",
+                        featureType: "poi.park",
                         stylers: [{visibility: "off"}]
                     },
                     {
-                        featureType: "poi.business",
+                        featureType: "poi.government",
+                        stylers: [{visibility: "off"}]
+                    },
+                    {
+                        featureType: "poi.school",
                         stylers: [{visibility: "off"}]
                     }
+                    // Keep poi.business visible!
                 ];
             }
 
-            // Create map with enhanced settings
+            // Create map
             map = new google.maps.Map(mapContainer, mapOptions);
 
-            console.log("Map object created with Safari fixes:", !!map);
+            console.log("Map object created with precise POI handling:", !!map);
 
             // Create info window with better settings
             infoWindow = new google.maps.InfoWindow({
@@ -3020,7 +3023,7 @@ window.initGoogleMap = function () {
 
             // Set initialization flag
             mapInitialized = true;
-            console.log("Google Map successfully initialized with Safari POI fixes");
+            console.log("Google Map successfully initialized with precise POI conflict detection");
 
             // Process any pending businesses
             if (pendingBusinessesToDisplay.length > 0) {
@@ -3029,7 +3032,7 @@ window.initGoogleMap = function () {
                 pendingBusinessesToDisplay = [];
             }
 
-            // Setup map handlers with Safari fixes
+            // Setup map handlers
             setupMapClickHandler();
             setupMarkerClickPriority();
             initAdditionalMapFeatures();
@@ -3120,7 +3123,7 @@ function resetMapView() {
 }
 
 /**
- * SAFARI FIX: Enhanced marker click priority setup
+ * FIXED: Less aggressive marker click priority
  */
 function setupMarkerClickPriority() {
     if (!map) {
@@ -3128,69 +3131,53 @@ function setupMarkerClickPriority() {
         return;
     }
 
-    console.log("Setting up enhanced marker click priority with Safari fixes");
+    console.log("Setting up precise marker click priority");
 
-    // SAFARI FIX: Disable clickable icons completely on Safari to prevent conflicts
+    // REVERT: Don't disable clickable icons - we need POI clicks to work
+    // Only hide some POI categories that might be confusing
     if (isSafariOrIOS) {
-        console.log("Safari detected: Disabling clickable icons to prevent conflicts");
-        map.setOptions({clickableIcons: false});
-
-        // Also try to hide POI labels on Safari
+        console.log("Safari: Adding minimal POI filtering");
         map.setOptions({
             styles: [
                 {
-                    featureType: "poi",
-                    elementType: "labels",
+                    featureType: "poi.park",
                     stylers: [{visibility: "off"}]
                 },
                 {
-                    featureType: "poi.business",
+                    featureType: "poi.government",
                     stylers: [{visibility: "off"}]
                 }
+                // Keep business POIs visible - we need them!
             ]
         });
     }
 
-    // Create listener that gets called before Google's POI click
+    // Much more precise conflict detection
     google.maps.event.addListener(map, 'click', function (event) {
-        // Only process if we have a POI click
         if (event.placeId) {
-            console.log("Checking for marker priority conflict with POI:", event.placeId);
+            console.log("Priority check for POI:", event.placeId);
 
-            // Check if any of our markers are close to this click
-            const clickPoint = event.latLng;
+            // Only check for EXACT place ID matches
+            const exactMarkerMatch = markers.find(marker => {
+                if (!marker.business) return false;
 
-            if (!clickPoint) return;
+                return marker.business.placeId === event.placeId ||
+                    marker.business._id === 'google_' + event.placeId;
+            });
 
-            // Check each marker
-            for (const marker of markers) {
-                if (!marker.position || !marker.business) continue;
+            if (exactMarkerMatch) {
+                console.log("Exact marker match found - preventing POI click");
+                event.stop();
 
-                const markerLatLng = marker.position;
+                setTimeout(() => {
+                    showEnhancedInfoWindowWithCombinedIncentives(exactMarkerMatch);
+                }, 50);
 
-                try {
-                    // Calculate distance between click and marker
-                    const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                        clickPoint,
-                        markerLatLng
-                    );
-
-                    // If click is within 100 meters of our marker, use our marker instead
-                    if (distance <= 100) {
-                        console.log(`Preventing POI click, using our marker instead (distance: ${distance.toFixed(1)}m)`);
-                        event.stop();
-
-                        // SAFARI FIX: Use timeout to ensure event is properly stopped
-                        setTimeout(() => {
-                            showEnhancedInfoWindowWithCombinedIncentives(marker);
-                        }, 50);
-
-                        return;
-                    }
-                } catch (error) {
-                    console.warn("Error calculating distance for marker priority:", error);
-                }
+                return;
             }
+
+            // If no exact match, let the POI click proceed normally
+            console.log("No exact marker match - allowing POI click to proceed");
         }
     });
 }
