@@ -2393,7 +2393,7 @@ function findMatchingChainLocally(placeName) {
 }
 
 /**
- * Fixed setupMapClickHandler function with proper error handling
+ * SAFARI FIX: Enhanced setupMapClickHandler with better Safari POI prevention
  */
 async function setupMapClickHandler() {
     if (!map) {
@@ -2401,37 +2401,69 @@ async function setupMapClickHandler() {
         return;
     }
 
-    console.log("Setting up map click handler");
+    console.log("Setting up map click handler with Safari POI fixes");
 
     try {
         // Import the Places library
         const {Place} = await google.maps.importLibrary("places");
 
-        // Listen for POI clicks
+        // SAFARI FIX: More aggressive POI click prevention
         map.addListener('click', async function (event) {
             console.log("Map clicked", event);
 
             // Check if clicked on a POI
             if (event.placeId) {
-                // Stop the default info window
-                event.stop();
-
                 console.log("POI clicked, placeId:", event.placeId);
 
-                try {
-                    // Check if this is already one of our markers
-                    const existingMarker = markers.find(marker =>
-                        marker.business &&
-                        (marker.business.placeId === event.placeId ||
-                            marker.business._id === 'google_' + event.placeId)
-                    );
+                // SAFARI FIX: Always prevent default POI behavior first
+                event.stop();
 
-                    if (existingMarker) {
-                        console.log("Found existing marker for clicked place");
-                        showEnhancedInfoWindow(existingMarker);
-                        return;
+                // SAFARI FIX: Check if we already have a marker for this place ID or location
+                const existingMarker = markers.find(marker => {
+                    if (!marker.business) return false;
+
+                    // Check by place ID
+                    if (marker.business.placeId === event.placeId ||
+                        marker.business._id === 'google_' + event.placeId) {
+                        return true;
                     }
 
+                    // SAFARI FIX: Also check by location proximity (within 50 meters)
+                    if (marker.business.lat && marker.business.lng && event.latLng) {
+                        const markerLatLng = new google.maps.LatLng(
+                            parseFloat(marker.business.lat),
+                            parseFloat(marker.business.lng)
+                        );
+                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            event.latLng,
+                            markerLatLng
+                        );
+
+                        // If within 50 meters, consider it the same location
+                        if (distance <= 50) {
+                            console.log(`Safari fix: Found existing marker within ${distance.toFixed(1)}m`);
+                            return true;
+                        }
+                    }
+
+                    return false;
+                });
+
+                if (existingMarker) {
+                    console.log("Found existing marker for clicked POI - using our enhanced marker");
+
+                    // SAFARI FIX: Add small delay to ensure event is fully prevented
+                    setTimeout(() => {
+                        showEnhancedInfoWindowWithCombinedIncentives(existingMarker);
+                    }, 100);
+
+                    return; // Exit early, don't create new marker
+                }
+
+                // If no existing marker found, proceed with normal POI handling
+                console.log("No existing marker found, creating new POI marker");
+
+                try {
                     // Create a Place instance with the clicked place ID
                     const place = new Place({
                         id: event.placeId
@@ -2463,21 +2495,19 @@ async function setupMapClickHandler() {
                     let zip = '';
                     let phone = '';
 
-                    // Extract phone number - FIXED: removed formattedPhoneNumber
+                    // Extract phone number
                     phone = place.nationalPhoneNumber || place.internationalPhoneNumber || '';
 
                     // Parse address components if available
                     if (place.addressComponents && place.addressComponents.length > 0) {
                         console.log("Parsing address components:", place.addressComponents);
 
-                        // Extract components using the same logic as addBusinessToDatabase
                         const streetNumber = getAddressComponent(place.addressComponents, 'street_number');
                         const route = getAddressComponent(place.addressComponents, 'route');
                         city = getAddressComponent(place.addressComponents, 'locality');
                         state = getAddressComponent(place.addressComponents, 'administrative_area_level_1');
                         zip = getAddressComponent(place.addressComponents, 'postal_code');
 
-                        // Combine street number and route for address1
                         if (streetNumber && route) {
                             address1 = `${streetNumber} ${route}`;
                         } else if (route) {
@@ -2495,13 +2525,11 @@ async function setupMapClickHandler() {
                         if (addressParts.length >= 1) address1 = addressParts[0];
                         if (addressParts.length >= 2) city = addressParts[1];
                         if (addressParts.length >= 3) {
-                            // Parse "State ZIP" format
                             const stateZipMatch = addressParts[2].match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
                             if (stateZipMatch) {
                                 state = stateZipMatch[1];
                                 zip = stateZipMatch[2];
                             } else {
-                                // If pattern doesn't match, try to split by space
                                 const stateZipParts = addressParts[2].split(' ');
                                 if (stateZipParts.length >= 2) {
                                     state = stateZipParts[0];
@@ -2519,7 +2547,6 @@ async function setupMapClickHandler() {
                             lng = typeof place.location.lng === 'function' ? place.location.lng() : place.location.lng || 0;
                         } catch (coordError) {
                             console.warn("Error extracting coordinates:", coordError);
-                            // Use event coordinates as fallback
                             if (event.latLng) {
                                 lat = event.latLng.lat();
                                 lng = event.latLng.lng();
@@ -2533,13 +2560,12 @@ async function setupMapClickHandler() {
                     // Map business type from Google Places types
                     const businessType = mapGooglePlaceTypeToBusinessType(place.types || []);
 
-                    // Check if this business matches any chains (with error handling)
+                    // Check if this business matches any chains
                     let chainMatch = null;
                     try {
                         chainMatch = await findMatchingChainForPlaceResult(businessName);
                     } catch (error) {
-                        console.warn("Error checking for chain match (non-critical):", error);
-                        // Continue without chain match
+                        console.warn("Error checking for chain match:", error);
                     }
 
                     // Create properly parsed business object
@@ -2580,65 +2606,66 @@ async function setupMapClickHandler() {
                             );
                         } catch (distanceError) {
                             console.warn("Error calculating distance:", distanceError);
-                            // Distance calculation failed, continue without it
                         }
                     }
 
                     console.log("Parsed business object:", business);
 
-                    try {
-                        // Import the marker library
-                        const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
+                    // Create a temporary marker-like object for the info window
+                    const tempMarker = {
+                        business: business,
+                        position: new google.maps.LatLng(lat, lng),
+                        getPosition: function () {
+                            return this.position;
+                        }
+                    };
 
-                        // Create a simple pin element for the temporary marker
-                        const pinElement = document.createElement('div');
-                        pinElement.style.width = '10px';
-                        pinElement.style.height = '10px';
-                        pinElement.style.backgroundColor = '#EA4335';
-                        pinElement.style.borderRadius = '50%';
-                        pinElement.style.opacity = '0'; // Make it invisible since it's just for positioning
+                    // SAFARI FIX: Add delay before showing info window
+                    setTimeout(() => {
+                        showEnhancedInfoWindowWithCombinedIncentives(tempMarker);
+                    }, 100);
 
-                        // Create a real AdvancedMarkerElement
-                        const tempMarker = new AdvancedMarkerElement({
-                            position: new google.maps.LatLng(lat, lng),
-                            map: null, // Don't add to map visually
-                            content: pinElement,
-                            title: business.bname
-                        });
-
-                        // Store the business data
-                        tempMarker.business = business;
-                        tempMarker.position = new google.maps.LatLng(lat, lng);
-
-                        // Show enhanced info window
-                        showEnhancedInfoWindow(tempMarker);
-
-                    } catch (error) {
-                        console.error("Error creating temporary AdvancedMarkerElement:", error);
-
-                        // Fallback to the old method if AdvancedMarkerElement fails
-                        const tempMarker = {
-                            business: business,
-                            position: new google.maps.LatLng(lat, lng),
-                            getPosition: function () {
-                                return this.position;
-                            }
-                        };
-
-                        showEnhancedInfoWindow(tempMarker);
-                    }
                 } catch (error) {
                     console.error("Error fetching place details:", error);
-                    // Show a user-friendly message instead of breaking
                     alert("Unable to load details for this location. Please try again.");
                 }
             }
         });
 
-        console.log("Map click handler set up successfully");
+        // SAFARI FIX: Additional listener specifically for POI clicks with higher priority
+        if (isSafariOrIOS) {
+            console.log("Adding Safari-specific POI click prevention");
+
+            map.addListener('click', function (event) {
+                if (event.placeId) {
+                    // Check if we have an existing marker at this location
+                    const hasExistingMarker = markers.some(marker => {
+                        if (!marker.business || !marker.business.lat || !marker.business.lng) return false;
+
+                        const markerLatLng = new google.maps.LatLng(
+                            parseFloat(marker.business.lat),
+                            parseFloat(marker.business.lng)
+                        );
+                        const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                            event.latLng,
+                            markerLatLng
+                        );
+
+                        return distance <= 50; // Within 50 meters
+                    });
+
+                    if (hasExistingMarker) {
+                        console.log("Safari: Preventing POI click - we have a marker here");
+                        event.stop();
+                        return false;
+                    }
+                }
+            });
+        }
+
+        console.log("Map click handler set up successfully with Safari fixes");
     } catch (error) {
         console.error("Error setting up map click handler:", error);
-        // Don't break the app if this fails
     }
 }
 
@@ -2941,22 +2968,40 @@ window.initGoogleMap = function () {
 
         // Only create the map if it doesn't already exist
         if (!map) {
-            // Create map with enhanced settings for better info window handling
-            map = new google.maps.Map(mapContainer, {
+            // SAFARI FIX: Disable clickable icons on Safari from the start
+            const mapOptions = {
                 center: CONFIG.defaultCenter,
                 zoom: CONFIG.defaultZoom,
                 mapId: CONFIG.mapId || 'ebe8ec43a7bc252d',
-                clickableIcons: true,
-                gestureHandling: 'greedy', // Better touch handling
+                clickableIcons: !isSafariOrIOS, // Disable on Safari/iOS
+                gestureHandling: 'greedy',
                 zoomControl: true,
                 mapTypeControl: false,
                 scaleControl: true,
                 streetViewControl: false,
                 rotateControl: false,
                 fullscreenControl: true
-            });
+            };
 
-            console.log("Map object created with enhanced settings:", !!map);
+            // SAFARI FIX: Add POI hiding styles on Safari
+            if (isSafariOrIOS) {
+                mapOptions.styles = [
+                    {
+                        featureType: "poi",
+                        elementType: "labels",
+                        stylers: [{visibility: "off"}]
+                    },
+                    {
+                        featureType: "poi.business",
+                        stylers: [{visibility: "off"}]
+                    }
+                ];
+            }
+
+            // Create map with enhanced settings
+            map = new google.maps.Map(mapContainer, mapOptions);
+
+            console.log("Map object created with Safari fixes:", !!map);
 
             // Create info window with better settings
             infoWindow = new google.maps.InfoWindow({
@@ -2975,7 +3020,7 @@ window.initGoogleMap = function () {
 
             // Set initialization flag
             mapInitialized = true;
-            console.log("Google Map successfully initialized with enhanced settings");
+            console.log("Google Map successfully initialized with Safari POI fixes");
 
             // Process any pending businesses
             if (pendingBusinessesToDisplay.length > 0) {
@@ -2984,7 +3029,7 @@ window.initGoogleMap = function () {
                 pendingBusinessesToDisplay = [];
             }
 
-            // Setup map handlers
+            // Setup map handlers with Safari fixes
             setupMapClickHandler();
             setupMarkerClickPriority();
             initAdditionalMapFeatures();
@@ -3017,7 +3062,7 @@ window.initGoogleMap = function () {
             `;
         }
     }
-};
+}
 
 /**
  * Add initial message to map
@@ -3075,7 +3120,7 @@ function resetMapView() {
 }
 
 /**
- * Setup marker click priority over POI clicks
+ * SAFARI FIX: Enhanced marker click priority setup
  */
 function setupMarkerClickPriority() {
     if (!map) {
@@ -3083,51 +3128,71 @@ function setupMarkerClickPriority() {
         return;
     }
 
-    console.log("Setting up enhanced marker click priority");
+    console.log("Setting up enhanced marker click priority with Safari fixes");
+
+    // SAFARI FIX: Disable clickable icons completely on Safari to prevent conflicts
+    if (isSafariOrIOS) {
+        console.log("Safari detected: Disabling clickable icons to prevent conflicts");
+        map.setOptions({clickableIcons: false});
+
+        // Also try to hide POI labels on Safari
+        map.setOptions({
+            styles: [
+                {
+                    featureType: "poi",
+                    elementType: "labels",
+                    stylers: [{visibility: "off"}]
+                },
+                {
+                    featureType: "poi.business",
+                    stylers: [{visibility: "off"}]
+                }
+            ]
+        });
+    }
 
     // Create listener that gets called before Google's POI click
     google.maps.event.addListener(map, 'click', function (event) {
         // Only process if we have a POI click
         if (event.placeId) {
+            console.log("Checking for marker priority conflict with POI:", event.placeId);
+
             // Check if any of our markers are close to this click
             const clickPoint = event.latLng;
-            const pixelRadius = 20;
-            const projection = map.getProjection();
 
-            if (!projection) return;
-
-            // Convert latLng to pixel coordinates
-            const scale = Math.pow(2, map.getZoom());
-            const worldCoordinate = projection.fromLatLngToPoint(clickPoint);
+            if (!clickPoint) return;
 
             // Check each marker
             for (const marker of markers) {
-                if (!marker.position) continue;
+                if (!marker.position || !marker.business) continue;
 
                 const markerLatLng = marker.position;
-                const markerWorldCoord = projection.fromLatLngToPoint(markerLatLng);
 
-                // Calculate distance in pixels
-                const pixelDistance = Math.sqrt(
-                    Math.pow((worldCoordinate.x - markerWorldCoord.x) * scale, 2) +
-                    Math.pow((worldCoordinate.y - markerWorldCoord.y) * scale, 2)
-                );
+                try {
+                    // Calculate distance between click and marker
+                    const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                        clickPoint,
+                        markerLatLng
+                    );
 
-                // If click is near our marker
-                if (pixelDistance <= pixelRadius) {
-                    console.log("Preventing POI click, using our enhanced marker instead");
-                    event.stop();
+                    // If click is within 100 meters of our marker, use our marker instead
+                    if (distance <= 100) {
+                        console.log(`Preventing POI click, using our marker instead (distance: ${distance.toFixed(1)}m)`);
+                        event.stop();
 
-                    // Trigger our enhanced marker click
-                    setTimeout(() => {
-                        showEnhancedInfoWindow(marker); // USE ENHANCED VERSION
-                    }, 10);
+                        // SAFARI FIX: Use timeout to ensure event is properly stopped
+                        setTimeout(() => {
+                            showEnhancedInfoWindowWithCombinedIncentives(marker);
+                        }, 50);
 
-                    return;
+                        return;
+                    }
+                } catch (error) {
+                    console.warn("Error calculating distance for marker priority:", error);
                 }
             }
         }
-    }, {passive: false});
+    });
 }
 
 /**
@@ -3674,6 +3739,7 @@ function addEnhancedLoadingCSS() {
         document.head.appendChild(style);
     }
 }
+
 /**
  * UPDATED: Fetch chain incentives for Places results using new chains API
  * @param {string} placeId - Google Place ID
@@ -5373,6 +5439,7 @@ async function tryServerSideChainMatching(placeName) {
 
     return null;
 }
+
 /**
  * UPDATED: Get chain data from your NEW chains collection by name
  * @param {string} chainName - Canonical chain name
@@ -5915,7 +5982,7 @@ function createStableSafariMarker(business, position, isFromDatabase) {
         marker.isSafariStableMarker = true;
 
         // Add Safari-compatible click handler
-        marker.addListener('click', function(e) {
+        marker.addListener('click', function (e) {
             console.log(`📱 Safari stable marker clicked: ${business.bname}`);
 
             // Prevent any default marker behavior
@@ -5957,15 +6024,15 @@ function createSafariCompatibleIcon(business, markerColor, isFromDatabase) {
                         <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/>
                     </filter>
                 </defs>
-                <circle cx="${size/2}" cy="${size/2}" r="${(size-8)/2}" 
+                <circle cx="${size / 2}" cy="${size / 2}" r="${(size - 8) / 2}" 
                         fill="${markerColor}" 
                         stroke="white" 
                         stroke-width="3" 
                         filter="url(#shadow)"/>
-                <text x="${size/2}" y="${size/2 + 2}" 
+                <text x="${size / 2}" y="${size / 2 + 2}" 
                       text-anchor="middle" 
                       dominant-baseline="middle" 
-                      font-size="${size/3}" 
+                      font-size="${size / 3}" 
                       fill="white">
                     ${businessIcon}
                 </text>
@@ -5983,7 +6050,7 @@ function createSafariCompatibleIcon(business, markerColor, isFromDatabase) {
             url: dataUrl,
             size: new google.maps.Size(size, size + 8),
             scaledSize: new google.maps.Size(size, size + 8),
-            anchor: new google.maps.Point(size/2, size + 8),
+            anchor: new google.maps.Point(size / 2, size + 8),
             optimized: false // Critical for Safari
         };
 
@@ -6069,7 +6136,7 @@ function createBasicSafariMarker(business, position, isFromDatabase) {
         marker.isFromDatabase = isFromDatabase;
         marker.isBasicSafariMarker = true;
 
-        marker.addListener('click', function() {
+        marker.addListener('click', function () {
             console.log(`📱 Basic Safari marker clicked: ${business.bname}`);
             setTimeout(() => {
                 showEnhancedInfoWindowWithCombinedIncentives(marker);
@@ -6159,7 +6226,7 @@ async function createEnhancedBusinessMarkerFixed(business, location, forceDataba
         marker.isAdvancedMarker = true;
 
         // Add click event listener
-        const clickHandler = function(e) {
+        const clickHandler = function (e) {
             if (e) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -6168,16 +6235,16 @@ async function createEnhancedBusinessMarkerFixed(business, location, forceDataba
             showEnhancedInfoWindowWithCombinedIncentives(marker);
         };
 
-        pinElement.addEventListener('click', clickHandler, { passive: false });
+        pinElement.addEventListener('click', clickHandler, {passive: false});
 
         // Add hover effects for desktop
         if (!('ontouchstart' in window)) {
-            pinElement.addEventListener('mouseenter', function() {
+            pinElement.addEventListener('mouseenter', function () {
                 pinElement.style.transform = 'scale(1.1)';
                 pinElement.style.zIndex = '1000';
             });
 
-            pinElement.addEventListener('mouseleave', function() {
+            pinElement.addEventListener('mouseleave', function () {
                 pinElement.style.transform = 'scale(1)';
                 pinElement.style.zIndex = 'auto';
             });
@@ -7328,6 +7395,7 @@ function showEnhancedInfoWindowFixed2(marker) {
         }
     }, 200);
 }
+
 /**
  * UPDATED: Load chain incentives for enhanced info window using new chains API
  * @param {string} containerId - Container ID for incentives
@@ -7550,7 +7618,6 @@ async function findMatchingChainForPlaceResultFixed(placeName) {
         return null;
     }
 }
-
 
 
 // FIX 2: Process API queue with rate limiting
@@ -9184,7 +9251,7 @@ function addCategorizedBusinessRowEnhanced(business, tableBody, category) {
 /**
  * Enhanced focusOnMapMarker function to handle Google Places businesses
  */
-window.focusOnGooglePlacesMarker = function(businessId) {
+window.focusOnGooglePlacesMarker = function (businessId) {
     console.log("focusOnGooglePlacesMarker called for business ID:", businessId);
 
     // Check if map is initialized
@@ -10309,7 +10376,7 @@ async function searchGooglePlacesForBusinessEnhanced(businessName, searchLocatio
             ]
         };
 
-        console.log(`🌐 Enhanced Places API request with ${searchRadius/1000}km radius:`, request);
+        console.log(`🌐 Enhanced Places API request with ${searchRadius / 1000}km radius:`, request);
 
         // Perform text search
         const {places} = await Place.searchByText(request);
@@ -10594,7 +10661,7 @@ async function debugLasVegasOliveGardenSearch() {
 
         // Test database search
         console.log("3. Testing database search for Olive Garden...");
-        const formData = { businessName: "Olive Garden", address: "", useMyLocation: false };
+        const formData = {businessName: "Olive Garden", address: "", useMyLocation: false};
         const dbResults = await searchDatabaseWithFuzzyMatching(formData, lasVegasLocation, false);
         console.log(`   Found ${dbResults.length} Olive Garden locations in database`);
 
@@ -11603,7 +11670,7 @@ function initializeDatabaseStatistics() {
 }
 
 // Enhanced DOM ready handler for statistics
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Wait a moment for other initialization to complete
     setTimeout(() => {
         initializeDatabaseStatistics();
@@ -12382,10 +12449,10 @@ function showLoadingOverlay(options = {}) {
         title = "Searching for Businesses",
         message = "Please wait while we find the best results...",
         steps = [
-            { id: "step-1", text: "Processing Location", icon: "📍" },
-            { id: "step-2", text: "Searching Database", icon: "🏢" },
-            { id: "step-3", text: "Finding Additional Locations", icon: "🌐" },
-            { id: "step-4", text: "Organizing Results", icon: "📊" }
+            {id: "step-1", text: "Processing Location", icon: "📍"},
+            {id: "step-2", text: "Searching Database", icon: "🏢"},
+            {id: "step-3", text: "Finding Additional Locations", icon: "🌐"},
+            {id: "step-4", text: "Organizing Results", icon: "📊"}
         ],
         showCancel = true
     } = options;
@@ -12516,7 +12583,7 @@ function nextLoadingStep(customMessage = null) {
  * Show loading with automatic step progression
  */
 function showLoadingWithSteps(title, initialMessage, stepMessages = []) {
-    showLoadingOverlay({ title, message: initialMessage });
+    showLoadingOverlay({title, message: initialMessage});
 
     // Auto-progress through steps with delays
     stepMessages.forEach((message, index) => {
@@ -12539,10 +12606,10 @@ async function performEnhancedBusinessSearchWithLoadingOverlay(formData, bustCac
             title: `Searching for ${formData.businessName || 'Businesses'}`,
             message: "Please wait while we find the best results in your area...",
             steps: [
-                { id: "step-1", text: "Processing Location", icon: "📍" },
-                { id: "step-2", text: "Searching Database", icon: "🏢" },
-                { id: "step-3", text: "Finding Additional Locations", icon: "🌐" },
-                { id: "step-4", text: "Organizing Results", icon: "📊" }
+                {id: "step-1", text: "Processing Location", icon: "📍"},
+                {id: "step-2", text: "Searching Database", icon: "🏢"},
+                {id: "step-3", text: "Finding Additional Locations", icon: "🌐"},
+                {id: "step-4", text: "Organizing Results", icon: "📊"}
             ],
             showCancel: true
         });
@@ -12757,7 +12824,7 @@ function enhanceFormSubmissionWithLoading() {
     const newForm = form.cloneNode(true);
     form.parentNode.replaceChild(newForm, form);
 
-    newForm.addEventListener('submit', async function(event) {
+    newForm.addEventListener('submit', async function (event) {
         event.preventDefault();
 
         // Get form data
@@ -12829,7 +12896,7 @@ async function testLoadingOverlay() {
 }
 
 // Initialize enhanced loading when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Add loading overlay styles
     addLoadingOverlayStyles();
 
@@ -13555,7 +13622,7 @@ function addBusinessRowWithCombinedIncentives(business, tableBody, category) {
 }
 
 // Initialize combined incentives styles
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     addCombinedIncentivesStyles();
 });
 
@@ -13816,7 +13883,7 @@ function showEnhancedInfoWindowWithCombinedIncentives(marker) {
                 console.log("✅ Safari-compatible info window opened");
 
                 // SAFARI FIX: Enhanced DOM ready handling
-                const domReadyHandler = function() {
+                const domReadyHandler = function () {
                     console.log("🔄 Info window DOM ready on Safari");
 
                     // Multiple timeouts to ensure Safari processes everything
@@ -13965,7 +14032,7 @@ function addSafariMarkerClickFix() {
     // Override the marker creation to add better iOS touch handling
     const originalCreateBusinessMarker = window.createBusinessMarker;
 
-    window.createBusinessMarker = function(business) {
+    window.createBusinessMarker = function (business) {
         const marker = originalCreateBusinessMarker(business);
 
         if (marker && marker.content) {
@@ -13978,7 +14045,7 @@ function addSafariMarkerClickFix() {
             marker.content = newPinElement;
 
             // SAFARI FIX: Add both click and touchstart events
-            const clickHandler = function(e) {
+            const clickHandler = function (e) {
                 e.preventDefault();
                 e.stopPropagation();
                 console.log(`📱 Safari marker clicked: ${business.bname}`);
@@ -13989,8 +14056,8 @@ function addSafariMarkerClickFix() {
                 }, 50);
             };
 
-            newPinElement.addEventListener('click', clickHandler, { passive: false });
-            newPinElement.addEventListener('touchstart', clickHandler, { passive: false });
+            newPinElement.addEventListener('click', clickHandler, {passive: false});
+            newPinElement.addEventListener('touchstart', clickHandler, {passive: false});
 
             // SAFARI FIX: Improve touch responsiveness
             newPinElement.style.webkitTouchCallout = 'none';
@@ -14163,7 +14230,7 @@ function initSafariInfoWindowFixes() {
 
     // SAFARI FIX: Override the showInfoWindow function too
     const originalShowInfoWindow = window.showInfoWindow;
-    window.showInfoWindow = function(marker) {
+    window.showInfoWindow = function (marker) {
         console.log("📱 Safari showInfoWindow called");
         showEnhancedInfoWindowWithCombinedIncentives(marker);
     };
@@ -14194,7 +14261,8 @@ function detectAndFixSafari() {
             }
 
             // Prevent iOS zoom on form elements
-            document.addEventListener('touchstart', function() {}, { passive: true });
+            document.addEventListener('touchstart', function () {
+            }, {passive: true});
         }
     }
 }
@@ -14235,7 +14303,7 @@ async function testCombinedIncentives() {
 }
 
 // Initialize table styles
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     addTableCombinedIncentivesStyles();
 });
 
