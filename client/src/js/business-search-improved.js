@@ -2021,110 +2021,104 @@ function fixInfoWindowPositioning() {
 /**
  * Load incentives for info window (works for both iOS and standard)
  */
-function loadIncentivesForInfoWindowFixed(business) {
-    console.log("🎁 FIXED: Loading incentives for info window:", business.bname);
+function loadIncentivesForInfoWindowUpdated(business) {
+    console.log("🎁 FIXED INFO INCENTIVES: Loading for", business.bname);
 
     const isGooglePlace = business.isGooglePlace === true;
     const isChainLocation = !!business.chain_id;
-    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
 
-    console.log("🔍 Container ID:", containerId);
-    console.log("🔍 Is Google Place:", isGooglePlace);
-    console.log("🔍 Is Chain Location:", isChainLocation);
+    // INFO WINDOWS use "incentives-container-{containerId}" format
+    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
 
     // Check if container exists
     const container = document.getElementById(`incentives-container-${containerId}`);
     if (!container) {
-        console.error(`❌ Container not found: incentives-container-${containerId}`);
-        console.log("🔍 Available containers:", Array.from(document.querySelectorAll('[id*="incentives-container"]')).map(el => el.id));
+        console.error(`❌ Info window container not found: incentives-container-${containerId}`);
+
+        // Debug: show available containers
+        const allContainers = document.querySelectorAll('[id*="incentives-container"]');
+        console.log("🔍 Available info containers:", Array.from(allContainers).map(el => el.id));
         return;
     }
 
-    console.log("✅ Container found, loading incentives...");
+    console.log("✅ Info window container found, loading incentives...");
 
     try {
         if (!isGooglePlace && isChainLocation) {
-            // Database business with chain - load combined incentives
-            console.log("🔗 Loading combined incentives for database chain business");
+            // Database business with chain - use the info window version
             if (typeof loadCombinedIncentivesForInfoWindow === 'function') {
                 loadCombinedIncentivesForInfoWindow(containerId, business._id, business.chain_id);
-            } else if (typeof loadChainIncentivesForDatabaseBusinessFixed === 'function') {
-                loadChainIncentivesForDatabaseBusinessFixed(containerId, business.chain_id);
             } else {
-                console.error("No chain incentives function available");
+                console.error("loadCombinedIncentivesForInfoWindow function not available");
             }
         } else if (!isGooglePlace) {
-            // Database business without chain - load regular incentives
-            console.log("🏢 Loading regular incentives for database business");
+            // Database business without chain
             if (typeof loadCombinedIncentivesForInfoWindow === 'function') {
                 loadCombinedIncentivesForInfoWindow(containerId, business._id, null);
-            } else if (typeof loadIncentivesForEnhancedWindowFixed === 'function') {
-                loadIncentivesForEnhancedWindowFixed(containerId);
             } else {
-                console.error("No regular incentives function available");
+                console.error("loadCombinedIncentivesForInfoWindow function not available");
             }
         } else if (isGooglePlace && isChainLocation) {
-            // Google Places with chain - load chain incentives
-            console.log("🌐 Loading chain incentives for Google Places");
+            // Google Places with chain
             if (typeof loadChainIncentivesForEnhancedWindowFixed === 'function') {
                 loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
             } else {
-                console.error("No Google Places chain incentives function available");
+                console.error("loadChainIncentivesForEnhancedWindowFixed function not available");
             }
         } else {
             console.log("ℹ️ No incentives to load for this business type");
-            container.innerHTML = '<em>No incentives available for this business type</em>';
         }
     } catch (error) {
-        console.error("❌ Error loading incentives:", error);
+        console.error("❌ Error loading info window incentives:", error);
         container.innerHTML = '<em>Error loading incentives</em>';
     }
 }
 
 
-/**
- * Load incentives for a database business
- * @param {string} businessId - Business ID
- */
-function loadIncentivesForInfoWindow(businessId) {
-    const container = document.getElementById(`incentives-container-${businessId}`);
-    if (!container) {
-        console.error("Incentives container not found for business:", businessId);
-        return;
-    }
 
-    const baseURL = getBaseURL();
-    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
-
-    fetch(apiURL)
-        .then(response => response.json())
-        .then(data => {
-            if (!data.results || data.results.length === 0) {
-                container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">No incentives available</p>';
-                return;
-            }
-
-            let incentivesHTML = '<p style="margin:4px 0;"><strong>Incentives:</strong></p><ul style="margin:4px 0; padding-left:16px; font-size:13px;">';
-
-            data.results.forEach(incentive => {
-                if (incentive.is_available) {
-                    const typeLabel = getIncentiveTypeLabel(incentive.type);
-                    const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
-                    const chainBadge = incentive.is_chain_wide ?
-                        '<span style="background-color:#4285F4; color:white; padding:1px 4px; border-radius:3px; font-size:11px; margin-left:4px;">Chain-wide</span>' : '';
-
-                    incentivesHTML += `<li style="margin-bottom:4px;"><strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}</li>`;
-                }
-            });
-
-            incentivesHTML += '</ul>';
-            container.innerHTML = incentivesHTML;
-        })
-        .catch(error => {
-            console.error("Error loading incentives:", error);
-            container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">Error loading incentives</p>';
-        });
-}
+// /**
+//  * Load incentives for a database business
+//  * @param {string} businessId - Business ID
+//  */
+// function loadIncentivesForInfoWindow(businessId) {
+//     const container = document.getElementById(`incentives-container-${businessId}`);
+//     if (!container) {
+//         console.error("Incentives container not found for business:", businessId);
+//         return;
+//     }
+//
+//     const baseURL = getBaseURL();
+//     const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
+//
+//     fetch(apiURL)
+//         .then(response => response.json())
+//         .then(data => {
+//             if (!data.results || data.results.length === 0) {
+//                 container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">No incentives available</p>';
+//                 return;
+//             }
+//
+//             let incentivesHTML = '<p style="margin:4px 0;"><strong>Incentives:</strong></p><ul style="margin:4px 0; padding-left:16px; font-size:13px;">';
+//
+//             data.results.forEach(incentive => {
+//                 if (incentive.is_available) {
+//                     const typeLabel = getIncentiveTypeLabel(incentive.type);
+//                     const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+//                     const chainBadge = incentive.is_chain_wide ?
+//                         '<span style="background-color:#4285F4; color:white; padding:1px 4px; border-radius:3px; font-size:11px; margin-left:4px;">Chain-wide</span>' : '';
+//
+//                     incentivesHTML += `<li style="margin-bottom:4px;"><strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}</li>`;
+//                 }
+//             });
+//
+//             incentivesHTML += '</ul>';
+//             container.innerHTML = incentivesHTML;
+//         })
+//         .catch(error => {
+//             console.error("Error loading incentives:", error);
+//             container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">Error loading incentives</p>';
+//         });
+// }
 
 /**
  * Load chain incentives for a Google Places result
@@ -13050,34 +13044,6 @@ async function loadCombinedIncentivesForTableCell(businessId, chainId = null) {
 }
 
 /**
- * FIXED: Updated fetchCombinedBusinessIncentives to use the correct table loading function
- */
-function fetchCombinedBusinessIncentivesFixed(businessId, chainId = null) {
-    if (!businessId || businessId.startsWith('google_')) {
-        console.log(`⏭️ Skipping incentives for Google Places business: ${businessId}`);
-        return;
-    }
-
-    console.log(`🎁 FIXED TABLE INCENTIVES: Fetching for business ID: ${businessId}`);
-    console.log(`   - Chain ID: ${chainId || 'None'}`);
-
-    // Wait for DOM to be ready
-    setTimeout(() => {
-        const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
-
-        if (!incentivesCell) {
-            console.error(`❌ Could not find incentives cell for business ${businessId}`);
-            return;
-        }
-
-        console.log(`✅ Found incentives cell for ${businessId}, loading combined incentives`);
-
-        // FIXED: Use the table-specific loading function
-        loadCombinedIncentivesForTableCell(businessId, chainId);
-    }, 200);
-}
-
-/**
  * FIXED: Add enhanced styles for table incentive display
  */
 function addTableCombinedIncentivesStyles() {
@@ -13181,14 +13147,21 @@ function addTableCombinedIncentivesStyles() {
  * @param {string} businessId - Business ID
  * @param {string} chainId - Chain ID (optional)
  */
-async function loadCombinedIncentivesForDatabaseBusiness(containerId, businessId, chainId = null) {
-    console.log(`🎁 COMBINED INCENTIVES: Loading for business ${businessId}, chain ${chainId}`);
+async function loadCombinedIncentivesForTableCellFixed(businessId, chainId = null) {
+    console.log(`🎁 FIXED TABLE INCENTIVES: Loading for business ${businessId}, chain ${chainId}`);
 
-    const container = document.getElementById(`incentives-container-${containerId}`);
+    // CRITICAL FIX: Use the correct container ID format that matches your table
+    const container = document.getElementById(`incentives-for-${businessId}`);
     if (!container) {
-        console.error(`❌ Container not found: incentives-container-${containerId}`);
+        console.error(`❌ Table container not found: incentives-for-${businessId}`);
+
+        // Debug: show what containers actually exist
+        const allIncentiveContainers = document.querySelectorAll('[id*="incentives"]');
+        console.log("🔍 Available incentive containers:", Array.from(allIncentiveContainers).map(el => el.id));
         return;
     }
+
+    console.log(`✅ Found table container: incentives-for-${businessId}`);
 
     // Show loading state
     container.innerHTML = '<em style="color: #666;">⏳ Loading all incentives...</em>';
@@ -13260,7 +13233,7 @@ async function loadCombinedIncentivesForDatabaseBusiness(containerId, businessId
             }
         }
 
-        // STEP 3: Display combined incentives
+        // STEP 3: Display combined incentives in table format
         console.log(`📊 Total incentives found: ${allIncentives.length}`);
 
         if (allIncentives.length === 0) {
@@ -13275,53 +13248,35 @@ async function loadCombinedIncentivesForDatabaseBusiness(containerId, businessId
             return 0;
         });
 
-        // Build combined HTML
-        let incentivesHTML = '<div class="incentives-header"><strong>🎁 Available Incentives:</strong></div>';
-        incentivesHTML += '<div class="combined-incentives-list">';
+        // Build combined HTML for TABLE display (more compact)
+        let incentivesHTML = '';
 
         allIncentives.forEach(incentive => {
             const typeLabel = getIncentiveTypeLabel(incentive.type);
             const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
 
-            // Create scope badge
+            // Create scope badge for table
             const scopeBadge = incentive.source === 'chain' ?
-                '<span class="scope-badge chain-scope">🔗 Chain-wide</span>' :
-                '<span class="scope-badge location-scope">📍 Location only</span>';
+                '<span class="scope-badge-table chain-scope">⛓️ Chain-wide</span>' :
+                '<span class="scope-badge-table location-scope">📍 Location only</span>';
 
             incentivesHTML += `
-                <div class="combined-incentive-item ${incentive.source}-incentive">
-                    <div class="incentive-header">
-                        <div class="incentive-type-amount">
-                            <strong>${typeLabel}${otherDescription}:</strong> 
-                            <span class="incentive-amount">${incentive.amount}%</span>
-                        </div>
+                <div class="table-incentive-item ${incentive.source}-incentive">
+                    <div class="table-incentive-header">
+                        <strong>${typeLabel}${otherDescription}:</strong> 
+                        <span class="incentive-amount">${incentive.amount}%</span>
                         ${scopeBadge}
                     </div>
-                    ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
+                    ${incentive.information ? `<div class="table-incentive-info">${incentive.information}</div>` : ''}
                 </div>
             `;
         });
 
-        incentivesHTML += '</div>';
-
-        // Add summary if both types exist
-        const chainCount = allIncentives.filter(i => i.source === 'chain').length;
-        const locationCount = allIncentives.filter(i => i.source === 'location').length;
-
-        if (chainCount > 0 && locationCount > 0) {
-            incentivesHTML += `
-                <div class="incentives-summary">
-                    ✨ This location offers ${chainCount} chain-wide incentive${chainCount !== 1 ? 's' : ''} 
-                    plus ${locationCount} location-specific incentive${locationCount !== 1 ? 's' : ''}!
-                </div>
-            `;
-        }
-
         container.innerHTML = incentivesHTML;
-        console.log(`✅ Successfully displayed ${allIncentives.length} combined incentives`);
+        console.log(`✅ Successfully displayed ${allIncentives.length} combined incentives in table`);
 
     } catch (error) {
-        console.error("❌ Error loading combined incentives:", error);
+        console.error("❌ Error loading combined incentives for table:", error);
         container.innerHTML = '<em style="color: #dc3545;">❌ Error loading incentives</em>';
     }
 }
@@ -13350,13 +13305,13 @@ async function loadCombinedIncentivesForInfoWindow(containerId, businessId, chai
  * @param {string} businessId - Business ID
  * @param {string} chainId - Chain ID (optional)
  */
-function fetchCombinedBusinessIncentives(businessId, chainId = null) {
+function fetchCombinedBusinessIncentivesFixed(businessId, chainId = null) {
     if (!businessId || businessId.startsWith('google_')) {
         console.log(`⏭️ Skipping incentives for Google Places business: ${businessId}`);
         return;
     }
 
-    console.log(`🎁 TABLE COMBINED INCENTIVES: Fetching for business ID: ${businessId}`);
+    console.log(`🎁 FIXED TABLE INCENTIVES: Fetching for business ID: ${businessId}`);
     console.log(`   - Chain ID: ${chainId || 'None'}`);
 
     // Wait for DOM to be ready
@@ -13365,15 +13320,20 @@ function fetchCombinedBusinessIncentives(businessId, chainId = null) {
 
         if (!incentivesCell) {
             console.error(`❌ Could not find incentives cell for business ${businessId}`);
+
+            // Debug: show available containers
+            const allCells = document.querySelectorAll('[id*="incentives-for"]');
+            console.log("🔍 Available incentive cells:", Array.from(allCells).map(el => el.id));
             return;
         }
 
         console.log(`✅ Found incentives cell for ${businessId}, loading combined incentives`);
 
-        // Use the combined loading function
-        loadCombinedIncentivesForDatabaseBusiness(businessId, businessId, chainId);
+        // FIXED: Use the table-specific loading function with correct container ID
+        loadCombinedIncentivesForTableCellFixed(businessId, chainId);
     }, 200);
 }
+
 
 /**
  * Add enhanced styles for combined incentives display
@@ -13943,12 +13903,19 @@ if (typeof window !== 'undefined') {
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
+    // Replace the table incentives loading functions
+    window.loadCombinedIncentivesForTableCell = loadCombinedIncentivesForTableCellFixed;
+    window.loadCombinedIncentivesForDatabaseBusiness = loadCombinedIncentivesForTableCellFixed;
+    window.fetchCombinedBusinessIncentives = fetchCombinedBusinessIncentivesFixed;
+    window.fetchBusinessIncentives = fetchCombinedBusinessIncentivesFixed;
+
+    // Update the info window incentives loader
+    window.loadIncentivesForInfoWindow = loadIncentivesForInfoWindowUpdated;
+
+    console.log("✅ Container ID fixes applied - table and info window incentives should now work correctly");
+
     // Fix the missing function mappings
     window.addCategorizedBusinessRow = window.addBusinessRowWithCombinedIncentives || window.addBusinessRow || window.addCategorizedBusinessRow;
-
-    // Add the fixed incentives loader
-    window.loadIncentivesForInfoWindow = loadIncentivesForInfoWindowFixed;
-    window.loadIncentivesForInfoWindowFixed = loadIncentivesForInfoWindowFixed;
 
     // Replace the info window function with the fixed version
     window.showEnhancedInfoWindow = showEnhancedInfoWindowWithIOSSupportFixed;
@@ -13979,13 +13946,10 @@ if (typeof window !== 'undefined') {
     window.createEnhancedBusinessMarker = createEnhancedBusinessMarkerIOSFixed;
     window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerIOSFixed;
 
-
-    window.loadCombinedIncentivesForTableCell = loadCombinedIncentivesForTableCell;
     window.fetchCombinedBusinessIncentivesFixed = fetchCombinedBusinessIncentivesFixed;
     window.addTableCombinedIncentivesStyles = addTableCombinedIncentivesStyles;
 
     // Replace the existing functions
-    window.fetchCombinedBusinessIncentives = fetchCombinedBusinessIncentivesFixed;
     window.fetchBusinessIncentives = fetchCombinedBusinessIncentivesFixed;
     window.fetchBusinessIncentivesFixed = fetchCombinedBusinessIncentivesFixed;
 
@@ -13997,7 +13961,6 @@ if (typeof window !== 'undefined') {
     window.buildCategoryAwareInfoWindowContentEnhanced = buildInfoWindowContentWithCombinedIncentives;
     window.buildEnhancedInfoWindowContent = buildInfoWindowContentWithCombinedIncentives;
 
-    window.loadCombinedIncentivesForDatabaseBusiness = loadCombinedIncentivesForDatabaseBusiness;
     window.loadCombinedIncentivesForInfoWindow = loadCombinedIncentivesForInfoWindow;
     window.addCombinedIncentivesStyles = addCombinedIncentivesStyles;
     window.addBusinessRowWithCombinedIncentives = addBusinessRowWithCombinedIncentives;
