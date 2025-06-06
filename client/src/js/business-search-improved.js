@@ -52,6 +52,13 @@ let googleMapsInitializing = false;
 // Global flag to track if Google Maps is already initialized
 let googleMapsInitialized = false;
 
+const isIOSSafari = (() => {
+    const ua = navigator.userAgent;
+    return /iPad|iPhone|iPod/.test(ua) && /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua);
+})();
+
+console.log("🍎 iOS Safari detected:", isIOSSafari);
+
 
 /**
  * Clear markers from the map
@@ -2012,6 +2019,23 @@ function fixInfoWindowPositioning() {
 }
 
 /**
+ * Load incentives for info window (works for both iOS and standard)
+ */
+function loadIncentivesForInfoWindow(business) {
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
+
+    if (!isGooglePlace && isChainLocation) {
+        loadCombinedIncentivesForInfoWindow(containerId, business._id, business.chain_id);
+    } else if (!isGooglePlace) {
+        loadCombinedIncentivesForInfoWindow(containerId, business._id, null);
+    } else if (isGooglePlace && isChainLocation) {
+        loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
+    }
+}
+
+/**
  * Load incentives for a database business
  * @param {string} businessId - Business ID
  */
@@ -2756,116 +2780,83 @@ function mapGooglePlaceTypeToBusinessType(types) {
  * @param {Object} business - Business object
  * @returns {string} HTML content
  */
-function buildInfoWindowContentIOSOptimized(business) {
+function buildInfoWindowContentForIOS(business) {
     const isGooglePlace = business.isGooglePlace === true;
     const isChainLocation = !!business.chain_id;
 
-    // Simplified address for iOS
+    // Simplified address
     let addressHTML = '';
     if (business.address1) {
-        addressHTML = `<div class="ios-info-address">
-            <strong>📍</strong> ${business.address1}`;
+        addressHTML = `<div class="ios-address">📍 ${business.address1}`;
         if (business.city && business.state) {
             addressHTML += `<br>${business.city}, ${business.state}`;
         }
         addressHTML += '</div>';
-    } else if (business.formattedAddress) {
-        addressHTML = `<div class="ios-info-address">
-            <strong>📍</strong> ${business.formattedAddress}
-        </div>`;
     }
 
-    // Simplified phone
+    // Phone
     const phoneHTML = business.phone ?
-        `<div class="ios-info-phone"><strong>📞</strong> <a href="tel:${business.phone.replace(/\D/g, '')}">${business.phone}</a></div>` : '';
+        `<div class="ios-phone">📞 <a href="tel:${business.phone.replace(/\D/g, '')}">${business.phone}</a></div>` : '';
 
     // Distance
     const distanceHTML = business.distance ?
-        `<div class="ios-info-distance"><strong>📏</strong> ${(business.distance / 1609).toFixed(1)} miles</div>` : '';
+        `<div class="ios-distance">📏 ${(business.distance / 1609).toFixed(1)} miles</div>` : '';
 
     // Chain badge
     const chainBadge = isChainLocation ?
         `<span class="ios-chain-badge">🔗 ${business.chain_name || 'Chain'}</span>` : '';
 
-    // Simplified action button
+    // Action button
     let actionButton = '';
     if (isGooglePlace) {
         if (isChainLocation) {
-            actionButton = `
-                <button class="ios-action-btn" onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
-                    Add ${business.chain_name} Location
-                </button>`;
+            actionButton = `<button class="ios-action-btn" onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">Add Location</button>`;
         } else {
-            actionButton = `
-                <button class="ios-action-btn" onclick="window.addBusinessToDatabase('${business.placeId}')">
-                    Add to Database
-                </button>`;
+            actionButton = `<button class="ios-action-btn" onclick="window.addBusinessToDatabase('${business.placeId}')">Add Business</button>`;
         }
     } else {
-        actionButton = `
-            <button class="ios-action-btn view-details" onclick="window.viewBusinessDetails('${business._id}')">
-                View Details
-            </button>`;
+        actionButton = `<button class="ios-action-btn" onclick="window.viewBusinessDetails('${business._id}')">View Details</button>`;
     }
 
-    // Container ID for incentives
     const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
 
-    // Simplified structure for iOS
     return `
         <div class="ios-info-window">
-            <div class="ios-info-header">
-                <h3>${business.bname} ${chainBadge}</h3>
+            <h3>${business.bname} ${chainBadge}</h3>
+            ${addressHTML}
+            ${phoneHTML}
+            ${distanceHTML}
+            <div id="incentives-container-${containerId}">
+                <em>Loading...</em>
             </div>
-            
-            <div class="ios-info-body">
-                ${addressHTML}
-                ${phoneHTML}
-                ${distanceHTML}
-                
-                <div class="ios-info-incentives">
-                    <div id="incentives-container-${containerId}">
-                        <em>Loading incentives...</em>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="ios-info-actions">
-                ${actionButton}
-            </div>
+            <div class="ios-actions">${actionButton}</div>
         </div>
     `;
 }
+
 
 /**
  * iOS-specific info window positioning fixes
  */
 function applyIOSInfoWindowFixes() {
-    console.log("🍎 Applying iOS-specific info window fixes");
+    if (!isIOSSafari) return;
+
+    console.log("🍎 Applying iOS info window fixes");
 
     const iwContainer = document.querySelector('.gm-style-iw-c');
     const iwContent = document.querySelector('.gm-style-iw-d');
 
     if (iwContainer) {
-        // iOS-specific positioning fixes
         iwContainer.style.maxWidth = '280px';
         iwContainer.style.overflow = 'visible';
-        iwContainer.style.position = 'relative';
         iwContainer.style.transform = 'none';
-
-        // Ensure visibility
-        iwContainer.style.display = 'block';
-        iwContainer.style.visibility = 'visible';
-        iwContainer.style.opacity = '1';
+        iwContainer.style.position = 'relative';
     }
 
     if (iwContent) {
         iwContent.style.overflow = 'auto';
         iwContent.style.maxHeight = '300px';
-        iwContent.style.padding = '0';
     }
-
-    console.log("🍎 iOS info window fixes applied");
 }
 
 /**
@@ -2883,6 +2874,90 @@ function loadIncentivesForIOSInfoWindow(business) {
     } else if (isGooglePlace && isChainLocation) {
         loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
     }
+}
+
+function addIOSCompatibilityStyles() {
+    if (document.getElementById('ios-compatibility-styles')) {
+        return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'ios-compatibility-styles';
+    style.textContent = `
+        /* iOS Safari compatibility styles */
+        .enhanced-custom-marker.ios-compatible {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .ios-info-window {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 260px;
+            padding: 12px;
+            line-height: 1.4;
+        }
+
+        .ios-info-window h3 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .ios-chain-badge {
+            background: #4285F4;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 11px;
+            margin-left: 4px;
+        }
+
+        .ios-address, .ios-phone, .ios-distance {
+            margin: 6px 0;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .ios-phone a {
+            color: #007AFF;
+            text-decoration: none;
+        }
+
+        .ios-actions {
+            margin-top: 12px;
+            text-align: center;
+        }
+
+        .ios-action-btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            width: 100%;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        .ios-action-btn:active {
+            opacity: 0.7;
+        }
+
+        /* iOS Safari specific info window fixes */
+        @supports (-webkit-touch-callout: none) {
+            .gm-style .gm-style-iw-c {
+                max-width: 280px !important;
+                transform: none !important;
+                position: relative !important;
+            }
+        }
+    `;
+
+    document.head.appendChild(style);
 }
 
 /**
@@ -4027,31 +4102,32 @@ function createEnhancedFallbackMarker(business, location) {
  * Enhanced info window with better content organization
  * @param {Object} marker - The marker that was clicked
  */
-function showEnhancedInfoWindowIOSFixed(marker) {
-    console.log("🪟 iOS-FIXED INFO WINDOW: Showing for:", marker.business?.bname);
+function showEnhancedInfoWindowWithIOSSupport(marker) {
+    console.log("🪟 iOS-COMPATIBLE INFO WINDOW: Showing for:", marker.business?.bname);
 
     if (!marker || !marker.business) {
-        console.error("❌ Invalid marker for iOS info window");
+        console.error("❌ Invalid marker for info window");
         return;
     }
 
     const business = marker.business;
+    const isGooglePlace = business.isGooglePlace === true;
+    const isChainLocation = !!business.chain_id;
+    const isFromDatabase = business.isFromDatabase === true;
 
-    // Close any existing info window first
+    // Close existing info window
     if (infoWindow) {
         infoWindow.close();
     }
 
-    // iOS SAFARI FIX: Create info window with specific iOS-friendly settings
+    // Create info window with iOS-specific settings
     if (isIOSSafari) {
         console.log("🍎 Creating iOS-optimized info window");
 
         infoWindow = new google.maps.InfoWindow({
-            maxWidth: 280, // Smaller for mobile
+            maxWidth: 280,
             disableAutoPan: false,
             pixelOffset: new google.maps.Size(0, -10),
-            // iOS-specific options
-            closeBoxURL: "", // Custom close button
             enableEventPropagation: true
         });
     } else {
@@ -4062,10 +4138,11 @@ function showEnhancedInfoWindowIOSFixed(marker) {
         });
     }
 
-    // Build the content with iOS optimizations
-    const content = buildInfoWindowContentIOSOptimized(business);
+    // Build content using your existing function but with iOS optimizations
+    const content = isIOSSafari ?
+        buildInfoWindowContentForIOS(business) :
+        buildInfoWindowContentWithCombinedIncentives(business);
 
-    // Set content
     infoWindow.setContent(content);
 
     // Get position safely
@@ -4078,50 +4155,44 @@ function showEnhancedInfoWindowIOSFixed(marker) {
     }
 
     if (!position) {
-        console.error("❌ Could not determine position for iOS info window");
+        console.error("❌ Could not determine position for info window");
         return;
     }
 
-    // iOS SAFARI FIX: Specific opening sequence for iOS
+    // iOS-specific opening sequence
     if (isIOSSafari) {
-        console.log("🍎 Opening info window with iOS-specific sequence");
+        console.log("🍎 Opening info window with iOS sequence");
 
-        // Pan to position first (iOS needs this)
+        // Pan first, then open with delay
         map.panTo(position);
 
-        // Wait for pan to complete, then open info window
         setTimeout(() => {
             try {
                 if (marker.getPosition) {
                     infoWindow.open({
                         anchor: marker,
                         map: map,
-                        shouldFocus: false // Prevent keyboard from appearing
+                        shouldFocus: false
                     });
                 } else {
                     infoWindow.setPosition(position);
                     infoWindow.open(map);
                 }
 
-                console.log("🍎 iOS info window opened successfully");
+                console.log("🍎 iOS info window opened");
 
-                // Add iOS-specific DOM ready handler
+                // iOS-specific DOM ready handling
                 google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
                     setTimeout(() => {
                         applyIOSInfoWindowFixes();
-                        loadIncentivesForIOSInfoWindow(business);
+                        loadIncentivesForInfoWindow(business);
                     }, 200);
                 });
 
             } catch (error) {
-                console.error("🍎 Error opening iOS info window:", error);
-                // Fallback: try simple position-based opening
-                setTimeout(() => {
-                    infoWindow.setPosition(position);
-                    infoWindow.open(map);
-                }, 100);
+                console.error("🍎 iOS info window error:", error);
             }
-        }, 300); // Longer delay for iOS
+        }, 300);
 
     } else {
         // Standard opening for other browsers
@@ -4136,18 +4207,18 @@ function showEnhancedInfoWindowIOSFixed(marker) {
                     infoWindow.open(map);
                 }
 
-                console.log("✅ Standard info window opened successfully");
+                console.log("✅ Standard info window opened");
 
                 google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
                     setTimeout(() => {
                         applyEnhancedInfoWindowFixes();
-                        loadIncentivesForIOSInfoWindow(business);
+                        loadIncentivesForInfoWindow(business);
                     }, 300);
                 });
             }, 200);
 
         } catch (error) {
-            console.error("❌ Error opening standard info window:", error);
+            console.error("❌ Standard info window error:", error);
         }
     }
 }
@@ -5068,7 +5139,7 @@ function createSimilarBusinessMarker(business, position) {
  * @param {Object} location - Google Maps location object
  * @param {boolean} forceNearby - Force blue/nearby styling
  */
-async function createEnhancedBusinessMarkerIOSFixed(business, location, forceNearby = false) {
+async function createEnhancedBusinessMarkerWithIOSSupport(business, location, forceNearby = false) {
     try {
         // Import the marker library
         const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
@@ -5080,47 +5151,50 @@ async function createEnhancedBusinessMarkerIOSFixed(business, location, forceNea
             return createEnhancedFallbackMarker(business, location);
         }
 
-        // Determine marker styling
+        // Determine marker styling (keep your existing logic)
         const isFromDatabase = !business.isGooglePlace;
         const isNearby = forceNearby || business.isNearby === true || business.isSimilarBusiness === true;
 
-        // Choose marker color and style
         let markerColor, markerClass;
         if (isNearby || business.isSimilarBusiness) {
-            markerColor = CONFIG.markerColors.nearby; // Blue
+            markerColor = CONFIG.markerColors.nearby;
             markerClass = "nearby";
         } else if (isFromDatabase) {
-            markerColor = CONFIG.markerColors.primary; // Red
+            markerColor = CONFIG.markerColors.primary;
             markerClass = "primary";
         } else {
-            markerColor = CONFIG.markerColors.nearby; // Blue
+            markerColor = CONFIG.markerColors.nearby;
             markerClass = "nearby";
         }
 
-        // Get business icon
+        // Get business icon (keep your existing function)
         const businessIcon = getBusinessTypeTextIcon(business.type);
 
-        // Create enhanced pin element with iOS-specific optimizations
+        // Create enhanced pin element with iOS optimizations
         const pinElement = document.createElement('div');
         pinElement.className = 'enhanced-custom-marker ios-compatible';
         pinElement.setAttribute('title', business.bname);
         pinElement.style.cursor = 'pointer';
 
-        // CRITICAL iOS FIX: Add touch-action for better iOS handling
-        pinElement.style.touchAction = 'manipulation';
-        pinElement.style.userSelect = 'none';
-        pinElement.style.webkitUserSelect = 'none';
+        // iOS-specific optimizations
+        if (isIOSSafari) {
+            pinElement.style.touchAction = 'manipulation';
+            pinElement.style.userSelect = 'none';
+            pinElement.style.webkitUserSelect = 'none';
+            pinElement.style.webkitTapHighlightColor = 'transparent';
+        }
 
-        // Enhanced marker HTML with iOS optimizations
+        // Enhanced marker HTML (keep your existing structure)
         pinElement.innerHTML = `
             <div class="enhanced-marker-container">
-                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor};">
+                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor} !important; border: 3px solid #ffffff;">
                     <div class="enhanced-marker-icon">
                         ${businessIcon}
                     </div>
                 </div>
                 <div class="enhanced-marker-shadow"></div>
-                ${business.chain_id ? '<div class="chain-indicator">⭐</div>' : ''}
+                ${business.chain_id ? '<div class="chain-indicator">🔗</div>' : ''}
+                ${isFromDatabase ? '<div class="database-indicator">✓</div>' : ''}
             </div>
         `;
 
@@ -5133,62 +5207,51 @@ async function createEnhancedBusinessMarkerIOSFixed(business, location, forceNea
             collisionBehavior: isFromDatabase ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
         });
 
-        // Store the business data and position
+        // Store the business data and flags
         marker.business = business;
         marker.position = position;
         marker.isFromDatabase = isFromDatabase;
 
-        // CRITICAL iOS FIX: Enhanced event handling for iOS Safari
+        // ENHANCED EVENT HANDLING: iOS Safari + Standard browsers
         if (isIOSSafari) {
             console.log("🍎 Adding iOS-specific event handlers for:", business.bname);
 
-            // Method 1: Direct touch events on the pin element
+            // iOS-specific touch events
             pinElement.addEventListener('touchstart', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 console.log("🍎 iOS touchstart on marker:", business.bname);
 
-                // Add visual feedback
+                // Visual feedback
                 pinElement.style.transform = 'scale(0.95)';
 
-                // Delay to allow for visual feedback
+                // Open info window with delay
                 setTimeout(() => {
                     pinElement.style.transform = 'scale(1)';
-                    showEnhancedInfoWindowIOSFixed(marker);
+                    showEnhancedInfoWindowWithIOSSupport(marker);
                 }, 100);
             }, { passive: false });
 
-            // Method 2: Touchend as backup
+            // Backup touch event
             pinElement.addEventListener('touchend', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log("🍎 iOS touchend on marker:", business.bname);
+                console.log("🍎 iOS touchend backup for marker:", business.bname);
 
-                // Small delay to prevent double-firing
                 setTimeout(() => {
-                    showEnhancedInfoWindowIOSFixed(marker);
+                    showEnhancedInfoWindowWithIOSSupport(marker);
                 }, 50);
             }, { passive: false });
 
-            // Method 3: Click event as final fallback
-            pinElement.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log("🍎 iOS click fallback on marker:", business.bname);
-                showEnhancedInfoWindowIOSFixed(marker);
-            });
-
         } else {
-            // Standard event handling for other browsers
+            // Standard click event for non-iOS browsers
             pinElement.addEventListener('click', function(e) {
                 console.log("🖱️ Standard click on marker:", business.bname);
                 e.stopPropagation();
-                showEnhancedInfoWindowIOSFixed(marker);
+                showEnhancedInfoWindowWithIOSSupport(marker);
             });
-        }
 
-        // Add hover effects (but not on iOS to avoid conflicts)
-        if (!isIOSSafari) {
+            // Hover effects for non-touch devices
             pinElement.addEventListener('mouseenter', function() {
                 pinElement.style.transform = 'scale(1.1)';
                 pinElement.style.zIndex = '1000';
@@ -5200,7 +5263,7 @@ async function createEnhancedBusinessMarkerIOSFixed(business, location, forceNea
             });
         }
 
-        // Add the marker to our array
+        // Add the marker to your array
         markers.push(marker);
         console.log(`✅ Added iOS-compatible marker for ${business.bname}`);
 
@@ -5210,7 +5273,6 @@ async function createEnhancedBusinessMarkerIOSFixed(business, location, forceNea
         return createEnhancedFallbackMarker(business, location);
     }
 }
-
 
 /**
  * UPDATED: Enhanced chain database with comprehensive name variations
@@ -13807,18 +13869,32 @@ document.addEventListener('DOMContentLoaded', function() {
     if (isIOSSafari) {
         console.log("🍎 iOS Safari detected - applying compatibility fixes");
         addIOSInfoWindowStyles();
+        addIOSCompatibilityStyles();
     }
 });
 
-// Initialize the dual action button styles
-if (typeof document !== 'undefined') {
-
-}
-
 // Export functions for global access
 if (typeof window !== 'undefined') {
+    window.createEnhancedBusinessMarker = createEnhancedBusinessMarkerWithIOSSupport;
+    window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerWithIOSSupport;
+    window.createEnhancedBusinessMarkerFixed = createEnhancedBusinessMarkerWithIOSSupport;
+
+    // Replace existing info window functions
+    window.showEnhancedInfoWindow = showEnhancedInfoWindowWithIOSSupport;
+    window.showEnhancedInfoWindowWithCategory = showEnhancedInfoWindowWithIOSSupport;
+    window.showEnhancedInfoWindowWithCombinedIncentives = showEnhancedInfoWindowWithIOSSupport;
+    window.showEnhancedInfoWindowIOSFixed = showEnhancedInfoWindowWithIOSSupport;
+
+    // Add new functions
+    window.buildInfoWindowContentForIOS = buildInfoWindowContentForIOS;
+    window.applyIOSInfoWindowFixes = applyIOSInfoWindowFixes;
+    window.addIOSCompatibilityStyles = addIOSCompatibilityStyles;
+
+    // Export the iOS detection for other functions to use
+    window.isIOSSafari = isIOSSafari;
+
+
     window.createEnhancedBusinessMarkerIOSFixed = createEnhancedBusinessMarkerIOSFixed;
-    window.showEnhancedInfoWindowIOSFixed = showEnhancedInfoWindowIOSFixed;
     window.buildInfoWindowContentIOSOptimized = buildInfoWindowContentIOSOptimized;
     window.applyIOSInfoWindowFixes = applyIOSInfoWindowFixes;
     window.addIOSInfoWindowStyles = addIOSInfoWindowStyles;
@@ -13826,9 +13902,6 @@ if (typeof window !== 'undefined') {
     // Replace existing functions with iOS-compatible versions
     window.createEnhancedBusinessMarker = createEnhancedBusinessMarkerIOSFixed;
     window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerIOSFixed;
-    window.showEnhancedInfoWindow = showEnhancedInfoWindowIOSFixed;
-    window.showEnhancedInfoWindowWithCategory = showEnhancedInfoWindowIOSFixed;
-    window.showEnhancedInfoWindowWithCombinedIncentives = showEnhancedInfoWindowIOSFixed;
 
 
     window.loadCombinedIncentivesForTableCell = loadCombinedIncentivesForTableCell;
@@ -13847,7 +13920,6 @@ if (typeof window !== 'undefined') {
     window.buildCategoryAwareInfoWindowContent = buildInfoWindowContentWithCombinedIncentives;
     window.buildCategoryAwareInfoWindowContentEnhanced = buildInfoWindowContentWithCombinedIncentives;
     window.buildEnhancedInfoWindowContent = buildInfoWindowContentWithCombinedIncentives;
-    window.showEnhancedInfoWindowFixed2 = showEnhancedInfoWindowWithCombinedIncentives;
 
     window.loadCombinedIncentivesForDatabaseBusiness = loadCombinedIncentivesForDatabaseBusiness;
     window.loadCombinedIncentivesForInfoWindow = loadCombinedIncentivesForInfoWindow;
