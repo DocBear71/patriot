@@ -3,6 +3,10 @@
  * Combines the best of both versions with proper error handling
  */
 
+// Global flag to track Safari and force stable markers
+const isSafariOrIOS = /^((?!chrome|android).)*safari/i.test(navigator.userAgent) ||
+    /iPad|iPhone|iPod/.test(navigator.userAgent);
+
 // Configuration constants
 const CONFIG = {
     mapId: 'ebe8ec43a7bc252d',
@@ -5830,17 +5834,26 @@ function addBusinessRow(business, tableBody, isFromPlaces) {
  */
 function createBusinessMarker(business) {
     try {
-        console.log(`🔍 MARKER DEBUG: Creating marker for ${business.bname}`);
-        console.log(`   - isGooglePlace: ${business.isGooglePlace}`);
-        console.log(`   - _id: ${business._id}`);
+        console.log(`🔍 STABLE MARKER: Creating marker for ${business.bname}`);
+        console.log(`   - Platform: ${isSafariOrIOS ? 'Safari/iOS' : 'Other'}`);
         console.log(`   - Source: ${business._id?.startsWith('google_') ? 'GOOGLE PLACES' : 'DATABASE'}`);
 
-        // Validate coordinates
+        // Validate coordinates first
         if (!business.lat || !business.lng ||
             isNaN(parseFloat(business.lat)) || isNaN(parseFloat(business.lng))) {
             console.warn(`❌ Invalid coordinates for business: ${business.bname}`);
             return null;
         }
+
+        // Determine business source consistently
+        const isFromDatabase = !business.isGooglePlace && !business._id?.startsWith('google_');
+        const isGooglePlace = business.isGooglePlace === true || business._id?.startsWith('google_');
+
+        // Set flags on business object
+        business.isFromDatabase = isFromDatabase;
+        business.isGooglePlace = isGooglePlace;
+
+        console.log(`🏷️ STABLE MARKER: ${business.bname} → ${isFromDatabase ? 'DATABASE' : 'GOOGLE PLACES'}`);
 
         // Create position
         const position = new google.maps.LatLng(
@@ -5848,17 +5861,15 @@ function createBusinessMarker(business) {
             parseFloat(business.lng)
         );
 
-        // CRITICAL FIX: Properly determine if this is a database business
-        const isFromDatabase = !business.isGooglePlace && !business._id?.startsWith('google_');
-
-        // Set proper flags on business object
-        business.isFromDatabase = isFromDatabase;
-        business.isGooglePlace = !isFromDatabase;
-
-        console.log(`🏷️ FINAL DETERMINATION: ${business.bname} → ${isFromDatabase ? 'DATABASE (RED MARKER)' : 'GOOGLE PLACES (BLUE MARKER)'}`);
-
-        // Use enhanced marker creation with explicit color forcing
-        const marker = createEnhancedBusinessMarkerFixed(business, position, isFromDatabase);
+        // SAFARI FIX: Use stable marker creation based on platform
+        let marker;
+        if (isSafariOrIOS) {
+            // Force consistent markers on Safari/iOS to prevent flickering
+            marker = createStableSafariMarker(business, position, isFromDatabase);
+        } else {
+            // Use advanced markers on other browsers
+            marker = createEnhancedBusinessMarkerFixed(business, position, isFromDatabase);
+        }
 
         // Add to bounds if successful
         if (marker && bounds) {
@@ -5867,13 +5878,222 @@ function createBusinessMarker(business) {
 
         return marker;
     } catch (error) {
-        console.error("❌ Error creating business marker:", error);
+        console.error("❌ Error creating stable marker:", error);
         return null;
     }
 }
 
+/**
+ * SAFARI FIX: Create stable markers that don't flicker on Safari/iOS
+ */
+function createStableSafariMarker(business, position, isFromDatabase) {
+    try {
+        console.log(`📱 SAFARI STABLE: Creating non-flickering marker for ${business.bname}`);
+
+        const isChainLocation = !!business.chain_id;
+        const markerColor = isFromDatabase ? CONFIG.markerColors.primary : CONFIG.markerColors.nearby;
+
+        // Create custom icon that Safari can handle consistently
+        const customIcon = createSafariCompatibleIcon(business, markerColor, isFromDatabase);
+
+        // Use standard Marker with custom icon for Safari stability
+        const marker = new google.maps.Marker({
+            position: position,
+            map: map,
+            title: business.bname,
+            icon: customIcon,
+            animation: null, // Disable animation on Safari to prevent flickering
+            zIndex: isFromDatabase ? 1000 : 100,
+            optimized: false, // Critical for custom icons on Safari
+            clickable: true
+        });
+
+        // Store business data
+        marker.business = business;
+        marker.position = position;
+        marker.isFromDatabase = isFromDatabase;
+        marker.isSafariStableMarker = true;
+
+        // Add Safari-compatible click handler
+        marker.addListener('click', function(e) {
+            console.log(`📱 Safari stable marker clicked: ${business.bname}`);
+
+            // Prevent any default marker behavior
+            if (e) {
+                e.stop && e.stop();
+            }
+
+            // Small delay for Safari
+            setTimeout(() => {
+                showEnhancedInfoWindowWithCombinedIncentives(marker);
+            }, 50);
+        });
+
+        // Add to markers array
+        markers.push(marker);
+        console.log(`✅ Created STABLE Safari marker for ${business.bname}`);
+
+        return marker;
+
+    } catch (error) {
+        console.error("❌ Error creating Safari stable marker:", error);
+        return createBasicSafariMarker(business, position, isFromDatabase);
+    }
+}
+
+/**
+ * SAFARI FIX: Create Safari-compatible custom icon
+ */
+function createSafariCompatibleIcon(business, markerColor, isFromDatabase) {
+    try {
+        // Create SVG icon that Safari can render consistently
+        const size = isFromDatabase ? 40 : 36;
+        const businessIcon = getBusinessTypeEmojiForSafari(business.type);
+
+        const svgIcon = `
+            <svg width="${size}" height="${size + 8}" viewBox="0 0 ${size} ${size + 8}" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/>
+                    </filter>
+                </defs>
+                <circle cx="${size/2}" cy="${size/2}" r="${(size-8)/2}" 
+                        fill="${markerColor}" 
+                        stroke="white" 
+                        stroke-width="3" 
+                        filter="url(#shadow)"/>
+                <text x="${size/2}" y="${size/2 + 2}" 
+                      text-anchor="middle" 
+                      dominant-baseline="middle" 
+                      font-size="${size/3}" 
+                      fill="white">
+                    ${businessIcon}
+                </text>
+                ${business.chain_id ? `
+                    <circle cx="${size - 8}" cy="8" r="6" fill="#FFD700" stroke="white" stroke-width="2"/>
+                    <text x="${size - 8}" y="10" text-anchor="middle" dominant-baseline="middle" font-size="8" fill="#333">⛓</text>
+                ` : ''}
+            </svg>
+        `;
+
+        // Convert SVG to data URL for Safari compatibility
+        const dataUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgIcon);
+
+        return {
+            url: dataUrl,
+            size: new google.maps.Size(size, size + 8),
+            scaledSize: new google.maps.Size(size, size + 8),
+            anchor: new google.maps.Point(size/2, size + 8),
+            optimized: false // Critical for Safari
+        };
+
+    } catch (error) {
+        console.error("❌ Error creating Safari icon:", error);
+        return createFallbackSafariIcon(markerColor, isFromDatabase);
+    }
+}
+
+/**
+ * SAFARI FIX: Simple emoji-based business type icons for Safari
+ */
+function getBusinessTypeEmojiForSafari(businessType) {
+    const emojiMap = {
+        'AUTO': '🚗',
+        'BEAU': '💄',
+        'BOOK': '📚',
+        'CLTH': '👕',
+        'CONV': '🏪',
+        'DEPT': '🏬',
+        'ELEC': '⚡',
+        'ENTR': '🎬',
+        'FURN': '🪑',
+        'FUEL': '⛽',
+        'GIFT': '🎁',
+        'GROC': '🛒',
+        'HARDW': '🔨',
+        'HEAL': '🏥',
+        'HOTEL': '🏨',
+        'JEWL': '💎',
+        'OTHER': '📍',
+        'RX': '💊',
+        'REST': '🍽️',
+        'RETAIL': '🛍️',
+        'SERV': '🔧',
+        'SPEC': '⭐',
+        'SPRT': '⚽',
+        'TECH': '💻',
+        'TOYS': '🧸'
+    };
+
+    return emojiMap[businessType] || '📍';
+}
+
+/**
+ * SAFARI FIX: Ultra-simple fallback icon for Safari
+ */
+function createFallbackSafariIcon(markerColor, isFromDatabase) {
+    const size = isFromDatabase ? 20 : 16;
+
+    return {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: markerColor,
+        fillOpacity: 0.9,
+        strokeWeight: 3,
+        strokeColor: '#FFFFFF',
+        scale: size,
+        anchor: new google.maps.Point(0, 0)
+    };
+}
+
+/**
+ * SAFARI FIX: Basic marker as last resort
+ */
+function createBasicSafariMarker(business, position, isFromDatabase) {
+    try {
+        console.log(`📱 BASIC SAFARI: Creating basic marker for ${business.bname}`);
+
+        const markerColor = isFromDatabase ? CONFIG.markerColors.primary : CONFIG.markerColors.nearby;
+
+        const marker = new google.maps.Marker({
+            position: position,
+            map: map,
+            title: business.bname,
+            icon: createFallbackSafariIcon(markerColor, isFromDatabase),
+            animation: null,
+            zIndex: isFromDatabase ? 1000 : 100,
+            optimized: false
+        });
+
+        marker.business = business;
+        marker.position = position;
+        marker.isFromDatabase = isFromDatabase;
+        marker.isBasicSafariMarker = true;
+
+        marker.addListener('click', function() {
+            console.log(`📱 Basic Safari marker clicked: ${business.bname}`);
+            setTimeout(() => {
+                showEnhancedInfoWindowWithCombinedIncentives(marker);
+            }, 50);
+        });
+
+        markers.push(marker);
+        console.log(`✅ Created BASIC Safari marker for ${business.bname}`);
+
+        return marker;
+
+    } catch (error) {
+        console.error("❌ Error creating basic Safari marker:", error);
+        return null;
+    }
+}
+
+/**
+ * FIXED: Enhanced marker creation for non-Safari browsers
+ */
 async function createEnhancedBusinessMarkerFixed(business, location, forceDatabase = false) {
     try {
+        console.log(`🔧 ENHANCED MARKER: Creating for ${business.bname} (Non-Safari)`);
+
         // Import the marker library
         const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
 
@@ -5881,23 +6101,23 @@ async function createEnhancedBusinessMarkerFixed(business, location, forceDataba
         let position = createSafeLatLng(location);
         if (!position) {
             console.error("❌ Invalid position for enhanced marker:", location);
-            return createEnhancedFallbackMarker(business, location);
+            return createStableSafariMarker(business, location, forceDatabase);
         }
 
-        // CRITICAL FIX: Determine marker styling with explicit logic
+        // Determine marker styling
         const isFromDatabase = forceDatabase || (!business.isGooglePlace && !business._id?.startsWith('google_'));
         const isChainLocation = !!business.chain_id;
 
-        // Choose marker color with explicit logic
+        // Choose marker color
         let markerColor, markerClass;
         if (isFromDatabase) {
-            markerColor = CONFIG.markerColors.primary; // RED for database businesses
+            markerColor = CONFIG.markerColors.primary;
             markerClass = "primary database-business";
-            console.log(`🔴 RED MARKER: ${business.bname} (Database business)`);
+            console.log(`🔴 RED ADVANCED MARKER: ${business.bname} (Database business)`);
         } else {
-            markerColor = CONFIG.markerColors.nearby; // BLUE for Google Places
+            markerColor = CONFIG.markerColors.nearby;
             markerClass = "nearby google-places";
-            console.log(`🔵 BLUE MARKER: ${business.bname} (Google Places)`);
+            console.log(`🔵 BLUE ADVANCED MARKER: ${business.bname} (Google Places)`);
         }
 
         // Get business icon
@@ -5909,7 +6129,7 @@ async function createEnhancedBusinessMarkerFixed(business, location, forceDataba
         pinElement.setAttribute('title', business.bname);
         pinElement.style.cursor = 'pointer';
 
-        // Enhanced marker HTML with explicit styling
+        // Enhanced marker HTML
         pinElement.innerHTML = `
             <div class="enhanced-marker-container">
                 <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor} !important; border: 3px solid #ffffff;">
@@ -5936,33 +6156,42 @@ async function createEnhancedBusinessMarkerFixed(business, location, forceDataba
         marker.business = business;
         marker.position = position;
         marker.isFromDatabase = isFromDatabase;
+        marker.isAdvancedMarker = true;
 
         // Add click event listener
-        pinElement.addEventListener('click', function (e) {
-            console.log(`🖱️ Marker clicked: ${business.bname} (${isFromDatabase ? 'Database' : 'Google Places'})`);
-            e.stopPropagation();
-            showEnhancedInfoWindow(marker);
-        });
+        const clickHandler = function(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            console.log(`🖱️ Advanced marker clicked: ${business.bname}`);
+            showEnhancedInfoWindowWithCombinedIncentives(marker);
+        };
 
-        // Add hover effects
-        pinElement.addEventListener('mouseenter', function () {
-            pinElement.style.transform = 'scale(1.1)';
-            pinElement.style.zIndex = '1000';
-        });
+        pinElement.addEventListener('click', clickHandler, { passive: false });
 
-        pinElement.addEventListener('mouseleave', function () {
-            pinElement.style.transform = 'scale(1)';
-            pinElement.style.zIndex = 'auto';
-        });
+        // Add hover effects for desktop
+        if (!('ontouchstart' in window)) {
+            pinElement.addEventListener('mouseenter', function() {
+                pinElement.style.transform = 'scale(1.1)';
+                pinElement.style.zIndex = '1000';
+            });
+
+            pinElement.addEventListener('mouseleave', function() {
+                pinElement.style.transform = 'scale(1)';
+                pinElement.style.zIndex = 'auto';
+            });
+        }
 
         // Add the marker to our array
         markers.push(marker);
-        console.log(`✅ Added ${isFromDatabase ? 'DATABASE' : 'GOOGLE PLACES'} marker for ${business.bname}`);
+        console.log(`✅ Added ADVANCED marker for ${business.bname}`);
 
         return marker;
+
     } catch (error) {
-        console.error("❌ Error creating enhanced marker:", error);
-        return createEnhancedFallbackMarker(business, location);
+        console.error("❌ Error creating enhanced marker, falling back to Safari stable:", error);
+        return createStableSafariMarker(business, location, forceDatabase);
     }
 }
 
@@ -8236,107 +8465,36 @@ function createAddressKey(business) {
 // FIX 5: Enhanced marker creation with category support
 async function createEnhancedBusinessMarkerWithCategory(business, location) {
     try {
-        // Import the marker library
-        const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
+        console.log(`🎯 CATEGORY MARKER: Creating for ${business.bname} with category ${business.markerColor}`);
 
-        // Create a position object from the location
-        let position = createSafeLatLng(location);
-        if (!position) {
-            console.error("❌ Invalid position for enhanced marker:", location);
-            return createEnhancedFallbackMarker(business, location);
+        // SAFARI FIX: On Safari/iOS, always use stable markers to prevent flickering
+        if (isSafariOrIOS) {
+            console.log(`📱 Safari detected - using stable marker for ${business.bname}`);
+
+            // Determine if this should be a database marker based on category
+            const isFromDatabase = business.markerColor === 'primary' ||
+                business.markerColor === 'database' ||
+                business.isFromDatabase === true;
+
+            return createStableSafariMarker(business, location, isFromDatabase);
         }
 
-        // Determine marker styling based on category
-        const markerColor = business.markerColor || 'nearby';
-        const colorValue = ENHANCED_CONFIG.markerColors[markerColor];
+        // NON-SAFARI: Use the existing enhanced marker logic
+        // This calls your existing createEnhancedBusinessMarkerFixed function
+        // which has all the original advanced marker creation code
+        const isFromDatabase = business.isFromDatabase ||
+            business.markerColor === 'primary' ||
+            business.markerColor === 'database';
 
-        let markerClass = '';
-        let logMessage = '';
+        return createEnhancedBusinessMarkerFixed(business, location, isFromDatabase);
 
-        switch (markerColor) {
-            case 'primary':
-                markerClass = 'primary database-business';
-                logMessage = `🔴 RED MARKER: ${business.bname} (Primary search result)`;
-                break;
-            case 'database':
-                markerClass = 'database nearby-database';
-                logMessage = `🟢 GREEN MARKER: ${business.bname} (Nearby database business)`;
-                break;
-            case 'nearby':
-            default:
-                markerClass = 'nearby google-places';
-                logMessage = `🔵 BLUE MARKER: ${business.bname} (Google Places)`;
-                break;
-        }
-
-        console.log(logMessage);
-
-        // Get business icon
-        const businessIcon = getBusinessTypeTextIcon(business.type);
-
-        // Create enhanced pin element
-        const pinElement = document.createElement('div');
-        pinElement.className = 'enhanced-custom-marker';
-        pinElement.setAttribute('title', business.bname);
-        pinElement.style.cursor = 'pointer';
-
-        // Enhanced marker HTML with category-specific styling
-        pinElement.innerHTML = `
-            <div class="enhanced-marker-container">
-                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${colorValue} !important; border: 3px solid #ffffff;">
-                    <div class="enhanced-marker-icon">
-                        ${businessIcon}
-                    </div>
-                </div>
-                <div class="enhanced-marker-shadow"></div>
-                ${business.chain_id ? '<div class="chain-indicator">🔗</div>' : ''}
-                ${business.isFromDatabase ? '<div class="database-indicator">✓</div>' : ''}
-                ${business.isNearbyDatabase ? '<div class="nearby-database-indicator">🏢</div>' : ''}
-            </div>
-        `;
-
-        // Create the advanced marker
-        const marker = new AdvancedMarkerElement({
-            position: position,
-            map: map,
-            title: business.bname,
-            content: pinElement,
-            collisionBehavior: business.isPrimaryResult ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
-        });
-
-        // Store the business data and flags
-        marker.business = business;
-        marker.position = position;
-        marker.isFromDatabase = business.isFromDatabase;
-        marker.isPrimaryResult = business.isPrimaryResult;
-        marker.isNearbyDatabase = business.isNearbyDatabase;
-
-        // Add click event listener
-        pinElement.addEventListener('click', function (e) {
-            console.log(`🖱️ Marker clicked: ${business.bname} (${business.markerColor})`);
-            e.stopPropagation();
-            showEnhancedInfoWindowWithCategory(marker);
-        });
-
-        // Add hover effects
-        pinElement.addEventListener('mouseenter', function () {
-            pinElement.style.transform = 'scale(1.1)';
-            pinElement.style.zIndex = '1000';
-        });
-
-        pinElement.addEventListener('mouseleave', function () {
-            pinElement.style.transform = 'scale(1)';
-            pinElement.style.zIndex = 'auto';
-        });
-
-        // Add the marker to our array
-        markers.push(marker);
-        console.log(`✅ Added ${markerColor.toUpperCase()} marker for ${business.bname}`);
-
-        return marker;
     } catch (error) {
-        console.error("❌ Error creating enhanced marker with category:", error);
-        return createEnhancedFallbackMarker(business, location);
+        console.error("❌ Error creating category marker:", error);
+
+        // Fallback to stable Safari marker on any error
+        const isFromDatabase = business.markerColor === 'primary' ||
+            business.markerColor === 'database';
+        return createStableSafariMarker(business, location, isFromDatabase);
     }
 }
 
@@ -8694,7 +8852,9 @@ function displayBusinessesOnMapWithCategories(businesses) {
     }, 200);
 }
 
-// FIX 2: Categorized business marker creation
+/**
+ * SAFARI FIX: Override categorized marker creation
+ */
 function createCategorizedBusinessMarker(business) {
     try {
         // Validate coordinates
@@ -8710,12 +8870,102 @@ function createCategorizedBusinessMarker(business) {
             parseFloat(business.lng)
         );
 
-        // Use the enhanced marker creation with categories
-        return createEnhancedBusinessMarkerWithCategory(business, position);
+        // Use platform-appropriate marker creation
+        if (isSafariOrIOS) {
+            const isFromDatabase = business.markerColor === 'primary' || business.markerColor === 'database';
+            return createStableSafariMarker(business, position, isFromDatabase);
+        } else {
+            return createEnhancedBusinessMarkerWithCategory(business, position);
+        }
     } catch (error) {
-        console.error("❌ Error creating categorized business marker:", error);
+        console.error("❌ Error creating categorized marker:", error);
         return null;
     }
+}
+
+/**
+ * SAFARI FIX: Debug function to check marker stability
+ */
+function debugMarkerStability() {
+    console.log("🔍 MARKER STABILITY DEBUG:");
+    console.log(`   Platform: ${isSafariOrIOS ? 'Safari/iOS (using stable markers)' : 'Other (using advanced markers)'}`);
+
+    if (!markers || markers.length === 0) {
+        console.log("❌ No markers found");
+        return;
+    }
+
+    let stableMarkers = 0;
+    let advancedMarkers = 0;
+    let basicMarkers = 0;
+    let unknownMarkers = 0;
+
+    markers.forEach((marker, index) => {
+        if (!marker.business) {
+            unknownMarkers++;
+            return;
+        }
+
+        let markerType = 'Unknown';
+        if (marker.isSafariStableMarker) {
+            stableMarkers++;
+            markerType = 'Safari Stable';
+        } else if (marker.isBasicSafariMarker) {
+            basicMarkers++;
+            markerType = 'Basic Safari';
+        } else if (marker.isAdvancedMarker) {
+            advancedMarkers++;
+            markerType = 'Advanced';
+        } else {
+            unknownMarkers++;
+        }
+
+        console.log(`   ${index + 1}. ${marker.business.bname} - ${markerType}`);
+    });
+
+    console.log(`📊 STABILITY SUMMARY:`);
+    console.log(`   - Safari Stable: ${stableMarkers}`);
+    console.log(`   - Advanced: ${advancedMarkers}`);
+    console.log(`   - Basic Safari: ${basicMarkers}`);
+    console.log(`   - Unknown: ${unknownMarkers}`);
+
+    if (isSafariOrIOS && advancedMarkers > 0) {
+        console.warn(`⚠️ Advanced markers detected on Safari - these may flicker!`);
+    }
+}
+
+/**
+ * Initialize the stable marker system
+ */
+function initializeStableMarkerSystem() {
+    console.log(`🔧 Initializing stable marker system for ${isSafariOrIOS ? 'Safari/iOS' : 'other browsers'}`);
+
+    // Add debug function to window
+    window.debugMarkerStability = debugMarkerStability;
+
+    if (isSafariOrIOS) {
+        console.log("📱 Safari/iOS detected - using stable marker system to prevent flickering");
+
+        // Add CSS to improve Safari rendering
+        const style = document.createElement('style');
+        style.textContent = `
+            /* Safari marker stability improvements */
+            .gm-style img {
+                max-width: none !important;
+                image-rendering: -webkit-optimize-contrast !important;
+            }
+            
+            /* Prevent Safari from reprocessing marker images */
+            .gm-style div[style*="position: absolute"] img {
+                will-change: auto !important;
+                transform: translateZ(0) !important;
+                -webkit-transform: translateZ(0) !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    console.log("✅ Stable marker system initialized");
 }
 
 // FIX 3: Enhanced search results display with categories
@@ -13947,6 +14197,13 @@ function detectAndFixSafari() {
             document.addEventListener('touchstart', function() {}, { passive: true });
         }
     }
+}
+
+// Auto-initialize
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeStableMarkerSystem);
+} else {
+    initializeStableMarkerSystem();
 }
 
 // Initialize Safari fixes when DOM is ready
