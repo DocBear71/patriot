@@ -2021,19 +2021,66 @@ function fixInfoWindowPositioning() {
 /**
  * Load incentives for info window (works for both iOS and standard)
  */
-function loadIncentivesForInfoWindow(business) {
+function loadIncentivesForInfoWindowFixed(business) {
+    console.log("🎁 FIXED: Loading incentives for info window:", business.bname);
+
     const isGooglePlace = business.isGooglePlace === true;
     const isChainLocation = !!business.chain_id;
     const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
 
-    if (!isGooglePlace && isChainLocation) {
-        loadCombinedIncentivesForInfoWindow(containerId, business._id, business.chain_id);
-    } else if (!isGooglePlace) {
-        loadCombinedIncentivesForInfoWindow(containerId, business._id, null);
-    } else if (isGooglePlace && isChainLocation) {
-        loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
+    console.log("🔍 Container ID:", containerId);
+    console.log("🔍 Is Google Place:", isGooglePlace);
+    console.log("🔍 Is Chain Location:", isChainLocation);
+
+    // Check if container exists
+    const container = document.getElementById(`incentives-container-${containerId}`);
+    if (!container) {
+        console.error(`❌ Container not found: incentives-container-${containerId}`);
+        console.log("🔍 Available containers:", Array.from(document.querySelectorAll('[id*="incentives-container"]')).map(el => el.id));
+        return;
+    }
+
+    console.log("✅ Container found, loading incentives...");
+
+    try {
+        if (!isGooglePlace && isChainLocation) {
+            // Database business with chain - load combined incentives
+            console.log("🔗 Loading combined incentives for database chain business");
+            if (typeof loadCombinedIncentivesForInfoWindow === 'function') {
+                loadCombinedIncentivesForInfoWindow(containerId, business._id, business.chain_id);
+            } else if (typeof loadChainIncentivesForDatabaseBusinessFixed === 'function') {
+                loadChainIncentivesForDatabaseBusinessFixed(containerId, business.chain_id);
+            } else {
+                console.error("No chain incentives function available");
+            }
+        } else if (!isGooglePlace) {
+            // Database business without chain - load regular incentives
+            console.log("🏢 Loading regular incentives for database business");
+            if (typeof loadCombinedIncentivesForInfoWindow === 'function') {
+                loadCombinedIncentivesForInfoWindow(containerId, business._id, null);
+            } else if (typeof loadIncentivesForEnhancedWindowFixed === 'function') {
+                loadIncentivesForEnhancedWindowFixed(containerId);
+            } else {
+                console.error("No regular incentives function available");
+            }
+        } else if (isGooglePlace && isChainLocation) {
+            // Google Places with chain - load chain incentives
+            console.log("🌐 Loading chain incentives for Google Places");
+            if (typeof loadChainIncentivesForEnhancedWindowFixed === 'function') {
+                loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
+            } else {
+                console.error("No Google Places chain incentives function available");
+            }
+        } else {
+            console.log("ℹ️ No incentives to load for this business type");
+            container.innerHTML = '<em>No incentives available for this business type</em>';
+        }
+    } catch (error) {
+        console.error("❌ Error loading incentives:", error);
+        container.innerHTML = '<em>Error loading incentives</em>';
     }
 }
+
 
 /**
  * Load incentives for a database business
@@ -4102,8 +4149,8 @@ function createEnhancedFallbackMarker(business, location) {
  * Enhanced info window with better content organization
  * @param {Object} marker - The marker that was clicked
  */
-function showEnhancedInfoWindowWithIOSSupport(marker) {
-    console.log("🪟 iOS-COMPATIBLE INFO WINDOW: Showing for:", marker.business?.bname);
+function showEnhancedInfoWindowWithIOSSupportFixed(marker) {
+    console.log("🪟 FIXED iOS-COMPATIBLE INFO WINDOW: Showing for:", marker.business?.bname);
 
     if (!marker || !marker.business) {
         console.error("❌ Invalid marker for info window");
@@ -4138,10 +4185,12 @@ function showEnhancedInfoWindowWithIOSSupport(marker) {
         });
     }
 
-    // Build content using your existing function but with iOS optimizations
+    // Build content
     const content = isIOSSafari ?
         buildInfoWindowContentForIOS(business) :
-        buildInfoWindowContentWithCombinedIncentives(business);
+        (typeof buildInfoWindowContentWithCombinedIncentives === 'function' ?
+            buildInfoWindowContentWithCombinedIncentives(business) :
+            buildInfoWindowContentForIOS(business));
 
     infoWindow.setContent(content);
 
@@ -4181,11 +4230,11 @@ function showEnhancedInfoWindowWithIOSSupport(marker) {
 
                 console.log("🍎 iOS info window opened");
 
-                // iOS-specific DOM ready handling
+                // iOS-specific DOM ready handling with FIXED incentives loader
                 google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
                     setTimeout(() => {
                         applyIOSInfoWindowFixes();
-                        loadIncentivesForInfoWindow(business);
+                        loadIncentivesForInfoWindowFixed(business); // FIXED FUNCTION CALL
                     }, 200);
                 });
 
@@ -4211,8 +4260,10 @@ function showEnhancedInfoWindowWithIOSSupport(marker) {
 
                 google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
                     setTimeout(() => {
-                        applyEnhancedInfoWindowFixes();
-                        loadIncentivesForInfoWindow(business);
+                        if (typeof applyEnhancedInfoWindowFixes === 'function') {
+                            applyEnhancedInfoWindowFixes();
+                        }
+                        loadIncentivesForInfoWindowFixed(business); // FIXED FUNCTION CALL
                     }, 300);
                 });
             }, 200);
@@ -4222,6 +4273,7 @@ function showEnhancedInfoWindowWithIOSSupport(marker) {
         }
     }
 }
+
 
 /**
  * Build enhanced info window content with better organization
@@ -13873,17 +13925,41 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+if (typeof window !== 'undefined') {
+    // Fix for: addCategorizedBusinessRow is not defined
+    window.addCategorizedBusinessRow = window.addBusinessRowWithCombinedIncentives || window.addBusinessRow || function(business, tableBody, category) {
+        console.log("Fallback: addCategorizedBusinessRow called for", business.bname);
+
+        // Use your existing addBusinessRow function as fallback
+        if (typeof addBusinessRowWithCombinedIncentives === 'function') {
+            return addBusinessRowWithCombinedIncentives(business, tableBody, category);
+        } else if (typeof addBusinessRow === 'function') {
+            return addBusinessRow(business, tableBody, false); // false for isFromPlaces
+        } else {
+            console.error("No business row function available");
+        }
+    };
+}
+
 // Export functions for global access
 if (typeof window !== 'undefined') {
+    // Fix the missing function mappings
+    window.addCategorizedBusinessRow = window.addBusinessRowWithCombinedIncentives || window.addBusinessRow || window.addCategorizedBusinessRow;
+
+    // Add the fixed incentives loader
+    window.loadIncentivesForInfoWindow = loadIncentivesForInfoWindowFixed;
+    window.loadIncentivesForInfoWindowFixed = loadIncentivesForInfoWindowFixed;
+
+    // Replace the info window function with the fixed version
+    window.showEnhancedInfoWindow = showEnhancedInfoWindowWithIOSSupportFixed;
+    window.showEnhancedInfoWindowWithIOSSupport = showEnhancedInfoWindowWithIOSSupportFixed;
+    window.showEnhancedInfoWindowWithCombinedIncentives = showEnhancedInfoWindowWithIOSSupportFixed;
+
+    console.log("✅ Function name fixes applied");
+
     window.createEnhancedBusinessMarker = createEnhancedBusinessMarkerWithIOSSupport;
     window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerWithIOSSupport;
     window.createEnhancedBusinessMarkerFixed = createEnhancedBusinessMarkerWithIOSSupport;
-
-    // Replace existing info window functions
-    window.showEnhancedInfoWindow = showEnhancedInfoWindowWithIOSSupport;
-    window.showEnhancedInfoWindowWithCategory = showEnhancedInfoWindowWithIOSSupport;
-    window.showEnhancedInfoWindowWithCombinedIncentives = showEnhancedInfoWindowWithIOSSupport;
-    window.showEnhancedInfoWindowIOSFixed = showEnhancedInfoWindowWithIOSSupport;
 
     // Add new functions
     window.buildInfoWindowContentForIOS = buildInfoWindowContentForIOS;
