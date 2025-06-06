@@ -52,13 +52,6 @@ let googleMapsInitializing = false;
 // Global flag to track if Google Maps is already initialized
 let googleMapsInitialized = false;
 
-const isIOSSafari = (() => {
-    const ua = navigator.userAgent;
-    return /iPad|iPhone|iPod/.test(ua) && /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua);
-})();
-
-console.log("🍎 iOS Safari detected:", isIOSSafari);
-
 
 /**
  * Clear markers from the map
@@ -2019,106 +2012,48 @@ function fixInfoWindowPositioning() {
 }
 
 /**
- * Load incentives for info window (works for both iOS and standard)
+ * Load incentives for a database business
+ * @param {string} businessId - Business ID
  */
-function loadIncentivesForInfoWindowUpdated(business) {
-    console.log("🎁 FIXED INFO INCENTIVES: Loading for", business.bname);
-
-    const isGooglePlace = business.isGooglePlace === true;
-    const isChainLocation = !!business.chain_id;
-
-    // INFO WINDOWS use "incentives-container-{containerId}" format
-    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
-
-    // Check if container exists
-    const container = document.getElementById(`incentives-container-${containerId}`);
+function loadIncentivesForInfoWindow(businessId) {
+    const container = document.getElementById(`incentives-container-${businessId}`);
     if (!container) {
-        console.error(`❌ Info window container not found: incentives-container-${containerId}`);
-
-        // Debug: show available containers
-        const allContainers = document.querySelectorAll('[id*="incentives-container"]');
-        console.log("🔍 Available info containers:", Array.from(allContainers).map(el => el.id));
+        console.error("Incentives container not found for business:", businessId);
         return;
     }
 
-    console.log("✅ Info window container found, loading incentives...");
+    const baseURL = getBaseURL();
+    const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
 
-    try {
-        if (!isGooglePlace && isChainLocation) {
-            // Database business with chain - use the info window version
-            if (typeof loadCombinedIncentivesForInfoWindow === 'function') {
-                loadCombinedIncentivesForInfoWindow(containerId, business._id, business.chain_id);
-            } else {
-                console.error("loadCombinedIncentivesForInfoWindow function not available");
+    fetch(apiURL)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.results || data.results.length === 0) {
+                container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">No incentives available</p>';
+                return;
             }
-        } else if (!isGooglePlace) {
-            // Database business without chain
-            if (typeof loadCombinedIncentivesForInfoWindow === 'function') {
-                loadCombinedIncentivesForInfoWindow(containerId, business._id, null);
-            } else {
-                console.error("loadCombinedIncentivesForInfoWindow function not available");
-            }
-        } else if (isGooglePlace && isChainLocation) {
-            // Google Places with chain
-            if (typeof loadChainIncentivesForEnhancedWindowFixed === 'function') {
-                loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
-            } else {
-                console.error("loadChainIncentivesForEnhancedWindowFixed function not available");
-            }
-        } else {
-            console.log("ℹ️ No incentives to load for this business type");
-        }
-    } catch (error) {
-        console.error("❌ Error loading info window incentives:", error);
-        container.innerHTML = '<em>Error loading incentives</em>';
-    }
+
+            let incentivesHTML = '<p style="margin:4px 0;"><strong>Incentives:</strong></p><ul style="margin:4px 0; padding-left:16px; font-size:13px;">';
+
+            data.results.forEach(incentive => {
+                if (incentive.is_available) {
+                    const typeLabel = getIncentiveTypeLabel(incentive.type);
+                    const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
+                    const chainBadge = incentive.is_chain_wide ?
+                        '<span style="background-color:#4285F4; color:white; padding:1px 4px; border-radius:3px; font-size:11px; margin-left:4px;">Chain-wide</span>' : '';
+
+                    incentivesHTML += `<li style="margin-bottom:4px;"><strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}</li>`;
+                }
+            });
+
+            incentivesHTML += '</ul>';
+            container.innerHTML = incentivesHTML;
+        })
+        .catch(error => {
+            console.error("Error loading incentives:", error);
+            container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">Error loading incentives</p>';
+        });
 }
-
-
-
-// /**
-//  * Load incentives for a database business
-//  * @param {string} businessId - Business ID
-//  */
-// function loadIncentivesForInfoWindow(businessId) {
-//     const container = document.getElementById(`incentives-container-${businessId}`);
-//     if (!container) {
-//         console.error("Incentives container not found for business:", businessId);
-//         return;
-//     }
-//
-//     const baseURL = getBaseURL();
-//     const apiURL = `${baseURL}/api/combined-api.js?operation=incentives&business_id=${businessId}`;
-//
-//     fetch(apiURL)
-//         .then(response => response.json())
-//         .then(data => {
-//             if (!data.results || data.results.length === 0) {
-//                 container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">No incentives available</p>';
-//                 return;
-//             }
-//
-//             let incentivesHTML = '<p style="margin:4px 0;"><strong>Incentives:</strong></p><ul style="margin:4px 0; padding-left:16px; font-size:13px;">';
-//
-//             data.results.forEach(incentive => {
-//                 if (incentive.is_available) {
-//                     const typeLabel = getIncentiveTypeLabel(incentive.type);
-//                     const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
-//                     const chainBadge = incentive.is_chain_wide ?
-//                         '<span style="background-color:#4285F4; color:white; padding:1px 4px; border-radius:3px; font-size:11px; margin-left:4px;">Chain-wide</span>' : '';
-//
-//                     incentivesHTML += `<li style="margin-bottom:4px;"><strong>${typeLabel}${otherDescription}:</strong> ${incentive.amount}% ${chainBadge}</li>`;
-//                 }
-//             });
-//
-//             incentivesHTML += '</ul>';
-//             container.innerHTML = incentivesHTML;
-//         })
-//         .catch(error => {
-//             console.error("Error loading incentives:", error);
-//             container.innerHTML = '<p style="margin:4px 0; font-style:italic; color:#666;">Error loading incentives</p>';
-//         });
-// }
 
 /**
  * Load chain incentives for a Google Places result
@@ -2821,314 +2756,95 @@ function mapGooglePlaceTypeToBusinessType(types) {
  * @param {Object} business - Business object
  * @returns {string} HTML content
  */
-function buildInfoWindowContentForIOS(business) {
+function buildInfoWindowContent(business) {
     const isGooglePlace = business.isGooglePlace === true;
     const isChainLocation = !!business.chain_id;
 
-    // Simplified address
-    let addressHTML = '';
+    // Format address
+    let addressText = '';
     if (business.address1) {
-        addressHTML = `<div class="ios-address">📍 ${business.address1}`;
-        if (business.city && business.state) {
-            addressHTML += `<br>${business.city}, ${business.state}`;
-        }
-        addressHTML += '</div>';
+        addressText = `<p><strong>Address:</strong><br>${business.address1}`;
+        if (business.city) addressText += `, ${business.city}`;
+        if (business.state) addressText += `, ${business.state}`;
+        if (business.zip) addressText += ` ${business.zip}`;
+        addressText += '</p>';
+    } else if (business.formattedAddress) {
+        addressText = `<p><strong>Address:</strong><br>${business.formattedAddress}</p>`;
     }
 
-    // Phone
-    const phoneHTML = business.phone ?
-        `<div class="ios-phone">📞 <a href="tel:${business.phone.replace(/\D/g, '')}">${business.phone}</a></div>` : '';
-
-    // Distance
-    const distanceHTML = business.distance ?
-        `<div class="ios-distance">📏 ${(business.distance / 1609).toFixed(1)} miles</div>` : '';
-
-    // Chain badge
+    // Create chain badge if applicable
     const chainBadge = isChainLocation ?
-        `<span class="ios-chain-badge">🔗 ${business.chain_name || 'Chain'}</span>` : '';
+        `<span style="display:inline-block; background-color:#4285F4; color:white; padding:2px 6px; border-radius:4px; font-size:0.8em; margin-left:5px;">${business.chain_name || 'Chain Location'}</span>` :
+        '';
 
-    // Action button
-    let actionButton = '';
+    // Business type (for Google Places, try to determine from types)
+    let businessType = '';
+    if (business.type) {
+        businessType = `<p><strong>Type:</strong> ${getBusinessTypeLabel(business.type)}</p>`;
+    } else if (isGooglePlace && business.types && business.types.length > 0) {
+        const placeType = getPlaceTypeLabel(business.types);
+        businessType = `<p><strong>Type:</strong> ${placeType}</p>`;
+    }
+
+    // Distance if available
+    const distanceText = business.distance ?
+        `<p><strong>Distance:</strong> ${(business.distance / 1609).toFixed(1)} miles</p>` : '';
+
+    // Status for Google Places
+    const statusText = isGooglePlace ?
+        '<p style="color:#666; font-style:italic;">This business is not yet in the Patriot Thanks database.</p>' : '';
+
+    // Chain explanation if applicable
+    const chainExplanation = isChainLocation ?
+        `<p style="color:#4285F4; font-size:12px; margin-top:8px;">This location appears to match ${business.chain_name} in our database. Chain-wide incentives may apply.</p>` : '';
+
+    // Determine action button
+    let actionButton;
     if (isGooglePlace) {
         if (isChainLocation) {
-            actionButton = `<button class="ios-action-btn" onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">Add Location</button>`;
+            actionButton = `
+                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
+                        onclick="window.addBusinessToDatabase('${business.placeId}', '${business.chain_id}')">
+                    Add ${business.chain_name} Location
+                </button>
+            `;
         } else {
-            actionButton = `<button class="ios-action-btn" onclick="window.addBusinessToDatabase('${business.placeId}')">Add Business</button>`;
+            actionButton = `
+                <button style="background-color:#EA4335; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
+                        onclick="window.addBusinessToDatabase('${business.placeId}')">
+                    Add to Patriot Thanks
+                </button>
+            `;
         }
     } else {
-        actionButton = `<button class="ios-action-btn" onclick="window.viewBusinessDetails('${business._id}')">View Details</button>`;
+        actionButton = `
+            <button style="background-color:#4285F4; color:white; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; width:100%;" 
+                    onclick="window.viewBusinessDetails('${business._id}')">
+                View Details
+            </button>
+        `;
     }
 
-    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
-
+    // Build complete content
     return `
-        <div class="ios-info-window">
-            <h3>${business.bname} ${chainBadge}</h3>
-            ${addressHTML}
-            ${phoneHTML}
-            ${distanceHTML}
-            <div id="incentives-container-${containerId}">
-                <em>Loading...</em>
+        <div style="max-width:280px; font-family:Arial,sans-serif; padding:8px;">
+            <h3 style="margin:0 0 8px 0; font-size:16px; line-height:1.2;">${business.bname} ${chainBadge}</h3>
+            ${addressText}
+            ${businessType}
+            ${distanceText}
+            ${statusText}
+            ${chainExplanation}
+            <div id="incentives-container-${business._id || business.placeId}" style="margin:8px 0;">
+                ${isGooglePlace && !isChainLocation ?
+        '<p style="margin:4px 0; font-style:italic; color:#666;">Add this business to see available incentives.</p>' :
+        '<p style="margin:4px 0;"><em>Loading incentives...</em></p>'}
             </div>
-            <div class="ios-actions">${actionButton}</div>
+            <div style="margin-top:12px; text-align:center;">
+                ${actionButton}
+            </div>
         </div>
     `;
 }
-
-
-/**
- * iOS-specific info window positioning fixes
- */
-function applyIOSInfoWindowFixes() {
-    if (!isIOSSafari) return;
-
-    console.log("🍎 Applying iOS info window fixes");
-
-    const iwContainer = document.querySelector('.gm-style-iw-c');
-    const iwContent = document.querySelector('.gm-style-iw-d');
-
-    if (iwContainer) {
-        iwContainer.style.maxWidth = '280px';
-        iwContainer.style.overflow = 'visible';
-        iwContainer.style.transform = 'none';
-        iwContainer.style.position = 'relative';
-    }
-
-    if (iwContent) {
-        iwContent.style.overflow = 'auto';
-        iwContent.style.maxHeight = '300px';
-    }
-}
-
-/**
- * Load incentives for iOS info window
- */
-function loadIncentivesForIOSInfoWindow(business) {
-    const isGooglePlace = business.isGooglePlace === true;
-    const isChainLocation = !!business.chain_id;
-    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
-
-    if (!isGooglePlace && isChainLocation) {
-        loadCombinedIncentivesForInfoWindow(containerId, business._id, business.chain_id);
-    } else if (!isGooglePlace) {
-        loadCombinedIncentivesForInfoWindow(containerId, business._id, null);
-    } else if (isGooglePlace && isChainLocation) {
-        loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
-    }
-}
-
-function addIOSCompatibilityStyles() {
-    if (document.getElementById('ios-compatibility-styles')) {
-        return;
-    }
-
-    const style = document.createElement('style');
-    style.id = 'ios-compatibility-styles';
-    style.textContent = `
-        /* iOS Safari compatibility styles */
-        .enhanced-custom-marker.ios-compatible {
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-
-        .ios-info-window {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            max-width: 260px;
-            padding: 12px;
-            line-height: 1.4;
-        }
-
-        .ios-info-window h3 {
-            margin: 0 0 8px 0;
-            font-size: 16px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .ios-chain-badge {
-            background: #4285F4;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 8px;
-            font-size: 11px;
-            margin-left: 4px;
-        }
-
-        .ios-address, .ios-phone, .ios-distance {
-            margin: 6px 0;
-            font-size: 14px;
-            color: #555;
-        }
-
-        .ios-phone a {
-            color: #007AFF;
-            text-decoration: none;
-        }
-
-        .ios-actions {
-            margin-top: 12px;
-            text-align: center;
-        }
-
-        .ios-action-btn {
-            background: #007AFF;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            width: 100%;
-            -webkit-appearance: none;
-            cursor: pointer;
-        }
-
-        .ios-action-btn:active {
-            opacity: 0.7;
-        }
-
-        /* iOS Safari specific info window fixes */
-        @supports (-webkit-touch-callout: none) {
-            .gm-style .gm-style-iw-c {
-                max-width: 280px !important;
-                transform: none !important;
-                position: relative !important;
-            }
-        }
-    `;
-
-    document.head.appendChild(style);
-}
-
-/**
- * CSS fixes for iOS Safari info windows
- */
-function addIOSInfoWindowStyles() {
-    if (document.getElementById('ios-info-window-styles')) {
-        return;
-    }
-
-    const style = document.createElement('style');
-    style.id = 'ios-info-window-styles';
-    style.textContent = `
-        /* iOS Safari specific info window styles */
-        .ios-info-window {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            max-width: 260px;
-            line-height: 1.4;
-            padding: 12px;
-            box-sizing: border-box;
-        }
-
-        .ios-info-header h3 {
-            margin: 0 0 8px 0;
-            font-size: 16px;
-            color: #333;
-            font-weight: 600;
-            word-wrap: break-word;
-        }
-
-        .ios-chain-badge {
-            display: inline-block;
-            background: #4285F4;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 8px;
-            font-size: 11px;
-            margin-left: 4px;
-            font-weight: 500;
-        }
-
-        .ios-info-body > div {
-            margin: 6px 0;
-            font-size: 14px;
-            color: #555;
-            word-wrap: break-word;
-        }
-
-        .ios-info-address strong,
-        .ios-info-phone strong,
-        .ios-info-distance strong {
-            color: #333;
-        }
-
-        .ios-info-phone a {
-            color: #007AFF;
-            text-decoration: none;
-        }
-
-        .ios-info-incentives {
-            margin: 10px 0;
-            min-height: 20px;
-        }
-
-        .ios-info-actions {
-            margin-top: 12px;
-            text-align: center;
-        }
-
-        .ios-action-btn {
-            background: #007AFF;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            -webkit-appearance: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .ios-action-btn.view-details {
-            background: #34C759;
-        }
-
-        .ios-action-btn:active {
-            opacity: 0.7;
-            transform: scale(0.98);
-        }
-
-        /* iOS-specific marker styles */
-        .enhanced-custom-marker.ios-compatible {
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-
-        .enhanced-custom-marker.ios-compatible:active {
-            opacity: 0.8;
-        }
-
-        /* iOS Safari info window container fixes */
-        @supports (-webkit-touch-callout: none) {
-            .gm-style .gm-style-iw-c {
-                max-width: 280px !important;
-                overflow: visible !important;
-                transform: none !important;
-                position: relative !important;
-            }
-            
-            .gm-style .gm-style-iw-d {
-                overflow: auto !important;
-                max-height: 300px !important;
-                padding: 0 !important;
-            }
-            
-            .gm-style .gm-style-iw {
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-            }
-        }
-    `;
-
-    document.head.appendChild(style);
-}
-
 
 /**
  * Enhanced getPlaceTypeLabel function for Google Places types
@@ -4143,52 +3859,36 @@ function createEnhancedFallbackMarker(business, location) {
  * Enhanced info window with better content organization
  * @param {Object} marker - The marker that was clicked
  */
-function showEnhancedInfoWindowWithIOSSupportFixed(marker) {
-    console.log("🪟 FIXED iOS-COMPATIBLE INFO WINDOW: Showing for:", marker.business?.bname);
+function showEnhancedInfoWindow(marker) {
+    console.log("showEnhancedInfoWindow called with marker:", marker);
 
     if (!marker || !marker.business) {
-        console.error("❌ Invalid marker for info window");
+        console.error("Invalid marker for enhanced info window", marker);
         return;
     }
 
     const business = marker.business;
     const isGooglePlace = business.isGooglePlace === true;
     const isChainLocation = !!business.chain_id;
-    const isFromDatabase = business.isFromDatabase === true;
 
-    // Close existing info window
+    // Close any existing info window
     if (infoWindow) {
         infoWindow.close();
     }
 
-    // Create info window with iOS-specific settings
-    if (isIOSSafari) {
-        console.log("🍎 Creating iOS-optimized info window");
+    // Create new info window
+    infoWindow = new google.maps.InfoWindow({
+        maxWidth: 320,
+        disableAutoPan: false
+    });
 
-        infoWindow = new google.maps.InfoWindow({
-            maxWidth: 280,
-            disableAutoPan: false,
-            pixelOffset: new google.maps.Size(0, -10),
-            enableEventPropagation: true
-        });
-    } else {
-        // Standard info window for other browsers
-        infoWindow = new google.maps.InfoWindow({
-            maxWidth: 320,
-            disableAutoPan: false
-        });
-    }
+    // Build enhanced content
+    const content = buildEnhancedInfoWindowContent(business);
 
-    // Build content
-    const content = isIOSSafari ?
-        buildInfoWindowContentForIOS(business) :
-        (typeof buildInfoWindowContentWithCombinedIncentives === 'function' ?
-            buildInfoWindowContentWithCombinedIncentives(business) :
-            buildInfoWindowContentForIOS(business));
-
+    // Set content
     infoWindow.setContent(content);
 
-    // Get position safely
+    // Get safe position
     let position = marker.position;
     if (!position && marker.getPosition) {
         position = marker.getPosition();
@@ -4198,76 +3898,94 @@ function showEnhancedInfoWindowWithIOSSupportFixed(marker) {
     }
 
     if (!position) {
-        console.error("❌ Could not determine position for info window");
+        console.error("Could not determine position for enhanced info window");
         return;
     }
 
-    // iOS-specific opening sequence
-    if (isIOSSafari) {
-        console.log("🍎 Opening info window with iOS sequence");
-
-        // Pan first, then open with delay
+    // Pan to position
+    try {
         map.panTo(position);
+    } catch (panError) {
+        console.warn("Error panning to position:", panError);
+    }
 
-        setTimeout(() => {
-            try {
-                if (marker.getPosition) {
-                    infoWindow.open({
-                        anchor: marker,
-                        map: map,
-                        shouldFocus: false
-                    });
-                } else {
-                    infoWindow.setPosition(position);
-                    infoWindow.open(map);
-                }
-
-                console.log("🍎 iOS info window opened");
-
-                // iOS-specific DOM ready handling with FIXED incentives loader
-                google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
-                    setTimeout(() => {
-                        applyIOSInfoWindowFixes();
-                        loadIncentivesForInfoWindowFixed(business); // FIXED FUNCTION CALL
-                    }, 200);
-                });
-
-            } catch (error) {
-                console.error("🍎 iOS info window error:", error);
-            }
-        }, 300);
-
-    } else {
-        // Standard opening for other browsers
+    // Open info window
+    setTimeout(() => {
         try {
-            map.panTo(position);
+            // Check if this is an AdvancedMarkerElement or regular Marker
+            if (marker instanceof google.maps.marker.AdvancedMarkerElement ||
+                marker instanceof google.maps.Marker) {
 
-            setTimeout(() => {
-                if (marker.getPosition) {
-                    infoWindow.open(map, marker);
-                } else {
-                    infoWindow.setPosition(position);
-                    infoWindow.open(map);
-                }
+                // Real Google Maps marker - use marker-based opening
+                infoWindow.open(map, marker);
+                console.log("Info window opened with Google Maps marker - will move with map");
 
-                console.log("✅ Standard info window opened");
+            } else {
+                // Custom marker object - use position-based opening with enhanced tracking
+                console.log("Info window opened at position - adding comprehensive map tracking");
 
-                google.maps.event.addListenerOnce(infoWindow, 'domready', function() {
-                    setTimeout(() => {
-                        if (typeof applyEnhancedInfoWindowFixes === 'function') {
-                            applyEnhancedInfoWindowFixes();
-                        }
-                        loadIncentivesForInfoWindowFixed(business); // FIXED FUNCTION CALL
-                    }, 300);
-                });
-            }, 200);
+                infoWindow.setPosition(position);
+                infoWindow.open(map);
+
+                // Enhanced tracking for multiple map events
+                const listeners = [];
+
+                // Store the original position
+                const originalPosition = position;
+
+                // Function to update info window position
+                const updatePosition = () => {
+                    if (infoWindow.getMap()) {
+                        infoWindow.setPosition(originalPosition);
+                    }
+                };
+
+                // Track all types of map movement
+                listeners.push(google.maps.event.addListener(map, 'center_changed', updatePosition));
+                listeners.push(google.maps.event.addListener(map, 'zoom_changed', updatePosition));
+                listeners.push(google.maps.event.addListener(map, 'drag', updatePosition));
+                listeners.push(google.maps.event.addListener(map, 'dragstart', updatePosition));
+                listeners.push(google.maps.event.addListener(map, 'dragend', updatePosition));
+                listeners.push(google.maps.event.addListener(map, 'bounds_changed', updatePosition));
+
+                // Clean up all listeners when info window closes
+                const cleanupListeners = () => {
+                    listeners.forEach(listener => google.maps.event.removeListener(listener));
+                    console.log("Cleaned up info window movement listeners");
+                };
+
+                google.maps.event.addListenerOnce(infoWindow, 'closeclick', cleanupListeners);
+
+                // Also clean up when a new info window is opened
+                google.maps.event.addListenerOnce(infoWindow, 'position_changed', cleanupListeners);
+            }
+
+            console.log("Enhanced info window opened successfully");
+
+            // Apply fixes after DOM is ready
+            google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
+                setTimeout(() => {
+                    applyEnhancedInfoWindowFixes();
+
+                    // Load incentives with correct container ID logic
+                    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
+                    console.log(`🎁 INCENTIVES: Loading for container ID: ${containerId}`);
+
+                    if (isFromDatabase && isChainLocation) {
+                        loadChainIncentivesForDatabaseBusinessFixed(containerId, business.chain_id);
+                    } else if (isFromDatabase) {
+                        loadIncentivesForEnhancedWindowFixed(containerId);
+                    } else if (isGooglePlace && isChainLocation) {
+                        loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
+                    }
+                }, 300);
+            });
 
         } catch (error) {
-            console.error("❌ Standard info window error:", error);
+            console.error("Error opening enhanced info window:", error);
         }
-    }
+    }, 200);
 }
-
 
 /**
  * Build enhanced info window content with better organization
@@ -5185,7 +4903,7 @@ function createSimilarBusinessMarker(business, position) {
  * @param {Object} location - Google Maps location object
  * @param {boolean} forceNearby - Force blue/nearby styling
  */
-async function createEnhancedBusinessMarkerWithIOSSupport(business, location, forceNearby = false) {
+async function createEnhancedBusinessMarker(business, location, forceNearby = false) {
     try {
         // Import the marker library
         const {AdvancedMarkerElement} = await google.maps.importLibrary("marker");
@@ -5193,54 +4911,47 @@ async function createEnhancedBusinessMarkerWithIOSSupport(business, location, fo
         // Create a position object from the location
         let position = createSafeLatLng(location);
         if (!position) {
-            console.error("❌ Invalid position for enhanced marker:", location);
+            console.error("Invalid position for enhanced marker:", location);
             return createEnhancedFallbackMarker(business, location);
         }
 
-        // Determine marker styling (keep your existing logic)
+        // Determine marker styling
         const isFromDatabase = !business.isGooglePlace;
         const isNearby = forceNearby || business.isNearby === true || business.isSimilarBusiness === true;
 
+        // Choose marker color and style
         let markerColor, markerClass;
         if (isNearby || business.isSimilarBusiness) {
-            markerColor = CONFIG.markerColors.nearby;
+            markerColor = CONFIG.markerColors.nearby; // Blue for nearby/similar businesses
             markerClass = "nearby";
         } else if (isFromDatabase) {
-            markerColor = CONFIG.markerColors.primary;
+            markerColor = CONFIG.markerColors.primary; // Red for primary search results
             markerClass = "primary";
         } else {
-            markerColor = CONFIG.markerColors.nearby;
+            markerColor = CONFIG.markerColors.nearby; // Blue for Google Places
             markerClass = "nearby";
         }
 
-        // Get business icon (keep your existing function)
+        // Get business icon
         const businessIcon = getBusinessTypeTextIcon(business.type);
 
-        // Create enhanced pin element with iOS optimizations
+        // Create enhanced pin element
         const pinElement = document.createElement('div');
-        pinElement.className = 'enhanced-custom-marker ios-compatible';
+        pinElement.className = 'enhanced-custom-marker';
         pinElement.setAttribute('title', business.bname);
         pinElement.style.cursor = 'pointer';
 
-        // iOS-specific optimizations
-        if (isIOSSafari) {
-            pinElement.style.touchAction = 'manipulation';
-            pinElement.style.userSelect = 'none';
-            pinElement.style.webkitUserSelect = 'none';
-            pinElement.style.webkitTapHighlightColor = 'transparent';
-        }
-
-        // Enhanced marker HTML (keep your existing structure)
+        // Enhanced marker HTML with better styling
         pinElement.innerHTML = `
             <div class="enhanced-marker-container">
-                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor} !important; border: 3px solid #ffffff;">
+                <div class="enhanced-marker-pin ${markerClass}" style="background-color: ${markerColor};">
                     <div class="enhanced-marker-icon">
                         ${businessIcon}
                     </div>
                 </div>
                 <div class="enhanced-marker-shadow"></div>
-                ${business.chain_id ? '<div class="chain-indicator">🔗</div>' : ''}
-                ${isFromDatabase ? '<div class="database-indicator">✓</div>' : ''}
+                ${business.chain_id ? '<div class="chain-indicator">⭐</div>' : ''}
+                ${business.isSimilarBusiness ? '<div class="similar-indicator">≈</div>' : ''}
             </div>
         `;
 
@@ -5253,69 +4964,37 @@ async function createEnhancedBusinessMarkerWithIOSSupport(business, location, fo
             collisionBehavior: isFromDatabase ? 'REQUIRED_AND_HIDES_OPTIONAL' : 'OPTIONAL_AND_HIDES_LOWER_PRIORITY'
         });
 
-        // Store the business data and flags
+        // Store the business data and position
         marker.business = business;
         marker.position = position;
         marker.isFromDatabase = isFromDatabase;
+        marker.isSimilarBusiness = business.isSimilarBusiness || forceNearby;
 
-        // ENHANCED EVENT HANDLING: iOS Safari + Standard browsers
-        if (isIOSSafari) {
-            console.log("🍎 Adding iOS-specific event handlers for:", business.bname);
+        // Add click event listener
+        pinElement.addEventListener('click', function (e) {
+            console.log("Enhanced similar business marker clicked:", business.bname);
+            e.stopPropagation();
+            showEnhancedInfoWindow(marker);
+        });
 
-            // iOS-specific touch events
-            pinElement.addEventListener('touchstart', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log("🍎 iOS touchstart on marker:", business.bname);
+        // Add hover effects
+        pinElement.addEventListener('mouseenter', function () {
+            pinElement.style.transform = 'scale(1.1)';
+            pinElement.style.zIndex = '1000';
+        });
 
-                // Visual feedback
-                pinElement.style.transform = 'scale(0.95)';
+        pinElement.addEventListener('mouseleave', function () {
+            pinElement.style.transform = 'scale(1)';
+            pinElement.style.zIndex = 'auto';
+        });
 
-                // Open info window with delay
-                setTimeout(() => {
-                    pinElement.style.transform = 'scale(1)';
-                    showEnhancedInfoWindowWithIOSSupport(marker);
-                }, 100);
-            }, { passive: false });
-
-            // Backup touch event
-            pinElement.addEventListener('touchend', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log("🍎 iOS touchend backup for marker:", business.bname);
-
-                setTimeout(() => {
-                    showEnhancedInfoWindowWithIOSSupport(marker);
-                }, 50);
-            }, { passive: false });
-
-        } else {
-            // Standard click event for non-iOS browsers
-            pinElement.addEventListener('click', function(e) {
-                console.log("🖱️ Standard click on marker:", business.bname);
-                e.stopPropagation();
-                showEnhancedInfoWindowWithIOSSupport(marker);
-            });
-
-            // Hover effects for non-touch devices
-            pinElement.addEventListener('mouseenter', function() {
-                pinElement.style.transform = 'scale(1.1)';
-                pinElement.style.zIndex = '1000';
-            });
-
-            pinElement.addEventListener('mouseleave', function() {
-                pinElement.style.transform = 'scale(1)';
-                pinElement.style.zIndex = 'auto';
-            });
-        }
-
-        // Add the marker to your array
+        // Add the marker to our array
         markers.push(marker);
-        console.log(`✅ Added iOS-compatible marker for ${business.bname}`);
+        console.log(`Added enhanced ${business.isSimilarBusiness ? 'similar business' : ''} marker for ${business.bname}`);
 
         return marker;
     } catch (error) {
-        console.error("❌ Error creating iOS-compatible marker:", error);
+        console.error("Error creating enhanced marker:", error);
         return createEnhancedFallbackMarker(business, location);
     }
 }
@@ -5684,7 +5363,7 @@ async function tryServerSideChainMatching(placeName) {
                 }
             }
         } catch (error) {
-             // Try next variation
+            // Try next variation
         }
     }
 
@@ -12911,10 +12590,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
-* FIXED: Enhanced incentive loading that uses correct container ID format
-* @param {string} businessId - Business ID (also used as container ID for table cells)
-* @param {string} chainId - Chain ID (optional)
-*/
+ * FIXED: Enhanced incentive loading that uses correct container ID format
+ * @param {string} businessId - Business ID (also used as container ID for table cells)
+ * @param {string} chainId - Chain ID (optional)
+ */
 async function loadCombinedIncentivesForTableCell(businessId, chainId = null) {
     console.log(`🎁 FIXED TABLE INCENTIVES: Loading for business ${businessId}, chain ${chainId}`);
 
@@ -13044,6 +12723,34 @@ async function loadCombinedIncentivesForTableCell(businessId, chainId = null) {
 }
 
 /**
+ * FIXED: Updated fetchCombinedBusinessIncentives to use the correct table loading function
+ */
+function fetchCombinedBusinessIncentivesFixed(businessId, chainId = null) {
+    if (!businessId || businessId.startsWith('google_')) {
+        console.log(`⏭️ Skipping incentives for Google Places business: ${businessId}`);
+        return;
+    }
+
+    console.log(`🎁 FIXED TABLE INCENTIVES: Fetching for business ID: ${businessId}`);
+    console.log(`   - Chain ID: ${chainId || 'None'}`);
+
+    // Wait for DOM to be ready
+    setTimeout(() => {
+        const incentivesCell = document.getElementById(`incentives-for-${businessId}`);
+
+        if (!incentivesCell) {
+            console.error(`❌ Could not find incentives cell for business ${businessId}`);
+            return;
+        }
+
+        console.log(`✅ Found incentives cell for ${businessId}, loading combined incentives`);
+
+        // FIXED: Use the table-specific loading function
+        loadCombinedIncentivesForTableCell(businessId, chainId);
+    }, 200);
+}
+
+/**
  * FIXED: Add enhanced styles for table incentive display
  */
 function addTableCombinedIncentivesStyles() {
@@ -13147,21 +12854,14 @@ function addTableCombinedIncentivesStyles() {
  * @param {string} businessId - Business ID
  * @param {string} chainId - Chain ID (optional)
  */
-async function loadCombinedIncentivesForTableCellFixed(businessId, chainId = null) {
-    console.log(`🎁 FIXED TABLE INCENTIVES: Loading for business ${businessId}, chain ${chainId}`);
+async function loadCombinedIncentivesForDatabaseBusiness(containerId, businessId, chainId = null) {
+    console.log(`🎁 COMBINED INCENTIVES: Loading for business ${businessId}, chain ${chainId}`);
 
-    // CRITICAL FIX: Use the correct container ID format that matches your table
-    const container = document.getElementById(`incentives-for-${businessId}`);
+    const container = document.getElementById(`incentives-container-${containerId}`);
     if (!container) {
-        console.error(`❌ Table container not found: incentives-for-${businessId}`);
-
-        // Debug: show what containers actually exist
-        const allIncentiveContainers = document.querySelectorAll('[id*="incentives"]');
-        console.log("🔍 Available incentive containers:", Array.from(allIncentiveContainers).map(el => el.id));
+        console.error(`❌ Container not found: incentives-container-${containerId}`);
         return;
     }
-
-    console.log(`✅ Found table container: incentives-for-${businessId}`);
 
     // Show loading state
     container.innerHTML = '<em style="color: #666;">⏳ Loading all incentives...</em>';
@@ -13233,7 +12933,7 @@ async function loadCombinedIncentivesForTableCellFixed(businessId, chainId = nul
             }
         }
 
-        // STEP 3: Display combined incentives in table format
+        // STEP 3: Display combined incentives
         console.log(`📊 Total incentives found: ${allIncentives.length}`);
 
         if (allIncentives.length === 0) {
@@ -13248,35 +12948,53 @@ async function loadCombinedIncentivesForTableCellFixed(businessId, chainId = nul
             return 0;
         });
 
-        // Build combined HTML for TABLE display (more compact)
-        let incentivesHTML = '';
+        // Build combined HTML
+        let incentivesHTML = '<div class="incentives-header"><strong>🎁 Available Incentives:</strong></div>';
+        incentivesHTML += '<div class="combined-incentives-list">';
 
         allIncentives.forEach(incentive => {
             const typeLabel = getIncentiveTypeLabel(incentive.type);
             const otherDescription = incentive.other_description ? ` (${incentive.other_description})` : '';
 
-            // Create scope badge for table
+            // Create scope badge
             const scopeBadge = incentive.source === 'chain' ?
-                '<span class="scope-badge-table chain-scope">⛓️ Chain-wide</span>' :
-                '<span class="scope-badge-table location-scope">📍 Location only</span>';
+                '<span class="scope-badge chain-scope">🔗 Chain-wide</span>' :
+                '<span class="scope-badge location-scope">📍 Location only</span>';
 
             incentivesHTML += `
-                <div class="table-incentive-item ${incentive.source}-incentive">
-                    <div class="table-incentive-header">
-                        <strong>${typeLabel}${otherDescription}:</strong> 
-                        <span class="incentive-amount">${incentive.amount}%</span>
+                <div class="combined-incentive-item ${incentive.source}-incentive">
+                    <div class="incentive-header">
+                        <div class="incentive-type-amount">
+                            <strong>${typeLabel}${otherDescription}:</strong> 
+                            <span class="incentive-amount">${incentive.amount}%</span>
+                        </div>
                         ${scopeBadge}
                     </div>
-                    ${incentive.information ? `<div class="table-incentive-info">${incentive.information}</div>` : ''}
+                    ${incentive.information ? `<div class="incentive-info">${incentive.information}</div>` : ''}
                 </div>
             `;
         });
 
+        incentivesHTML += '</div>';
+
+        // Add summary if both types exist
+        const chainCount = allIncentives.filter(i => i.source === 'chain').length;
+        const locationCount = allIncentives.filter(i => i.source === 'location').length;
+
+        if (chainCount > 0 && locationCount > 0) {
+            incentivesHTML += `
+                <div class="incentives-summary">
+                    ✨ This location offers ${chainCount} chain-wide incentive${chainCount !== 1 ? 's' : ''} 
+                    plus ${locationCount} location-specific incentive${locationCount !== 1 ? 's' : ''}!
+                </div>
+            `;
+        }
+
         container.innerHTML = incentivesHTML;
-        console.log(`✅ Successfully displayed ${allIncentives.length} combined incentives in table`);
+        console.log(`✅ Successfully displayed ${allIncentives.length} combined incentives`);
 
     } catch (error) {
-        console.error("❌ Error loading combined incentives for table:", error);
+        console.error("❌ Error loading combined incentives:", error);
         container.innerHTML = '<em style="color: #dc3545;">❌ Error loading incentives</em>';
     }
 }
@@ -13305,13 +13023,13 @@ async function loadCombinedIncentivesForInfoWindow(containerId, businessId, chai
  * @param {string} businessId - Business ID
  * @param {string} chainId - Chain ID (optional)
  */
-function fetchCombinedBusinessIncentivesFixed(businessId, chainId = null) {
+function fetchCombinedBusinessIncentives(businessId, chainId = null) {
     if (!businessId || businessId.startsWith('google_')) {
         console.log(`⏭️ Skipping incentives for Google Places business: ${businessId}`);
         return;
     }
 
-    console.log(`🎁 FIXED TABLE INCENTIVES: Fetching for business ID: ${businessId}`);
+    console.log(`🎁 TABLE COMBINED INCENTIVES: Fetching for business ID: ${businessId}`);
     console.log(`   - Chain ID: ${chainId || 'None'}`);
 
     // Wait for DOM to be ready
@@ -13320,20 +13038,15 @@ function fetchCombinedBusinessIncentivesFixed(businessId, chainId = null) {
 
         if (!incentivesCell) {
             console.error(`❌ Could not find incentives cell for business ${businessId}`);
-
-            // Debug: show available containers
-            const allCells = document.querySelectorAll('[id*="incentives-for"]');
-            console.log("🔍 Available incentive cells:", Array.from(allCells).map(el => el.id));
             return;
         }
 
         console.log(`✅ Found incentives cell for ${businessId}, loading combined incentives`);
 
-        // FIXED: Use the table-specific loading function with correct container ID
-        loadCombinedIncentivesForTableCellFixed(businessId, chainId);
+        // Use the combined loading function
+        loadCombinedIncentivesForDatabaseBusiness(businessId, businessId, chainId);
     }, 200);
 }
-
 
 /**
  * Add enhanced styles for combined incentives display
@@ -13759,10 +13472,10 @@ function buildInfoWindowContentWithCombinedIncentives(business) {
  * @param {Object} marker - The marker that was clicked
  */
 function showEnhancedInfoWindowWithCombinedIncentives(marker) {
-    console.log("🪟 COMBINED INFO WINDOW: Showing enhanced info window with combined incentives for:", marker.business?.bname);
+    console.log("🪟 SAFARI FIX: Showing enhanced info window for:", marker.business?.bname);
 
     if (!marker || !marker.business) {
-        console.error("❌ Invalid marker for combined info window");
+        console.error("❌ Invalid marker for info window");
         return;
     }
 
@@ -13771,87 +13484,476 @@ function showEnhancedInfoWindowWithCombinedIncentives(marker) {
     const isChainLocation = !!business.chain_id;
     const isFromDatabase = business.isFromDatabase === true;
 
-    // Close existing info window
+    // Close existing info window first
     if (infoWindow) {
         infoWindow.close();
+        // Small delay to ensure closure on Safari
+        setTimeout(() => {
+            createAndShowInfoWindow();
+        }, 100);
+    } else {
+        createAndShowInfoWindow();
     }
 
-    // Create new info window
-    infoWindow = new google.maps.InfoWindow({
-        maxWidth: 320,
-        disableAutoPan: false
-    });
+    function createAndShowInfoWindow() {
+        // SAFARI FIX: Create info window with minimal configuration
+        infoWindow = new google.maps.InfoWindow({
+            maxWidth: 300, // Smaller for mobile
+            disableAutoPan: false,
+            // Remove pixelOffset for Safari compatibility
+            zIndex: 1000
+        });
 
-    // Build enhanced content with combined incentives support
-    const content = buildInfoWindowContentWithCombinedIncentives(business);
+        // Build enhanced content
+        const content = buildInfoWindowContentWithCombinedIncentives(business);
 
-    // Set content
-    infoWindow.setContent(content);
+        // Set content
+        infoWindow.setContent(content);
 
-    // Get position (same as before)
-    let position = marker.position;
-    if (!position && marker.getPosition) {
-        position = marker.getPosition();
+        // SAFARI FIX: Get position with better error handling
+        let position = null;
+
+        try {
+            if (marker.getPosition && typeof marker.getPosition === 'function') {
+                position = marker.getPosition();
+            } else if (marker.position) {
+                position = marker.position;
+            }
+
+            // Fallback to business coordinates
+            if (!position && business.lat && business.lng) {
+                position = new google.maps.LatLng(
+                    parseFloat(business.lat),
+                    parseFloat(business.lng)
+                );
+            }
+        } catch (error) {
+            console.warn("⚠️ Error getting marker position:", error);
+            // Create fallback position
+            if (business.lat && business.lng) {
+                position = new google.maps.LatLng(
+                    parseFloat(business.lat),
+                    parseFloat(business.lng)
+                );
+            }
+        }
+
+        if (!position) {
+            console.error("❌ Could not determine position for info window");
+            return;
+        }
+
+        // SAFARI FIX: Pan to position first, then open info window
+        try {
+            map.panTo(position);
+        } catch (panError) {
+            console.warn("⚠️ Error panning to position:", panError);
+        }
+
+        // SAFARI FIX: Open info window with delay and better error handling
+        setTimeout(() => {
+            try {
+                // SAFARI FIX: Always use marker-based opening when possible
+                if (marker instanceof google.maps.Marker ||
+                    marker instanceof google.maps.marker.AdvancedMarkerElement) {
+                    infoWindow.open(map, marker);
+                } else {
+                    // Fallback for custom markers
+                    infoWindow.setPosition(position);
+                    infoWindow.open(map);
+                }
+
+                console.log("✅ Safari-compatible info window opened");
+
+                // SAFARI FIX: Enhanced DOM ready handling
+                const domReadyHandler = function() {
+                    console.log("🔄 Info window DOM ready on Safari");
+
+                    // Multiple timeouts to ensure Safari processes everything
+                    setTimeout(() => {
+                        applySafariInfoWindowFixes();
+                    }, 100);
+
+                    setTimeout(() => {
+                        // Load incentives
+                        const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
+                        loadIncentivesForSafari(containerId, business, isFromDatabase, isChainLocation);
+                    }, 300);
+                };
+
+                // SAFARI FIX: Use both domready and timeout for reliability
+                google.maps.event.addListenerOnce(infoWindow, 'domready', domReadyHandler);
+
+                // Fallback timeout in case domready doesn't fire on Safari
+                setTimeout(domReadyHandler, 500);
+
+            } catch (error) {
+                console.error("❌ Error opening info window on Safari:", error);
+
+                // SAFARI FIX: Fallback to basic info window
+                try {
+                    const basicInfoWindow = new google.maps.InfoWindow({
+                        content: `<div style="padding: 10px;"><h4>${business.bname}</h4><p>Click for more details</p></div>`,
+                        maxWidth: 250
+                    });
+                    basicInfoWindow.open(map, marker);
+                    console.log("📱 Opened fallback info window for Safari");
+                } catch (fallbackError) {
+                    console.error("❌ Even fallback info window failed:", fallbackError);
+                }
+            }
+        }, 150); // Longer delay for Safari
     }
-    if (!position) {
-        position = createSafeLatLng(business);
-    }
+}
 
-    if (!position) {
-        console.error("❌ Could not determine position for combined info window");
+/**
+ * SAFARI FIX: Apply Safari-specific info window fixes
+ */
+function applySafariInfoWindowFixes() {
+    console.log("🔧 Applying Safari-specific info window fixes");
+
+    try {
+        const iwContainer = document.querySelector('.gm-style-iw-c');
+        const iwContent = document.querySelector('.gm-style-iw-d');
+
+        if (!iwContainer) {
+            console.log("ℹ️ Info window container not found - may not be rendered yet");
+            return;
+        }
+
+        // SAFARI FIX: Force proper dimensions
+        iwContainer.style.width = 'auto';
+        iwContainer.style.minWidth = '280px';
+        iwContainer.style.maxWidth = '300px';
+        iwContainer.style.height = 'auto';
+        iwContainer.style.maxHeight = '350px';
+
+        // SAFARI FIX: Ensure visibility
+        iwContainer.style.display = 'block';
+        iwContainer.style.visibility = 'visible';
+        iwContainer.style.opacity = '1';
+        iwContainer.style.position = 'relative';
+
+        // SAFARI FIX: Remove problematic transforms that Safari handles poorly
+        const currentTransform = iwContainer.style.transform;
+        if (currentTransform && currentTransform.includes('translate')) {
+            console.log("🔄 Resetting problematic transform for Safari");
+            // Only reset if it seems problematic
+            const rect = iwContainer.getBoundingClientRect();
+            if (rect.width < 50 || rect.top < 0) {
+                iwContainer.style.transform = 'none';
+                iwContainer.style.left = 'auto';
+                iwContainer.style.top = 'auto';
+            }
+        }
+
+        if (iwContent) {
+            iwContent.style.overflow = 'auto';
+            iwContent.style.maxHeight = '300px';
+            iwContent.style.padding = '0';
+            iwContent.style.width = 'auto';
+        }
+
+        // SAFARI FIX: Handle tail positioning
+        const iwTail = document.querySelector('.gm-style-iw-t');
+        if (iwTail) {
+            iwTail.style.position = 'absolute';
+            iwTail.style.bottom = '0px';
+            iwTail.style.left = '50%';
+            iwTail.style.transform = 'translateX(-50%)';
+            iwTail.style.width = '20px';
+            iwTail.style.height = '15px';
+        }
+
+        // SAFARI FIX: Ensure close button is accessible
+        const closeButton = document.querySelector('.gm-ui-hover-effect');
+        if (closeButton) {
+            closeButton.style.position = 'absolute';
+            closeButton.style.top = '8px';
+            closeButton.style.right = '8px';
+            closeButton.style.width = '24px';
+            closeButton.style.height = '24px';
+            closeButton.style.opacity = '0.8';
+            closeButton.style.zIndex = '1002';
+            closeButton.style.cursor = 'pointer';
+
+            // SAFARI FIX: Add touch events for iOS
+            closeButton.style.webkitTouchCallout = 'none';
+            closeButton.style.webkitUserSelect = 'none';
+        }
+
+        console.log("✅ Safari info window fixes applied");
+
+    } catch (error) {
+        console.error("❌ Error applying Safari fixes:", error);
+    }
+}
+
+/**
+ * SAFARI FIX: Load incentives with Safari-specific handling
+ */
+function loadIncentivesForSafari(containerId, business, isFromDatabase, isChainLocation) {
+    console.log(`🎁 SAFARI: Loading incentives for ${containerId}`);
+
+    try {
+        if (isFromDatabase && isChainLocation) {
+            loadCombinedIncentivesForInfoWindow(containerId, business._id, business.chain_id);
+        } else if (isFromDatabase) {
+            loadCombinedIncentivesForInfoWindow(containerId, business._id, null);
+        } else if (business.isGooglePlace && isChainLocation) {
+            loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
+        }
+    } catch (error) {
+        console.error("❌ Error loading incentives on Safari:", error);
+    }
+}
+
+/**
+ * SAFARI FIX: Enhanced marker click handling for iOS
+ */
+function addSafariMarkerClickFix() {
+    // Override the marker creation to add better iOS touch handling
+    const originalCreateBusinessMarker = window.createBusinessMarker;
+
+    window.createBusinessMarker = function(business) {
+        const marker = originalCreateBusinessMarker(business);
+
+        if (marker && marker.content) {
+            // SAFARI FIX: Add touch-friendly click handling
+            const pinElement = marker.content;
+
+            // Remove existing click listeners
+            const newPinElement = pinElement.cloneNode(true);
+            pinElement.parentNode.replaceChild(newPinElement, pinElement);
+            marker.content = newPinElement;
+
+            // SAFARI FIX: Add both click and touchstart events
+            const clickHandler = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log(`📱 Safari marker clicked: ${business.bname}`);
+
+                // Small delay to ensure Safari processes the touch
+                setTimeout(() => {
+                    showEnhancedInfoWindowWithCombinedIncentives(marker);
+                }, 50);
+            };
+
+            newPinElement.addEventListener('click', clickHandler, { passive: false });
+            newPinElement.addEventListener('touchstart', clickHandler, { passive: false });
+
+            // SAFARI FIX: Improve touch responsiveness
+            newPinElement.style.webkitTouchCallout = 'none';
+            newPinElement.style.webkitUserSelect = 'none';
+            newPinElement.style.touchAction = 'manipulation';
+            newPinElement.style.cursor = 'pointer';
+        }
+
+        return marker;
+    };
+}
+
+/**
+ * SAFARI FIX: Enhanced CSS for Safari compatibility
+ */
+function addSafariCompatibleCSS() {
+    if (document.getElementById('safari-info-window-fix')) {
         return;
     }
 
-    // Pan to position
-    try {
-        map.panTo(position);
-    } catch (panError) {
-        console.warn("⚠️ Error panning to position:", panError);
-    }
+    const style = document.createElement('style');
+    style.id = 'safari-info-window-fix';
+    style.textContent = `
+        /* SAFARI iOS SPECIFIC FIXES */
+        
+        /* Force info window visibility on Safari */
+        .gm-style .gm-style-iw-c {
+            padding: 0 !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 7px 1px rgba(0,0,0,0.3) !important;
+            width: auto !important;
+            min-width: 280px !important;
+            max-width: 300px !important;
+            max-height: 350px !important;
+            overflow: hidden !important;
+            position: relative !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            /* Safari-specific fixes */
+            -webkit-transform: none !important;
+            transform: none !important;
+            will-change: auto !important;
+        }
 
-    // Open info window
-    setTimeout(() => {
-        try {
-            if (marker.getPosition) {
-                infoWindow.open(map, marker);
-            } else {
-                infoWindow.setPosition(position);
-                infoWindow.open(map);
+        .gm-style .gm-style-iw-d {
+            overflow: auto !important;
+            max-height: 300px !important;
+            padding: 0 !important;
+            width: auto !important;
+            min-width: 280px !important;
+            /* Safari scroll fix */
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .gm-style .gm-style-iw {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: relative !important;
+        }
+
+        /* Safari-specific tail fixes */
+        .gm-style .gm-style-iw-t {
+            position: absolute !important;
+            bottom: 0px !important;
+            left: 50% !important;
+            right: auto !important;
+            top: auto !important;
+            transform: translateX(-50%) !important;
+            -webkit-transform: translateX(-50%) !important;
+            width: 20px !important;
+            height: 15px !important;
+            margin: 0 !important;
+        }
+
+        /* Safari close button fix */
+        .gm-ui-hover-effect {
+            opacity: 0.8 !important;
+            width: 24px !important;
+            height: 24px !important;
+            right: 8px !important;
+            top: 8px !important;
+            z-index: 1002 !important;
+            position: absolute !important;
+            cursor: pointer !important;
+            /* Safari touch improvements */
+            -webkit-touch-callout: none !important;
+            -webkit-user-select: none !important;
+            touch-action: manipulation !important;
+        }
+
+        /* Safari marker improvements */
+        .enhanced-custom-marker,
+        .custom-marker {
+            cursor: pointer !important;
+            /* Safari touch improvements */
+            -webkit-touch-callout: none !important;
+            -webkit-user-select: none !important;
+            touch-action: manipulation !important;
+        }
+
+        /* Enhanced info window content for Safari */
+        .enhanced-info-window {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 280px;
+            line-height: 1.4;
+            padding: 12px !important;
+            margin: 0;
+            box-sizing: border-box;
+            /* Safari-specific improvements */
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
+        /* Safari button improvements */
+        .enhanced-add-btn, 
+        .enhanced-view-btn,
+        .add-business-btn,
+        .view-details-btn {
+            /* Safari touch improvements */
+            -webkit-touch-callout: none !important;
+            -webkit-user-select: none !important;
+            touch-action: manipulation !important;
+            cursor: pointer !important;
+            /* Prevent zoom on double-tap */
+            touch-action: manipulation !important;
+        }
+
+        /* Safari-specific responsive fixes */
+        @media screen and (max-width: 480px) {
+            .gm-style .gm-style-iw-c {
+                max-width: 250px !important;
+                min-width: 250px !important;
+            }
+            
+            .enhanced-info-window {
+                max-width: 230px;
+                padding: 10px !important;
+            }
+        }
+
+        /* Fix for Safari viewport issues */
+        @supports (-webkit-touch-callout: none) {
+            .gm-style .gm-style-iw-c {
+                /* Additional Safari-only fixes */
+                backface-visibility: hidden;
+                -webkit-backface-visibility: hidden;
+                perspective: 1000px;
+                -webkit-perspective: 1000px;
+            }
+        }
+    `;
+
+    document.head.appendChild(style);
+    console.log("📱 Added Safari-compatible CSS");
+}
+
+/**
+ * SAFARI FIX: Initialize Safari-specific fixes
+ */
+function initSafariInfoWindowFixes() {
+    console.log("📱 Initializing Safari info window fixes");
+
+    // Add Safari-compatible CSS
+    addSafariCompatibleCSS();
+
+    // Apply marker click fixes
+    addSafariMarkerClickFix();
+
+    // SAFARI FIX: Override the showInfoWindow function too
+    const originalShowInfoWindow = window.showInfoWindow;
+    window.showInfoWindow = function(marker) {
+        console.log("📱 Safari showInfoWindow called");
+        showEnhancedInfoWindowWithCombinedIncentives(marker);
+    };
+
+    console.log("✅ Safari fixes initialized");
+}
+
+/**
+ * SAFARI FIX: Detect Safari and apply fixes
+ */
+function detectAndFixSafari() {
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+    if (isSafari || isIOS) {
+        console.log("📱 Safari or iOS detected, applying fixes");
+        initSafariInfoWindowFixes();
+
+        // Additional iOS-specific fixes
+        if (isIOS) {
+            console.log("📱 iOS detected, applying additional mobile fixes");
+
+            // Fix viewport zoom issues
+            const viewport = document.querySelector('meta[name="viewport"]');
+            if (viewport) {
+                viewport.setAttribute('content',
+                    'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
             }
 
-            console.log("✅ Combined info window opened successfully");
-
-            // ENHANCED: Load combined incentives after DOM is ready
-            google.maps.event.addListenerOnce(infoWindow, 'domready', function () {
-                setTimeout(() => {
-                    applyEnhancedInfoWindowFixes();
-
-                    // ENHANCED: Use combined incentives loading
-                    const containerId = isGooglePlace ? `google_${business.placeId}` : business._id;
-
-                    console.log(`🎁 COMBINED INFO INCENTIVES: Loading for container ID: ${containerId}`);
-
-                    if (isFromDatabase && isChainLocation) {
-                        // Database business with chain - load BOTH chain and location incentives
-                        console.log(`🔗 Loading combined chain + location incentives for database business: ${business.bname}`);
-                        loadCombinedIncentivesForInfoWindow(containerId, business._id, business.chain_id);
-                    } else if (isFromDatabase) {
-                        // Database business without chain - load location incentives only
-                        console.log(`🏢 Loading location incentives for database business: ${business.bname}`);
-                        loadCombinedIncentivesForInfoWindow(containerId, business._id, null);
-                    } else if (isGooglePlace && isChainLocation) {
-                        // Google Places with chain - load chain incentives only
-                        console.log(`🌐 Loading chain incentives for Google Places: ${business.bname}`);
-                        loadChainIncentivesForEnhancedWindowFixed(containerId, business.chain_id);
-                    }
-                    // Non-chain Google Places don't need incentives loaded
-                }, 300);
-            });
-
-        } catch (error) {
-            console.error("❌ Error opening combined info window:", error);
+            // Prevent iOS zoom on form elements
+            document.addEventListener('touchstart', function() {}, { passive: true });
         }
-    }, 200);
+    }
+}
+
+// Initialize Safari fixes when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', detectAndFixSafari);
+} else {
+    detectAndFixSafari();
 }
 
 /**
@@ -13875,92 +13977,41 @@ async function testCombinedIncentives() {
     }
 }
 
-// Initialize table styles and Initialize iOS fixes when DOM is ready
+// Initialize table styles
 document.addEventListener('DOMContentLoaded', function() {
     addTableCombinedIncentivesStyles();
-    if (isIOSSafari) {
-        console.log("🍎 iOS Safari detected - applying compatibility fixes");
-        addIOSInfoWindowStyles();
-        addIOSCompatibilityStyles();
-    }
 });
 
-if (typeof window !== 'undefined') {
-    // Fix for: addCategorizedBusinessRow is not defined
-    window.addCategorizedBusinessRow = window.addBusinessRowWithCombinedIncentives || window.addBusinessRow || function(business, tableBody, category) {
-        console.log("Fallback: addCategorizedBusinessRow called for", business.bname);
 
-        // Use your existing addBusinessRow function as fallback
-        if (typeof addBusinessRowWithCombinedIncentives === 'function') {
-            return addBusinessRowWithCombinedIncentives(business, tableBody, category);
-        } else if (typeof addBusinessRow === 'function') {
-            return addBusinessRow(business, tableBody, false); // false for isFromPlaces
-        } else {
-            console.error("No business row function available");
-        }
-    };
+// Initialize the dual action button styles
+if (typeof document !== 'undefined') {
+    addDualActionButtonStyles();
 }
 
 // Export functions for global access
 if (typeof window !== 'undefined') {
-    // Replace the table incentives loading functions
-    window.loadCombinedIncentivesForTableCell = loadCombinedIncentivesForTableCellFixed;
-    window.loadCombinedIncentivesForDatabaseBusiness = loadCombinedIncentivesForTableCellFixed;
-    window.fetchCombinedBusinessIncentives = fetchCombinedBusinessIncentivesFixed;
-    window.fetchBusinessIncentives = fetchCombinedBusinessIncentivesFixed;
-
-    // Update the info window incentives loader
-    window.loadIncentivesForInfoWindow = loadIncentivesForInfoWindowUpdated;
-
-    console.log("✅ Container ID fixes applied - table and info window incentives should now work correctly");
-
-    // Fix the missing function mappings
-    window.addCategorizedBusinessRow = window.addBusinessRowWithCombinedIncentives || window.addBusinessRow || window.addCategorizedBusinessRow;
-
-    // Replace the info window function with the fixed version
-    window.showEnhancedInfoWindow = showEnhancedInfoWindowWithIOSSupportFixed;
-    window.showEnhancedInfoWindowWithIOSSupport = showEnhancedInfoWindowWithIOSSupportFixed;
-    window.showEnhancedInfoWindowWithCombinedIncentives = showEnhancedInfoWindowWithIOSSupportFixed;
-
-    console.log("✅ Function name fixes applied");
-
-    window.createEnhancedBusinessMarker = createEnhancedBusinessMarkerWithIOSSupport;
-    window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerWithIOSSupport;
-    window.createEnhancedBusinessMarkerFixed = createEnhancedBusinessMarkerWithIOSSupport;
-
-    // Add new functions
-    window.buildInfoWindowContentForIOS = buildInfoWindowContentForIOS;
-    window.applyIOSInfoWindowFixes = applyIOSInfoWindowFixes;
-    window.addIOSCompatibilityStyles = addIOSCompatibilityStyles;
-
-    // Export the iOS detection for other functions to use
-    window.isIOSSafari = isIOSSafari;
-
-
-    window.createEnhancedBusinessMarkerIOSFixed = createEnhancedBusinessMarkerIOSFixed;
-    window.buildInfoWindowContentIOSOptimized = buildInfoWindowContentIOSOptimized;
-    window.applyIOSInfoWindowFixes = applyIOSInfoWindowFixes;
-    window.addIOSInfoWindowStyles = addIOSInfoWindowStyles;
-
-    // Replace existing functions with iOS-compatible versions
-    window.createEnhancedBusinessMarker = createEnhancedBusinessMarkerIOSFixed;
-    window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerIOSFixed;
-
+    window.loadCombinedIncentivesForTableCell = loadCombinedIncentivesForTableCell;
     window.fetchCombinedBusinessIncentivesFixed = fetchCombinedBusinessIncentivesFixed;
     window.addTableCombinedIncentivesStyles = addTableCombinedIncentivesStyles;
 
     // Replace the existing functions
+    window.fetchCombinedBusinessIncentives = fetchCombinedBusinessIncentivesFixed;
     window.fetchBusinessIncentives = fetchCombinedBusinessIncentivesFixed;
     window.fetchBusinessIncentivesFixed = fetchCombinedBusinessIncentivesFixed;
 
     window.buildInfoWindowContentWithCombinedIncentives = buildInfoWindowContentWithCombinedIncentives;
+    window.showEnhancedInfoWindowWithCombinedIncentives = showEnhancedInfoWindowWithCombinedIncentives;
     window.testCombinedIncentives = testCombinedIncentives;
 
     // Replace existing info window functions
     window.buildCategoryAwareInfoWindowContent = buildInfoWindowContentWithCombinedIncentives;
     window.buildCategoryAwareInfoWindowContentEnhanced = buildInfoWindowContentWithCombinedIncentives;
     window.buildEnhancedInfoWindowContent = buildInfoWindowContentWithCombinedIncentives;
+    window.showEnhancedInfoWindow = showEnhancedInfoWindowWithCombinedIncentives;
+    window.showEnhancedInfoWindowWithCategory = showEnhancedInfoWindowWithCombinedIncentives;
+    window.showEnhancedInfoWindowFixed2 = showEnhancedInfoWindowWithCombinedIncentives;
 
+    window.loadCombinedIncentivesForDatabaseBusiness = loadCombinedIncentivesForDatabaseBusiness;
     window.loadCombinedIncentivesForInfoWindow = loadCombinedIncentivesForInfoWindow;
     window.addCombinedIncentivesStyles = addCombinedIncentivesStyles;
     window.addBusinessRowWithCombinedIncentives = addBusinessRowWithCombinedIncentives;
@@ -14016,6 +14067,7 @@ if (typeof window !== 'undefined') {
     window.displaySearchResultsFixed = displaySearchResultsWithCategories;
     window.categorizeFinalResults = categorizeFinalResults;
     window.createAddressKey = createAddressKey;
+    window.createEnhancedBusinessMarkerWithCategory = createEnhancedBusinessMarkerWithCategory;
     window.createCategorizedBusinessMarker = createCategorizedBusinessMarker;
     window.addTableSectionHeader = addTableSectionHeader;
     window.showEnhancedSearchSuccessMessage = showEnhancedSearchSuccessMessage;
@@ -14070,6 +14122,8 @@ if (typeof window !== 'undefined') {
     window.showInfoWindow = showInfoWindow;
     window.fixInfoWindowPositioning = fixInfoWindowPositioning;
     window.withErrorHandling = withErrorHandling;
+    window.createEnhancedBusinessMarker = createEnhancedBusinessMarker;
+    window.showEnhancedInfoWindow = showEnhancedInfoWindow;
     window.buildEnhancedInfoWindowContent = buildEnhancedInfoWindowContent;
     window.addEnhancedMarkerStyles = addEnhancedMarkerStyles;
     window.getBusinessTypeTextIcon = getBusinessTypeTextIcon;
@@ -14097,7 +14151,6 @@ if (typeof window !== 'undefined') {
 
     addEnhancedUserInterfaceCSS();
     addEnhancedTableChainStyles();
-    addDualActionButtonStyles();
 
 }
 
