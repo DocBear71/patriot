@@ -768,7 +768,7 @@ async function handleForgotPassword(req, res) {
                 html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background-color: #f8f9fa; padding: 20px; text-align: center;">
-                <img src="${baseURL}/images/docbearlogov4.png" alt="Patriot Thanks Logo" style="max-width: 100px;">
+                <img src="${baseURL}/images/patriotthankslogo6-13-2025.png" alt="Patriot Thanks Logo" style="max-width: 100px;">
                 <h1 style="color: #333;">Password Reset Request</h1>
             </div>
             <div style="padding: 20px;">

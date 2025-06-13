@@ -12067,7 +12067,7 @@ function createLoadingOverlay() {
             <div class="loading-content">
                 <!-- Logo or Icon -->
                 <div class="loading-logo">
-                    <img src="./images/docbearlogov4.png" alt="Patriot Thanks" class="loading-logo-img">
+                    <img src="./images/patriotthankslogo6-13-2025.png" alt="Patriot Thanks" class="loading-logo-img">
                 </div>
                 
                 <!-- Main Loading Animation -->
